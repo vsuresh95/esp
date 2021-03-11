@@ -38,3 +38,7 @@
 [submodule "utils/zynq"]
 	path = utils/zynq
 	url = https://github.com/sld-columbia/zynq-template.git
+[submodule "accelerators/third-party/vitislib/Vitis_Libraries"]
+	path = accelerators/third-party/vitislib/Vitis_Libraries
+	url = https://github.com/sld-columbia/Vitis_Libraries.git
+	branch = esp
