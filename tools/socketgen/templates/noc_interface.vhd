@@ -42,8 +42,7 @@ use std.textio.all;
     has_l2         : integer := 1;
     has_dvfs       : integer := 1;
     has_pll        : integer;
-    extra_clk_buf  : integer;
-    tile_id        : integer := 0);
+    extra_clk_buf  : integer);
   port (
     rst       : in  std_ulogic;
     clk       : in  std_ulogic;
@@ -52,6 +51,7 @@ use std.textio.all;
     pllclk    : out std_ulogic;
     local_y   : in  local_yx;
     local_x   : in  local_yx;
+    tile_id   : in  integer;
     paddr     : in  integer range 0 to 4095;
     pmask     : in  integer range 0 to 4095;
     paddr_ext : in  integer range 0 to 4095;
@@ -283,13 +283,13 @@ begin
         mem_info      => cacheable_mem_info,
         cache_y       => cache_y,
         cache_x       => cache_x,
-        cache_tile_id => cache_tile_id,
-        tile_id       => tile_id)
+        cache_tile_id => cache_tile_id)
       port map (
         rst                        => rst,
         clk                        => clk,
         local_y                    => local_y,
         local_x                    => local_x,
+        tile_id                    => tile_id,
         dma_read                   => dma_read,
         dma_write                  => dma_write,
         dma_length                 => dma_length,

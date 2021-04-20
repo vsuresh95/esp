@@ -35,7 +35,8 @@ entity llc_wrapper is
     ahb_if_en     : integer range 0 to 1         := 1;
     nl2           : integer                      := 4;
     nllc          : integer                      := 0;
-    noc_xlen      : integer                      := 3;
+    noc_xlen      : integer                      := 2;
+    noc_ylen      : integer                      := 2;
     hindex        : integer range 0 to NAHBSLV - 1 := 4;
     pindex        : integer range 0 to NAPBSLV - 1 := 5;
     pirq          : integer                      := 4;
@@ -103,8 +104,6 @@ entity llc_wrapper is
 end llc_wrapper;
 
 architecture rtl of llc_wrapper is
-
-  constant USE_SPANDEX : integer := 1;
 
   -- Helpers
   function fix_endian (
@@ -1157,7 +1156,7 @@ begin  -- architecture rtl
           reg.origin_x                                              := get_origin_x(NOC_FLIT_SIZE, coherence_req_data_out);
           reg.origin_y                                              := get_origin_y(NOC_FLIT_SIZE, coherence_req_data_out);
           if unsigned(reg.origin_x) >= 0 and unsigned(reg.origin_x) < noc_xlen and
-             unsigned(reg.origin_y) >= 0 and unsigned(reg.origin_y) < noc_xlen
+             unsigned(reg.origin_y) >= 0 and unsigned(reg.origin_y) < noc_ylen
           then
 
             reg.tile_id := to_integer(unsigned(reg.origin_x)) +
@@ -1179,7 +1178,7 @@ begin  -- architecture rtl
         if coherence_req_empty = '0' then
 
           case reg.coh_msg is
-            when REQ_WB | REQ_WTdata | REQ_WT | REQ_WTfwd | REQ_AMO_ADD | REQ_AMO_AND | REQ_AMO_OR | REQ_AMO_XOR | REQ_AMO_MAX | REQ_AMO_MAXU | REQ_AMO_MIN | REQ_AMO_MINU =>
+            when REQ_PUTM | REQ_WB | REQ_WTdata | REQ_WT | REQ_WTfwd | REQ_AMO_ADD | REQ_AMO_AND | REQ_AMO_OR | REQ_AMO_XOR | REQ_AMO_MAX | REQ_AMO_MAXU | REQ_AMO_MIN | REQ_AMO_MINU =>
 
             coherence_req_rdreq <= '1';
 
@@ -1294,7 +1293,7 @@ begin  -- architecture rtl
           reg.origin_y := get_origin_y(NOC_FLIT_SIZE, dma_rcv_data_out);
 
           if unsigned(reg.origin_x) >= 0 and unsigned(reg.origin_x) < noc_xlen and
-             unsigned(reg.origin_y) >= 0 and unsigned(reg.origin_y) < noc_xlen
+             unsigned(reg.origin_y) >= 0 and unsigned(reg.origin_y) < noc_ylen
           then
             reg.tile_id := to_integer(unsigned(reg.origin_x)) +
                            to_integer(unsigned(reg.origin_y)) * noc_xlen;
@@ -1465,7 +1464,6 @@ begin  -- architecture rtl
     variable msg : noc_msg_type;
     variable preamble : noc_preamble_type;
     variable reserved : reserved_field_type;
-    variable mix_msg      : mix_msg_t;
     
   begin  -- process fsm_rsp_in
     -- initialize variables
@@ -1503,7 +1501,7 @@ begin  -- architecture rtl
           reg.word_mask := reserved(RESERVED_WIDTH - 1 downto RESERVED_WIDTH - WORDS_PER_LINE);
 
           if unsigned(reg.origin_x) >= 0 and unsigned(reg.origin_x) < noc_xlen and
-             unsigned(reg.origin_y) >= 0 and unsigned(reg.origin_y) < noc_xlen
+             unsigned(reg.origin_y) >= 0 and unsigned(reg.origin_y) < noc_ylen
           then
             reg.tile_id := to_integer(unsigned(reg.origin_x)) + to_integer(unsigned(reg.origin_y)) * noc_xlen;
             if tile_cache_id(reg.tile_id) >= 0 then
@@ -1523,10 +1521,9 @@ begin  -- architecture rtl
 
             reg.addr := coherence_rsp_rcv_data_out(ADDR_BITS - 1 downto LINE_RANGE_LO);
 
-          mix_msg := reg.coh_msg;
-          case mix_msg is
+          case reg.coh_msg is
           
-            when RSP_S | RSP_Odata | RSP_RVK_O | RSP_WTdata | RSP_V =>
+            when RSP_DATA | RSP_S | RSP_Odata | RSP_RVK_O | RSP_WTdata | RSP_V =>
             
             reg.word_cnt := 0;
             reg.state    := rcv_data;
@@ -1829,10 +1826,17 @@ begin  -- architecture rtl
       when send_addr =>
         if coherence_rsp_snd_full = '0' then
 
-          mix_msg := '0' & reg.coh_msg;
+          if USE_SPANDEX = 0 then
+            -- Set ESP legacy coherence message types
+            mix_msg := '1' & reg.coh_msg;
+          else
+            -- Use Spandex coherence message types
+            mix_msg := '0' & reg.coh_msg;
+          end if;
+
           case mix_msg is
 
-            when RSP_S | RSP_Odata | RSP_RVK_O | RSP_WTdata | RSP_V =>
+            when RSP_DATA | RSP_EDATA | RSP_S | RSP_Odata | RSP_RVK_O | RSP_WTdata | RSP_V =>
 
           coherence_rsp_snd_wrreq   <= '1';
           coherence_rsp_snd_data_in(NOC_FLIT_SIZE - 1 downto NOC_FLIT_SIZE - PREAMBLE_WIDTH) <= PREAMBLE_BODY;
@@ -1841,6 +1845,7 @@ begin  -- architecture rtl
           reg.word_cnt              := 0;
 
             when others =>
+              -- RSP_INV_ACK
 
               coherence_rsp_snd_wrreq   <= '1';
               coherence_rsp_snd_data_in(NOC_FLIT_SIZE - 1 downto NOC_FLIT_SIZE - PREAMBLE_WIDTH) <= PREAMBLE_TAIL;
@@ -2092,7 +2097,7 @@ begin  -- architecture rtl
       -- NoC to cache
       llc_req_in_ready        => llc_req_in_ready,
       llc_req_in_valid        => llc_req_in_valid,
-      llc_req_in_data_coh_msg => llc_req_in_data_coh_msg,
+      llc_req_in_data_coh_msg => llc_req_in_data_coh_msg(2 downto 0),
       llc_req_in_data_hprot   => llc_req_in_data_hprot,
       llc_req_in_data_addr    => llc_req_in_data_addr,
       llc_req_in_data_line    => llc_req_in_data_line,
@@ -2102,7 +2107,7 @@ begin  -- architecture rtl
 
       llc_dma_req_in_ready        => llc_dma_req_in_ready,
       llc_dma_req_in_valid        => llc_dma_req_in_valid,
-      llc_dma_req_in_data_coh_msg => llc_dma_req_in_data_coh_msg,
+      llc_dma_req_in_data_coh_msg => llc_dma_req_in_data_coh_msg(2 downto 0),
       llc_dma_req_in_data_hprot   => llc_dma_req_in_data_hprot,
       llc_dma_req_in_data_addr    => llc_dma_req_in_data_addr,
       llc_dma_req_in_data_line    => llc_dma_req_in_data_line,
@@ -2112,7 +2117,7 @@ begin  -- architecture rtl
 
       llc_rsp_in_ready        => llc_rsp_in_ready,
       llc_rsp_in_valid        => llc_rsp_in_valid,
-      llc_rsp_in_data_coh_msg => llc_rsp_in_data_coh_msg,
+      llc_rsp_in_data_coh_msg => llc_rsp_in_data_coh_msg(1 downto 0),
       llc_rsp_in_data_addr    => llc_rsp_in_data_addr,
       llc_rsp_in_data_line    => llc_rsp_in_data_line,
       llc_rsp_in_data_req_id  => llc_rsp_in_data_req_id,
@@ -2120,7 +2125,7 @@ begin  -- architecture rtl
       -- cache to NoC
       llc_rsp_out_ready           => llc_rsp_out_ready,
       llc_rsp_out_valid           => llc_rsp_out_valid,
-      llc_rsp_out_data_coh_msg    => llc_rsp_out_data_coh_msg,
+      llc_rsp_out_data_coh_msg    => llc_rsp_out_data_coh_msg(1 downto 0),
       llc_rsp_out_data_addr       => llc_rsp_out_data_addr,
       llc_rsp_out_data_line       => llc_rsp_out_data_line,
       llc_rsp_out_data_invack_cnt => llc_rsp_out_data_invack_cnt,
@@ -2130,7 +2135,7 @@ begin  -- architecture rtl
 
       llc_dma_rsp_out_ready           => llc_dma_rsp_out_ready,
       llc_dma_rsp_out_valid           => llc_dma_rsp_out_valid,
-      llc_dma_rsp_out_data_coh_msg    => llc_dma_rsp_out_data_coh_msg,
+      llc_dma_rsp_out_data_coh_msg    => llc_dma_rsp_out_data_coh_msg(1 downto 0),
       llc_dma_rsp_out_data_addr       => llc_dma_rsp_out_data_addr,
       llc_dma_rsp_out_data_line       => llc_dma_rsp_out_data_line,
       llc_dma_rsp_out_data_invack_cnt => llc_dma_rsp_out_data_invack_cnt,
@@ -2140,7 +2145,7 @@ begin  -- architecture rtl
 
       llc_fwd_out_ready        => llc_fwd_out_ready,
       llc_fwd_out_valid        => llc_fwd_out_valid,
-      llc_fwd_out_data_coh_msg => llc_fwd_out_data_coh_msg,
+      llc_fwd_out_data_coh_msg => llc_fwd_out_data_coh_msg(2 downto 0),
       llc_fwd_out_data_addr    => llc_fwd_out_data_addr,
       llc_fwd_out_data_req_id  => llc_fwd_out_data_req_id,
       llc_fwd_out_data_dest_id => llc_fwd_out_data_dest_id,
@@ -2164,6 +2169,25 @@ begin  -- architecture rtl
       llc_stats_valid         => llc_stats_valid,
       llc_stats_data          => llc_stats_data
     );
+
+  -- ESP (USE_SPANDEX = 0) cache coherence messages begin with "110" on the NoC
+  -- We append the additional '1' in the FSM based on USE_SPANDEX
+  llc_rsp_out_data_coh_msg(COH_MSG_TYPE_WIDTH - 1 downto 2) <= "10";
+  llc_dma_rsp_out_data_coh_msg(COH_MSG_TYPE_WIDTH - 1 downto 2) <= "10";
+  llc_fwd_out_data_coh_msg(MIX_MSG_TYPE_WIDTH - 2) <= '1';
+
+  -- Spandex concatenates hprot with a word mask to forward writes of
+  -- granularity smaller than a cache line to the next levels of hierarchy.
+  -- When USE_SPANDEX is set to zero, word_mask is ignored, but we set all
+  -- bits to '1' to indicate that the entire line is going to be written.
+  llc_rsp_out_data_word_mask <= (others => '1');
+  llc_dma_rsp_out_data_word_mask <= (others => '1');
+  llc_fwd_out_data_word_mask <= (others => '1');
+
+  -- Spandex sends data responses on the FWD plane
+  -- Set fwd_out_data_line to when USE_SPANDEX is 0
+  llc_fwd_out_data_line  <= (others => '0');
+
   end generate llc_gen;
 
   llc_spandex_gen: if USE_SPANDEX = 1 generate

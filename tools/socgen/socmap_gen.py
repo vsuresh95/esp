@@ -464,7 +464,12 @@ def print_global_constants(fp, soc):
   if soc.cache_rtl.get() == 1:
     fp.write("  constant CFG_CACHE_RTL   : integer := 1;\n")
   else:
-    fp.write("  constant CFG_CACHE_RTL   : integer := 0;\n\n")
+    fp.write("  constant CFG_CACHE_RTL   : integer := 0;\n")
+  if soc.cache_spandex.get() == 1:
+    fp.write("  constant USE_SPANDEX     : integer := 1;\n")
+  else:
+    fp.write("  constant USE_SPANDEX     : integer := 0;\n")
+  fp.write("\n")
 
 
 def print_constants(fp, soc, esp_config):
@@ -2343,33 +2348,6 @@ def create_socmap(esp_config, soc):
   fp.write("package esp_global is\n\n")
   print_global_constants(fp, soc)
   print_constants(fp, soc, esp_config)
-
-  spandex_l2_config = ""
-  import json
-  spandex_config_file = './spandex-config.json'
-  spandex_config = {}
-  try:
-    f = open(spandex_config_file)
-    spandex_config = json.load(f)
-    f.close()
-  except:
-    print('Spandex Warning: Failed to read Spandex configuration. Using standard MESI cache with Translation Unit.')
-
-  print('Parsing Spandex L2 cache hierarchy')
-
-  for i in range(soc.noc.cols * soc.noc.rows):
-    spandex_l2_type = '0'
-    if 'l2' not in spandex_config:
-      spandex_config['l2'] = {}
-    if str(i) in spandex_config['l2']:
-      if spandex_config['l2'][str(i)] == 'spandex':
-        spandex_l2_type = '3'
-      else:
-        pass
-    spandex_l2_config += ', ' * (i > 0) + spandex_l2_type
-
-  fp.write('  type SPANDEX_L2_CONFIG_T is ARRAY(0 to {}) of integer;\n'.format(str(soc.noc.cols * soc.noc.rows - 1)))
-  fp.write('  constant SPANDEX_L2_CONFIG : SPANDEX_L2_CONFIG_T  := ({});\n'.format(spandex_l2_config))
 
   fp.write("end esp_global;\n")
   fp.close()

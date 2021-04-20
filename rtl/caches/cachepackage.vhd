@@ -182,8 +182,7 @@ package cachepackage is
       mem_info    : tile_mem_info_vector(0 to MEM_ID_RANGE_MSB);
       cache_y     : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
       cache_x     : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
-      cache_tile_id : cache_attribute_array;
-      tile_id     : integer := 0);
+      cache_tile_id : cache_attribute_array);
     port (
       rst : in std_ulogic;
       clk : in std_ulogic;
@@ -192,6 +191,7 @@ package cachepackage is
       local_x  : in local_yx;
       pconfig  : in apb_config_type;
       cache_id : in integer;
+      tile_id  : in integer range 0 to CFG_TILES_NUM - 1;
 
       -- frontend (cache - AMBA)
       ahbsi : in  ahb_slv_in_type;
@@ -240,14 +240,14 @@ package cachepackage is
       mem_info    : tile_mem_info_vector(0 to MEM_ID_RANGE_MSB);
       cache_y     : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
       cache_x     : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
-      cache_tile_id : cache_attribute_array;
-      tile_id     : integer := 0);
+      cache_tile_id : cache_attribute_array);
     port (
       rst : in std_ulogic;
       clk : in std_ulogic;
 
       local_y  : in local_yx;
       local_x  : in local_yx;
+      tile_id  : in integer range 0 to CFG_TILES_NUM - 1;
 
       -- frontend (cache - Accelerator DMA)
       -- header / lenght parallel ports
@@ -308,6 +308,7 @@ package cachepackage is
       nl2         : integer                      := 4;
       nllc        : integer                      := 1;
       noc_xlen    : integer                      := 2;
+      noc_ylen    : integer                      := 2;
       hindex      : integer range 0 to NAHBSLV - 1 := 4;
       pindex      : integer range 0 to NAPBSLV - 1 := 5;
       pirq        : integer                      := 4;
@@ -449,6 +450,7 @@ package body cachepackage is
     variable dest_x, dest_y : local_yx;
     variable dest_init      : integer;
     variable reserved       : std_logic_vector(RESERVED_WIDTH-1 downto 0);
+    variable noc_msg        : noc_msg_type;
 
   begin
 
@@ -480,8 +482,13 @@ package body cachepackage is
     end if;
 
     -- compose header
+    if USE_SPANDEX = 0 then
+      noc_msg := '1' & coh_msg;
+    else
+      noc_msg := '0' & coh_msg;
+    end if;
     reserved := word_mask & std_logic_vector(resize(unsigned(hprot), RESERVED_WIDTH - WORDS_PER_LINE));
-    header := create_header(NOC_FLIT_SIZE, local_y, local_x, dest_y, dest_x, '0' & coh_msg, reserved);
+    header := create_header(NOC_FLIT_SIZE, local_y, local_x, dest_y, dest_x, noc_msg, reserved);
 
     return header;
 

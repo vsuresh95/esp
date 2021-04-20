@@ -116,12 +116,12 @@ class Component():
 ### Globals (updated based on DMA_WIDTH)
 #
 bits_per_line = 128
+words_per_line = 4
 phys_addr_bits = 32
-word_offset_bits = 1
-byte_offset_bits = 3
+word_offset_bits = 2
+byte_offset_bits = 2
 offset_bits = 4
 little_endian = 1
-words_per_line = 2**word_offset_bits
 
 
 #
@@ -1268,8 +1268,7 @@ def gen_tech_dep(accelerator_list, cache_list, dma_width, template_dir, out_dir)
         is_llc = "llc" in cac.name
         for impl in cac.hlscfg:
           f.write("\n")
-          rtl_name = cac.name
-          f.write("  component " + rtl_name + "_" + impl + "\n")
+          f.write("  component " + cac.name + "_" + impl + "\n")
           f.write("    port (\n")
           write_cache_interface(f, cac, is_llc)
           f.write("    );\n")
@@ -1592,8 +1591,7 @@ def gen_interfaces(accelerator_list, axi_accelerator_list, dma_width, template_d
         f.write("      has_l2         : integer := 1;\n")
         f.write("      has_dvfs       : integer := 1;\n")
         f.write("      has_pll        : integer;\n")
-        f.write("      extra_clk_buf  : integer;\n")
-        f.write("      tile_id        : integer := 0\n")
+        f.write("      extra_clk_buf  : integer\n")
         f.write("    );\n")
         f.write("\n")
         f.write("    port (\n")
@@ -1604,6 +1602,7 @@ def gen_interfaces(accelerator_list, axi_accelerator_list, dma_width, template_d
         f.write("      pllclk            : out std_ulogic;\n")
         f.write("      local_y           : in  local_yx;\n")
         f.write("      local_x           : in  local_yx;\n")
+        f.write("      tile_id           : in  integer;\n")
         f.write("      paddr             : in  integer range 0 to 4095;\n")
         f.write("      pmask             : in  integer range 0 to 4095;\n")
         f.write("      paddr_ext         : in  integer range 0 to 4095;\n")
@@ -1736,8 +1735,7 @@ def gen_tile_acc(accelerator_list, axi_acceleratorlist, template_dir, out_dir):
           f.write("        has_l2         => this_has_l2,\n")
           f.write("        has_dvfs       => this_has_dvfs,\n")
           f.write("        has_pll        => this_has_pll,\n")
-          f.write("        extra_clk_buf  => this_extra_clk_buf,\n")
-          f.write("        tile_id        => this_tile_id)\n")
+          f.write("        extra_clk_buf  => this_extra_clk_buf)\n")
           f.write("      port map (\n")
           f.write("        rst               => rst,\n")
           f.write("        clk               => clk_feedthru,\n")
@@ -1746,6 +1744,7 @@ def gen_tile_acc(accelerator_list, axi_acceleratorlist, template_dir, out_dir):
           f.write("        pllclk            => clk_feedthru,\n")
           f.write("        local_y           => this_local_y,\n")
           f.write("        local_x           => this_local_x,\n")
+          f.write("        tile_id           => tile_id,\n")
           f.write("        paddr             => this_paddr,\n")
           f.write("        pmask             => this_pmask,\n")
           f.write("        paddr_ext         => this_paddr_ext,\n")
@@ -2001,10 +2000,10 @@ for acc in accelerators:
 # Compute relevan bitwidths for cache interfaces
 # based on DMA_WIDTH and a fixed 128-bits cache line
 bits_per_line = 128
-word_offset_bits = int(math.log2(128/dma_width))
+words_per_line = bits_per_line/dma_width
+word_offset_bits = int(math.log2(words_per_line))
 byte_offset_bits = int(math.log2(dma_width/8))
 offset_bits = word_offset_bits + byte_offset_bits
-word_per_line = 2**word_offset_bits
 
 for cac in caches:
   cacd = Component()

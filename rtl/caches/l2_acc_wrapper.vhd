@@ -40,14 +40,14 @@ entity l2_acc_wrapper is
     mem_info    : tile_mem_info_vector(0 to MEM_ID_RANGE_MSB);
     cache_y     : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
     cache_x     : yx_vec(0 to 2**NL2_MAX_LOG2 - 1);
-    cache_tile_id : cache_attribute_array;
-    tile_id     : integer := 0);
+    cache_tile_id : cache_attribute_array);
   port (
     rst : in std_ulogic;
     clk : in std_ulogic;
 
     local_y  : in local_yx;
     local_x  : in local_yx;
+    tile_id  : in integer range 0 to CFG_TILES_NUM - 1;
 
     -- frontend (cache - Accelerator DMA)
     -- header / lenght parallel ports
@@ -98,9 +98,6 @@ entity l2_acc_wrapper is
 end l2_acc_wrapper;
 
 architecture rtl of l2_acc_wrapper is
-
-  -- Interface with L2 cache
-  constant USE_SPANDEX : integer := 1;
 
   -- AHB to cache
   signal cpu_req_ready          : std_ulogic;
@@ -483,13 +480,13 @@ begin  -- architecture rtl of l2_acc_wrapper
       -- cache to NoC
       l2_req_out_ready          => req_out_ready,
       l2_req_out_valid          => req_out_valid,
-      l2_req_out_data_coh_msg   => req_out_data_coh_msg,
+      l2_req_out_data_coh_msg   => req_out_data_coh_msg(1 downto 0),
       l2_req_out_data_hprot     => req_out_data_hprot,
       l2_req_out_data_addr      => req_out_data_addr,
       l2_req_out_data_line      => req_out_data_line,
       l2_rsp_out_ready          => rsp_out_ready,
       l2_rsp_out_valid          => rsp_out_valid,
-      l2_rsp_out_data_coh_msg   => rsp_out_data_coh_msg,
+      l2_rsp_out_data_coh_msg   => rsp_out_data_coh_msg(1 downto 0),
       l2_rsp_out_data_req_id    => rsp_out_data_req_id,
       l2_rsp_out_data_to_req    => rsp_out_data_to_req,
       l2_rsp_out_data_addr      => rsp_out_data_addr,
@@ -497,12 +494,12 @@ begin  -- architecture rtl of l2_acc_wrapper
       -- NoC to cache
       l2_fwd_in_ready           => fwd_in_ready,
       l2_fwd_in_valid           => fwd_in_valid,
-      l2_fwd_in_data_coh_msg    => fwd_in_data_coh_msg,
+      l2_fwd_in_data_coh_msg    => fwd_in_data_coh_msg(2 downto 0),
       l2_fwd_in_data_addr       => fwd_in_data_addr,
       l2_fwd_in_data_req_id     => fwd_in_data_req_id,
       l2_rsp_in_ready           => rsp_in_ready,
       l2_rsp_in_valid           => rsp_in_valid,
-      l2_rsp_in_data_coh_msg    => rsp_in_data_coh_msg,
+      l2_rsp_in_data_coh_msg    => rsp_in_data_coh_msg(1 downto 0),
       l2_rsp_in_data_addr       => rsp_in_data_addr,
       l2_rsp_in_data_line       => rsp_in_data_line,
       l2_rsp_in_data_invack_cnt => rsp_in_data_invack_cnt,
@@ -511,6 +508,29 @@ begin  -- architecture rtl of l2_acc_wrapper
       l2_stats_valid            => stats_valid,
       l2_stats_data             => stats_data
       );
+
+    -- ESP (USE_SPANDEX = 0) cache coherence messages begin with "110" on the NoC
+    -- We append the additional '1' in the FSM based on USE_SPANDEX
+    req_out_data_coh_msg(COH_MSG_TYPE_WIDTH - 1 downto 2) <= "10";
+    rsp_out_data_coh_msg(COH_MSG_TYPE_WIDTH - 1 downto 2) <= "10";
+
+    -- Spandex concatenates hprot with a word mask to forward writes of
+    -- granularity smaller than a cache line to the next levels of hierarchy.
+    -- When USE_SPANDEX is set to zero, word_mask is ignored, but we set all
+    -- bits to '1' to indicate that the entire line is going to be written.
+    req_out_data_word_mask <= (others => '1');
+    rsp_out_data_word_mask <= (others => '1');
+
+    -- Spandex uses forward messages from the L2 for peer-to-peer communication.
+    -- Disabling this queue when USE_SPANDEX is 0
+    fwd_out_valid          <= '0';
+    fwd_out_data_coh_msg   <= (others => '0');
+    fwd_out_data_req_id    <= (others => '0');
+    fwd_out_data_to_req    <= (others => '0');
+    fwd_out_data_addr      <= (others => '0');
+    fwd_out_data_line      <= (others => '0');
+    fwd_out_data_word_mask <= (others => '0');
+
   end generate l2_gen;
 
   l2_spandex_gen: if USE_SPANDEX = 1 generate
@@ -923,7 +943,8 @@ begin  -- architecture rtl of l2_acc_wrapper
 -------------------------------------------------------------------------------
   fsm_req : process (req_reg, coherence_req_full,
                      req_out_valid, req_out_data_coh_msg, req_out_data_hprot,
-                     req_out_data_addr, req_out_data_line, req_out_data_word_mask, local_x, local_y) is
+                     req_out_data_addr, req_out_data_line, req_out_data_word_mask,
+                     local_x, local_y) is
 
     variable reg    : req_reg_type;
     variable req_id : cache_id_t;
@@ -977,11 +998,18 @@ begin  -- architecture rtl of l2_acc_wrapper
         if coherence_req_full = '0' then
 
           coherence_req_wrreq <= '1';
-          mix_msg := '0' & reg.coh_msg;
+
+          if USE_SPANDEX = 0 then
+            -- Set ESP legacy coherence message types
+            mix_msg := '1' & reg.coh_msg;
+          else
+            -- Use Spandex coherence message types
+            mix_msg := '0' & reg.coh_msg;
+          end if;
 
           case mix_msg is
 
-            when REQ_WB | REQ_WTdata | REQ_WT | REQ_WTfwd | REQ_AMO_ADD | REQ_AMO_AND | REQ_AMO_OR | REQ_AMO_XOR | REQ_AMO_MAX | REQ_AMO_MAXU | REQ_AMO_MIN | REQ_AMO_MINU =>
+            when REQ_PUTM | REQ_WB | REQ_WTdata | REQ_WT | REQ_WTfwd | REQ_AMO_ADD | REQ_AMO_AND | REQ_AMO_OR | REQ_AMO_XOR | REQ_AMO_MAX | REQ_AMO_MAXU | REQ_AMO_MIN | REQ_AMO_MINU =>
 
             coherence_req_data_in(NOC_FLIT_SIZE - 1 downto NOC_FLIT_SIZE - PREAMBLE_WIDTH) <= PREAMBLE_BODY;
             coherence_req_data_in(GLOB_PHYS_ADDR_BITS - 1 downto 0) <= reg.addr & empty_offset;
@@ -1035,7 +1063,8 @@ begin  -- architecture rtl of l2_acc_wrapper
 -------------------------------------------------------------------------------
   fsm_rsp_out : process (rsp_out_reg, coherence_rsp_snd_full,
                          rsp_out_valid, rsp_out_data_coh_msg, rsp_out_data_req_id,
-                         rsp_out_data_to_req, rsp_out_data_addr, rsp_out_data_line, rsp_out_data_word_mask, local_x, local_y) is
+                         rsp_out_data_to_req, rsp_out_data_addr, rsp_out_data_line, rsp_out_data_word_mask,
+                         local_x, local_y) is
 
     variable reg   : rsp_out_reg_type;
     variable hprot : hprot_t := (others => '0');
@@ -1091,11 +1120,18 @@ begin  -- architecture rtl of l2_acc_wrapper
         if coherence_rsp_snd_full = '0' then
 
           coherence_rsp_snd_wrreq <= '1';
-          mix_msg := '0' & reg.coh_msg;
+
+          if USE_SPANDEX = 0 then
+            -- Set ESP legacy coherence message types
+            mix_msg := '1' & reg.coh_msg;
+          else
+            -- Use Spandex coherence message types
+            mix_msg := '0' & reg.coh_msg;
+          end if;
 
           case mix_msg is
 
-            when RSP_S | RSP_Odata | RSP_RVK_O | RSP_WTdata | RSP_V =>
+            when RSP_DATA | RSP_S | RSP_Odata | RSP_RVK_O | RSP_WTdata | RSP_V =>
 
             coherence_rsp_snd_data_in(NOC_FLIT_SIZE - 1 downto NOC_FLIT_SIZE - PREAMBLE_WIDTH) <= PREAMBLE_BODY;
             coherence_rsp_snd_data_in(GLOB_PHYS_ADDR_BITS - 1 downto 0) <= reg.addr & empty_offset;
@@ -1149,7 +1185,7 @@ begin  -- architecture rtl of l2_acc_wrapper
 -------------------------------------------------------------------------------
 -- FSM: Forwards to NoC -- DCS hprot == DATA Only
 -------------------------------------------------------------------------------
-fsm_fwd_out : process (fwd_out_reg, coherence_fwd_snd_full,
+fsm_fwd_out : process (tile_id, fwd_out_reg, coherence_fwd_snd_full,
 fwd_out_valid, fwd_out_data_coh_msg, fwd_out_data_req_id,
 fwd_out_data_to_req, fwd_out_data_addr, fwd_out_data_line, fwd_out_data_word_mask) is
 
@@ -1449,11 +1485,17 @@ end process fsm_fwd_out;
       when rcv_addr =>
         if coherence_rsp_rcv_empty = '0' then
 
-          mix_msg := '0' & reg.coh_msg;
+          if USE_SPANDEX = 0 then
+            -- Set ESP legacy coherence message types
+            mix_msg := '1' & reg.coh_msg;
+          else
+            -- Use Spandex coherence message types
+            mix_msg := '0' & reg.coh_msg;
+          end if;
 
           case mix_msg is
 
-            when RSP_S | RSP_Odata | RSP_RVK_O | RSP_WTdata | RSP_V =>
+            when RSP_DATA | RSP_EDATA | RSP_S | RSP_Odata | RSP_RVK_O | RSP_WTdata | RSP_V =>
 
               coherence_rsp_rcv_rdreq <= '1';
               reg.addr                := coherence_rsp_rcv_data_out(ADDR_BITS - 1 downto LINE_RANGE_LO);
@@ -1461,6 +1503,7 @@ end process fsm_fwd_out;
               reg.state               := rcv_data;
 
             when others =>
+              -- RSP_INV_ACK
 
             if rsp_in_ready = '1' then
 

@@ -7,6 +7,7 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
 use work.esp_global.all;
+use work.stdlib.all;
 use work.gencomp.all;
 use work.monitor_pkg.all;
 
@@ -67,6 +68,9 @@ package nocpackage is
   constant PREAMBLE_BODY   : noc_preamble_type := "00";
   constant PREAMBLE_1FLIT  : noc_preamble_type := "11";
 
+  -- -- Message type preamble
+  constant MSG_T_PR : std_logic := to_std_logic(1 - USE_SPANDEX);
+
   -- -- Message type encoding
   -- -- Cachable data plane 1 -> request messages
   constant REQ_S          : noc_msg_type := "00000";  -- Writer-invalidated Read
@@ -105,7 +109,7 @@ package nocpackage is
   constant RSP_O              : noc_msg_type := "00110";
   constant RSP_WT             : noc_msg_type := "00111";
   constant RSP_WTdata         : noc_msg_type := "01000";
-  constant RSP_DATA_DMA       : noc_msg_type := "00011";
+  constant RSP_DATA_DMA       : noc_msg_type := MSG_T_PR & MSG_T_PR & "011"; -- message type in common with original ESP caches
 
 -- ********
 -- Original ESP
@@ -141,7 +145,7 @@ package nocpackage is
   constant REQ_P2P       : noc_msg_type := "11101";
   constant REQ_DMA_READ  : noc_msg_type := "11110";  -- Read coherent with LLC
   constant REQ_DMA_WRITE : noc_msg_type := "11111";  -- Write coherent with LLC
-  constant CPU_DMA       : std_logic_vector(4 downto 0) := "11100";  -- identify DMA from CPU
+  constant CPU_DMA       : noc_msg_type := "11100";  -- identify DMA from CPU
   -- Configuration plane 5 -> RD/WR registers
   constant REQ_REG_RD   : noc_msg_type := "11000";
   constant REQ_REG_WR   : noc_msg_type := "11001";

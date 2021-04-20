@@ -42,7 +42,6 @@ entity tile_cpu is
     this_has_pll       : integer range 0 to 1 := 0;
     this_has_dco       : integer range 0 to 1 := 0;
     this_extra_clk_buf : integer range 0 to 1 := 0;
-    this_tile_id       : integer range 0 to CFG_TILES_NUM - 1 := 0;
     test_if_en         : integer range 0 to 1 := 0;
     ROUTER_PORTS       : ports_vec := "11111";
     HAS_SYNC           : integer range 0 to 1 := 1);
@@ -1241,9 +1240,7 @@ begin
         mem_info      => tile_mem_list(0 to MEM_ID_RANGE_MSB),
         cache_y       => cache_y,
         cache_x       => cache_x,
-        cache_tile_id => cache_tile_id,
-        tile_id       => this_tile_id
-        )
+        cache_tile_id => cache_tile_id)
       port map (
         rst                        => l2_rstn,
         clk                        => clk_feedthru,
@@ -1251,6 +1248,7 @@ begin
         local_x                    => this_local_x,
         pconfig                    => this_l2_pconfig,
         cache_id                   => this_cache_id,
+        tile_id                    => tile_id
         ahbsi                      => cache_ahbsi,
         ahbso                      => cache_ahbso,
         ahbmi                      => ahbmi,
