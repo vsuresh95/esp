@@ -129,7 +129,7 @@ end;
   type irq_fsm is (idle, pending, wait_for_clear_irq);
   signal irq_state, irq_next : irq_fsm;
   signal irq_header_i, irq_header : misc_noc_flit_type;
-  signal irq_info : std_logic_vector(3 downto 0);
+  signal irq_info : std_logic_vector(RESERVED_WIDTH - 1 downto 0);
 
   -- Other signals
   signal acc_go : std_ulogic;
@@ -151,7 +151,7 @@ begin
     1 => apb_iobar(paddr, pmask),
     2 => apb_iobar(paddr_ext, pmask_ext));
 
-  irq_info <= conv_std_logic_vector(pirq, 4);
+  irq_info <= conv_std_logic_vector(pirq, RESERVED_WIDTH);
 
   apbi_paddr <= apbi.paddr and X"0FFFFFFF";
 

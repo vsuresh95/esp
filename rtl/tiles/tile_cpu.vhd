@@ -1248,7 +1248,7 @@ begin
         local_x                    => this_local_x,
         pconfig                    => this_l2_pconfig,
         cache_id                   => this_cache_id,
-        tile_id                    => tile_id
+        tile_id                    => tile_id,
         ahbsi                      => cache_ahbsi,
         ahbso                      => cache_ahbso,
         ahbmi                      => ahbmi,

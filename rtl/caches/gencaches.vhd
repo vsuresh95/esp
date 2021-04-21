@@ -28,11 +28,11 @@ package gencaches is
       l2_cpu_req_data_addr : in addr_t;
       l2_cpu_req_data_word : in word_t;
       l2_fwd_in_valid : in std_ulogic;
-      l2_fwd_in_data_coh_msg : in mix_msg_t;
+      l2_fwd_in_data_coh_msg : in std_logic_vector(2 downto 0);
       l2_fwd_in_data_addr : in line_addr_t;
       l2_fwd_in_data_req_id : in cache_id_t;
       l2_rsp_in_valid : in std_ulogic;
-      l2_rsp_in_data_coh_msg : in coh_msg_t;
+      l2_rsp_in_data_coh_msg : in std_logic_vector(1 downto 0);
       l2_rsp_in_data_addr : in line_addr_t;
       l2_rsp_in_data_line : in line_t;
       l2_rsp_in_data_invack_cnt : in invack_cnt_t;
@@ -56,12 +56,12 @@ package gencaches is
       l2_bresp_valid : out std_ulogic;
       l2_bresp_data : out bresp_t;
       l2_req_out_valid : out std_ulogic;
-      l2_req_out_data_coh_msg : out coh_msg_t;
+      l2_req_out_data_coh_msg : out std_logic_vector(1 downto 0);
       l2_req_out_data_hprot : out hprot_t;
       l2_req_out_data_addr : out line_addr_t;
       l2_req_out_data_line : out line_t;
       l2_rsp_out_valid : out std_ulogic;
-      l2_rsp_out_data_coh_msg : out coh_msg_t;
+      l2_rsp_out_data_coh_msg : out std_logic_vector(1 downto 0);
       l2_rsp_out_data_req_id : out cache_id_t;
       l2_rsp_out_data_to_req : out std_logic_vector(1 downto 0);
       l2_rsp_out_data_addr : out line_addr_t;
@@ -74,6 +74,7 @@ package gencaches is
   component l2_spandex
     generic (
       use_rtl : integer;
+      little_end : integer range 0 to 1;
       sets : integer;
       ways : integer
       );
@@ -163,7 +164,7 @@ package gencaches is
       clk : in std_ulogic;
       rst : in std_ulogic;
       llc_req_in_valid : in std_ulogic;
-      llc_req_in_data_coh_msg : in mix_msg_t;
+      llc_req_in_data_coh_msg : in std_logic_vector(2 downto 0);
       llc_req_in_data_hprot : in hprot_t;
       llc_req_in_data_addr : in line_addr_t;
       llc_req_in_data_word_offset : in word_offset_t;
@@ -171,7 +172,7 @@ package gencaches is
       llc_req_in_data_line : in line_t;
       llc_req_in_data_req_id : in cache_id_t;
       llc_dma_req_in_valid : in std_ulogic;
-      llc_dma_req_in_data_coh_msg : in mix_msg_t;
+      llc_dma_req_in_data_coh_msg : in std_logic_vector(2 downto 0);
       llc_dma_req_in_data_hprot : in hprot_t;
       llc_dma_req_in_data_addr : in line_addr_t;
       llc_dma_req_in_data_word_offset : in word_offset_t;
@@ -179,7 +180,7 @@ package gencaches is
       llc_dma_req_in_data_line : in line_t;
       llc_dma_req_in_data_req_id : in llc_coh_dev_id_t;
       llc_rsp_in_valid : in std_ulogic;
-      llc_rsp_in_data_coh_msg : in coh_msg_t;
+      llc_rsp_in_data_coh_msg : in std_logic_vector(1 downto 0);
       llc_rsp_in_data_addr : in line_addr_t;
       llc_rsp_in_data_line : in line_t;
       llc_rsp_in_data_req_id : in cache_id_t;
@@ -199,7 +200,7 @@ package gencaches is
       llc_mem_rsp_ready : out std_ulogic;
       llc_rst_tb_ready : out std_ulogic;
       llc_rsp_out_valid : out std_ulogic;
-      llc_rsp_out_data_coh_msg : out coh_msg_t;
+      llc_rsp_out_data_coh_msg : out std_logic_vector(1 downto 0);
       llc_rsp_out_data_addr : out line_addr_t;
       llc_rsp_out_data_line : out line_t;
       llc_rsp_out_data_invack_cnt : out invack_cnt_t;
@@ -207,7 +208,7 @@ package gencaches is
       llc_rsp_out_data_dest_id : out cache_id_t;
       llc_rsp_out_data_word_offset : out word_offset_t;
       llc_dma_rsp_out_valid : out std_ulogic;
-      llc_dma_rsp_out_data_coh_msg : out coh_msg_t;
+      llc_dma_rsp_out_data_coh_msg : out std_logic_vector(1 downto 0);
       llc_dma_rsp_out_data_addr : out line_addr_t;
       llc_dma_rsp_out_data_line : out line_t;
       llc_dma_rsp_out_data_invack_cnt : out invack_cnt_t;
@@ -215,7 +216,7 @@ package gencaches is
       llc_dma_rsp_out_data_dest_id : out cache_id_t;
       llc_dma_rsp_out_data_word_offset : out word_offset_t;
       llc_fwd_out_valid : out std_ulogic;
-      llc_fwd_out_data_coh_msg : out mix_msg_t;
+      llc_fwd_out_data_coh_msg : out std_logic_vector(2 downto 0);
       llc_fwd_out_data_addr : out line_addr_t;
       llc_fwd_out_data_req_id : out cache_id_t;
       llc_fwd_out_data_dest_id : out cache_id_t;

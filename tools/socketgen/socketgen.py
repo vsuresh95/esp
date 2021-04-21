@@ -2000,7 +2000,7 @@ for acc in accelerators:
 # Compute relevan bitwidths for cache interfaces
 # based on DMA_WIDTH and a fixed 128-bits cache line
 bits_per_line = 128
-words_per_line = bits_per_line/dma_width
+words_per_line = int(bits_per_line/dma_width)
 word_offset_bits = int(math.log2(words_per_line))
 byte_offset_bits = int(math.log2(dma_width/8))
 offset_bits = word_offset_bits + byte_offset_bits
