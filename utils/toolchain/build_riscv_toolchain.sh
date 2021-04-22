@@ -10,8 +10,16 @@ ESP_ROOT=$(realpath ${SCRIPT_PATH}/../..)
 LINUXSRC=${ESP_ROOT}/soft/ariane/linux
 LINUX_VERSION=4.20.0
 export SYSROOT=${ESP_ROOT}/soft/ariane/sysroot
-RISCV_GNU_TOOLCHAIN_SHA=afcc8bc655d30cf6af054ac1d3f5f89d0627aa79
+#RISCV_GNU_TOOLCHAIN_SHA=afcc8bc655d30cf6af054ac1d3f5f89d0627aa79
+RISCV_GNU_TOOLCHAIN_SHA=2c037e631e27bc01582476f5b3c5d5e9e51489b8
 BUILDROOT_SHA=d6fa6a45e196665d6607b522f290b1451b949c2c
+
+BUILDROOT_BRANCH=2019.08.x
+
+# A small patch to force NumPy in buildroot for RISCV64
+BUILDROOT_PATCH=${ESP_ROOT}/utils/toolchain/python-numpy.patch
+
+#BUILDROOT_BRANCH=master
 
 DEFAULT_TARGET_DIR="/opt/riscv"
 TMP=/tmp/_riscv_build
@@ -158,8 +166,10 @@ if [ $(noyes "Skip buildroot?") == "n" ]; then
     	cd $src
     fi
 
-    git reset --hard ${BUILDROOT_SHA}
+#    git reset --hard ${BUILDROOT_SHA}
+    git checkout ${BUILDROOT_BRANCH}
     git submodule update --init --recursive
+    git apply ${BUILDROOT_PATCH}
 
     make distclean
     make defconfig BR2_DEFCONFIG=${SCRIPT_PATH}/riscv_buildroot_defconfig
