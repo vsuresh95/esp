@@ -1,0 +1,4 @@
+mac_plm_block_in_dma32 6400 32 1w:0r 0w:1r
+mac_plm_block_out_dma32 100 32 1w:0r 0w:1r
+mac_plm_block_in_dma64 6400 32 2w:0r 0w:1r
+mac_plm_block_out_dma64 100 32 1w:0r 0w:2r
