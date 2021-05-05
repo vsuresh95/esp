@@ -10,8 +10,6 @@
 #include <esp_probe.h>
 #include <fixed_point.h>
 
-#include <Eigen/Dense>
-
 typedef int64_t token_t;
 
 static unsigned DMA_WORD_PER_BEAT(unsigned _st)
