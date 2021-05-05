@@ -20,7 +20,7 @@ static int validate_buffer(token_t *out, token_t *gold)
 	unsigned errors = 0;
 
 	for (i = 0; i < gemm_batch; i++)
-		for (j = 0; j < gemm_m*gemm_n; j++)
+		for (j = 0; j < gemm_m * gemm_n; j++)
 			if (gold[i * out_words_adj + j] != out[i * out_words_adj + j])
 				errors++;
 
@@ -35,11 +35,11 @@ static void init_buffer(token_t *in, token_t * gold)
 	int j;
 
 	for (i = 0; i < gemm_batch; i++)
-		for (j = 0; j < (gemm_m*gemm_k)+(gemm_n*gemm_k); j++)
+		for (j = 0; j < (gemm_m * gemm_k) + (gemm_n * gemm_k); j++)
 			in[i * in_words_adj + j] = (token_t) j;
 
 	for (i = 0; i < gemm_batch; i++)
-		for (j = 0; j < gemm_m*gemm_n; j++)
+		for (j = 0; j < gemm_m * gemm_n; j++)
 			gold[i * out_words_adj + j] = (token_t) j;
 }
 
@@ -48,11 +48,11 @@ static void init_buffer(token_t *in, token_t * gold)
 static void init_parameters()
 {
 	if (DMA_WORD_PER_BEAT(sizeof(token_t)) == 0) {
-		in_words_adj = (gemm_m*gemm_k)+(gemm_n*gemm_k);
-		out_words_adj = gemm_m*gemm_n;
+		in_words_adj = (gemm_m * gemm_k) + (gemm_n * gemm_k);
+		out_words_adj = gemm_m * gemm_n;
 	} else {
-		in_words_adj = round_up((gemm_m*gemm_k)+(gemm_n*gemm_k), DMA_WORD_PER_BEAT(sizeof(token_t)));
-		out_words_adj = round_up(gemm_m*gemm_n, DMA_WORD_PER_BEAT(sizeof(token_t)));
+		in_words_adj = round_up((gemm_m * gemm_k) + (gemm_n * gemm_k), DMA_WORD_PER_BEAT(sizeof(token_t)));
+		out_words_adj = round_up(gemm_m * gemm_n, DMA_WORD_PER_BEAT(sizeof(token_t)));
 	}
 	in_len = in_words_adj * (gemm_batch);
 	out_len =  out_words_adj * (gemm_batch);
@@ -84,9 +84,10 @@ int main(int argc, char **argv)
 	printf("  .gemm_m = %d\n", gemm_m);
 	printf("  .gemm_n = %d\n", gemm_n);
 	printf("  .gemm_k = %d\n", gemm_k);
-	printf("  .offset_n = %d\n", offset_n);
-	printf("  .offset_m = %d\n", offset_m);
+	printf("  .offset_c = %d\n", offset_c);
 	printf("  .gemm_batch = %d\n", gemm_batch);
+	printf("  .offset_b = %d\n", offset_b);
+	printf("  .offset_a = %d\n", offset_a);
 	printf("  .block_size = %d\n", block_size);
 	printf("\n  ** START **\n");
 

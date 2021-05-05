@@ -26,9 +26,10 @@ void system_t::config_proc()
         config.gemm_m = gemm_m;
         config.gemm_n = gemm_n;
         config.gemm_k = gemm_k;
-        config.offset_n = offset_n;
-        config.offset_m = offset_m;
+        config.offset_c = offset_c;
         config.gemm_batch = gemm_batch;
+        config.offset_b = offset_b;
+        config.offset_a = offset_a;
         config.block_size = block_size;
 
         wait(); conf_info.write(config);
@@ -88,11 +89,11 @@ void system_t::load_memory()
 
     // Input data and golden output (aligned to DMA_WIDTH makes your life easier)
 #if (DMA_WORD_PER_BEAT == 0)
-    in_words_adj = (gemm_m*gemm_k)+(gemm_n*gemm_k);
-    out_words_adj = gemm_m*gemm_n;
+    in_words_adj = (gemm_m * gemm_k) + (gemm_n * gemm_k);
+    out_words_adj = gemm_m * gemm_n;
 #else
-    in_words_adj = round_up((gemm_m*gemm_k)+(gemm_n*gemm_k), DMA_WORD_PER_BEAT);
-    out_words_adj = round_up(gemm_m*gemm_n, DMA_WORD_PER_BEAT);
+    in_words_adj = round_up((gemm_m * gemm_k) + (gemm_n * gemm_k), DMA_WORD_PER_BEAT);
+    out_words_adj = round_up(gemm_m * gemm_n, DMA_WORD_PER_BEAT);
 #endif
 
     in_size = in_words_adj * (gemm_batch);
@@ -100,13 +101,13 @@ void system_t::load_memory()
 
     in = new int64_t[in_size];
     for (int i = 0; i < gemm_batch; i++)
-        for (int j = 0; j < (gemm_m*gemm_k)+(gemm_n*gemm_k); j++)
+        for (int j = 0; j < (gemm_m * gemm_k) + (gemm_n * gemm_k); j++)
             in[i * in_words_adj + j] = (int64_t) j;
 
     // Compute golden output
     gold = new int64_t[out_size];
     for (int i = 0; i < gemm_batch; i++)
-        for (int j = 0; j < gemm_m*gemm_n; j++)
+        for (int j = 0; j < gemm_m * gemm_n; j++)
             gold[i * out_words_adj + j] = (int64_t) j;
 
     // Memory initialization:
@@ -160,7 +161,7 @@ int system_t::validate()
     uint32_t errors = 0;
 
     for (int i = 0; i < gemm_batch; i++)
-        for (int j = 0; j < gemm_m*gemm_n; j++)
+        for (int j = 0; j < gemm_m * gemm_n; j++)
             if (gold[i * out_words_adj + j] != out[i * out_words_adj + j])
                 errors++;
 

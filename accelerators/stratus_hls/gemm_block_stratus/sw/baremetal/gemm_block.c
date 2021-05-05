@@ -25,9 +25,10 @@ static unsigned DMA_WORD_PER_BEAT(unsigned _st)
 const int32_t gemm_m = 64;
 const int32_t gemm_n = 64;
 const int32_t gemm_k = 64;
-const int32_t offset_n = 0;
-const int32_t offset_m = 0;
+const int32_t offset_c = 0;
 const int32_t gemm_batch = 1;
+const int32_t offset_b = 0;
+const int32_t offset_a = 0;
 const int32_t block_size = 16;
 
 static unsigned in_words_adj;
@@ -48,12 +49,13 @@ static unsigned mem_size;
 
 /* User defined registers */
 /* <<--regs-->> */
-#define GEMM_BLOCK_GEMM_M_REG 0x58
-#define GEMM_BLOCK_GEMM_N_REG 0x54
-#define GEMM_BLOCK_GEMM_K_REG 0x50
-#define GEMM_BLOCK_OFFSET_N_REG 0x4c
-#define GEMM_BLOCK_OFFSET_M_REG 0x48
-#define GEMM_BLOCK_GEMM_BATCH_REG 0x44
+#define GEMM_BLOCK_GEMM_M_REG 0x5c
+#define GEMM_BLOCK_GEMM_N_REG 0x58
+#define GEMM_BLOCK_GEMM_K_REG 0x54
+#define GEMM_BLOCK_OFFSET_C_REG 0x50
+#define GEMM_BLOCK_GEMM_BATCH_REG 0x4c
+#define GEMM_BLOCK_OFFSET_B_REG 0x48
+#define GEMM_BLOCK_OFFSET_A_REG 0x44
 #define GEMM_BLOCK_BLOCK_SIZE_REG 0x40
 
 
@@ -64,7 +66,7 @@ static int validate_buf(token_t *out, token_t *gold)
 	unsigned errors = 0;
 
 	for (i = 0; i < gemm_batch; i++)
-		for (j = 0; j < gemm_m*gemm_n; j++)
+		for (j = 0; j < gemm_m * gemm_n; j++)
 			if (gold[i * out_words_adj + j] != out[i * out_words_adj + j])
 				errors++;
 
@@ -78,11 +80,11 @@ static void init_buf (token_t *in, token_t * gold)
 	int j;
 
 	for (i = 0; i < gemm_batch; i++)
-		for (j = 0; j < (gemm_m*gemm_k)+(gemm_n*gemm_k); j++)
+		for (j = 0; j < (gemm_m * gemm_k) + (gemm_n * gemm_k); j++)
 			in[i * in_words_adj + j] = (token_t) j;
 
 	for (i = 0; i < gemm_batch; i++)
-		for (j = 0; j < gemm_m*gemm_n; j++)
+		for (j = 0; j < gemm_m * gemm_n; j++)
 			gold[i * out_words_adj + j] = (token_t) j;
 }
 
@@ -102,11 +104,11 @@ int main(int argc, char * argv[])
 	unsigned coherence;
 
 	if (DMA_WORD_PER_BEAT(sizeof(token_t)) == 0) {
-		in_words_adj = (gemm_m*gemm_k)+(gemm_n*gemm_k);
-		out_words_adj = gemm_m*gemm_n;
+		in_words_adj = (gemm_m * gemm_k) + (gemm_n * gemm_k);
+		out_words_adj = gemm_m * gemm_n;
 	} else {
-		in_words_adj = round_up((gemm_m*gemm_k)+(gemm_n*gemm_k), DMA_WORD_PER_BEAT(sizeof(token_t)));
-		out_words_adj = round_up(gemm_m*gemm_n, DMA_WORD_PER_BEAT(sizeof(token_t)));
+		in_words_adj = round_up((gemm_m * gemm_k) + (gemm_n * gemm_k), DMA_WORD_PER_BEAT(sizeof(token_t)));
+		out_words_adj = round_up(gemm_m * gemm_n, DMA_WORD_PER_BEAT(sizeof(token_t)));
 	}
 	in_len = in_words_adj * (gemm_batch);
 	out_len = out_words_adj * (gemm_batch);
@@ -188,9 +190,10 @@ int main(int argc, char * argv[])
 		iowrite32(dev, GEMM_BLOCK_GEMM_M_REG, gemm_m);
 		iowrite32(dev, GEMM_BLOCK_GEMM_N_REG, gemm_n);
 		iowrite32(dev, GEMM_BLOCK_GEMM_K_REG, gemm_k);
-		iowrite32(dev, GEMM_BLOCK_OFFSET_N_REG, offset_n);
-		iowrite32(dev, GEMM_BLOCK_OFFSET_M_REG, offset_m);
+		iowrite32(dev, GEMM_BLOCK_OFFSET_C_REG, offset_c);
 		iowrite32(dev, GEMM_BLOCK_GEMM_BATCH_REG, gemm_batch);
+		iowrite32(dev, GEMM_BLOCK_OFFSET_B_REG, offset_b);
+		iowrite32(dev, GEMM_BLOCK_OFFSET_A_REG, offset_a);
 		iowrite32(dev, GEMM_BLOCK_BLOCK_SIZE_REG, block_size);
 
 			// Flush (customize coherence model here)

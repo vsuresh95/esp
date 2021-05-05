@@ -31,9 +31,10 @@ void gemm_block::load_input()
     int32_t gemm_m;
     int32_t gemm_n;
     int32_t gemm_k;
-    int32_t offset_n;
-    int32_t offset_m;
+    int32_t offset_c;
     int32_t gemm_batch;
+    int32_t offset_b;
+    int32_t offset_a;
     int32_t block_size;
     {
         HLS_PROTO("load-config");
@@ -46,9 +47,10 @@ void gemm_block::load_input()
         gemm_m = config.gemm_m;
         gemm_n = config.gemm_n;
         gemm_k = config.gemm_k;
-        offset_n = config.offset_n;
-        offset_m = config.offset_m;
+        offset_c = config.offset_c;
         gemm_batch = config.gemm_batch;
+        offset_b = config.offset_b;
+        offset_a = config.offset_a;
         block_size = config.block_size;
     }
 
@@ -65,9 +67,9 @@ void gemm_block::load_input()
         {
             wait();
 #if (DMA_WORD_PER_BEAT == 0)
-            uint32_t length = (gemm_m*gemm_k)+(gemm_n*gemm_k);
+            uint32_t length = (gemm_m * gemm_k) + (gemm_n * gemm_k);
 #else
-            uint32_t length = round_up((gemm_m*gemm_k)+(gemm_n*gemm_k), DMA_WORD_PER_BEAT);
+            uint32_t length = round_up((gemm_m * gemm_k) + (gemm_n * gemm_k), DMA_WORD_PER_BEAT);
 #endif
             // Chunking
             for (int rem = length; rem > 0; rem -= PLM_IN_WORD)
@@ -159,9 +161,10 @@ void gemm_block::store_output()
     int32_t gemm_m;
     int32_t gemm_n;
     int32_t gemm_k;
-    int32_t offset_n;
-    int32_t offset_m;
+    int32_t offset_c;
     int32_t gemm_batch;
+    int32_t offset_b;
+    int32_t offset_a;
     int32_t block_size;
     {
         HLS_PROTO("store-config");
@@ -174,9 +177,10 @@ void gemm_block::store_output()
         gemm_m = config.gemm_m;
         gemm_n = config.gemm_n;
         gemm_k = config.gemm_k;
-        offset_n = config.offset_n;
-        offset_m = config.offset_m;
+        offset_c = config.offset_c;
         gemm_batch = config.gemm_batch;
+        offset_b = config.offset_b;
+        offset_a = config.offset_a;
         block_size = config.block_size;
     }
 
@@ -187,9 +191,9 @@ void gemm_block::store_output()
 
         bool ping = true;
 #if (DMA_WORD_PER_BEAT == 0)
-        uint32_t store_offset = ((gemm_m*gemm_k)+(gemm_n*gemm_k)) * gemm_batch;
+        uint32_t store_offset = ((gemm_m * gemm_k) + (gemm_n * gemm_k)) * gemm_batch;
 #else
-        uint32_t store_offset = round_up((gemm_m*gemm_k)+(gemm_n*gemm_k), DMA_WORD_PER_BEAT) * gemm_batch;
+        uint32_t store_offset = round_up((gemm_m * gemm_k) + (gemm_n * gemm_k), DMA_WORD_PER_BEAT) * gemm_batch;
 #endif
         uint32_t offset = store_offset;
 
@@ -199,9 +203,9 @@ void gemm_block::store_output()
         {
             wait();
 #if (DMA_WORD_PER_BEAT == 0)
-            uint32_t length = gemm_m*gemm_n;
+            uint32_t length = gemm_m * gemm_n;
 #else
-            uint32_t length = round_up(gemm_m*gemm_n, DMA_WORD_PER_BEAT);
+            uint32_t length = round_up(gemm_m * gemm_n, DMA_WORD_PER_BEAT);
 #endif
             // Chunking
             for (int rem = length; rem > 0; rem -= PLM_OUT_WORD)
@@ -295,9 +299,10 @@ void gemm_block::compute_kernel()
     int32_t gemm_m;
     int32_t gemm_n;
     int32_t gemm_k;
-    int32_t offset_n;
-    int32_t offset_m;
+    int32_t offset_c;
     int32_t gemm_batch;
+    int32_t offset_b;
+    int32_t offset_a;
     int32_t block_size;
     {
         HLS_PROTO("compute-config");
@@ -310,9 +315,10 @@ void gemm_block::compute_kernel()
         gemm_m = config.gemm_m;
         gemm_n = config.gemm_n;
         gemm_k = config.gemm_k;
-        offset_n = config.offset_n;
-        offset_m = config.offset_m;
+        offset_c = config.offset_c;
         gemm_batch = config.gemm_batch;
+        offset_b = config.offset_b;
+        offset_a = config.offset_a;
         block_size = config.block_size;
     }
 
@@ -322,8 +328,8 @@ void gemm_block::compute_kernel()
     {
         for (uint16_t b = 0; b < gemm_batch; b++)
         {
-            uint32_t in_length = (gemm_m*gemm_k)+(gemm_n*gemm_k);
-            uint32_t out_length = gemm_m*gemm_n;
+            uint32_t in_length = (gemm_m * gemm_k) + (gemm_n * gemm_k);
+            uint32_t out_length = gemm_m * gemm_n;
             int out_rem = out_length;
 
             for (int in_rem = in_length; in_rem > 0; in_rem -= PLM_IN_WORD)

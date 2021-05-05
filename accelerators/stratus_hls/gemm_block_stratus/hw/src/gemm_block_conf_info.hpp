@@ -22,9 +22,10 @@ public:
         this->gemm_m = 64;
         this->gemm_n = 64;
         this->gemm_k = 64;
-        this->offset_n = 0;
-        this->offset_m = 0;
+        this->offset_c = 0;
         this->gemm_batch = 1;
+        this->offset_b = 0;
+        this->offset_a = 0;
         this->block_size = 16;
     }
 
@@ -33,9 +34,10 @@ public:
         int32_t gemm_m, 
         int32_t gemm_n, 
         int32_t gemm_k, 
-        int32_t offset_n, 
-        int32_t offset_m, 
+        int32_t offset_c, 
         int32_t gemm_batch, 
+        int32_t offset_b, 
+        int32_t offset_a, 
         int32_t block_size
         )
     {
@@ -43,9 +45,10 @@ public:
         this->gemm_m = gemm_m;
         this->gemm_n = gemm_n;
         this->gemm_k = gemm_k;
-        this->offset_n = offset_n;
-        this->offset_m = offset_m;
+        this->offset_c = offset_c;
         this->gemm_batch = gemm_batch;
+        this->offset_b = offset_b;
+        this->offset_a = offset_a;
         this->block_size = block_size;
     }
 
@@ -56,9 +59,10 @@ public:
         if (gemm_m != rhs.gemm_m) return false;
         if (gemm_n != rhs.gemm_n) return false;
         if (gemm_k != rhs.gemm_k) return false;
-        if (offset_n != rhs.offset_n) return false;
-        if (offset_m != rhs.offset_m) return false;
+        if (offset_c != rhs.offset_c) return false;
         if (gemm_batch != rhs.gemm_batch) return false;
+        if (offset_b != rhs.offset_b) return false;
+        if (offset_a != rhs.offset_a) return false;
         if (block_size != rhs.block_size) return false;
         return true;
     }
@@ -70,9 +74,10 @@ public:
         gemm_m = other.gemm_m;
         gemm_n = other.gemm_n;
         gemm_k = other.gemm_k;
-        offset_n = other.offset_n;
-        offset_m = other.offset_m;
+        offset_c = other.offset_c;
         gemm_batch = other.gemm_batch;
+        offset_b = other.offset_b;
+        offset_a = other.offset_a;
         block_size = other.block_size;
         return *this;
     }
@@ -89,9 +94,10 @@ public:
         os << "gemm_m = " << conf_info.gemm_m << ", ";
         os << "gemm_n = " << conf_info.gemm_n << ", ";
         os << "gemm_k = " << conf_info.gemm_k << ", ";
-        os << "offset_n = " << conf_info.offset_n << ", ";
-        os << "offset_m = " << conf_info.offset_m << ", ";
+        os << "offset_c = " << conf_info.offset_c << ", ";
         os << "gemm_batch = " << conf_info.gemm_batch << ", ";
+        os << "offset_b = " << conf_info.offset_b << ", ";
+        os << "offset_a = " << conf_info.offset_a << ", ";
         os << "block_size = " << conf_info.block_size << "";
         os << "}";
         return os;
@@ -101,9 +107,10 @@ public:
         int32_t gemm_m;
         int32_t gemm_n;
         int32_t gemm_k;
-        int32_t offset_n;
-        int32_t offset_m;
+        int32_t offset_c;
         int32_t gemm_batch;
+        int32_t offset_b;
+        int32_t offset_a;
         int32_t block_size;
 };
 

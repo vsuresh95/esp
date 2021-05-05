@@ -57,9 +57,10 @@ public:
         gemm_m = 64;
         gemm_n = 64;
         gemm_k = 64;
-        offset_n = 0;
-        offset_m = 0;
+        offset_c = 0;
         gemm_batch = 1;
+        offset_b = 0;
+        offset_a = 0;
         block_size = 16;
     }
 
@@ -82,9 +83,10 @@ public:
     int32_t gemm_m;
     int32_t gemm_n;
     int32_t gemm_k;
-    int32_t offset_n;
-    int32_t offset_m;
+    int32_t offset_c;
     int32_t gemm_batch;
+    int32_t offset_b;
+    int32_t offset_a;
     int32_t block_size;
 
     uint32_t in_words_adj;

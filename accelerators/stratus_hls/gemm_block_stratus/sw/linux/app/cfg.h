@@ -12,18 +12,20 @@ typedef int64_t token_t;
 #define GEMM_M 64
 #define GEMM_N 64
 #define GEMM_K 64
-#define OFFSET_N 0
-#define OFFSET_M 0
+#define OFFSET_C 0
 #define GEMM_BATCH 1
+#define OFFSET_B 0
+#define OFFSET_A 0
 #define BLOCK_SIZE 16
 
 /* <<--params-->> */
 const int32_t gemm_m = GEMM_M;
 const int32_t gemm_n = GEMM_N;
 const int32_t gemm_k = GEMM_K;
-const int32_t offset_n = OFFSET_N;
-const int32_t offset_m = OFFSET_M;
+const int32_t offset_c = OFFSET_C;
 const int32_t gemm_batch = GEMM_BATCH;
+const int32_t offset_b = OFFSET_B;
+const int32_t offset_a = OFFSET_A;
 const int32_t block_size = BLOCK_SIZE;
 
 #define NACC 1
@@ -34,9 +36,10 @@ struct gemm_block_stratus_access gemm_block_cfg_000[] = {
 		.gemm_m = GEMM_M,
 		.gemm_n = GEMM_N,
 		.gemm_k = GEMM_K,
-		.offset_n = OFFSET_N,
-		.offset_m = OFFSET_M,
+		.offset_c = OFFSET_C,
 		.gemm_batch = GEMM_BATCH,
+		.offset_b = OFFSET_B,
+		.offset_a = OFFSET_A,
 		.block_size = BLOCK_SIZE,
 		.src_offset = 0,
 		.dst_offset = 0,
