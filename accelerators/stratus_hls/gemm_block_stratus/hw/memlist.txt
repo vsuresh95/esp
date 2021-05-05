@@ -1,0 +1,4 @@
+gemm_block_plm_block_in_dma32 8192 64 1w:0r 0w:1r
+gemm_block_plm_block_out_dma32 4096 64 1w:0r 0w:1r
+gemm_block_plm_block_in_dma64 8192 64 1w:0r 0w:1r
+gemm_block_plm_block_out_dma64 4096 64 1w:0r 0w:1r
