@@ -99,16 +99,16 @@ void system_t::load_memory()
     in_size = in_words_adj * (gemm_batch);
     out_size = out_words_adj * (gemm_batch);
 
-    in = new int64_t[in_size];
+    in = new int32_t[in_size];
     for (int i = 0; i < gemm_batch; i++)
         for (int j = 0; j < (gemm_m * gemm_k) + (gemm_n * gemm_k); j++)
-            in[i * in_words_adj + j] = (int64_t) j;
+            in[i * in_words_adj + j] = (int32_t) j;
 
     // Compute golden output
-    gold = new int64_t[out_size];
+    gold = new int32_t[out_size];
     for (int i = 0; i < gemm_batch; i++)
         for (int j = 0; j < gemm_m * gemm_n; j++)
-            gold[i * out_words_adj + j] = (int64_t) j;
+            gold[i * out_words_adj + j] = (int32_t) j;
 
     // Memory initialization:
 #if (DMA_WORD_PER_BEAT == 0)
@@ -132,7 +132,7 @@ void system_t::load_memory()
 void system_t::dump_memory()
 {
     // Get results from memory
-    out = new int64_t[out_size];
+    out = new int32_t[out_size];
     uint32_t offset = in_size;
 
 #if (DMA_WORD_PER_BEAT == 0)

@@ -5,13 +5,13 @@
 #define __GEMM_BLOCK_DIRECTIVES_HPP__
 
 #if (DMA_WIDTH == 32)
-#define DMA_BEAT_PER_WORD 2
-#define DMA_WORD_PER_BEAT 0
+#define DMA_BEAT_PER_WORD 1
+#define DMA_WORD_PER_BEAT 1
 #define PLM_IN_NAME "gemm_block_plm_block_in_dma32"
 #define PLM_OUT_NAME "gemm_block_plm_block_out_dma32"
 #elif (DMA_WIDTH == 64)
 #define DMA_BEAT_PER_WORD 1
-#define DMA_WORD_PER_BEAT 1
+#define DMA_WORD_PER_BEAT 2
 #define PLM_IN_NAME "gemm_block_plm_block_in_dma64"
 #define PLM_OUT_NAME "gemm_block_plm_block_out_dma64"
 #endif

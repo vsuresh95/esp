@@ -172,5 +172,7 @@ int system_t::validate()
     delete [] out;
     delete [] gold;
 
+    ESP_REPORT_INFO("DMA_WORD_PER_BEAT = %d\n", DMA_WORD_PER_BEAT);
+    
     return errors;
 }

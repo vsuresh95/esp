@@ -10,7 +10,7 @@
 #include <esp_probe.h>
 #include <fixed_point.h>
 
-typedef int64_t token_t;
+typedef int32_t token_t;
 
 static unsigned DMA_WORD_PER_BEAT(unsigned _st)
 {
@@ -84,8 +84,13 @@ static void init_buf (token_t *in, token_t * gold)
 			in[i * in_words_adj + j] = (token_t) j;
 
 	for (i = 0; i < gemm_batch; i++)
-		for (j = 0; j < gemm_m * gemm_n; j++)
-			gold[i * out_words_adj + j] = (token_t) j;
+        for (int m = 0; m < gemm_m; m++)
+            for (int n = 0; n < gemm_n; n++) {
+                gold[i * out_words_adj + m * gemm_n + n] = 0;
+                for (int k = 0; k < gemm_k; k++)
+                    gold[i * out_words_adj + m * gemm_n + n] +=
+                        in[i * in_words_adj + m * gemm_k + k] * in[i * in_words_adj + gemm_m * gemm_k + n * gemm_k + k];
+            }
 }
 
 

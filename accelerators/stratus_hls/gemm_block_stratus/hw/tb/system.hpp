@@ -11,7 +11,7 @@
 
 #include "esp_templates.hpp"
 
-const size_t MEM_SIZE = 1572864 / (DMA_WIDTH/8);
+const size_t MEM_SIZE = 786432 / (DMA_WIDTH/8);
 
 #include "core/systems/esp_system.hpp"
 
@@ -93,9 +93,9 @@ public:
     uint32_t out_words_adj;
     uint32_t in_size;
     uint32_t out_size;
-    int64_t *in;
-    int64_t *out;
-    int64_t *gold;
+    int32_t *in;
+    int32_t *out;
+    int32_t *gold;
 
     // Other Functions
 };

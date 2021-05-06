@@ -337,15 +337,44 @@ void gemm_block::compute_kernel()
 
                 uint32_t in_len  = in_rem  > PLM_IN_WORD  ? PLM_IN_WORD  : in_rem;
                 uint32_t out_len = out_rem > PLM_OUT_WORD ? PLM_OUT_WORD : out_rem;
+                uint32_t acc;
 
                 this->compute_load_handshake();
 
                 // Computing phase implementation
-                for (int i = 0; i < in_len; i++) {
-                    if (ping)
-                        plm_out_ping[i] = plm_in_ping[i];
-                    else
-                        plm_out_pong[i] = plm_in_pong[i];
+                for (int a = 0; a < (gemm_m/block_size)+1; a++)
+                {
+                    for (int b = 0; b < (gemm_n/block_size)+1; b++)
+                    {
+                        for (int c = 0; c < (gemm_k/block_size)+1; c++)
+                        {
+                            block_size_m = (a == gemm_m/block_size) ? gemm_m%block_size : block_size;
+                            block_size_n = (b == gemm_n/block_size) ? gemm_n%block_size : block_size;
+                            block_size_k = (c == gemm_k/block_size) ? gemm_k%block_size : block_size;
+
+                            for (int m = 0; m < block_size_m; m++)
+                            {
+                                for (int n = 0; n < block_size_n; n++)
+                                {
+                                    acc = 0;
+
+                                    for (int k = 0; k < block_size_k; k++)
+                                    {
+                                        // TODO: assumes even number of elements in the arrays for ping-pong
+                                        if (ping)
+                                            acc += plm_in_ping[m*gemm_k + k] * plm_in_ping[gemm_m*gemm_k + n*gemm_k + k];
+                                        else
+                                            acc += plm_in_pong[m*gemm_k + k] * plm_in_pong[gemm_m*gemm_k + n*gemm_k + k];
+                                    }
+
+                                    if (ping)
+                                        plm_out_ping[m*gemm_n + n] = acc;
+                                    else
+                                        plm_out_pong[m*gemm_n + n] = acc;
+                                }
+                            }
+                        }
+                    }
                 }
 
                 out_rem -= PLM_OUT_WORD;

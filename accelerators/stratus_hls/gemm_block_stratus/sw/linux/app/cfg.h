@@ -6,7 +6,7 @@
 #include "libesp.h"
 #include "gemm_block_stratus.h"
 
-typedef int64_t token_t;
+typedef int32_t token_t;
 
 /* <<--params-def-->> */
 #define GEMM_M 64
