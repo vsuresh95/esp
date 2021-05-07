@@ -13,14 +13,10 @@
 #define DRV_NAME	"gemm_block_stratus"
 
 /* <<--regs-->> */
-#define GEMM_BLOCK_GEMM_M_REG 0x5c
-#define GEMM_BLOCK_GEMM_N_REG 0x58
-#define GEMM_BLOCK_GEMM_K_REG 0x54
-#define GEMM_BLOCK_OFFSET_C_REG 0x50
-#define GEMM_BLOCK_GEMM_BATCH_REG 0x4c
-#define GEMM_BLOCK_OFFSET_B_REG 0x48
-#define GEMM_BLOCK_OFFSET_A_REG 0x44
-#define GEMM_BLOCK_BLOCK_SIZE_REG 0x40
+#define GEMM_BLOCK_GEMM_M_REG 0x4c
+#define GEMM_BLOCK_GEMM_N_REG 0x48
+#define GEMM_BLOCK_GEMM_K_REG 0x44
+#define GEMM_BLOCK_GEMM_BATCH_REG 0x40
 
 struct gemm_block_stratus_device {
 	struct esp_device esp;
@@ -33,7 +29,7 @@ static struct of_device_id gemm_block_device_ids[] = {
 		.name = "SLD_GEMM_BLOCK_STRATUS",
 	},
 	{
-		.name = "eb_06a",
+		.name = "eb_100",
 	},
 	{
 		.compatible = "sld,gemm_block_stratus",
@@ -56,11 +52,7 @@ static void gemm_block_prep_xfer(struct esp_device *esp, void *arg)
 	iowrite32be(a->gemm_m, esp->iomem + GEMM_BLOCK_GEMM_M_REG);
 	iowrite32be(a->gemm_n, esp->iomem + GEMM_BLOCK_GEMM_N_REG);
 	iowrite32be(a->gemm_k, esp->iomem + GEMM_BLOCK_GEMM_K_REG);
-	iowrite32be(a->offset_c, esp->iomem + GEMM_BLOCK_OFFSET_C_REG);
 	iowrite32be(a->gemm_batch, esp->iomem + GEMM_BLOCK_GEMM_BATCH_REG);
-	iowrite32be(a->offset_b, esp->iomem + GEMM_BLOCK_OFFSET_B_REG);
-	iowrite32be(a->offset_a, esp->iomem + GEMM_BLOCK_OFFSET_A_REG);
-	iowrite32be(a->block_size, esp->iomem + GEMM_BLOCK_BLOCK_SIZE_REG);
 	iowrite32be(a->src_offset, esp->iomem + SRC_OFFSET_REG);
 	iowrite32be(a->dst_offset, esp->iomem + DST_OFFSET_REG);
 

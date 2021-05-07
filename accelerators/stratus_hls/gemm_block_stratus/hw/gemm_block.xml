@@ -1,11 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <sld>
-  <accelerator name="gemm_block" desc="Accelerator GEMM_BLOCK" data_size="4" device_id="06a" hls_tool="stratus_hls">
-    <param name="block_size" desc="block_size" />
-    <param name="offset_a" desc="offset_a" />
-    <param name="offset_b" desc="offset_b" />
+  <accelerator name="gemm_block" desc="Accelerator GEMM_BLOCK" data_size="4" device_id="100" hls_tool="stratus_hls">
     <param name="gemm_batch" desc="gemm_batch" />
-    <param name="offset_c" desc="offset_c" />
     <param name="gemm_k" desc="gemm_k" />
     <param name="gemm_n" desc="gemm_n" />
     <param name="gemm_m" desc="gemm_m" />

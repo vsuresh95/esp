@@ -84,11 +84,7 @@ int main(int argc, char **argv)
 	printf("  .gemm_m = %d\n", gemm_m);
 	printf("  .gemm_n = %d\n", gemm_n);
 	printf("  .gemm_k = %d\n", gemm_k);
-	printf("  .offset_c = %d\n", offset_c);
 	printf("  .gemm_batch = %d\n", gemm_batch);
-	printf("  .offset_b = %d\n", offset_b);
-	printf("  .offset_a = %d\n", offset_a);
-	printf("  .block_size = %d\n", block_size);
 	printf("\n  ** START **\n");
 
 	esp_run(cfg_000, NACC);

@@ -31,11 +31,7 @@ void gemm_block::load_input()
     int32_t gemm_m;
     int32_t gemm_n;
     int32_t gemm_k;
-    int32_t offset_c;
     int32_t gemm_batch;
-    int32_t offset_b;
-    int32_t offset_a;
-    int32_t block_size;
     {
         HLS_PROTO("load-config");
 
@@ -47,11 +43,7 @@ void gemm_block::load_input()
         gemm_m = config.gemm_m;
         gemm_n = config.gemm_n;
         gemm_k = config.gemm_k;
-        offset_c = config.offset_c;
         gemm_batch = config.gemm_batch;
-        offset_b = config.offset_b;
-        offset_a = config.offset_a;
-        block_size = config.block_size;
     }
 
     // Load
@@ -59,54 +51,58 @@ void gemm_block::load_input()
         HLS_PROTO("load-dma");
         wait();
 
-        bool ping = true;
-        uint32_t offset = 0;
+        bool ping_m = true;
+        uint32_t offset_m = 0;
+        uint32_t length_m = gemm_m * gemm_k;
 
-        // Batching
-        for (uint16_t b = 0; b < gemm_batch; b++)
+        for (int32_t rem_m = length_m; rem_m > 0; rem_m -= PLM_IN_WORD/2)
         {
             wait();
-#if (DMA_WORD_PER_BEAT == 0)
-            uint32_t length = (gemm_m * gemm_k) + (gemm_n * gemm_k);
-#else
-            uint32_t length = round_up((gemm_m * gemm_k) + (gemm_n * gemm_k), DMA_WORD_PER_BEAT);
-#endif
-            // Chunking
-            for (int rem = length; rem > 0; rem -= PLM_IN_WORD)
+            uint32_t len_m = rem_m > PLM_IN_WORD/2 ? PLM_IN_WORD/2 : rem_m;
+
+            // fetch data along dimension m
+            dma_info_t dma_info(offset_m / DMA_WORD_PER_BEAT, len_m / DMA_WORD_PER_BEAT, DMA_SIZE);
+            offset_m += len_m;
+            this->dma_read_ctrl.put(dma_info);
+
+            for (uint32_t i = 0; i < len_m; i += DMA_WORD_PER_BEAT)
+            {
+                HLS_BREAK_DEP(plm_in_ping);
+                HLS_BREAK_DEP(plm_in_pong);
+
+                sc_dt::sc_bv<DMA_WIDTH> dataBv;
+
+                dataBv = this->dma_read_chnl.get();
+                wait();
+
+                // Write to PLM (all DMA_WORD_PER_BEAT words in one cycle)
+                for (uint32_t k = 0; k < DMA_WORD_PER_BEAT; k++)
+                {
+                    HLS_UNROLL_SIMPLE;
+                    if (ping_m)
+                        plm_in_ping[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
+                    else
+                        plm_in_pong[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
+                    // ESP_REPORT_INFO("[INPUT M] rem_m = %d i = %d k = %d ping_m = %d data = %d",
+                    // rem_m, i, k, ping_m, dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64());
+                }
+            }
+
+            bool ping_n = true;
+            uint32_t offset_n = gemm_m * gemm_k;
+            uint32_t length_n = gemm_n * gemm_k;
+
+            for (int32_t rem_n = length_n; rem_n > 0; rem_n -= PLM_IN_WORD/2)
             {
                 wait();
-                // Configure DMA transaction
-                uint32_t len = rem > PLM_IN_WORD ? PLM_IN_WORD : rem;
-#if (DMA_WORD_PER_BEAT == 0)
-                // data word is wider than NoC links
-                dma_info_t dma_info(offset * DMA_BEAT_PER_WORD, len * DMA_BEAT_PER_WORD, DMA_SIZE);
-#else
-                dma_info_t dma_info(offset / DMA_WORD_PER_BEAT, len / DMA_WORD_PER_BEAT, DMA_SIZE);
-#endif
-                offset += len;
+                uint32_t len_n = rem_n > PLM_IN_WORD/2 ? PLM_IN_WORD/2 : rem_n;
 
+                // fetch data along dimension n
+                dma_info_t dma_info(offset_n / DMA_WORD_PER_BEAT, len_n / DMA_WORD_PER_BEAT, DMA_SIZE);
+                offset_n += len_n;
                 this->dma_read_ctrl.put(dma_info);
 
-#if (DMA_WORD_PER_BEAT == 0)
-                // data word is wider than NoC links
-                for (uint16_t i = 0; i < len; i++)
-                {
-                    sc_dt::sc_bv<DATA_WIDTH> dataBv;
-
-                    for (uint16_t k = 0; k < DMA_BEAT_PER_WORD; k++)
-                    {
-                        dataBv.range((k+1) * DMA_WIDTH - 1, k * DMA_WIDTH) = this->dma_read_chnl.get();
-                        wait();
-                    }
-
-                    // Write to PLM
-                    if (ping)
-                        plm_in_ping[i] = dataBv.to_int64();
-                    else
-                        plm_in_pong[i] = dataBv.to_int64();
-                }
-#else
-                for (uint16_t i = 0; i < len; i += DMA_WORD_PER_BEAT)
+                for (uint32_t i = 0; i < len_n; i += DMA_WORD_PER_BEAT)
                 {
                     HLS_BREAK_DEP(plm_in_ping);
                     HLS_BREAK_DEP(plm_in_pong);
@@ -117,19 +113,21 @@ void gemm_block::load_input()
                     wait();
 
                     // Write to PLM (all DMA_WORD_PER_BEAT words in one cycle)
-                    for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
+                    for (uint32_t k = 0; k < DMA_WORD_PER_BEAT; k++)
                     {
                         HLS_UNROLL_SIMPLE;
-                        if (ping)
-                            plm_in_ping[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
+                        if (ping_n)
+                            plm_in_ping[PLM_IN_WORD/2 + i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
                         else
-                            plm_in_pong[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
+                            plm_in_pong[PLM_IN_WORD/2 + i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
+                        // ESP_REPORT_INFO("[INPUT N] rem_m = %d rem_n = %d i = %d k = %d ping_m = %d ping_n = %d data = %d",
+                        // rem_m, rem_n, i, k, ping_m, ping_n, dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64());
                     }
                 }
-#endif
                 this->load_compute_handshake();
-                ping = !ping;
+                ping_n = !ping_n;
             }
+            ping_m = !ping_m;
         }
     }
 
@@ -161,11 +159,7 @@ void gemm_block::store_output()
     int32_t gemm_m;
     int32_t gemm_n;
     int32_t gemm_k;
-    int32_t offset_c;
     int32_t gemm_batch;
-    int32_t offset_b;
-    int32_t offset_a;
-    int32_t block_size;
     {
         HLS_PROTO("store-config");
 
@@ -177,11 +171,7 @@ void gemm_block::store_output()
         gemm_m = config.gemm_m;
         gemm_n = config.gemm_n;
         gemm_k = config.gemm_k;
-        offset_c = config.offset_c;
         gemm_batch = config.gemm_batch;
-        offset_b = config.offset_b;
-        offset_a = config.offset_a;
-        block_size = config.block_size;
     }
 
     // Store
@@ -189,85 +179,42 @@ void gemm_block::store_output()
         HLS_PROTO("store-dma");
         wait();
 
+        uint32_t offset = (gemm_m * gemm_k) + (gemm_n * gemm_k);
+
+        uint32_t length = gemm_m * gemm_n;
+
         bool ping = true;
-#if (DMA_WORD_PER_BEAT == 0)
-        uint32_t store_offset = ((gemm_m * gemm_k) + (gemm_n * gemm_k)) * gemm_batch;
-#else
-        uint32_t store_offset = round_up((gemm_m * gemm_k) + (gemm_n * gemm_k), DMA_WORD_PER_BEAT) * gemm_batch;
-#endif
-        uint32_t offset = store_offset;
 
-        wait();
-        // Batching
-        for (uint16_t b = 0; b < gemm_batch; b++)
+        for (int32_t rem = length; rem > 0; rem -= PLM_OUT_WORD)
         {
-            wait();
-#if (DMA_WORD_PER_BEAT == 0)
-            uint32_t length = gemm_m * gemm_n;
-#else
-            uint32_t length = round_up(gemm_m * gemm_n, DMA_WORD_PER_BEAT);
-#endif
-            // Chunking
-            for (int rem = length; rem > 0; rem -= PLM_OUT_WORD)
+            this->store_compute_handshake();
+
+            uint32_t len = rem > PLM_OUT_WORD ? PLM_OUT_WORD : rem;
+
+            dma_info_t dma_info(offset / DMA_WORD_PER_BEAT, len / DMA_WORD_PER_BEAT, DMA_SIZE);
+            offset += len;
+
+            this->dma_write_ctrl.put(dma_info);
+
+            for (uint32_t i = 0; i < len; i += DMA_WORD_PER_BEAT)
             {
+                sc_dt::sc_bv<DMA_WIDTH> dataBv;
 
-                this->store_compute_handshake();
-
-                // Configure DMA transaction
-                uint32_t len = rem > PLM_OUT_WORD ? PLM_OUT_WORD : rem;
-#if (DMA_WORD_PER_BEAT == 0)
-                // data word is wider than NoC links
-                dma_info_t dma_info(offset * DMA_BEAT_PER_WORD, len * DMA_BEAT_PER_WORD, DMA_SIZE);
-#else
-                dma_info_t dma_info(offset / DMA_WORD_PER_BEAT, len / DMA_WORD_PER_BEAT, DMA_SIZE);
-#endif
-                offset += len;
-
-                this->dma_write_ctrl.put(dma_info);
-
-#if (DMA_WORD_PER_BEAT == 0)
-                // data word is wider than NoC links
-                for (uint16_t i = 0; i < len; i++)
+                // Read from PLM
+                wait();
+                for (uint32_t k = 0; k < DMA_WORD_PER_BEAT; k++)
                 {
-                    // Read from PLM
-                    sc_dt::sc_int<DATA_WIDTH> data;
-                    wait();
+                    HLS_UNROLL_SIMPLE;
                     if (ping)
-                        data = plm_out_ping[i];
+                        dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH) = plm_out_ping[i + k];
                     else
-                        data = plm_out_pong[i];
-                    sc_dt::sc_bv<DATA_WIDTH> dataBv(data);
-
-                    uint16_t k = 0;
-                    for (k = 0; k < DMA_BEAT_PER_WORD - 1; k++)
-                    {
-                        this->dma_write_chnl.put(dataBv.range((k+1) * DMA_WIDTH - 1, k * DMA_WIDTH));
-                        wait();
-                    }
-                    // Last beat on the bus does not require wait(), which is
-                    // placed before accessing the PLM
-                    this->dma_write_chnl.put(dataBv.range((k+1) * DMA_WIDTH - 1, k * DMA_WIDTH));
+                        dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH) = plm_out_pong[i + k];
+                    // ESP_REPORT_INFO("[OUTPUT] rem = %d i = %d k = %d ping = %d data = %d",
+                    // rem, i, k, ping, dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64());
                 }
-#else
-                for (uint16_t i = 0; i < len; i += DMA_WORD_PER_BEAT)
-                {
-                    sc_dt::sc_bv<DMA_WIDTH> dataBv;
-
-                    // Read from PLM
-                    wait();
-                    for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
-                    {
-                        HLS_UNROLL_SIMPLE;
-                        if (ping)
-                            dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH) = plm_out_ping[i + k];
-                        else
-                            dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH) = plm_out_pong[i + k];
-                    }
-                    this->dma_write_chnl.put(dataBv);
-                }
-#endif
-                ping = !ping;
+                this->dma_write_chnl.put(dataBv);
             }
+            ping = !ping;
         }
     }
 
@@ -299,11 +246,7 @@ void gemm_block::compute_kernel()
     int32_t gemm_m;
     int32_t gemm_n;
     int32_t gemm_k;
-    int32_t offset_c;
     int32_t gemm_batch;
-    int32_t offset_b;
-    int32_t offset_a;
-    int32_t block_size;
     {
         HLS_PROTO("compute-config");
 
@@ -315,72 +258,70 @@ void gemm_block::compute_kernel()
         gemm_m = config.gemm_m;
         gemm_n = config.gemm_n;
         gemm_k = config.gemm_k;
-        offset_c = config.offset_c;
         gemm_batch = config.gemm_batch;
-        offset_b = config.offset_b;
-        offset_a = config.offset_a;
-        block_size = config.block_size;
     }
 
-
     // Compute
-    bool ping = true;
+    bool ping_m = true;
+    bool ping_n = true;
     {
-        for (uint16_t b = 0; b < gemm_batch; b++)
-        {
-            uint32_t in_length = (gemm_m * gemm_k) + (gemm_n * gemm_k);
-            uint32_t out_length = gemm_m * gemm_n;
-            int out_rem = out_length;
+        uint32_t length_m = gemm_m * gemm_k;
+        uint32_t length_n = gemm_n * gemm_k;
 
-            for (int in_rem = in_length; in_rem > 0; in_rem -= PLM_IN_WORD)
+        uint32_t acc = 0;
+
+        uint32_t out_pos = 0;
+
+        uint32_t row_num = 0;
+
+        for (int32_t rem_m = length_m; rem_m > 0; rem_m -= PLM_IN_WORD/2)
+        {   
+            uint32_t col_num = 0;
+
+            for (int32_t rem_n = length_n; rem_n > 0; rem_n -= PLM_IN_WORD/2)
             {
-
-                uint32_t in_len  = in_rem  > PLM_IN_WORD  ? PLM_IN_WORD  : in_rem;
-                uint32_t out_len = out_rem > PLM_OUT_WORD ? PLM_OUT_WORD : out_rem;
-                uint32_t acc;
-
                 this->compute_load_handshake();
+                
+                // ESP_REPORT_INFO("[COMPUTE] Starting block row/batch = %d col = %d", row_num, col_num);
 
                 // Computing phase implementation
-                for (int a = 0; a < (gemm_m/block_size)+1; a++)
+                for (uint32_t m = 0; m < (PLM_IN_WORD/2)/gemm_n; m++)
                 {
-                    for (int b = 0; b < (gemm_n/block_size)+1; b++)
+                    for (uint32_t n = 0; n < (PLM_IN_WORD/2)/gemm_k; n++)
                     {
-                        for (int c = 0; c < (gemm_k/block_size)+1; c++)
+                        for (uint32_t k = 0; k < gemm_k; k++)
                         {
-                            block_size_m = (a == gemm_m/block_size) ? gemm_m%block_size : block_size;
-                            block_size_n = (b == gemm_n/block_size) ? gemm_n%block_size : block_size;
-                            block_size_k = (c == gemm_k/block_size) ? gemm_k%block_size : block_size;
-
-                            for (int m = 0; m < block_size_m; m++)
-                            {
-                                for (int n = 0; n < block_size_n; n++)
-                                {
-                                    acc = 0;
-
-                                    for (int k = 0; k < block_size_k; k++)
-                                    {
-                                        // TODO: assumes even number of elements in the arrays for ping-pong
-                                        if (ping)
-                                            acc += plm_in_ping[m*gemm_k + k] * plm_in_ping[gemm_m*gemm_k + n*gemm_k + k];
-                                        else
-                                            acc += plm_in_pong[m*gemm_k + k] * plm_in_pong[gemm_m*gemm_k + n*gemm_k + k];
-                                    }
-
-                                    if (ping)
-                                        plm_out_ping[m*gemm_n + n] = acc;
-                                    else
-                                        plm_out_pong[m*gemm_n + n] = acc;
-                                }
+                            if (ping_m & ping_n) {
+                                acc += plm_in_ping[m*gemm_k + k] * plm_in_ping[(PLM_IN_WORD/2) + n*gemm_k + k];
+                                // ESP_REPORT_INFO("[COMPUTE] ping_m = %d ping_n = %d m = %d n = %d k = %d acc = %d", ping_m, ping_n, m, n, k, acc);
+                            } else if (ping_m & (!ping_n)) {
+                                acc += plm_in_ping[m*gemm_k + k] * plm_in_pong[(PLM_IN_WORD/2) + n*gemm_k + k];
+                                // ESP_REPORT_INFO("[COMPUTE] ping_m = %d ping_n = %d m = %d n = %d k = %d acc = %d", ping_m, ping_n, m, n, k, acc);
+                            } else if ((!ping_m) & ping_n) {
+                                acc += plm_in_pong[m*gemm_k + k] * plm_in_ping[(PLM_IN_WORD/2) + n*gemm_k + k];
+                                // ESP_REPORT_INFO("[COMPUTE] ping_m = %d ping_n = %d m = %d n = %d k = %d acc = %d", ping_m, ping_n, m, n, k, acc);
+                            } else {
+                                acc += plm_in_pong[m*gemm_k + k] * plm_in_pong[(PLM_IN_WORD/2) + n*gemm_k + k];
+                                // ESP_REPORT_INFO("[COMPUTE] ping_m = %d ping_n = %d m = %d n = %d k = %d acc = %d", ping_m, ping_n, m, n, k, acc);
                             }
                         }
+                        if (ping_m)
+                            plm_out_ping[out_pos + m*gemm_n + n] = acc;
+                        else
+                            plm_out_pong[out_pos + m*gemm_n + n] = acc;
+                        // ESP_REPORT_INFO("[COMPUTE] output = %d acc = %d", out_pos + m*gemm_n + n , acc);
+                        acc = 0;
                     }
                 }
-
-                out_rem -= PLM_OUT_WORD;
-                this->compute_store_handshake();
-                ping = !ping;
+                out_pos += (PLM_IN_WORD/2)/gemm_k;
+                ping_n = !ping_n;
+                col_num++;
             }
+            out_pos = 0;
+            ping_m = !ping_m;
+            row_num++;
+
+            this->compute_store_handshake();
         }
 
         // Conclude

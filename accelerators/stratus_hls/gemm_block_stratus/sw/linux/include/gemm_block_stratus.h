@@ -23,11 +23,7 @@ struct gemm_block_stratus_access {
 	unsigned gemm_m;
 	unsigned gemm_n;
 	unsigned gemm_k;
-	unsigned offset_c;
 	unsigned gemm_batch;
-	unsigned offset_b;
-	unsigned offset_a;
-	unsigned block_size;
 	unsigned src_offset;
 	unsigned dst_offset;
 };

@@ -26,11 +26,7 @@ void system_t::config_proc()
         config.gemm_m = gemm_m;
         config.gemm_n = gemm_n;
         config.gemm_k = gemm_k;
-        config.offset_c = offset_c;
         config.gemm_batch = gemm_batch;
-        config.offset_b = offset_b;
-        config.offset_a = offset_a;
-        config.block_size = block_size;
 
         wait(); conf_info.write(config);
         conf_done.write(true);
@@ -102,13 +98,18 @@ void system_t::load_memory()
     in = new int32_t[in_size];
     for (int i = 0; i < gemm_batch; i++)
         for (int j = 0; j < (gemm_m * gemm_k) + (gemm_n * gemm_k); j++)
-            in[i * in_words_adj + j] = (int32_t) j;
+            in[i * in_words_adj + j] = (int32_t) (j % gemm_k);
 
     // Compute golden output
     gold = new int32_t[out_size];
     for (int i = 0; i < gemm_batch; i++)
-        for (int j = 0; j < gemm_m * gemm_n; j++)
-            gold[i * out_words_adj + j] = (int32_t) j;
+        for (int m = 0; m < gemm_m; m++)
+            for (int n = 0; n < gemm_n; n++) {
+                gold[i * out_words_adj + m * gemm_n + n] = 0;
+                for (int k = 0; k < gemm_k; k++)
+                    gold[i * out_words_adj + m * gemm_n + n] +=
+                        in[i * in_words_adj + m * gemm_k + k] * in[i * in_words_adj + gemm_m * gemm_k + n * gemm_k + k];
+            }
 
     // Memory initialization:
 #if (DMA_WORD_PER_BEAT == 0)
@@ -162,8 +163,10 @@ int system_t::validate()
 
     for (int i = 0; i < gemm_batch; i++)
         for (int j = 0; j < gemm_m * gemm_n; j++)
-            if (gold[i * out_words_adj + j] != out[i * out_words_adj + j])
+            if (gold[i * out_words_adj + j] != out[i * out_words_adj + j]) {
+                ESP_REPORT_INFO("Error j = %d %d %d\n", j, gold[i * out_words_adj + j], out[i * out_words_adj + j]);
                 errors++;
+            }
 
     delete [] in;
     delete [] out;

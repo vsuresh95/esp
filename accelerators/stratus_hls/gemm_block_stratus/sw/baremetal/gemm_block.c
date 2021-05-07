@@ -18,18 +18,14 @@ static unsigned DMA_WORD_PER_BEAT(unsigned _st)
 }
 
 
-#define SLD_GEMM_BLOCK 0x06a
+#define SLD_GEMM_BLOCK 0x100
 #define DEV_NAME "sld,gemm_block_stratus"
 
 /* <<--params-->> */
 const int32_t gemm_m = 64;
 const int32_t gemm_n = 64;
 const int32_t gemm_k = 64;
-const int32_t offset_c = 0;
 const int32_t gemm_batch = 1;
-const int32_t offset_b = 0;
-const int32_t offset_a = 0;
-const int32_t block_size = 16;
 
 static unsigned in_words_adj;
 static unsigned out_words_adj;
@@ -49,14 +45,10 @@ static unsigned mem_size;
 
 /* User defined registers */
 /* <<--regs-->> */
-#define GEMM_BLOCK_GEMM_M_REG 0x5c
-#define GEMM_BLOCK_GEMM_N_REG 0x58
-#define GEMM_BLOCK_GEMM_K_REG 0x54
-#define GEMM_BLOCK_OFFSET_C_REG 0x50
-#define GEMM_BLOCK_GEMM_BATCH_REG 0x4c
-#define GEMM_BLOCK_OFFSET_B_REG 0x48
-#define GEMM_BLOCK_OFFSET_A_REG 0x44
-#define GEMM_BLOCK_BLOCK_SIZE_REG 0x40
+#define GEMM_BLOCK_GEMM_M_REG 0x4c
+#define GEMM_BLOCK_GEMM_N_REG 0x48
+#define GEMM_BLOCK_GEMM_K_REG 0x44
+#define GEMM_BLOCK_GEMM_BATCH_REG 0x40
 
 
 static int validate_buf(token_t *out, token_t *gold)
@@ -84,13 +76,8 @@ static void init_buf (token_t *in, token_t * gold)
 			in[i * in_words_adj + j] = (token_t) j;
 
 	for (i = 0; i < gemm_batch; i++)
-        for (int m = 0; m < gemm_m; m++)
-            for (int n = 0; n < gemm_n; n++) {
-                gold[i * out_words_adj + m * gemm_n + n] = 0;
-                for (int k = 0; k < gemm_k; k++)
-                    gold[i * out_words_adj + m * gemm_n + n] +=
-                        in[i * in_words_adj + m * gemm_k + k] * in[i * in_words_adj + gemm_m * gemm_k + n * gemm_k + k];
-            }
+		for (j = 0; j < gemm_m * gemm_n; j++)
+			gold[i * out_words_adj + j] = (token_t) j;
 }
 
 
@@ -195,11 +182,7 @@ int main(int argc, char * argv[])
 		iowrite32(dev, GEMM_BLOCK_GEMM_M_REG, gemm_m);
 		iowrite32(dev, GEMM_BLOCK_GEMM_N_REG, gemm_n);
 		iowrite32(dev, GEMM_BLOCK_GEMM_K_REG, gemm_k);
-		iowrite32(dev, GEMM_BLOCK_OFFSET_C_REG, offset_c);
 		iowrite32(dev, GEMM_BLOCK_GEMM_BATCH_REG, gemm_batch);
-		iowrite32(dev, GEMM_BLOCK_OFFSET_B_REG, offset_b);
-		iowrite32(dev, GEMM_BLOCK_OFFSET_A_REG, offset_a);
-		iowrite32(dev, GEMM_BLOCK_BLOCK_SIZE_REG, block_size);
 
 			// Flush (customize coherence model here)
 			esp_flush(coherence);
