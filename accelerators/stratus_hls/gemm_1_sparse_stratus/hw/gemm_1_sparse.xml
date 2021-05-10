@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sld>
+  <accelerator name="gemm_1_sparse" desc="Accelerator GEMM_1_SPARSE" data_size="4" device_id="071" hls_tool="stratus_hls">
+    <param name="var_size" desc="var_size" />
+    <param name="gemm_batch" desc="gemm_batch" />
+    <param name="gemm_k" desc="gemm_k" />
+    <param name="gemm_n" desc="gemm_n" />
+    <param name="gemm_m" desc="gemm_m" />
+    <param name="h_order_size" desc="h_order_size" />
+  </accelerator>
+</sld>

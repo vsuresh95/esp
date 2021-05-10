@@ -1,0 +1,4 @@
+gemm_1_sparse_plm_block_in_dma32 524 32 1w:0r 0w:1r
+gemm_1_sparse_plm_block_out_dma32 256 32 1w:0r 0w:1r
+gemm_1_sparse_plm_block_in_dma64 524 32 2w:0r 0w:1r
+gemm_1_sparse_plm_block_out_dma64 256 32 1w:0r 0w:2r
