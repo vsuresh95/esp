@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sld>
+  <accelerator name="gemm_2_block" desc="Accelerator GEMM_2_BLOCK" data_size="4" device_id="072" hls_tool="stratus_hls">
+    <param name="gemm_batch" desc="gemm_batch" />
+    <param name="gemm_k" desc="gemm_k" />
+    <param name="gemm_n" desc="gemm_n" />
+    <param name="gemm_m" desc="gemm_m" />
+  </accelerator>
+</sld>
