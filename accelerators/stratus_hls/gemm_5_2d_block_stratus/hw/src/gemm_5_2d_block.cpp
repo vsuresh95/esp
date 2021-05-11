@@ -270,29 +270,46 @@ void gemm_5_2d_block::compute_kernel()
                     {
                         for (uint32_t acc_inst = 0; acc_inst < NUM_GEMM; acc_inst++)
                         {
-                            HLS_UNROLL_LOOP(ON, "num_gemm");
+                            // unroll the above loop i.e., acc_inst NUM_GEMM times
+                            HLS_UNROLL_LOOP(ALL, "num_gemm");
+
                             for (uint32_t n = acc_inst*ACC_REGION; n < (acc_inst+1)*ACC_REGION; n++)
                             {
+                                // do not unroll the above loop
+                                HLS_UNROLL_LOOP(OFF, "acc_region");
+
                                 for (uint32_t k = 0; k < BLOCK_SIZE; k++)
                                 {
+                                    // do not unroll the above loop
+                                    HLS_UNROLL_LOOP(OFF, "mac_loop");
+
+                                    uint32_t m_index = m*BLOCK_SIZE + k;
+                                    uint32_t n_index = (PLM_IN_WORD/2) + n*BLOCK_SIZE + k;
+
                                     HLS_BREAK_ARRAY_DEPENDENCY(plm_in_ping);
+
                                     if (ping)
-                                        acc += plm_in_ping[m*BLOCK_SIZE + k] * plm_in_ping[(PLM_IN_WORD/2) + n*BLOCK_SIZE + k];
+                                        acc += plm_in_ping[m_index] * plm_in_ping[n_index];
                                     else
-                                        acc += plm_in_pong[m*BLOCK_SIZE + k] * plm_in_pong[(PLM_IN_WORD/2) + n*BLOCK_SIZE + k];
+                                        acc += plm_in_pong[m_index] * plm_in_pong[n_index];
                                 }
+
+                                uint32_t out_index = m*BLOCK_SIZE + n;
 
                                 HLS_BREAK_ARRAY_DEPENDENCY(plm_out_ping);
 
-                                // sum all the multiplies and add them to the previous matmul (from loop num_k)
-                                if (ping_out && (num_k == 0))
-                                    plm_out_ping[m*BLOCK_SIZE + n] = acc;
-                                else if (!ping_out && (num_k == 0))
-                                    plm_out_pong[m*BLOCK_SIZE + n] = acc;
-                                else if (ping_out && (num_k != 0))
-                                    plm_out_ping[m*BLOCK_SIZE + n] += acc;
-                                else
-                                    plm_out_pong[m*BLOCK_SIZE + n] += acc;
+                                // sum all the multiplies and add/assign them to the previous matmul (from loop num_k)
+                                if (ping_out) {
+                                    if (num_k == 0)
+                                        plm_out_ping[out_index] = acc;
+                                    else
+                                        plm_out_ping[out_index] += acc;
+                                } else {
+                                    if (num_k == 0)
+                                        plm_out_pong[out_index] = acc;
+                                    else
+                                        plm_out_pong[out_index] += acc;
+                                }
                                 acc = 0;
                             }
                         }
