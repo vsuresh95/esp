@@ -11,7 +11,7 @@
 
 #include "esp_templates.hpp"
 
-const size_t MEM_SIZE = 49152 / (DMA_WIDTH/8);
+const size_t MEM_SIZE = 64 * 49152 / (DMA_WIDTH/8);
 
 #include "core/systems/esp_system.hpp"
 
@@ -54,9 +54,9 @@ public:
         acc->debug(debug);
 
         /* <<--params-default-->> */
-        gemm_m = 64;
-        gemm_n = 64;
-        gemm_k = 64;
+        gemm_m = 256;
+        gemm_n = 128;
+        gemm_k = 256;
     }
 
     // Processes

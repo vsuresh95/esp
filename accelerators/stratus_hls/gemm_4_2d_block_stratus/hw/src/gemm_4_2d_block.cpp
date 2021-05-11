@@ -54,17 +54,22 @@ void gemm_4_2d_block::load_input()
         // Moving in M dimension for matrix 1, and moving to new row of output
         for (uint32_t num_m = 0; num_m < gemm_m/BLOCK_SIZE; num_m++)
         {
+            wait();
             // Moving in N dimension for matrix 2, and moving to new column of output
             for (uint32_t num_n = 0; num_n < gemm_n/BLOCK_SIZE; num_n++)
             {
+                wait();
                 // Moving in K dimension for both matrices to fully compute output
                 for (uint32_t num_k = 0; num_k < gemm_k/BLOCK_SIZE; num_k++)
                 {
+                    wait();
                     // read the two 64x64 blocks from matrix 1 & 2 - only offset's change depending on 
                     // position in outer loops
                     for (uint32_t mat_num = 0; mat_num < 2; mat_num++)
                     {
                         uint32_t offset;
+
+                        wait();
 
                         // offset from start + vertical offset + horizontal offset
                         if (mat_num)
@@ -75,6 +80,8 @@ void gemm_4_2d_block::load_input()
                         // each new row of the block
                         for (uint32_t row_num = 0; row_num < BLOCK_SIZE; row_num++)
                         {
+                            wait();
+
                             dma_info_t dma_info(offset / DMA_WORD_PER_BEAT, BLOCK_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
                             this->dma_read_ctrl.put(dma_info);
                             offset += gemm_k;
@@ -160,6 +167,7 @@ void gemm_4_2d_block::store_output()
         // Moving in M dimension to new row of output
         for (uint32_t num_m = 0; num_m < gemm_m/BLOCK_SIZE; num_m++)
         {
+            wait();
             // Moving in N dimension to new column of output
             for (uint32_t num_n = 0; num_n < gemm_n/BLOCK_SIZE; num_n++)
             {
@@ -170,6 +178,8 @@ void gemm_4_2d_block::store_output()
                 // each new row of the block
                 for (uint32_t row_num = 0; row_num < BLOCK_SIZE; row_num++)
                 {
+                    wait();
+
                     dma_info_t dma_info(offset / DMA_WORD_PER_BEAT, BLOCK_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
                     offset += gemm_n;
 

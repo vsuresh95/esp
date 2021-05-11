@@ -18,6 +18,9 @@
 #define DMA_SIZE SIZE_WORD
 #define PLM_OUT_WORD 4096
 #define PLM_IN_WORD 8192
+#define BLOCK_SIZE 64
+#define NUM_GEMM 8
+#define ACC_REGION (BLOCK_SIZE/NUM_GEMM)
 
 class gemm_6_2d_block : public esp_accelerator_3P<DMA_WIDTH>
 {

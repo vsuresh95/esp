@@ -50,75 +50,68 @@ void gemm_6_2d_block::load_input()
         wait();
 
         bool ping = true;
-        uint32_t offset = 0;
 
-        // Batching
-        for (uint16_t b = 0; b < 1; b++)
+        // Moving in M dimension for matrix 1, and moving to new row of output
+        for (uint32_t num_m = 0; num_m < gemm_m/BLOCK_SIZE; num_m++)
         {
             wait();
-#if (DMA_WORD_PER_BEAT == 0)
-            uint32_t length = (gemm_m * gemm_k) + (gemm_n * gemm_k);
-#else
-            uint32_t length = round_up((gemm_m * gemm_k) + (gemm_n * gemm_k), DMA_WORD_PER_BEAT);
-#endif
-            // Chunking
-            for (int rem = length; rem > 0; rem -= PLM_IN_WORD)
+            // Moving in N dimension for matrix 2, and moving to new column of output
+            for (uint32_t num_n = 0; num_n < gemm_n/BLOCK_SIZE; num_n++)
             {
                 wait();
-                // Configure DMA transaction
-                uint32_t len = rem > PLM_IN_WORD ? PLM_IN_WORD : rem;
-#if (DMA_WORD_PER_BEAT == 0)
-                // data word is wider than NoC links
-                dma_info_t dma_info(offset * DMA_BEAT_PER_WORD, len * DMA_BEAT_PER_WORD, DMA_SIZE);
-#else
-                dma_info_t dma_info(offset / DMA_WORD_PER_BEAT, len / DMA_WORD_PER_BEAT, DMA_SIZE);
-#endif
-                offset += len;
-
-                this->dma_read_ctrl.put(dma_info);
-
-#if (DMA_WORD_PER_BEAT == 0)
-                // data word is wider than NoC links
-                for (uint16_t i = 0; i < len; i++)
+                // Moving in K dimension for both matrices to fully compute output
+                for (uint32_t num_k = 0; num_k < gemm_k/BLOCK_SIZE; num_k++)
                 {
-                    sc_dt::sc_bv<DATA_WIDTH> dataBv;
-
-                    for (uint16_t k = 0; k < DMA_BEAT_PER_WORD; k++)
-                    {
-                        dataBv.range((k+1) * DMA_WIDTH - 1, k * DMA_WIDTH) = this->dma_read_chnl.get();
-                        wait();
-                    }
-
-                    // Write to PLM
-                    if (ping)
-                        plm_in_ping[i] = dataBv.to_int64();
-                    else
-                        plm_in_pong[i] = dataBv.to_int64();
-                }
-#else
-                for (uint16_t i = 0; i < len; i += DMA_WORD_PER_BEAT)
-                {
-                    HLS_BREAK_DEP(plm_in_ping);
-                    HLS_BREAK_DEP(plm_in_pong);
-
-                    sc_dt::sc_bv<DMA_WIDTH> dataBv;
-
-                    dataBv = this->dma_read_chnl.get();
                     wait();
-
-                    // Write to PLM (all DMA_WORD_PER_BEAT words in one cycle)
-                    for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
+                    // read the two 64x64 blocks from matrix 1 & 2 - only offset's change depending on 
+                    // position in outer loops
+                    for (uint32_t mat_num = 0; mat_num < 2; mat_num++)
                     {
-                        HLS_UNROLL_SIMPLE;
-                        if (ping)
-                            plm_in_ping[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
+                        uint32_t offset;
+
+                        wait();
+
+                        // offset from start + vertical offset + horizontal offset
+                        if (mat_num)
+                            offset = (gemm_m * gemm_k) + (num_n * BLOCK_SIZE * gemm_k) + (num_k * BLOCK_SIZE);
                         else
-                            plm_in_pong[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
+                            offset = (num_m * BLOCK_SIZE * gemm_k) + (num_k * BLOCK_SIZE);
+                    
+                        // each new row of the block
+                        for (uint32_t row_num = 0; row_num < BLOCK_SIZE; row_num++)
+                        {
+                            wait();
+
+                            dma_info_t dma_info(offset / DMA_WORD_PER_BEAT, BLOCK_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                            this->dma_read_ctrl.put(dma_info);
+                            offset += gemm_k;
+
+                            for (uint32_t i = 0; i < BLOCK_SIZE; i += DMA_WORD_PER_BEAT)
+                            {
+                                HLS_BREAK_DEP(plm_in_ping);
+                                HLS_BREAK_DEP(plm_in_pong);
+
+                                sc_dt::sc_bv<DMA_WIDTH> dataBv;
+
+                                dataBv = this->dma_read_chnl.get();
+                                wait();
+
+                                // Write to PLM (all DMA_WORD_PER_BEAT words in one cycle)
+                                for (uint32_t k = 0; k < DMA_WORD_PER_BEAT; k++)
+                                {
+                                    uint32_t plm_index = (mat_num * (PLM_IN_WORD/2)) + (row_num * BLOCK_SIZE) + i + k;
+                                    HLS_UNROLL_SIMPLE;
+                                    if (ping)
+                                        plm_in_ping[plm_index] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
+                                    else
+                                        plm_in_pong[plm_index] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
+                                }
+                            }
+                        }
                     }
+                    this->load_compute_handshake();
+                    ping = !ping;
                 }
-#endif
-                this->load_compute_handshake();
-                ping = !ping;
             }
         }
     }
@@ -170,82 +163,45 @@ void gemm_6_2d_block::store_output()
         wait();
 
         bool ping = true;
-#if (DMA_WORD_PER_BEAT == 0)
-        uint32_t store_offset = ((gemm_m * gemm_k) + (gemm_n * gemm_k)) * 1;
-#else
-        uint32_t store_offset = round_up((gemm_m * gemm_k) + (gemm_n * gemm_k), DMA_WORD_PER_BEAT) * 1;
-#endif
-        uint32_t offset = store_offset;
 
-        wait();
-        // Batching
-        for (uint16_t b = 0; b < 1; b++)
+        // Moving in M dimension to new row of output
+        for (uint32_t num_m = 0; num_m < gemm_m/BLOCK_SIZE; num_m++)
         {
             wait();
-#if (DMA_WORD_PER_BEAT == 0)
-            uint32_t length = gemm_m * gemm_n;
-#else
-            uint32_t length = round_up(gemm_m * gemm_n, DMA_WORD_PER_BEAT);
-#endif
-            // Chunking
-            for (int rem = length; rem > 0; rem -= PLM_OUT_WORD)
+            // Moving in N dimension to new column of output
+            for (uint32_t num_n = 0; num_n < gemm_n/BLOCK_SIZE; num_n++)
             {
-
                 this->store_compute_handshake();
 
-                // Configure DMA transaction
-                uint32_t len = rem > PLM_OUT_WORD ? PLM_OUT_WORD : rem;
-#if (DMA_WORD_PER_BEAT == 0)
-                // data word is wider than NoC links
-                dma_info_t dma_info(offset * DMA_BEAT_PER_WORD, len * DMA_BEAT_PER_WORD, DMA_SIZE);
-#else
-                dma_info_t dma_info(offset / DMA_WORD_PER_BEAT, len / DMA_WORD_PER_BEAT, DMA_SIZE);
-#endif
-                offset += len;
+                uint32_t offset = (gemm_m * gemm_k) + (gemm_n * gemm_k) + (num_m * BLOCK_SIZE * gemm_n) + (num_n * BLOCK_SIZE);
 
-                this->dma_write_ctrl.put(dma_info);
-
-#if (DMA_WORD_PER_BEAT == 0)
-                // data word is wider than NoC links
-                for (uint16_t i = 0; i < len; i++)
+                // each new row of the block
+                for (uint32_t row_num = 0; row_num < BLOCK_SIZE; row_num++)
                 {
-                    // Read from PLM
-                    sc_dt::sc_int<DATA_WIDTH> data;
                     wait();
-                    if (ping)
-                        data = plm_out_ping[i];
-                    else
-                        data = plm_out_pong[i];
-                    sc_dt::sc_bv<DATA_WIDTH> dataBv(data);
 
-                    uint16_t k = 0;
-                    for (k = 0; k < DMA_BEAT_PER_WORD - 1; k++)
+                    dma_info_t dma_info(offset / DMA_WORD_PER_BEAT, BLOCK_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                    offset += gemm_n;
+
+                    this->dma_write_ctrl.put(dma_info);
+
+                    for (uint32_t i = 0; i < BLOCK_SIZE ; i += DMA_WORD_PER_BEAT)
                     {
-                        this->dma_write_chnl.put(dataBv.range((k+1) * DMA_WIDTH - 1, k * DMA_WIDTH));
+                        sc_dt::sc_bv<DMA_WIDTH> dataBv;
+
+                        // Read from PLM
                         wait();
+                        for (uint32_t k = 0; k < DMA_WORD_PER_BEAT; k++)
+                        {
+                            HLS_UNROLL_SIMPLE;
+                            if (ping)
+                                dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH) = plm_out_ping[(row_num * BLOCK_SIZE) + i + k];
+                            else
+                                dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH) = plm_out_pong[(row_num * BLOCK_SIZE) + i + k];
+                        }
+                        this->dma_write_chnl.put(dataBv);
                     }
-                    // Last beat on the bus does not require wait(), which is
-                    // placed before accessing the PLM
-                    this->dma_write_chnl.put(dataBv.range((k+1) * DMA_WIDTH - 1, k * DMA_WIDTH));
                 }
-#else
-                for (uint16_t i = 0; i < len; i += DMA_WORD_PER_BEAT)
-                {
-                    sc_dt::sc_bv<DMA_WIDTH> dataBv;
-
-                    // Read from PLM
-                    wait();
-                    for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
-                    {
-                        HLS_UNROLL_SIMPLE;
-                        if (ping)
-                            dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH) = plm_out_ping[i + k];
-                        else
-                            dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH) = plm_out_pong[i + k];
-                    }
-                    this->dma_write_chnl.put(dataBv);
-                }
-#endif
                 ping = !ping;
             }
         }
@@ -292,35 +248,59 @@ void gemm_6_2d_block::compute_kernel()
         gemm_k = config.gemm_k;
     }
 
-
     // Compute
     bool ping = true;
+    bool ping_out = true;
     {
-        for (uint16_t b = 0; b < 1; b++)
+        uint32_t acc = 0;
+
+        // Moving in M dimension for matrix 1, and moving to new row of output
+        for (uint32_t num_m = 0; num_m < gemm_m/BLOCK_SIZE; num_m++)
         {
-            uint32_t in_length = (gemm_m * gemm_k) + (gemm_n * gemm_k);
-            uint32_t out_length = gemm_m * gemm_n;
-            int out_rem = out_length;
-
-            for (int in_rem = in_length; in_rem > 0; in_rem -= PLM_IN_WORD)
+            // Moving in N dimension for matrix 2, and moving to new column of output
+            for (uint32_t num_n = 0; num_n < gemm_n/BLOCK_SIZE; num_n++)
             {
+                // Moving in K dimension for both matrices to fully compute output
+                for (uint32_t num_k = 0; num_k < gemm_k/BLOCK_SIZE; num_k++)
+                {
+                    this->compute_load_handshake();
 
-                uint32_t in_len  = in_rem  > PLM_IN_WORD  ? PLM_IN_WORD  : in_rem;
-                uint32_t out_len = out_rem > PLM_OUT_WORD ? PLM_OUT_WORD : out_rem;
+                    // Computing phase implementation
+                    for (uint32_t m = 0; m < BLOCK_SIZE; m++)
+                    {
+                        for (uint32_t acc_inst = 0; acc_inst < NUM_GEMM; acc_inst++)
+                        {
+                            HLS_UNROLL_LOOP(ON, "num_gemm");
+                            for (uint32_t n = acc_inst*ACC_REGION; n < (acc_inst+1)*ACC_REGION; n++)
+                            {
+                                for (uint32_t k = 0; k < BLOCK_SIZE; k++)
+                                {
+                                    HLS_BREAK_ARRAY_DEPENDENCY(plm_in_ping);
+                                    if (ping)
+                                        acc += plm_in_ping[m*BLOCK_SIZE + k] * plm_in_ping[(PLM_IN_WORD/2) + n*BLOCK_SIZE + k];
+                                    else
+                                        acc += plm_in_pong[m*BLOCK_SIZE + k] * plm_in_pong[(PLM_IN_WORD/2) + n*BLOCK_SIZE + k];
+                                }
 
-                this->compute_load_handshake();
+                                HLS_BREAK_ARRAY_DEPENDENCY(plm_out_ping);
 
-                // Computing phase implementation
-                for (int i = 0; i < in_len; i++) {
-                    if (ping)
-                        plm_out_ping[i] = plm_in_ping[i];
-                    else
-                        plm_out_pong[i] = plm_in_pong[i];
+                                // sum all the multiplies and add them to the previous matmul (from loop num_k)
+                                if (ping_out && (num_k == 0))
+                                    plm_out_ping[m*BLOCK_SIZE + n] = acc;
+                                else if (!ping_out && (num_k == 0))
+                                    plm_out_pong[m*BLOCK_SIZE + n] = acc;
+                                else if (ping_out && (num_k != 0))
+                                    plm_out_ping[m*BLOCK_SIZE + n] += acc;
+                                else
+                                    plm_out_pong[m*BLOCK_SIZE + n] += acc;
+                                acc = 0;
+                            }
+                        }
+                    }
+                    ping = !ping;
                 }
-
-                out_rem -= PLM_OUT_WORD;
                 this->compute_store_handshake();
-                ping = !ping;
+                ping_out = !ping_out;
             }
         }
 

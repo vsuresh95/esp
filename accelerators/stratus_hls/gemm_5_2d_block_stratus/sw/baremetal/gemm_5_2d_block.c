@@ -71,11 +71,15 @@ static void init_buf (token_t *in, token_t * gold)
 
 	for (i = 0; i < 1; i++)
 		for (j = 0; j < (gemm_m * gemm_k) + (gemm_n * gemm_k); j++)
-			in[i * in_words_adj + j] = (token_t) j;
+			in[i * in_words_adj + j] = (token_t) (j % gemm_k);
 
 	for (i = 0; i < 1; i++)
-		for (j = 0; j < gemm_m * gemm_n; j++)
-			gold[i * out_words_adj + j] = (token_t) j;
+        for (int m = 0; m < gemm_m; m++)
+            for (int n = 0; n < gemm_n; n++) {
+                gold[i * out_words_adj + m * gemm_n + n] = 0;
+                for (int k = 0; k < gemm_k; k++)
+                    gold[i * out_words_adj + m * gemm_n + n] += k * k;
+			}
 }
 
 
@@ -202,7 +206,7 @@ int main(int argc, char * argv[])
 			/* Validation */
 			errors = validate_buf(&mem[out_offset], gold);
 			if (errors)
-				printf("  ... FAIL\n");
+				printf("  ... FAIL errors = %d\n", errors);
 			else
 				printf("  ... PASS\n");
 		}

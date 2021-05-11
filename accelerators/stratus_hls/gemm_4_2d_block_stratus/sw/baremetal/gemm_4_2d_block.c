@@ -2,9 +2,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 
 #include <stdio.h>
-#ifndef __riscv
 #include <stdlib.h>
-#endif
 
 #include <esp_accelerator.h>
 #include <esp_probe.h>
@@ -22,9 +20,9 @@ static unsigned DMA_WORD_PER_BEAT(unsigned _st)
 #define DEV_NAME "sld,gemm_4_2d_block_stratus"
 
 /* <<--params-->> */
-const int32_t gemm_m = 64;
-const int32_t gemm_n = 64;
-const int32_t gemm_k = 64;
+const int32_t gemm_m = 256;
+const int32_t gemm_n = 128;
+const int32_t gemm_k = 256;
 
 static unsigned in_words_adj;
 static unsigned out_words_adj;
@@ -34,6 +32,8 @@ static unsigned in_size;
 static unsigned out_size;
 static unsigned out_offset;
 static unsigned mem_size;
+
+uint32_t checkpoint[10];
 
 /* Size of the contiguous chunks for scatter/gather */
 #define CHUNK_SHIFT 20
@@ -48,6 +48,23 @@ static unsigned mem_size;
 #define GEMM_4_2D_BLOCK_GEMM_N_REG 0x44
 #define GEMM_4_2D_BLOCK_GEMM_K_REG 0x40
 
+static inline uint64_t get_counter()
+{
+	uint64_t counter;
+	asm volatile (
+		"li t0, 0;"
+		// "rdcycle t0;"
+		"csrr t0, mcycle;"
+		"mv %0, t0"
+		: "=r" ( counter )
+		:
+		: "t0"
+	);
+
+	// printf("counter: %x\n", counter);
+
+	return counter;
+}
 
 static int validate_buf(token_t *out, token_t *gold)
 {
@@ -71,11 +88,20 @@ static void init_buf (token_t *in, token_t * gold)
 
 	for (i = 0; i < 1; i++)
 		for (j = 0; j < (gemm_m * gemm_k) + (gemm_n * gemm_k); j++)
-			in[i * in_words_adj + j] = (token_t) j;
+			in[i * in_words_adj + j] = (token_t) (rand() % gemm_k);
+
+	checkpoint[0] = get_counter();
 
 	for (i = 0; i < 1; i++)
-		for (j = 0; j < gemm_m * gemm_n; j++)
-			gold[i * out_words_adj + j] = (token_t) j;
+        for (int m = 0; m < gemm_m; m++)
+            for (int n = 0; n < gemm_n; n++) {
+                gold[i * out_words_adj + m * gemm_n + n] = 0;
+                for (int k = 0; k < gemm_k; k++)
+                    gold[i * out_words_adj + m * gemm_n + n] += 
+                        in[i * in_words_adj + m * gemm_k + k] * in[i * in_words_adj + gemm_m * gemm_k + n * gemm_k + k];
+			}
+
+	checkpoint[1] = get_counter();
 }
 
 
@@ -186,6 +212,9 @@ int main(int argc, char * argv[])
 
 			// Start accelerators
 			printf("  Start...\n");
+
+			checkpoint[2] = get_counter();
+
 			iowrite32(dev, CMD_REG, CMD_MASK_START);
 
 			// Wait for completion
@@ -196,19 +225,24 @@ int main(int argc, char * argv[])
 			}
 			iowrite32(dev, CMD_REG, 0x0);
 
+			checkpoint[3] = get_counter();
+
 			printf("  Done\n");
 			printf("  validating...\n");
 
 			/* Validation */
 			errors = validate_buf(&mem[out_offset], gold);
 			if (errors)
-				printf("  ... FAIL\n");
+				printf("  ... FAIL errors = %d\n", errors);
 			else
 				printf("  ... PASS\n");
 		}
 		aligned_free(ptable);
 		aligned_free(mem);
 		aligned_free(gold);
+
+		printf("Time take by CPU = %d\n", checkpoint[1] - checkpoint[0]);
+		printf("Time take by acc = %d\n", checkpoint[3] - checkpoint[2]);
 	}
 
 	return 0;
