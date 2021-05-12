@@ -368,7 +368,7 @@ void gemm_5_2d_block::compute_kernel()
                             // multiply all elements stored in regs_m and regs_n
                             for (uint32_t k = 0; k < BLOCK_SIZE; k++)
                             {
-                                HLS_UNROLL_LOOP(COMPLETE, 64, "multiply_k");
+                                HLS_UNROLL_LOOP(ON, "multiply_k");
                                 HLS_BREAK_ARRAY_DEPENDENCY(regs_m);
                                 HLS_BREAK_ARRAY_DEPENDENCY(regs_n);
                                 HLS_BREAK_ARRAY_DEPENDENCY(regs_mul);
@@ -381,7 +381,7 @@ void gemm_5_2d_block::compute_kernel()
                             // accmulate all the multiplies
                             for (uint32_t k = 0; k < BLOCK_SIZE; k++)
                             {
-                                HLS_UNROLL_LOOP(COMPLETE, 64, "accumulate_k");
+                                HLS_UNROLL_LOOP(ON, "accumulate_k");
                                 HLS_BREAK_ARRAY_DEPENDENCY(regs_mul);
 
                                 acc += regs_mul[k];
@@ -390,6 +390,8 @@ void gemm_5_2d_block::compute_kernel()
                             // assign the accumulate to the plm_out
                             {
                                 HLS_DEFINE_PROTOCOL("read_write_output");
+                                HLS_BREAK_ARRAY_DEPENDENCY(plm_out_ping);
+                                HLS_BREAK_ARRAY_DEPENDENCY(plm_out_pong);
 
                                 uint32_t partial_output;
                                 uint32_t out_index = m*BLOCK_SIZE + n;
