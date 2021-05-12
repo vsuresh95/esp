@@ -346,7 +346,7 @@ void gemm_5_2d_block::compute_kernel()
                             }
 
                             // read the entire row for matrix 1 from PLM into an array - 48-63
-                            for (int elem_n_3 = 3*(BLOCK_SIZE/4); elem_n_3 < BLOCK_SIZE; elem_n++)
+                            for (int elem_n_3 = 3*(BLOCK_SIZE/4); elem_n_3 < BLOCK_SIZE; elem_n_3++)
                             {
                                 HLS_UNROLL_LOOP(ON, "read_plm_n_3");
                                 HLS_BREAK_ARRAY_DEPENDENCY(plm_in_ping);
