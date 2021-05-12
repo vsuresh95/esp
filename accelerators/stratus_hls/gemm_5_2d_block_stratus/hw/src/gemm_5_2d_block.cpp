@@ -252,8 +252,6 @@ void gemm_5_2d_block::compute_kernel()
     bool ping = true;
     bool ping_out = true;
     {
-        uint32_t acc = 0;
-
         // Moving in M dimension for matrix 1, and moving to new row of output
         for (uint32_t num_m = 0; num_m < gemm_m/BLOCK_SIZE; num_m++)
         {
@@ -265,51 +263,152 @@ void gemm_5_2d_block::compute_kernel()
                 {
                     this->compute_load_handshake();
 
+                    uint32_t regs_m[64];
+                    uint32_t regs_n[64];
+                    uint32_t regs_mul[64];
+                    HLS_FLATTEN_ARRAY(regs_m);
+                    HLS_FLATTEN_ARRAY(regs_n);
+                    HLS_FLATTEN_ARRAY(regs_mul);
+
                     // Computing phase implementation
                     for (uint32_t m = 0; m < BLOCK_SIZE; m++)
                     {
+                        // read the entire row for matrix 1 from PLM into an array
+                        for (int elem_m = 0; elem_m < BLOCK_SIZE; elem_m++)
+                        {
+                            HLS_UNROLL_LOOP(COMPLETE, 16, "read_plm_m");
+                            HLS_BREAK_ARRAY_DEPENDENCY(plm_in_ping);
+                            HLS_BREAK_ARRAY_DEPENDENCY(plm_in_pong);
+                            HLS_BREAK_ARRAY_DEPENDENCY(regs_m);
+
+                            uint32_t m_index = m*BLOCK_SIZE + elem_m;
+
+                            if (ping)
+                                regs_m[elem_m] = plm_in_ping[m_index];
+                            else
+                                regs_m[elem_m] = plm_in_pong[m_index];
+                        }
+
                         for (uint32_t n = 0; n < BLOCK_SIZE; n++)
                         {
-                            for (uint32_t acc_inst = 0; acc_inst < NUM_GEMM; acc_inst++)
-                            {
-                                // unroll the above loop i.e., acc_inst NUM_GEMM times
-                                HLS_UNROLL_LOOP(ON, "num_gemm");
+                            HLS_PIPELINE_LOOP(HARD_STALL, 5, "pipe_mac");
 
-                                for (uint32_t k = acc_inst*ACC_REGION; k < (acc_inst+1)*ACC_REGION; k++)
-                                {
-                                    // do not unroll the above loop
-                                    HLS_UNROLL_LOOP(OFF, "mac_loop");
-
-                                    uint32_t m_index = m*BLOCK_SIZE + k;
-                                    uint32_t n_index = (PLM_IN_WORD/2) + n*BLOCK_SIZE + k;
-
-                                    HLS_BREAK_ARRAY_DEPENDENCY(plm_in_ping);
-
-                                    if (ping)
-                                        acc += plm_in_ping[m_index] * plm_in_ping[n_index];
-                                    else
-                                        acc += plm_in_pong[m_index] * plm_in_pong[n_index];
-                                }
-                            }
-
-                            uint32_t out_index = m*BLOCK_SIZE + n;
-
-                            HLS_BREAK_ARRAY_DEPENDENCY(plm_out_ping);
-
-                            // sum all the multiplies and add/assign them to the previous matmul (from loop num_k)
-                            if (ping_out) {
-                                if (num_k == 0)
-                                    plm_out_ping[out_index] = acc;
-                                else
-                                    plm_out_ping[out_index] += acc;
-                            } else {
-                                if (num_k == 0)
-                                    plm_out_pong[out_index] = acc;
-                                else
-                                    plm_out_pong[out_index] += acc;
-                            }
-                            acc = 0;
+                            ////////////////////////////////////////////////////////////////
+                            // START READ_PLM for N
+                            ////////////////////////////////////////////////////////////////
                             
+                            // read the entire row for matrix 1 from PLM into an array - 0-15
+                            for (int elem_n = 0; elem_n < (BLOCK_SIZE/4); elem_n++)
+                            {
+                                HLS_UNROLL_LOOP(ON, "read_plm_n_0");
+                                HLS_BREAK_ARRAY_DEPENDENCY(plm_in_ping);
+                                HLS_BREAK_ARRAY_DEPENDENCY(plm_in_pong);
+                                HLS_BREAK_ARRAY_DEPENDENCY(regs_n);
+
+                                uint32_t n_index = (PLM_IN_WORD/2) + n*BLOCK_SIZE + elem_n;
+
+                                if (ping)
+                                    regs_n[elem_n] = plm_in_ping[n_index];
+                                else
+                                    regs_n[elem_n] = plm_in_pong[n_index];
+                            }
+
+                            // read the entire row for matrix 1 from PLM into an array - 16-31
+                            for (int elem_n = (BLOCK_SIZE/4); elem_n < 2*(BLOCK_SIZE/4); elem_n++)
+                            {
+                                HLS_UNROLL_LOOP(ON, "read_plm_n_1");
+                                HLS_BREAK_ARRAY_DEPENDENCY(plm_in_ping);
+                                HLS_BREAK_ARRAY_DEPENDENCY(plm_in_pong);
+                                HLS_BREAK_ARRAY_DEPENDENCY(regs_n);
+
+                                uint32_t n_index = (PLM_IN_WORD/2) + n*BLOCK_SIZE + elem_n;
+
+                                if (ping)
+                                    regs_n[elem_n] = plm_in_ping[n_index];
+                                else
+                                    regs_n[elem_n] = plm_in_pong[n_index];
+                            }
+
+                            // read the entire row for matrix 1 from PLM into an array - 32-47
+                            for (int elem_n = 2*(BLOCK_SIZE/4); elem_n < 3*(BLOCK_SIZE/4); elem_n++)
+                            {
+                                HLS_UNROLL_LOOP(ON, "read_plm_n_2");
+                                HLS_BREAK_ARRAY_DEPENDENCY(plm_in_ping);
+                                HLS_BREAK_ARRAY_DEPENDENCY(plm_in_pong);
+                                HLS_BREAK_ARRAY_DEPENDENCY(regs_n);
+
+                                uint32_t n_index = (PLM_IN_WORD/2) + n*BLOCK_SIZE + elem_n;
+
+                                if (ping)
+                                    regs_n[elem_n] = plm_in_ping[n_index];
+                                else
+                                    regs_n[elem_n] = plm_in_pong[n_index];
+                            }
+
+                            // read the entire row for matrix 1 from PLM into an array - 48-63
+                            for (int elem_n = 3*(BLOCK_SIZE/4); elem_n < BLOCK_SIZE; elem_n++)
+                            {
+                                HLS_UNROLL_LOOP(ON, "read_plm_n_3");
+                                HLS_BREAK_ARRAY_DEPENDENCY(plm_in_ping);
+                                HLS_BREAK_ARRAY_DEPENDENCY(plm_in_pong);
+                                HLS_BREAK_ARRAY_DEPENDENCY(regs_n);
+
+                                uint32_t n_index = (PLM_IN_WORD/2) + n*BLOCK_SIZE + elem_n;
+
+                                if (ping)
+                                    regs_n[elem_n] = plm_in_ping[n_index];
+                                else
+                                    regs_n[elem_n] = plm_in_pong[n_index];
+                            }
+
+                            ////////////////////////////////////////////////////////////////
+                            // END READ_PLM for N
+                            ////////////////////////////////////////////////////////////////
+                            
+                            // multiply all elements stored in regs_m and regs_n
+                            for (uint32_t k = 0; k < BLOCK_SIZE; k++)
+                            {
+                                HLS_UNROLL_LOOP(COMPLETE, 64, "multiply_k");
+                                HLS_BREAK_ARRAY_DEPENDENCY(regs_m);
+                                HLS_BREAK_ARRAY_DEPENDENCY(regs_n);
+                                HLS_BREAK_ARRAY_DEPENDENCY(regs_mul);
+
+                                regs_mul[k] = regs_m[k] * regs_n[k];
+                            }
+
+                            uint32_t acc = 0;
+
+                            // accmulate all the multiplies
+                            for (uint32_t k = 0; k < BLOCK_SIZE; k++)
+                            {
+                                HLS_UNROLL_LOOP(COMPLETE, 64, "accumulate_k");
+                                HLS_BREAK_ARRAY_DEPENDENCY(regs_mul);
+
+                                acc += regs_mul[k];
+                            }
+
+                            // assign the accumulate to the plm_out
+                            {
+                                HLS_DEFINE_PROTOCOL("read_write_output");
+
+                                uint32_t partial_output;
+                                uint32_t out_index = m*BLOCK_SIZE + n;
+                                if (num_k == 0)
+                                    partial_output = 0;
+                                else {
+                                    if (ping_out)
+                                        partial_output = plm_out_ping[out_index];
+                                    else
+                                        partial_output = plm_out_pong[out_index];
+                                }
+
+                                wait();
+
+                                if (ping_out)
+                                    plm_out_ping[out_index] = partial_output + acc;
+                                else
+                                    plm_out_pong[out_index] = partial_output + acc;
+                            }
                         }
                     }
                     ping = !ping;
