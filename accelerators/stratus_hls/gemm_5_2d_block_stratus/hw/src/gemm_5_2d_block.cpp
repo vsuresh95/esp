@@ -336,29 +336,27 @@ void gemm_5_2d_block::compute_kernel()
                             }
 
                             // assign the accumulate to the plm_out
-                            {
-                                HLS_BREAK_ARRAY_DEPENDENCY(plm_out_ping);
-                                HLS_BREAK_ARRAY_DEPENDENCY(plm_out_pong);
+                            HLS_BREAK_ARRAY_DEPENDENCY(plm_out_ping);
+                            HLS_BREAK_ARRAY_DEPENDENCY(plm_out_pong);
 
-                                uint32_t partial_output;
-                                uint32_t out_index = m*BLOCK_SIZE + n;
+                            uint32_t partial_output;
+                            uint32_t out_index = m*BLOCK_SIZE + n;
 
-                                if (num_k == 0)
-                                    partial_output = 0;
-                                else {
-                                    if (ping_out)
-                                        partial_output = plm_out_ping[out_index];
-                                    else
-                                        partial_output = plm_out_pong[out_index];
-                                }
-
-                                partial_output += acc;
-
+                            if (num_k == 0)
+                                partial_output = 0;
+                            else {
                                 if (ping_out)
-                                    plm_out_ping[out_index] = partial_output;
+                                    partial_output = plm_out_ping[out_index];
                                 else
-                                    plm_out_pong[out_index] = partial_output;
+                                    partial_output = plm_out_pong[out_index];
                             }
+
+                            partial_output += acc;
+
+                            if (ping_out)
+                                plm_out_ping[out_index] = partial_output;
+                            else
+                                plm_out_pong[out_index] = partial_output;
                         }
                     }
                     ping = !ping;
