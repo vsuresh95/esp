@@ -266,14 +266,36 @@ void gemm_5_2d_block::compute_kernel()
                     uint32_t regs_m[64];
                     uint32_t regs_n[64];
                     uint32_t regs_mul[64];
+                    uint32_t regs_acc[64];
                     HLS_FLATTEN_ARRAY(regs_m);
                     HLS_FLATTEN_ARRAY(regs_n);
                     HLS_FLATTEN_ARRAY(regs_mul);
+                    HLS_FLATTEN_ARRAY(regs_acc);
 
                     // Computing phase implementation
                     for (uint32_t m = 0; m < BLOCK_SIZE; m++)
                     {
                         uint32_t m_offset = m*BLOCK_SIZE;
+
+                        // read the previous partial sum
+                        for (int elem_n = 0; elem_n < BLOCK_SIZE; elem_n++)
+                        {
+                            HLS_UNROLL_LOOP(AGGRESSIVE, 16, "acc_plm_out");
+                            HLS_BREAK_ARRAY_DEPENDENCY(plm_out_ping);
+                            HLS_BREAK_ARRAY_DEPENDENCY(plm_out_pong);
+                            HLS_BREAK_ARRAY_DEPENDENCY(regs_acc);
+
+                            uint32_t out_index = m*BLOCK_SIZE + elem_n;
+
+                            if (num_k == 0)
+                                regs_acc[elem_n] = 0;
+                            else {
+                                if (ping_out)
+                                    regs_acc[elem_n] = plm_out_ping[out_index];
+                                else
+                                    regs_acc[elem_n] = plm_out_pong[out_index];
+                            }
+                        }
 
                         // read the entire row for matrix 1 from PLM into an array
                         for (int elem_m = 0; elem_m < BLOCK_SIZE; elem_m++)
@@ -293,7 +315,7 @@ void gemm_5_2d_block::compute_kernel()
 
                         for (uint32_t n = 0; n < BLOCK_SIZE; n++)
                         {
-                            // HLS_PIPELINE_LOOP(HARD_STALL, 5, "pipe_mac");
+                            // HLS_PIPELINE_LOOP(HARD_STALL, 16, "pipe_mac");
 
                             uint32_t n_offset = (PLM_IN_WORD/2) + n*BLOCK_SIZE;
 
@@ -324,39 +346,31 @@ void gemm_5_2d_block::compute_kernel()
                                 regs_mul[k] = regs_m[k] * regs_n[k];
                             }
 
-                            uint32_t acc = 0;
-
                             // accmulate all the multiplies
                             for (uint32_t k = 0; k < BLOCK_SIZE; k++)
                             {
                                 HLS_UNROLL_LOOP(AGGRESSIVE, 64, "accummulate_k");
                                 HLS_BREAK_ARRAY_DEPENDENCY(regs_mul);
+                                HLS_BREAK_ARRAY_DEPENDENCY(regs_acc);
 
-                                acc += regs_mul[k];
+                                regs_acc[n] += regs_mul[k];
                             }
+                        }
 
-                            // assign the accumulate to the plm_out
+                        // assign the accumulate to the plm_out
+                        for (int elem_n = 0; elem_n < BLOCK_SIZE; elem_n++)
+                        {
+                            HLS_UNROLL_LOOP(AGGRESSIVE, 16, "acc_plm_out");
                             HLS_BREAK_ARRAY_DEPENDENCY(plm_out_ping);
                             HLS_BREAK_ARRAY_DEPENDENCY(plm_out_pong);
+                            HLS_BREAK_ARRAY_DEPENDENCY(regs_acc);
 
-                            uint32_t partial_output;
-                            uint32_t out_index = m*BLOCK_SIZE + n;
-
-                            if (num_k == 0)
-                                partial_output = 0;
-                            else {
-                                if (ping_out)
-                                    partial_output = plm_out_ping[out_index];
-                                else
-                                    partial_output = plm_out_pong[out_index];
-                            }
-
-                            partial_output += acc;
+                            uint32_t out_index = m*BLOCK_SIZE + elem_n;
 
                             if (ping_out)
-                                plm_out_ping[out_index] = partial_output;
+                                plm_out_ping[out_index] = regs_acc[elem_n];
                             else
-                                plm_out_pong[out_index] = partial_output;
+                                plm_out_pong[out_index] = regs_acc[elem_n];
                         }
                     }
                     ping = !ping;
