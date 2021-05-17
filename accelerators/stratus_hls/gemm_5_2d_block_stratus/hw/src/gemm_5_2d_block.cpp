@@ -277,23 +277,30 @@ void gemm_5_2d_block::compute_kernel()
                     {
                         uint32_t m_offset = m*BLOCK_SIZE;
 
-                        // read the previous partial sum
-                        for (int elem_n = 0; elem_n < BLOCK_SIZE; elem_n++)
+                        // read the previous partial sum, or not
+                        if (num_k == 0)
                         {
-                            HLS_UNROLL_LOOP(AGGRESSIVE, 16, "acc_plm_out");
-                            HLS_BREAK_ARRAY_DEPENDENCY(plm_out_ping);
-                            HLS_BREAK_ARRAY_DEPENDENCY(plm_out_pong);
-                            HLS_BREAK_ARRAY_DEPENDENCY(regs_acc);
+                            for (int elem_n_0 = 0; elem_n_0 < BLOCK_SIZE; elem_n_0++)
+                            {
+                                HLS_UNROLL_LOOP(ON, "read_plm_out_0");
 
-                            uint32_t out_index = m*BLOCK_SIZE + elem_n;
+                                regs_acc[elem_n_0] = 0;
+                            }
+                        }
+                        else
+                        {
+                            for (int elem_n_1 = 0; elem_n_1 < BLOCK_SIZE; elem_n_1++)
+                            {
+                                HLS_UNROLL_LOOP(AGGRESSIVE, 16, "read_plm_out_1");
+                                HLS_BREAK_ARRAY_DEPENDENCY(plm_out_ping);
+                                HLS_BREAK_ARRAY_DEPENDENCY(plm_out_pong);
 
-                            if (num_k == 0)
-                                regs_acc[elem_n] = 0;
-                            else {
+                                uint32_t out_index = m*BLOCK_SIZE + elem_n_1;
+
                                 if (ping_out)
-                                    regs_acc[elem_n] = plm_out_ping[out_index];
+                                    regs_acc[elem_n_1] = plm_out_ping[out_index];
                                 else
-                                    regs_acc[elem_n] = plm_out_pong[out_index];
+                                    regs_acc[elem_n_1] = plm_out_pong[out_index];
                             }
                         }
 
@@ -303,7 +310,6 @@ void gemm_5_2d_block::compute_kernel()
                             HLS_UNROLL_LOOP(AGGRESSIVE, 16, "read_plm_m");
                             HLS_BREAK_ARRAY_DEPENDENCY(plm_in_ping);
                             HLS_BREAK_ARRAY_DEPENDENCY(plm_in_pong);
-                            HLS_BREAK_ARRAY_DEPENDENCY(regs_m);
 
                             uint32_t m_index = m_offset + elem_m;
 
@@ -325,7 +331,6 @@ void gemm_5_2d_block::compute_kernel()
                                 HLS_UNROLL_LOOP(AGGRESSIVE, 16, "read_plm_n");
                                 HLS_BREAK_ARRAY_DEPENDENCY(plm_in_ping);
                                 HLS_BREAK_ARRAY_DEPENDENCY(plm_in_pong);
-                                HLS_BREAK_ARRAY_DEPENDENCY(regs_n);
 
                                 uint32_t n_index = n_offset + elem_n;
 
@@ -336,34 +341,28 @@ void gemm_5_2d_block::compute_kernel()
                             }
 
                             // multiply all elements stored in regs_m and regs_n
-                            for (uint32_t k = 0; k < BLOCK_SIZE; k++)
+                            for (uint32_t mul = 0; mul < BLOCK_SIZE; mul++)
                             {
-                                HLS_UNROLL_LOOP(AGGRESSIVE, 64, "multiply_k");
-                                HLS_BREAK_ARRAY_DEPENDENCY(regs_m);
-                                HLS_BREAK_ARRAY_DEPENDENCY(regs_n);
-                                HLS_BREAK_ARRAY_DEPENDENCY(regs_mul);
+                                HLS_UNROLL_LOOP(ON, "multiply_k");
 
-                                regs_mul[k] = regs_m[k] * regs_n[k];
+                                regs_mul[mul] = regs_m[mul] * regs_n[mul];
                             }
 
                             // accmulate all the multiplies
-                            for (uint32_t k = 0; k < BLOCK_SIZE; k++)
+                            for (uint32_t acc = 0; acc < BLOCK_SIZE; acc++)
                             {
-                                HLS_UNROLL_LOOP(AGGRESSIVE, 64, "accummulate_k");
-                                HLS_BREAK_ARRAY_DEPENDENCY(regs_mul);
-                                HLS_BREAK_ARRAY_DEPENDENCY(regs_acc);
+                                HLS_UNROLL_LOOP(ON, "accummulate_k");
 
-                                regs_acc[n] += regs_mul[k];
+                                regs_acc[n] += regs_mul[acc];
                             }
                         }
 
                         // assign the accumulate to the plm_out
                         for (int elem_n = 0; elem_n < BLOCK_SIZE; elem_n++)
                         {
-                            HLS_UNROLL_LOOP(AGGRESSIVE, 16, "acc_plm_out");
+                            HLS_UNROLL_LOOP(AGGRESSIVE, 16, "write_plm_out");
                             HLS_BREAK_ARRAY_DEPENDENCY(plm_out_ping);
                             HLS_BREAK_ARRAY_DEPENDENCY(plm_out_pong);
-                            HLS_BREAK_ARRAY_DEPENDENCY(regs_acc);
 
                             uint32_t out_index = m*BLOCK_SIZE + elem_n;
 
