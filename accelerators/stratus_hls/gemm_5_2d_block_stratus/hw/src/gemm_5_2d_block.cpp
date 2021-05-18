@@ -267,10 +267,20 @@ void gemm_5_2d_block::compute_kernel()
                     uint32_t regs_n[64];
                     uint32_t regs_mul[64];
                     uint32_t regs_acc[64];
+                    uint32_t regs_acc_0[32];
+                    uint32_t regs_acc_1[16];
+                    uint32_t regs_acc_2[8];
+                    uint32_t regs_acc_3[4];
+                    uint32_t regs_acc_4[2];
                     HLS_FLATTEN_ARRAY(regs_m);
                     HLS_FLATTEN_ARRAY(regs_n);
                     HLS_FLATTEN_ARRAY(regs_mul);
                     HLS_FLATTEN_ARRAY(regs_acc);
+                    HLS_FLATTEN_ARRAY(regs_acc_0);
+                    HLS_FLATTEN_ARRAY(regs_acc_1);
+                    HLS_FLATTEN_ARRAY(regs_acc_2);
+                    HLS_FLATTEN_ARRAY(regs_acc_3);
+                    HLS_FLATTEN_ARRAY(regs_acc_4);
 
                     // Computing phase implementation
                     for (uint32_t m = 0; m < BLOCK_SIZE; m++)
@@ -348,13 +358,42 @@ void gemm_5_2d_block::compute_kernel()
                                 regs_mul[mul] = regs_m[mul] * regs_n[mul];
                             }
 
-                            // accmulate all the multiplies
-                            for (uint32_t acc = 0; acc < BLOCK_SIZE; acc++)
+                            for (uint32_t mul = 0, acc = 0; mul < 64; mul=mul+2, acc++)
                             {
-                                HLS_UNROLL_LOOP(ON, "accummulate_k");
+                                HLS_UNROLL_LOOP(ON, "accumulate_k_0");
 
-                                regs_acc[n] += regs_mul[acc];
+                                regs_acc_0[acc] = regs_mul[mul]  + regs_mul[mul+1];
                             }
+
+                            for (uint32_t mul = 0, acc = 0; mul < 32; mul=mul+2, acc++)
+                            {
+                                HLS_UNROLL_LOOP(ON, "accumulate_k_1");
+
+                                regs_acc_1[acc] = regs_acc_0[mul]  + regs_acc_0[mul+1];
+                            }
+
+                            for (uint32_t mul = 0, acc = 0; mul < 16; mul=mul+2, acc++)
+                            {
+                                HLS_UNROLL_LOOP(ON, "accumulate_k_2");
+
+                                regs_acc_2[acc] = regs_acc_1[mul]  + regs_acc_1[mul+1];
+                            }
+
+                            for (uint32_t mul = 0, acc = 0; mul < 8; mul=mul+2, acc++)
+                            {
+                                HLS_UNROLL_LOOP(ON, "accumulate_k_3");
+
+                                regs_acc_3[acc] = regs_acc_2[mul]  + regs_acc_2[mul+1];
+                            }
+
+                            for (uint32_t mul = 0, acc = 0; mul < 4; mul=mul+2, acc++)
+                            {
+                                HLS_UNROLL_LOOP(ON, "accumulate_k_4");
+
+                                regs_acc_4[acc] = regs_acc_3[mul]  + regs_acc_3[mul+1];
+                            }
+
+                            regs_acc[n] = regs_acc_4[0] + regs_acc_4[1];
                         }
 
                         // assign the accumulate to the plm_out
