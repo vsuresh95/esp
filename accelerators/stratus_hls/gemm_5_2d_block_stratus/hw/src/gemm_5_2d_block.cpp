@@ -331,7 +331,7 @@ void gemm_5_2d_block::compute_kernel()
 
                         for (uint32_t n = 0; n < BLOCK_SIZE; n++)
                         {
-                            HLS_PIPELINE_LOOP(HARD_STALL, 10, "pipe_mac");
+                            HLS_PIPELINE_LOOP(HARD_STALL, 7, "pipe_mac");
 
                             uint32_t n_offset = (PLM_IN_WORD/2) + n*BLOCK_SIZE;
 
