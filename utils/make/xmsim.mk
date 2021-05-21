@@ -24,7 +24,7 @@ XMELABOPT += -nomxindr
 XMELABOPT += -timescale 10ps/10ps
 
 XMSIMOPT += $(SIMTOP)
-XMSIMOPT += -input xmsim.in
+XMSIMOPT += -input $(ESP_ROOT)/xmsim.tcl
 
 XMCOM     = xmvhdl  $(XMCOMOPT)
 XMLOG     = xmvlog -sv $(XMLOGOPT)
