@@ -200,6 +200,8 @@ package cachepackage is
       ahbmo : out ahb_mst_out_type;
       mosi  : in  axi_mosi_type;
       somi  : out axi_somi_type;
+      ace_req : out  ace_req_type;
+      ace_resp: in ace_resp_type;
       apbi  : in  apb_slv_in_type;
       apbo  : out apb_slv_out_type;
       flush : in  std_ulogic;           -- flush request from CPU

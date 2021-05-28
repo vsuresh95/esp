@@ -327,6 +327,9 @@ architecture rtl of tile_cpu is
   signal cache_ahbsi : ahb_slv_in_type;
   signal cache_ahbso : ahb_slv_out_type;
 
+  signal ace_req  : ace_req_type;
+  signal ace_resp : ace_resp_type;
+
   -- Mon
   signal mon_cache_int  : monitor_cache_type;
   signal mon_dvfs_int   : monitor_dvfs_type;
@@ -1196,6 +1199,8 @@ begin
         slmo        => somi(3),
         slmddri     => mosi(4),
         slmddro     => somi(4),
+        ace_req     => ace_req,
+        ace_resp    => ace_resp,
         apbi        => apbi,
         apbo        => apbo,
         apb_req     => apb_req,
@@ -1258,6 +1263,8 @@ begin
         ahbmo                      => ahbmo(CFG_NCPU_TILE),
         mosi                       => cache_drami,
         somi                       => cache_dramo,
+        ace_req                    => ace_req,
+        ace_resp                   => ace_resp,
         apbi                       => noc_apbi,
         apbo                       => noc_apbo(1),
         flush                      => dflush,
@@ -1332,6 +1339,7 @@ begin
     ahbso(ddr_hindex(0)) <= cache_ahbso;
     cache_ahbsi <= ahbsi;
 
+    ace_resp <= ace_resp_none;
 
     -- Remote uncached slaves
     ahbslv2noc_1 : ahbslv2noc
@@ -1450,6 +1458,7 @@ begin
 
     ariane_no_cache_coherence : if CFG_L2_ENABLE = 0 generate
       cache_drami <= axi_mosi_none;
+      ace_req     <= ace_req_none;
 
       mosi(1) <= ariane_drami;
       ariane_dramo <= somi(1);
