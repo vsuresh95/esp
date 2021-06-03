@@ -1,4 +1,8 @@
-#include "uart.h"
+#include <uart.h>
+#include <00_systest_helper.h>
+
+extern uint64_t amo_swap (volatile uint64_t* handshake, uint64_t value);
+extern volatile uint64_t read_dword_fcs (volatile uint64_t* dst, bool dcs_en, bool owner_pred);
 
 void write_reg_u32(uintptr_t addr, uint32_t value)
 {
@@ -51,12 +55,32 @@ void write_serial(char a)
 
 void print_uart(const char *str)
 {
+	uint64_t old_val;
+	volatile uint64_t* lock = (volatile uint64_t*) 0x90080000;
+
+	// acquire the lock
+	while (1) {
+		// check if lock is set
+		if (read_dword_fcs(lock, false, false) != 1) {
+			// try to set lock
+			old_val = amo_swap (lock, 1); 
+
+			// check if lock was set
+			if (old_val == 0){
+				break;
+			}
+		}
+	}
+
     const char *cur = &str[0];
     while (*cur != '\0')
     {
         write_serial((uint8_t)*cur);
         ++cur;
     }
+
+    // release the lock
+	old_val = amo_swap (lock, 0);
 }
 
 void init_uart()

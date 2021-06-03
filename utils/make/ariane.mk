@@ -7,7 +7,9 @@ ARIANE ?= $(ESP_ROOT)/rtl/cores/ariane/ariane
 RISCV_TESTS = $(SOFT)/riscv-tests
 RISCV_PK = $(SOFT)/riscv-pk
 
-soft: $(SOFT_BUILD)/prom.srec $(SOFT_BUILD)/ram.srec $(SOFT_BUILD)/prom.bin $(SOFT_BUILD)/systest.bin
+TEST_ID ?= 1
+
+soft: soft-clean $(SOFT_BUILD)/prom.srec $(SOFT_BUILD)/ram.srec $(SOFT_BUILD)/prom.bin $(SOFT_BUILD)/systest.bin
 
 soft-clean:
 	$(QUIET_CLEAN)$(RM)		 	\
@@ -53,6 +55,7 @@ $(SOFT_BUILD)/uart.o: $(BOOTROM_PATH)/uart.c $(ESP_CFG_BUILD)/socmap.h
 		-Os \
 		-Wall -Werror \
 		-mcmodel=medany -mexplicit-relocs \
+		-I. \
 		-I$(BOOTROM_PATH) \
 		-I$(DESIGN_PATH)/$(ESP_CFG_BUILD) \
 		-c $< -o $@
@@ -63,11 +66,13 @@ $(SOFT_BUILD)/prom.exe: $(SOFT_BUILD)/startup.o $(SOFT_BUILD)/uart.o $(SOFT_BUIL
 		-Os \
 		-Wall -Werror \
 		-mcmodel=medany -mexplicit-relocs \
+		-I. \
 		-I$(BOOTROM_PATH) \
 		-I$(DESIGN_PATH)/$(ESP_CFG_BUILD) \
 		-nostdlib -nodefaultlibs -nostartfiles \
 		-T$(BOOTROM_PATH)/linker.lds \
 		$(SOFT_BUILD)/startup.o $(SOFT_BUILD)/uart.o $(SOFT_BUILD)/main.o \
+ 		00_systest_helper.c \
 		-o $@
 
 $(SOFT_BUILD)/prom.srec: $(SOFT_BUILD)/prom.exe
@@ -92,13 +97,17 @@ RISCV_CFLAGS += -fno-builtin-printf
 RISCV_CFLAGS += -nostdlib
 RISCV_CFLAGS += -nostartfiles -lm -lgcc
 
-$(SOFT_BUILD)/systest.exe: systest.c $(SOFT_BUILD)/uart.o
+$(SOFT_BUILD)/systest.exe: 00_systest.c *_systest_*.c $(SOFT_BUILD)/uart.o
+	@echo "Compiling test $(TEST_ID)"
 	@mkdir -p $(SOFT_BUILD)
 	$(QUIET_CC) $(CROSS_COMPILE_ELF)gcc $(RISCV_CFLAGS) \
+	*_systest_*.c  \
 	$(SOFT)/common/syscalls.c \
 	$(RISCV_TESTS)/benchmarks/common/crt.S  \
+	-DTEST_ID=$(TEST_ID)  \
 	-T $(RISCV_TESTS)/benchmarks/common/test.ld -o $@ \
 	-I$(DESIGN_PATH)/$(ESP_CFG_BUILD) \
+	-I. \
 	$(SOFT_BUILD)/uart.o $<
 
 $(SOFT_BUILD)/systest.bin: $(TEST_PROGRAM)

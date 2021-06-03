@@ -28,7 +28,7 @@ SIMTOP = testbench
 VCOMOPT +=
 VLOGOPT +=
 
-XCOMOPT +=
+XCOMOPT += -DTEST_ID=$(TEST_ID)
 XLOGOPT +=
 
 VSIMOPT +=
