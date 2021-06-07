@@ -23,19 +23,25 @@ void simple_reqv ()
 		"csrr %0, mhartid"
 		: "=r" (hartid)
 	);
-
+	
 	// acquire the lock
 	while (1) {
 		// check if lock is set
 		if (read_dword_fcs(lock, false, false) != 1) {
+			printf ("%0d in\n", hartid);
+
 			// try to set lock
 			old_val = amo_swap (lock, 1); 
 
 			// check if lock was set
-			if (old_val == 0){
+			if (old_val != 1){
 				break;
 			}
+
+			printf ("%0d = %0d\n", hartid, old_val);
 		}
+
+		printf ("%0d\n", hartid);
 	}
 
 	printf ("%0d: Entered\n", hartid); 

@@ -66,7 +66,7 @@ void print_uart(const char *str)
 			old_val = amo_swap (lock, 1); 
 
 			// check if lock was set
-			if (old_val == 0){
+			if (old_val != 1){
 				break;
 			}
 		}
@@ -80,7 +80,7 @@ void print_uart(const char *str)
     }
 
     // release the lock
-	old_val = amo_swap (lock, 0);
+    old_val = amo_swap (lock, 0);
 }
 
 void init_uart()

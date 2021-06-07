@@ -6,6 +6,11 @@
 extern void simple_reqv ();
 extern void simple_reqwt ();
 extern void simple_reqwt_compare ();
+extern void simple_mesi ();
+
+#define STR(x) #x
+#define XSTR(x) STR(x)
+#pragma message "TEST_ID = " XSTR(TEST_ID)
 
 int main (int argc, char **argv)
 {
@@ -20,6 +25,9 @@ int main (int argc, char **argv)
 	printf ("%0d: Start T%0d\n", hartid, TEST_ID);
 
 	switch (TEST_ID) {
+		case 4:
+			simple_mesi();
+			break;
 		case 3:
 			simple_reqwt_compare();
 			break;

@@ -60,7 +60,7 @@ void write_dword_fcs (volatile uint64_t* dst, uint64_t value, bool dcs_en, bool 
 			asm volatile (
 				"mv t0, %0;"
 				"mv t1, %1;"
-				".word (0x2062B82B | (1 << 25))"
+				".word (0x2062B82B | (3 << 25))"
 				: 
 				: "r" (dst), "r" (value)
 				: "t0", "t1", "memory"
@@ -89,7 +89,7 @@ volatile uint64_t read_dword_fcs (volatile uint64_t* dst, bool dcs_en, bool owne
 			// OP enabled, ReqV & Cache ID 1
 			asm volatile (
 				"mv t0, %1;"
-				".word (0x2102B30B | (1 << 25));"
+				".word (0x2102B30B | (3 << 25));"
 				"mv %0, t1"
 				: "=r" (read_value)
 				: "r" (dst)
