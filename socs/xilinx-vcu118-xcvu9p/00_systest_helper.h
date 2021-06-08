@@ -4,6 +4,8 @@
 #ifndef __SYSTEST_HELPER__
 #define __SYSTEST_HELPER__
 
+uint64_t read_hartid ();
+
 void thread_entry (int cid, int nc);
 
 uint64_t amo_swap (volatile uint64_t* handshake, uint64_t value);

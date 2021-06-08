@@ -4,6 +4,17 @@ void thread_entry (int cid, int nc) {
 	return;
 }
 
+uint64_t read_hartid () {
+	uint64_t hartid;
+
+	asm volatile (
+		"csrr %0, mhartid"
+		: "=r" (hartid)
+	);
+
+	return hartid;
+}	
+
 uint64_t amo_swap (volatile uint64_t* handshake, uint64_t value) {
 	uint64_t old_val;
 

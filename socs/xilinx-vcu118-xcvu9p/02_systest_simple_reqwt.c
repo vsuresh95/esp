@@ -19,10 +19,7 @@ void simple_reqwt ()
 	volatile uint64_t* lr_sc = (volatile uint64_t*) 0x90020100;
 
 	// read hart ID
-	asm volatile (
-		"csrr %0, mhartid"
-		: "=r" (hartid)
-	);
+	hartid = read_hartid ();
 
 	// acquire the lock
 	while (1) {

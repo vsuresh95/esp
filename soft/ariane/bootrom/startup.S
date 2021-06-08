@@ -9,6 +9,7 @@
   .globl _prog_start
 _prog_start:
   # smp_pause(s1, s2)
+  # li sp, 0x9ff00000
   csrr a0, mhartid
   slli a0, a0, 0x10
   li a1, 0x9ff00000

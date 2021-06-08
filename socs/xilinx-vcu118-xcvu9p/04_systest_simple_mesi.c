@@ -20,10 +20,7 @@ void simple_mesi ()
 	uint64_t buffer2_val;
 
 	// read hart ID
-	asm volatile (
-		"csrr %0, mhartid"
-		: "=r" (hartid)
-	);
+	hartid = read_hartid ();
 
 	// acquire the lock
 	while (1) {

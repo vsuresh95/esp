@@ -20,10 +20,7 @@ void simple_reqwt_compare ()
 	volatile uint64_t* lr_sc = (volatile uint64_t*) 0x90020100;
 
 	// read hart ID
-	asm volatile (
-		"csrr %0, mhartid"
-		: "=r" (hartid)
-	);
+	hartid = read_hartid ();
 
 	///////////////////////////////////////////////////////////////
 	// Using ReqS + ReqO
