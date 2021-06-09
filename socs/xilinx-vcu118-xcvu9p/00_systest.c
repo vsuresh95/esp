@@ -23,7 +23,7 @@ int main (int argc, char **argv)
 		: "=r" (hartid)
 	);
 
-	// printf ("%0d: Start T%0d\n", hartid, TEST_ID);
+	printf ("%0d: Start T%0d\n", hartid, TEST_ID);
 
 	switch (TEST_ID) {
 		case 5:

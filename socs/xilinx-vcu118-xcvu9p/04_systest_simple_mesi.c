@@ -12,6 +12,10 @@ volatile uint64_t* lr_sc = (volatile uint64_t*) 0x90020100;
 #define BUF_LENGTH 50
 #define N_CPU 2
 
+#define STR(x) #x
+#define XSTR(x) STR(x)
+#pragma message "Inside test = " XSTR(TEST_ID)
+
 void simple_mesi ()
 {
 	uint64_t hartid;
@@ -23,18 +27,7 @@ void simple_mesi ()
 	hartid = read_hartid ();
 
 	// acquire the lock
-	while (1) {
-		// check if lock is set
-		if (read_dword_fcs(lock, false, false) != 1) {
-			// try to set lock
-			old_val = amo_swap (lock, 1); 
-
-			// check if lock was set
-			if (old_val != 1){
-				break;
-			}
-		}
-	}
+	spin_for_lock (lock);
 
 	printf ("%0d: Entered\n", hartid); 
 
@@ -64,7 +57,7 @@ void simple_mesi ()
 	printf ("%0d: Finished\n", hartid); 
 
 	// release the lock
-	old_val = amo_swap (lock, 0);
+	release_lock (lock);
 
 	// barrier for all to finish
 	while (read_dword_fcs(finish, false, false) != N_CPU);

@@ -30,6 +30,28 @@ uint64_t amo_swap (volatile uint64_t* handshake, uint64_t value) {
 	return old_val;
 }
 
+void spin_for_lock (volatile uint64_t* handshake) {
+	uint64_t old_val;
+
+	// acquire the lock
+	while (1) {
+		// check if lock is set
+		if (read_dword_fcs(handshake, false, false) != 1) {
+			// try to set lock
+			old_val = amo_swap (handshake, 1); 
+
+			// check if lock was set
+			if (old_val != 1){
+				break;
+			}
+		}
+	}
+}
+
+void release_lock (volatile uint64_t* handshake) {
+    while (amo_swap (handshake, 0) != 1);
+}
+
 void amo_add (volatile uint64_t* handshake, uint64_t value) {
 	asm volatile (
 		"mv t0, %1;"

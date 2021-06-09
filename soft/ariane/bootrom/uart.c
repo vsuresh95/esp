@@ -55,22 +55,10 @@ void write_serial(char a)
 
 void print_uart(const char *str)
 {
-	uint64_t old_val;
 	volatile uint64_t* lock = (volatile uint64_t*) 0x90080000;
 
 	// acquire the lock
-	while (1) {
-		// check if lock is set
-		if (read_dword_fcs(lock, false, false) != 1) {
-			// try to set lock
-			old_val = amo_swap (lock, 1); 
-
-			// check if lock was set
-			if (old_val != 1){
-				break;
-			}
-		}
-	}
+    spin_for_lock (lock);
 
     const char *cur = &str[0];
     while (*cur != '\0')
@@ -80,7 +68,7 @@ void print_uart(const char *str)
     }
 
     // release the lock
-    old_val = amo_swap (lock, 0);
+    release_lock (lock);
 }
 
 void init_uart()

@@ -10,6 +10,10 @@ void thread_entry (int cid, int nc);
 
 uint64_t amo_swap (volatile uint64_t* handshake, uint64_t value);
 
+void spin_for_lock (volatile uint64_t* handshake);
+
+void release_lock (volatile uint64_t* handshake);
+
 void amo_add (volatile uint64_t* handshake, uint64_t value);
 
 void self_inval (volatile uint64_t* handshake);

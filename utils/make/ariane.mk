@@ -97,11 +97,12 @@ RISCV_CFLAGS += -fno-builtin-printf
 RISCV_CFLAGS += -nostdlib
 RISCV_CFLAGS += -nostartfiles -lm -lgcc
 
-$(SOFT_BUILD)/systest.exe: 00_systest.c *_systest_*.c $(SOFT_BUILD)/uart.o
+$(SOFT_BUILD)/systest.exe: 00_systest*.c $(TEST_ID)_systest_*.c $(SOFT_BUILD)/uart.o
 	@echo "Compiling test $(TEST_ID)"
 	@mkdir -p $(SOFT_BUILD)
 	$(QUIET_CC) $(CROSS_COMPILE_ELF)gcc $(RISCV_CFLAGS) \
-	*_systest_*.c  \
+	00_systest_*.c  \
+	$(TEST_ID)_systest_*.c  \
 	$(SOFT)/common/syscalls.c \
 	$(RISCV_TESTS)/benchmarks/common/crt.S  \
 	-DTEST_ID=$(TEST_ID)  \
