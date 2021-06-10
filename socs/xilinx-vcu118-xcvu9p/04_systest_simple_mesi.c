@@ -3,12 +3,6 @@
 
 #include <00_systest_helper.h>
 
-volatile uint64_t* buffer1 = (volatile uint64_t*) 0x90010000;
-volatile uint64_t* buffer2 = (volatile uint64_t*) 0x90018000;
-volatile uint64_t* finish = (volatile uint64_t*) 0x90020000;
-volatile uint64_t* lock = (volatile uint64_t*) 0x90020080;
-volatile uint64_t* lr_sc = (volatile uint64_t*) 0x90020100;
-
 #define BUF_LENGTH 50
 #define N_CPU 2
 
@@ -22,6 +16,10 @@ void simple_mesi ()
 	uint64_t old_val;
 	uint64_t buffer1_val;
 	uint64_t buffer2_val;
+	volatile uint64_t* buffer1 = (volatile uint64_t*) 0x90010000;
+	volatile uint64_t* buffer2 = (volatile uint64_t*) 0x90018000;
+	volatile uint64_t* finish = (volatile uint64_t*) 0x90020000;
+	volatile uint64_t* lock = (volatile uint64_t*) 0x90020080;
 
 	// read hart ID
 	hartid = read_hartid ();

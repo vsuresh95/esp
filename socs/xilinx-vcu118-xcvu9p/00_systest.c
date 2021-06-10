@@ -8,6 +8,7 @@ extern void simple_reqwt ();
 extern void simple_reqwt_compare ();
 extern void simple_mesi ();
 extern void riscv_multicore ();
+extern void false_sharing ();
 
 #define STR(x) #x
 #define XSTR(x) STR(x)
@@ -26,6 +27,9 @@ int main (int argc, char **argv)
 	printf ("%0d: Start T%0d\n", hartid, TEST_ID);
 
 	switch (TEST_ID) {
+		case 6:
+			false_sharing();
+			break;
 		case 5:
 			riscv_multicore();
 			break;

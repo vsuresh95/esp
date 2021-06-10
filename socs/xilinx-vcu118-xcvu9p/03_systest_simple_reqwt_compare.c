@@ -21,7 +21,6 @@ void simple_reqwt_compare ()
 	volatile uint64_t* buffer2 = (volatile uint64_t*) 0x90018000;
 	volatile uint64_t* finish = (volatile uint64_t*) 0x90020000;
 	volatile uint64_t* lock = (volatile uint64_t*) 0x90020080;
-	volatile uint64_t* lr_sc = (volatile uint64_t*) 0x90020100;
 
 	// read hart ID
 	hartid = read_hartid ();
