@@ -127,7 +127,8 @@ package gencaches is
       l2_rd_rsp_valid : out std_ulogic;
       l2_rd_rsp_data_line : out line_t;
       l2_inval_valid : out std_ulogic;
-      l2_inval_data : out line_addr_t;
+      l2_inval_data_addr : out line_addr_t;
+      l2_inval_data_hprot : out hprot_t;
       l2_bresp_valid : out std_ulogic;
       l2_bresp_data : out bresp_t;
       l2_req_out_valid : out std_ulogic;
