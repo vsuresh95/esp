@@ -9,6 +9,7 @@ extern void simple_reqwt_compare ();
 extern void simple_mesi ();
 extern void riscv_multicore ();
 extern void false_sharing ();
+extern void riscv_multicore_reqv ();
 
 #define STR(x) #x
 #define XSTR(x) STR(x)
@@ -17,6 +18,7 @@ extern void false_sharing ();
 int main (int argc, char **argv)
 {
 	uint64_t hartid;
+    static uint64_t print_lock;
 
 	// read hart ID
 	asm volatile (
@@ -27,6 +29,9 @@ int main (int argc, char **argv)
 	printf ("%0d: Start T%0d\n", hartid, TEST_ID);
 
 	switch (TEST_ID) {
+		case 7:
+			riscv_multicore_reqv();
+			break;
 		case 6:
 			false_sharing();
 			break;

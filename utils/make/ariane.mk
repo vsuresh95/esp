@@ -55,7 +55,6 @@ $(SOFT_BUILD)/uart.o: $(BOOTROM_PATH)/uart.c $(ESP_CFG_BUILD)/socmap.h
 		-Os \
 		-Wall -Werror \
 		-mcmodel=medany -mexplicit-relocs \
-		-I. \
 		-I$(BOOTROM_PATH) \
 		-I$(DESIGN_PATH)/$(ESP_CFG_BUILD) \
 		-c $< -o $@
@@ -66,13 +65,11 @@ $(SOFT_BUILD)/prom.exe: $(SOFT_BUILD)/startup.o $(SOFT_BUILD)/uart.o $(SOFT_BUIL
 		-Os \
 		-Wall -Werror \
 		-mcmodel=medany -mexplicit-relocs \
-		-I. \
 		-I$(BOOTROM_PATH) \
 		-I$(DESIGN_PATH)/$(ESP_CFG_BUILD) \
 		-nostdlib -nodefaultlibs -nostartfiles \
 		-T$(BOOTROM_PATH)/linker.lds \
 		$(SOFT_BUILD)/startup.o $(SOFT_BUILD)/uart.o $(SOFT_BUILD)/main.o \
- 		00_systest_helper.c \
 		-o $@
 
 $(SOFT_BUILD)/prom.srec: $(SOFT_BUILD)/prom.exe

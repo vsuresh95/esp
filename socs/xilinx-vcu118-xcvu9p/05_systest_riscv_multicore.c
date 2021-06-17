@@ -1,136 +1,46 @@
-#include <stdint.h>
-#include <encoding.h>
-#include <stdio.h>
+// Copyright (c) 2011-2021 Columbia University, System Level Design Group
+// SPDX-License-Identifier: Apache-2.0
 
-#ifndef INIT_H
-#define INIT_H
+#include <00_systest_helper.h>
 
-#define MTIME           (*(volatile long long *)(0x02000000 + 0xbff8))
-#define MTIMECMP        ((volatile long long *)(0x02000000 + 0x4000))
-#define NHARTS 2
+#define N_CPU 2
 
-#define csr_read(csr)                                   \
-({                                                      \
-    register unsigned long __v;                         \
-    __asm__ __volatile__ ("csrr %0, " #csr              \
-                  : "=r" (__v));                        \
-    __v;                                                \
-})
+#define STR(x) #x
+#define XSTR(x) STR(x)
+#pragma message "Inside test = " XSTR(TEST_ID)
 
-typedef void* (*trap_handler_t)(unsigned hartid, unsigned mcause, void *mepc,
-        void *sp);
-void set_trap_handler(trap_handler_t handler);
-void enable_timer_interrupts();
-
-#endif
-
-trap_handler_t trap_handler[NHARTS] = {0};
-
-void set_trap_handler(trap_handler_t handler)
+void riscv_multicore ()
 {
-    unsigned hartid = csr_read(mhartid);
-    trap_handler[hartid] = handler;
-}
+    uint64_t hartid;
+    static uint64_t print_lock;
+    static uint64_t first;
+    static uint64_t shared_count;
+    static uint64_t hart_count[N_CPU];
+    static uint64_t lock;
 
-void enable_timer_interrupts()
-{
-    set_csr(mie, MIP_MTIP);
-    set_csr(mstatus, MSTATUS_MIE);
-}
+	// read hart ID
+	hartid = read_hartid ();
 
-void handle_trap(unsigned int mcause, void *mepc, void *sp)
-{
-    unsigned hartid = csr_read(mhartid);
-    if (trap_handler[hartid]) {
-        trap_handler[hartid](hartid, mcause, mepc, sp);
-        return;
-    }
-
-    while (1)
-        ;
-}
-
-typedef struct {
-    int counter;
-} atomic_t;
-
-static inline int atomic_xchg(atomic_t *v, int n)
-{
-    register int c;
-
-    __asm__ __volatile__ (
-            "amoswap.w.aqrl %0, %2, %1"
-            : "=r" (c), "+A" (v->counter)
-            : "r" (n));
-    return c;
-}
-
-static inline void mb(void)
-{
-    __asm__ __volatile__ ("fence");
-}
-
-void get_lock(atomic_t *lock)
-{
-    while (atomic_xchg(lock, 1) == 1)
-        ;
-    mb();
-}
-
-void put_lock(atomic_t *lock)
-{
-    mb();
-    atomic_xchg(lock, 0);
-}
-
-static atomic_t buf_lock = { .counter = 0 };
-static char buf[32];
-static int buf_initialized;
-static unsigned hart_count[NHARTS];
-static unsigned interrupt_count[NHARTS];
-
-static unsigned delta = 0x100;
-void *increment_count(unsigned hartid, unsigned mcause, void *mepc, void *sp)
-{
-    interrupt_count[hartid]++;
-    MTIMECMP[hartid] = MTIME + delta;
-    return mepc;
-}
-
-int riscv_multicore ()
-{
-    uint32_t hartid = csr_read(mhartid);
     hart_count[hartid] = 0;
-    interrupt_count[hartid] = 0;
 
-    set_trap_handler(increment_count);
-    // Despite being memory-mapped, there appears to be one mtimecmp
-    // register per hart. The spec does not address this.
-    MTIMECMP[hartid] = MTIME + delta;
-    enable_timer_interrupts();
-
+    // infinitely running test
     while (1) {
-        get_lock(&buf_lock);
+	    // acquire the lock
+	    spin_for_lock (&lock);
 
-        if (!buf_initialized) {
-            for (unsigned i = 0; i < sizeof(buf); i++) {
-                buf[i] = 'A' + (i % 26);
-            }
-            buf_initialized = 1;
+        if (first != 1) {
+            shared_count = 0;
+            first = 1;
         }
 
-        char first = buf[0];
-        int offset = (first & ~0x20) - 'A';
-        for (unsigned i = 0; i < sizeof(buf); i++) {
-            while (buf[i] != (first - offset + ((offset + i) % 26)))
-                ;
-
-            if (hartid & 1)
-                buf[i] = 'A' + ((i + hartid + hart_count[hartid]) % 26);
-            else
-                buf[i] = 'a' + ((i + hartid + hart_count[hartid]) % 26);
-        }
-        put_lock(&buf_lock);
+        shared_count++;
         hart_count[hartid]++;
+
+        printf ("%0d: %0d, %0d %0d\n", hartid, shared_count, hart_count[0], hart_count[1]);
+
+    	// release the lock
+    	release_lock (&lock);
     }
-}
+
+	return;
+} 

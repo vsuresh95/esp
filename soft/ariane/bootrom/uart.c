@@ -1,8 +1,4 @@
 #include <uart.h>
-#include <00_systest_helper.h>
-
-extern uint64_t amo_swap (volatile uint64_t* handshake, uint64_t value);
-extern volatile uint64_t read_dword_fcs (volatile uint64_t* dst, bool dcs_en, bool owner_pred);
 
 void write_reg_u32(uintptr_t addr, uint32_t value)
 {
@@ -55,20 +51,12 @@ void write_serial(char a)
 
 void print_uart(const char *str)
 {
-	volatile uint64_t* lock = (volatile uint64_t*) 0x90080000;
-
-	// acquire the lock
-    spin_for_lock (lock);
-
     const char *cur = &str[0];
     while (*cur != '\0')
     {
         write_serial((uint8_t)*cur);
         ++cur;
     }
-
-    // release the lock
-    release_lock (lock);
 }
 
 void init_uart()
