@@ -48,6 +48,8 @@ entity ariane_axi_wrap is
     apbo        : in  apb_slv_out_vector;
     apb_req     : out std_ulogic;
     apb_ack     : in  std_ulogic;
+    ace_req     : in  ace_req_type;
+    ace_resp    : out ace_resp_type;
     fence_l2    : out std_logic_vector(1 downto 0)
     );
 
@@ -146,6 +148,11 @@ architecture rtl of ariane_axi_wrap is
       dram_aw_user    : out std_logic_vector(AXI_USER_WIDTH-1 downto 0);
       dram_aw_valid   : out std_logic;
       dram_aw_ready   : in  std_logic;
+      dram_ac_addr    : in  std_logic_vector(AXI_ADDR_WIDTH-1 downto 0);
+      dram_ac_prot    : in  std_logic_vector(2 downto 0);
+      dram_ac_snoop   : in  std_logic_vector(3 downto 0);
+      dram_ac_valid   : in  std_logic;
+      dram_ac_ready   : out std_logic;
       dram_w_data     : out std_logic_vector(AXI_DATA_WIDTH-1 downto 0);
       dram_w_strb     : out std_logic_vector(AXI_STRB_WIDTH-1 downto 0);
       dram_w_last     : out std_logic;
@@ -429,6 +436,11 @@ begin  -- architecture rtl
       dram_aw_user    => drami.aw.user,
       dram_aw_valid   => drami.aw.valid,
       dram_aw_ready   => dramo.aw.ready,
+      dram_ac_addr    => ace_req.ac.addr,
+      dram_ac_prot    => ace_req.ac.prot,
+      dram_ac_snoop   => ace_req.ac.snoop,
+      dram_ac_valid   => ace_req.ac.valid,
+      dram_ac_ready   => ace_resp.ac.ready,
       dram_w_data     => drami.w.data,
       dram_w_strb     => drami.w.strb,
       dram_w_last     => drami.w.last,

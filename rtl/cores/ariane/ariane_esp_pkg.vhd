@@ -43,6 +43,8 @@ package ariane_esp_pkg is
       slmo        : in  axi_somi_type;
       slmddri     : out axi_mosi_type;
       slmddro     : in  axi_somi_type;
+      ace_req     : in  ace_req_type;
+      ace_resp    : out ace_resp_type;
       apbi        : out apb_slv_in_type;
       apbo        : in  apb_slv_out_vector;
       apb_req     : out std_ulogic;
