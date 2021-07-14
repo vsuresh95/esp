@@ -62,6 +62,8 @@ entity l2_wrapper is
     ahbmo : out ahb_mst_out_type;
     mosi  : in  axi_mosi_type;
     somi  : out axi_somi_type;
+    ace_req : out  ace_req_type;
+    ace_resp: in ace_resp_type;
     apbi  : in  apb_slv_in_type;
     apbo  : out apb_slv_out_type;
     flush : in  std_ulogic;             -- flush request from CPU
@@ -122,7 +124,8 @@ architecture rtl of l2_wrapper is
   signal rd_rsp_data_line       : line_t;
   signal inval_ready            : std_ulogic;
   signal inval_valid            : std_ulogic;
-  signal inval_data             : line_addr_t;
+  signal inval_data_addr        : line_addr_t;
+  signal inval_data_hprot       : hprot_t;
   signal bresp_ready            : std_ulogic;
   signal bresp_valid            : std_ulogic;
   signal bresp_data             : bresp_t;
@@ -309,11 +312,17 @@ architecture rtl of l2_wrapper is
   -- FIFO for invalidation addresses
   signal inv_fifo_rdreq        : std_ulogic;
   signal inv_fifo_wrreq        : std_ulogic;
-  signal inv_fifo_data_in      : line_addr_t;
+  signal inv_fifo_data_in      : std_logic_vector((ADDR_BITS - OFFSET_BITS) + HPROT_WIDTH - 1 downto 0);
   signal inv_fifo_empty        : std_ulogic;
   signal inv_fifo_almost_empty : std_ulogic;
   signal inv_fifo_full         : std_ulogic;
-  signal inv_fifo_data_out     : line_addr_t;
+  signal inv_fifo_data_out     : std_logic_vector((ADDR_BITS - OFFSET_BITS) + HPROT_WIDTH - 1 downto 0);
+
+  signal inv_fifo_data_in_addr  : line_addr_t;
+  signal inv_fifo_data_in_hprot : hprot_t;
+
+  signal inv_fifo_data_out_addr  : line_addr_t;
+  signal inv_fifo_data_out_hprot : hprot_t;
 
   -------------------------------------------------------------------------------
   -- FSM: Request to NoC
@@ -606,7 +615,8 @@ begin  -- architecture rtl of l2_wrapper
       l2_rd_rsp_data_line       => rd_rsp_data_line,
       l2_inval_ready            => inval_ready,
       l2_inval_valid            => inval_valid,
-      l2_inval_data             => inval_data,
+      l2_inval_data_addr        => inval_data_addr,
+      l2_inval_data_hprot       => inval_data_hprot,
       l2_bresp_ready            => bresp_ready,
       l2_bresp_valid            => bresp_valid,
       l2_bresp_data             => bresp_data,
@@ -701,7 +711,7 @@ begin  -- architecture rtl of l2_wrapper
       l2_rd_rsp_data_line       => rd_rsp_data_line,
       l2_inval_ready            => inval_ready,
       l2_inval_valid            => inval_valid,
-      l2_inval_data             => inval_data,
+      l2_inval_data             => inval_data_addr,
       l2_bresp_ready            => bresp_ready,
       l2_bresp_valid            => bresp_valid,
       l2_bresp_data             => bresp_data,
@@ -761,7 +771,7 @@ begin  -- architecture rtl of l2_wrapper
   Invalidate_fifo : fifo_custom
     generic map (
       depth => N_REQS + 12,             -- TODO: what size here?
-      width => ADDR_BITS - OFFSET_BITS)
+      width => ADDR_BITS - OFFSET_BITS + HPROT_WIDTH)
     port map (
       clk          => clk,
       rst          => rst,
@@ -772,6 +782,10 @@ begin  -- architecture rtl of l2_wrapper
       almost_empty => inv_fifo_almost_empty,
       full         => inv_fifo_full,
       data_out     => inv_fifo_data_out);
+
+  inv_fifo_data_in        <= inv_fifo_data_in_hprot & inv_fifo_data_in_addr;
+  inv_fifo_data_out_hprot <= inv_fifo_data_out(ADDR_BITS - OFFSET_BITS + HPROT_WIDTH - 1 downto ADDR_BITS - OFFSET_BITS);
+  inv_fifo_data_out_addr  <= inv_fifo_data_out(ADDR_BITS - OFFSET_BITS - 1 downto 0);
 
   ----------------------------------------------------------------------------
   -- Fence signal state
@@ -1390,7 +1404,8 @@ begin  -- architecture rtl of l2_wrapper
     inval_ready      <= '1';
     inv_fifo_rdreq   <= '0';
     inv_fifo_wrreq   <= '0';
-    inv_fifo_data_in <= (others => '0');
+    inv_fifo_data_in_addr  <= (others => '0');
+    inv_fifo_data_in_hprot <= (others => '0');
 
     ahbmo.hbusreq    <= '0';
     ahbmo.htrans     <=  HTRANS_IDLE;
@@ -1402,9 +1417,10 @@ begin  -- architecture rtl of l2_wrapper
     -- put writes of invalidate addresses coming from the L2 cache into a FIFO
     inval_ready      <= inval_valid when inv_fifo_full = '0' else '0';  -- ADD
     inv_fifo_wrreq   <= inval_valid when inv_fifo_full = '0' else '0';  -- ADD
-    inv_fifo_data_in <= inval_data;
+    inv_fifo_data_in_addr  <= inval_data_addr;
+    inv_fifo_data_in_hprot <= inval_data_hprot;
 
-  fsm_ahbm : process (ahbm_reg, ahbmi, inv_fifo_empty, inv_fifo_almost_empty, inv_fifo_data_out)
+  fsm_ahbm : process (ahbm_reg, ahbmi, inv_fifo_empty, inv_fifo_almost_empty, inv_fifo_data_out_addr)
 
     variable granted : std_ulogic;
     variable reg     : ahbm_reg_type;
@@ -1437,7 +1453,7 @@ begin  -- architecture rtl of l2_wrapper
           ahbmo.hbusreq <= '1';
           ahbmo.hlock   <= '1';
           ahbmo.htrans  <= HTRANS_NONSEQ;
-          ahbmo.haddr(LINE_RANGE_HI downto LINE_RANGE_LO) <= inv_fifo_data_out;
+          ahbmo.haddr(LINE_RANGE_HI downto LINE_RANGE_LO) <= inv_fifo_data_out_addr;
           ahbmo.haddr(OFFSET_BITS - 1 downto 0) <= (others => '0');
 
           if granted = '1' and ahbmi.hready = '1' then
@@ -1453,7 +1469,7 @@ begin  -- architecture rtl of l2_wrapper
         ahbmo.hbusreq <= '1';
         ahbmo.hlock   <= '1';
         ahbmo.htrans  <= HTRANS_NONSEQ;
-        ahbmo.haddr(LINE_RANGE_HI downto LINE_RANGE_LO) <= inv_fifo_data_out;
+        ahbmo.haddr(LINE_RANGE_HI downto LINE_RANGE_LO) <= inv_fifo_data_out_addr;
         ahbmo.haddr(OFFSET_BITS - 1 downto 0) <= (others => '0');
 
         if (granted = '1' and ahbmi.hready = '1') then
@@ -1465,7 +1481,7 @@ begin  -- architecture rtl of l2_wrapper
         ahbmo.hbusreq <= '1';
         ahbmo.hlock   <= '1';
         ahbmo.htrans  <= HTRANS_NONSEQ;
-        ahbmo.haddr(LINE_RANGE_HI downto LINE_RANGE_LO)   <= inv_fifo_data_out;
+        ahbmo.haddr(LINE_RANGE_HI downto LINE_RANGE_LO)   <= inv_fifo_data_out_addr;
         ahbmo.haddr(OFFSET_BITS - 1 downto 0) <= (others => '0');
 
         if (ahbmi.hready = '1') then
@@ -2791,21 +2807,23 @@ end process fsm_fwd_out;
 
   end process fsm_axi;
 
--------------------------------------------------------------------------------
--- FSM: Bridge from L2 cache frontend output to AHB master (L1 invalidation)
--------------------------------------------------------------------------------
-  inval_ready      <= '1';
-  inv_fifo_rdreq   <= '0';
-  inv_fifo_wrreq   <= '0';
-  inv_fifo_data_in <= (others => '0');
+  -- forward invalidate from the L2 cache to L1
+  inval_ready            <= inval_valid when inv_fifo_full = '0' else '0';
+  inv_fifo_wrreq         <= inval_valid when inv_fifo_full = '0' else '0';
+  inv_fifo_data_in_addr  <= inval_data_addr;
+  inv_fifo_data_in_hprot <= inval_data_hprot;
+  inv_fifo_rdreq         <= ace_resp.ac.ready when inv_fifo_empty = '0' else '0';
 
+  ace_req.ac.addr  <= inv_fifo_data_out_addr & empty_offset;
+  ace_req.ac.prot  <= (not inv_fifo_data_out_hprot(0)) & "01";
+  ace_req.ac.snoop <= XSNOOP_MAKEINVALID;
+  ace_req.ac.valid <= not inv_fifo_empty;
+
+  -- Disable AHB outputs
   ahbmo.hbusreq    <= '0';
   ahbmo.htrans     <=  HTRANS_IDLE;
   ahbmo.hlock      <= '0';
   ahbmo.haddr      <= (others => '0');
-
-  -- -- TODO!!!
-  -- -- Forward invalidate to AXI-ACE compliant interface to Ariane.
 
   end generate axi_frontend_gen;
 
