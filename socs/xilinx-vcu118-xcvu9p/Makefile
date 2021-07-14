@@ -12,7 +12,7 @@ ESP_ROOT = $(realpath ../../)
 TECHLIB  = virtexup
 BOARD    = xilinx-vcu118-xcvu9p
 DESIGN   = esp-$(BOARD)
-#LINUX_SMP = 1
+LINUX_SMP = 1
 LEON3_BASE_FREQ_MHZ ?= 78
 LEON3_STACK ?= 0x5bfffff0
 
