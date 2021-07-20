@@ -67,6 +67,7 @@ entity l2_wrapper is
     apbi  : in  apb_slv_in_type;
     apbo  : out apb_slv_out_type;
     flush : in  std_ulogic;             -- flush request from CPU
+    flush_l1 : out std_ulogic;
 
     -- fence to L2
     fence_l2 : in std_logic_vector(1 downto 0);
@@ -893,14 +894,17 @@ begin  -- architecture rtl of l2_wrapper
   begin  -- process cmd_state_fsm
     cmd_next <= cmd_state;
     flush_due <= '0';
+    flush_l1 <= '0';
 
     case cmd_state is
       when idle =>
         if cmd_reg(1 downto 0) = "10" then
           cmd_next <= wait_l1_flush;
+          flush_l1 <= '1';
         end if;
 
       when wait_l1_flush =>
+        flush_l1 <= '1';
         if flush = '1' then
           flush_due <= '1';
           if (flush_valid and flush_ready) = '1' then

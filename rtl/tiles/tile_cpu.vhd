@@ -221,6 +221,7 @@ architecture rtl of tile_cpu is
 
   -- L1 data-cache flush
   signal dflush : std_ulogic;
+  signal flush_l1 : std_logic;
 
   -- L2 wrapper and cache debug reset
   signal l2_rstn : std_ulogic;
@@ -1205,14 +1206,14 @@ begin
         apbo        => apbo,
         apb_req     => apb_req,
         apb_ack     => apb_ack,
-        fence_l2    => fence_l2);
+        fence_l2    => fence_l2,
+        flush_l1    => flush_l1,
+        flush_done  => dflush
+      );
 
     -- exit() writes to this address right before completing the program
     -- Next instruction is a jump to current PC.
     cpuerr <= '1' when ariane_drami.aw.addr = X"80001000" and ariane_drami.aw.valid = '1' else '0';
-
-    -- L1 can't be flushed on Ariane. So flush upon command.
-    dflush <= '1';
 
     -- RISC-V PLIC/CLINT outputs
     irq       <= irqi.irl(1 downto 0);
@@ -1268,6 +1269,7 @@ begin
         apbi                       => noc_apbi,
         apbo                       => noc_apbo(1),
         flush                      => dflush,
+        flush_l1                   => flush_l1,
         coherence_req_wrreq        => coherence_req_wrreq,
         coherence_req_data_in      => coherence_req_data_in,
         coherence_req_full         => coherence_req_full,

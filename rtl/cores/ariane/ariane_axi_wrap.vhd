@@ -50,7 +50,9 @@ entity ariane_axi_wrap is
     apb_ack     : in  std_ulogic;
     ace_req     : in  ace_req_type;
     ace_resp    : out ace_resp_type;
-    fence_l2    : out std_logic_vector(1 downto 0)
+    fence_l2    : out std_logic_vector(1 downto 0);
+    flush_l1    : in std_logic;
+    flush_done  : out std_logic
     );
 
 end ariane_axi_wrap;
@@ -327,7 +329,9 @@ architecture rtl of ariane_axi_wrap is
       prdata          : in  std_logic_vector(31 downto 0);
       pready          : in  std_logic;
       pslverr         : in  std_logic;
-      fence_l2        : out std_logic_vector(1 downto 0)
+      fence_l2        : out std_logic_vector(1 downto 0);
+      flush_l1        : in std_logic;
+      flush_done      : out std_logic
       );
   end component ariane_wrap;
 
@@ -615,7 +619,9 @@ begin  -- architecture rtl
       prdata          => prdata,
       pready          => apb_ack,
       pslverr         => '0',
-      fence_l2        => fence_l2
+      fence_l2        => fence_l2,
+      flush_l1        => flush_l1,
+      flush_done      => flush_done
       );
 
   -- Unused extended AXI ID
