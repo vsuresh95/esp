@@ -69,6 +69,7 @@ entity l2_acc_wrapper is
     aq                        : in  std_ulogic;
     rl                        : in  std_ulogic;
     spandex_conf              : in  std_logic_vector(31 downto 0);
+    flush_done                : out std_ulogic;
 
     -- backend (cache - NoC)
     -- tile->NoC1
@@ -164,7 +165,6 @@ architecture rtl of l2_acc_wrapper is
   --signal asserts                : asserts_t;
   --signal bookmark               : bookmark_t;
   --signal custom_dbg             : custom_dbg_t;
-  signal flush_done             : std_ulogic;
   -- statistics
   signal stats_ready            : std_ulogic;
   signal stats_valid            : std_ulogic;
