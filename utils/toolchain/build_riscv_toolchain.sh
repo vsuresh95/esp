@@ -11,7 +11,7 @@ LINUXSRC=${ESP_ROOT}/soft/ariane/linux
 LINUX_VERSION=4.20.0
 export SYSROOT=${ESP_ROOT}/soft/ariane/sysroot
 RISCV_GNU_TOOLCHAIN_SHA=afcc8bc655d30cf6af054ac1d3f5f89d0627aa79
-BUILDROOT_SHA=d6fa6a45e196665d6607b522f290b1451b949c2c
+BUILDROOT_SHA=5293208a57ce78f9fc958704d7df52f28532cde6
 
 DEFAULT_TARGET_DIR="/opt/riscv"
 TMP=/tmp/_riscv_build
@@ -130,7 +130,11 @@ if [ $(noyes "Skip ${src}") == "n" ]; then
     fi
 
     git reset --hard ${RISCV_GNU_TOOLCHAIN_SHA}
+    git cherry-pick baefbdd8bcedfabf0cf89dce679a8bd1a9f27b39
     git submodule update --init --recursive
+    cd riscv-gcc
+    git checkout b6cdb9a9f5eb1c4ae5b7769d90a79f29853a0fe2
+    cd ..
     ./configure --prefix=${TARGET_DIR} --disable-gdb
     cmd="make linux -j ${NTHREADS}"
     runsudo ${TARGET_DIR} "$cmd"
@@ -160,6 +164,7 @@ if [ $(noyes "Skip buildroot?") == "n" ]; then
 
     git reset --hard ${BUILDROOT_SHA}
     git submodule update --init --recursive
+    git apply ${ESP_ROOT}/utils/toolchain/buildroot.patch
 
     make distclean
     make defconfig BR2_DEFCONFIG=${SCRIPT_PATH}/riscv_buildroot_defconfig
