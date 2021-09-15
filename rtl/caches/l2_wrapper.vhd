@@ -607,6 +607,7 @@ begin  -- architecture rtl of l2_wrapper
       l2_cpu_req_data_hprot     => cpu_req_data_hprot,
       l2_cpu_req_data_addr      => cpu_req_data_addr,
       l2_cpu_req_data_word      => cpu_req_data_word,
+      l2_cpu_req_data_amo       => cpu_req_data_amo,
       l2_flush_ready            => flush_ready,
       l2_flush_valid            => flush_valid,
       l2_flush_data             => flush_data,
@@ -2226,7 +2227,11 @@ end process fsm_fwd_out;
             xreg.len    := mosi.ar.len;
             xreg.lock   := mosi.ar.lock;
             xreg.cache  := mosi.ar.cache;
-            xreg.atop   := (others => '0');
+            if USE_SPANDEX /= 0 then
+                xreg.atop   := (others => '0');
+            else
+                xreg.atop   := mosi.ar.user(5 downto 0);
+            end if;
             xreg.aq     := '0';
             xreg.rl     := '0';
 
@@ -2293,7 +2298,7 @@ end process fsm_fwd_out;
         cpu_req_data_use_owner_pred <= reg.use_owner_pred;
         cpu_req_data_dcs     <= reg.dcs;
         cpu_req_data_pred_cid<= reg.pred_cid;
-
+        cpu_req_data_amo     <= xreg.atop;
 
       -- LOAD REQUEST
       when load_req =>
@@ -2305,6 +2310,7 @@ end process fsm_fwd_out;
         cpu_req_data_use_owner_pred <= reg.use_owner_pred;
         cpu_req_data_dcs     <= reg.dcs;
         cpu_req_data_pred_cid<= reg.pred_cid;
+        cpu_req_data_amo     <= xreg.atop;
         cpu_req_valid <= '1';
 
         if cpu_req_ready = '1' then
@@ -2342,7 +2348,11 @@ end process fsm_fwd_out;
                 xreg.len    := mosi.ar.len;
                 xreg.lock   := mosi.ar.lock;
                 xreg.cache  := mosi.ar.cache;
-                xreg.atop   := (others => '0');
+                if USE_SPANDEX /= 0 then
+                    xreg.atop   := (others => '0');
+                else
+                    xreg.atop   := mosi.ar.user(5 downto 0);
+                end if;
                 xreg.aq     := '0';
                 xreg.rl     := '0';
 
@@ -2460,7 +2470,11 @@ end process fsm_fwd_out;
                 xreg.len    := mosi.ar.len;
                 xreg.lock   := mosi.ar.lock;
                 xreg.cache  := mosi.ar.cache;
-                xreg.atop   := (others => '0');
+                if USE_SPANDEX /= 0 then
+                    xreg.atop   := (others => '0');
+                else
+                    xreg.atop   := mosi.ar.user(5 downto 0);
+                end if;
                 xreg.aq     := '0';
                 xreg.rl     := '0';
 
@@ -2602,7 +2616,11 @@ end process fsm_fwd_out;
                   xreg.len    := mosi.ar.len;
                   xreg.lock   := mosi.ar.lock;
                   xreg.cache  := mosi.ar.cache;
-                  xreg.atop   := (others => '0');
+                  if USE_SPANDEX /= 0 then
+                    xreg.atop   := (others => '0');
+                  else
+                    xreg.atop   := mosi.ar.user(5 downto 0);
+                  end if;
                   xreg.aq     := '0';
                   xreg.rl     := '0';
 
@@ -2708,7 +2726,11 @@ end process fsm_fwd_out;
               xreg.len    := mosi.ar.len;
               xreg.lock   := mosi.ar.lock;
               xreg.cache  := mosi.ar.cache;
-              xreg.atop   := (others => '0');
+              if USE_SPANDEX /= 0 then
+                xreg.atop   := (others => '0');
+              else
+                xreg.atop   := mosi.ar.user(5 downto 0);
+              end if;
               xreg.aq     := '0';
               xreg.rl     := '0';
 
@@ -2778,6 +2800,7 @@ end process fsm_fwd_out;
           cpu_req_data_use_owner_pred <= reg.use_owner_pred;
           cpu_req_data_dcs     <= reg.dcs;
           cpu_req_data_pred_cid<= reg.pred_cid;
+          cpu_req_data_amo     <= xreg.atop;
 
           end if;
 

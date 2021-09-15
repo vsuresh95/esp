@@ -473,6 +473,7 @@ begin  -- architecture rtl of l2_acc_wrapper
       l2_cpu_req_data_hprot     => cpu_req_data_hprot,
       l2_cpu_req_data_addr      => cpu_req_data_addr,
       l2_cpu_req_data_word      => cpu_req_data_word,
+      l2_cpu_req_data_amo       => (others => '0'),
       l2_flush_ready            => flush_ready,
       l2_flush_valid            => flush_valid,
       l2_flush_data             => flush_data,

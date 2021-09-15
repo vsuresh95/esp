@@ -28,6 +28,7 @@ package gencaches is
       l2_cpu_req_data_hprot : in hprot_t;
       l2_cpu_req_data_addr : in addr_t;
       l2_cpu_req_data_word : in word_t;
+      l2_cpu_req_data_amo : in amo_t;
       l2_fwd_in_valid : in std_ulogic;
       l2_fwd_in_data_coh_msg : in std_logic_vector(2 downto 0);
       l2_fwd_in_data_addr : in line_addr_t;
