@@ -9,8 +9,6 @@ ARCH ?= sparc
 endif
 
 ESP_CORE_PATH ?= $(DRIVERS)/esp
-KBUILD_EXTRA_SYMBOLS := ../drivers/esp/Module.symvers
-export KBUILD_EXTRA_SYMBOLS
 
 all: check Module.symvers
 	make -C $(KSRC) M=`pwd` CROSS_COMPILE=$(CROSS_COMPILE) ARCH=$(ARCH)
