@@ -174,6 +174,7 @@ architecture rtl of l2_wrapper is
   --signal bookmark               : bookmark_t;
   --signal custom_dbg             : custom_dbg_t;
   signal flush_done             : std_ulogic;
+  signal acc_flush_done         : std_ulogic;
   -- statistics
   signal stats_ready            : std_ulogic;
   signal stats_valid            : std_ulogic;
@@ -758,6 +759,7 @@ begin  -- architecture rtl of l2_wrapper
       l2_rsp_in_data_word_mask  => rsp_in_data_word_mask,
       l2_rsp_in_data_invack_cnt => rsp_in_data_invack_cnt,
       flush_done                => flush_done,
+      acc_flush_done            => acc_flush_done,
       l2_stats_ready            => stats_ready,
       l2_stats_valid            => stats_valid,
       l2_stats_data             => stats_data,
