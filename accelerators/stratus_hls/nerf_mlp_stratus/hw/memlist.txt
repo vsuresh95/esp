@@ -1,0 +1,4 @@
+nerf_mlp_plm_block_in_dma32 262144 64 1w:0r 0w:1r
+nerf_mlp_plm_block_out_dma32 1 64 1w:0r 0w:1r
+nerf_mlp_plm_block_in_dma64 262144 64 1w:0r 0w:1r
+nerf_mlp_plm_block_out_dma64 1 64 1w:0r 0w:1r

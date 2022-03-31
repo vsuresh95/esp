@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sld>
+  <accelerator name="nerf_mlp" desc="Accelerator NERF_MLP" data_size="4" device_id="100" hls_tool="stratus_hls">
+    <param name="batch_size" desc="batch_size" />
+  </accelerator>
+</sld>
