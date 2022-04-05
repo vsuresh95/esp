@@ -16,8 +16,21 @@
 /* <<--defines-->> */
 #define DATA_WIDTH 64
 #define DMA_SIZE SIZE_DWORD
-#define PLM_OUT_WORD 1
-#define PLM_IN_WORD 262144
+
+#define WEIGHT_DMA 0
+#define BIAS_DMA 1
+
+#define LAYER_N_DIMS 256
+#define LAYER_0_INPUTS 60
+#define LAYER_0_OUTPUTS 256
+#define LAYER_4_INPUTS 316
+#define LAYER_4_OUTPUTS 256
+#define LAYER_8_INPUTS 280
+#define LAYER_8_OUTPUTS 256
+#define LAYER_9_INPUTS 256
+#define LAYER_9_OUTPUTS 128
+#define LAYER_10_INPUTS 128
+#define LAYER_10_OUTPUTS 3
 
 class nerf_mlp : public esp_accelerator_3P<DMA_WIDTH>
 {
@@ -33,16 +46,39 @@ public:
 
         // Map arrays to memories
         /* <<--plm-bind-->> */
-        HLS_MAP_plm(plm_out_pong, PLM_OUT_NAME);
-        HLS_MAP_plm(plm_out_ping, PLM_OUT_NAME);
-        HLS_MAP_plm(plm_in_pong, PLM_IN_NAME);
-        HLS_MAP_plm(plm_in_ping, PLM_IN_NAME);
+        HLS_MAP_plm(plm_wgt_0, "plm_wgt_0_name");
+        HLS_MAP_plm(plm_wgt_1, "plm_wgt_1_name");
+        HLS_MAP_plm(plm_wgt_2, "plm_wgt_2_name");
+        HLS_MAP_plm(plm_wgt_3, "plm_wgt_3_name");
+        HLS_MAP_plm(plm_wgt_4, "plm_wgt_4_name");
+        HLS_MAP_plm(plm_wgt_5, "plm_wgt_5_name");
+        HLS_MAP_plm(plm_wgt_6, "plm_wgt_6_name");
+        HLS_MAP_plm(plm_wgt_7, "plm_wgt_7_name");
+        HLS_MAP_plm(plm_wgt_8, "plm_wgt_8_name");
+        HLS_MAP_plm(plm_wgt_9, "plm_wgt_9_name");
+        HLS_MAP_plm(plm_wgt_10, "plm_wgt_10_name");
+
+        HLS_MAP_plm(plm_bias_0, "plm_bias_0_name");
+        HLS_MAP_plm(plm_bias_1, "plm_bias_1_name");
+        HLS_MAP_plm(plm_bias_2, "plm_bias_2_name");
+        HLS_MAP_plm(plm_bias_3, "plm_bias_3_name");
+        HLS_MAP_plm(plm_bias_4, "plm_bias_4_name");
+        HLS_MAP_plm(plm_bias_5, "plm_bias_5_name");
+        HLS_MAP_plm(plm_bias_6, "plm_bias_6_name");
+        HLS_MAP_plm(plm_bias_7, "plm_bias_7_name");
+        HLS_MAP_plm(plm_bias_8, "plm_bias_8_name");
+        HLS_MAP_plm(plm_bias_9, "plm_bias_9_name");
+        HLS_MAP_plm(plm_bias_10, "plm_bias_10_name");
+
+        HLS_MAP_plm(plm_pos, "plm_pos_name");
+        HLS_MAP_plm(plm_dir, "plm_dir_name");
     }
 
     // Processes
 
     // Load the input data
     void load_input();
+    void load_input_dma(uint32_t len, uint32_t offset, uint32_t wgt_or_bias, uint32_t plm_num);
 
     // Computation
     void compute_kernel();
@@ -56,11 +92,39 @@ public:
     // Functions
 
     // Private local memories
-    sc_dt::sc_int<DATA_WIDTH> plm_in_ping[PLM_IN_WORD];
-    sc_dt::sc_int<DATA_WIDTH> plm_in_pong[PLM_IN_WORD];
-    sc_dt::sc_int<DATA_WIDTH> plm_out_ping[PLM_OUT_WORD];
-    sc_dt::sc_int<DATA_WIDTH> plm_out_pong[PLM_OUT_WORD];
+    sc_dt::sc_int<DATA_WIDTH> plm_wgt_0[15360];
+    sc_dt::sc_int<DATA_WIDTH> plm_wgt_1[65536];
+    sc_dt::sc_int<DATA_WIDTH> plm_wgt_2[65536];
+    sc_dt::sc_int<DATA_WIDTH> plm_wgt_3[65536];
+    sc_dt::sc_int<DATA_WIDTH> plm_wgt_4[80896];
+    sc_dt::sc_int<DATA_WIDTH> plm_wgt_5[65536];
+    sc_dt::sc_int<DATA_WIDTH> plm_wgt_6[65536];
+    sc_dt::sc_int<DATA_WIDTH> plm_wgt_7[65536];
+    sc_dt::sc_int<DATA_WIDTH> plm_wgt_8[71680];
+    sc_dt::sc_int<DATA_WIDTH> plm_wgt_9[32768];
+    sc_dt::sc_int<DATA_WIDTH> plm_wgt_10[372];
 
+    sc_dt::sc_int<DATA_WIDTH> plm_bias_0[256];
+    sc_dt::sc_int<DATA_WIDTH> plm_bias_1[256];
+    sc_dt::sc_int<DATA_WIDTH> plm_bias_2[256];
+    sc_dt::sc_int<DATA_WIDTH> plm_bias_3[256];
+    sc_dt::sc_int<DATA_WIDTH> plm_bias_4[256];
+    sc_dt::sc_int<DATA_WIDTH> plm_bias_5[256];
+    sc_dt::sc_int<DATA_WIDTH> plm_bias_6[256];
+    sc_dt::sc_int<DATA_WIDTH> plm_bias_7[256];
+    sc_dt::sc_int<DATA_WIDTH> plm_bias_8[256];
+    sc_dt::sc_int<DATA_WIDTH> plm_bias_9[256];
+    sc_dt::sc_int<DATA_WIDTH> plm_bias_10[256];
+
+    sc_dt::sc_int<DATA_WIDTH> plm_pos[60];
+    sc_dt::sc_int<DATA_WIDTH> plm_dir[24];
+    
+    uint64_t regs_ping[316];
+    uint64_t regs_wgt[316];
+    uint64_t regs_bias[256];
+    uint64_t regs_mul[256];
+    uint64_t regs_pong[316];
+    uint64_t regs_out[3];
 };
 
 
