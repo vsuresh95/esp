@@ -8,8 +8,13 @@
   .option norvc
   .globl _prog_start
 _prog_start:
-  smp_pause(s1, s2)
-  li sp, 0x9ff00000
+  # smp_pause(s1, s2)
+  # li sp, 0x9ff00000
+  csrr a0, mhartid
+  slli a0, a0, 0x12
+  li a1, 0x9ff00000
+  sub a1, a1, a0
+  mv sp, a1
   call main
   smp_resume(s1, s2)
   csrr a0, mhartid
