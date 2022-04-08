@@ -6,9 +6,10 @@ ARIANE ?= $(ESP_ROOT)/rtl/cores/ariane/ariane
 
 RISCV_TESTS = $(SOFT)/riscv-tests
 RISCV_PK = $(SOFT)/riscv-pk
-OPENSBI = $(SOFT)/opensbi
 
 soft: $(SOFT_BUILD)/prom.srec $(SOFT_BUILD)/ram.srec $(SOFT_BUILD)/prom.bin $(SOFT_BUILD)/systest.bin
+
+MINI_ERA = $(ESP_ROOT)/soft/ariane/mini-era
 
 soft-clean:
 	$(QUIET_CLEAN)$(RM)		 	\
@@ -21,6 +22,12 @@ soft-clean:
 		$(SOFT_BUILD)/startup.o		\
 		$(SOFT_BUILD)/main.o		\
 		$(SOFT_BUILD)/uart.o		\
+		$(SOFT_BUILD)/get_counter.o \
+		$(SOFT_BUILD)/read_trace.o \
+		$(SOFT_BUILD)/kernels_api.o \
+		$(SOFT_BUILD)/descrambler_function.o \
+		$(SOFT_BUILD)/viterbi_parms.o \
+		$(SOFT_BUILD)/viterbi_flat.o \
 		$(SOFT_BUILD)/systest.bin
 
 soft-distclean: soft-clean
@@ -92,15 +99,123 @@ RISCV_CFLAGS += -fno-common
 RISCV_CFLAGS += -fno-builtin-printf
 RISCV_CFLAGS += -nostdlib
 RISCV_CFLAGS += -nostartfiles -lm -lgcc
+RISCV_CFLAGS += -I$(RISCV_PK)/machine
+RISCV_CFLAGS += -I$(DESIGN_PATH)/$(ESP_CFG_BUILD)
+RISCV_CFLAGS += -I$(DRIVERS)/include/
+RISCV_CFLAGS += -I$(DRIVERS)/../common/include/
+RISCV_CFLAGS += -I$(DRIVERS)/common/include/
+RISCV_CFLAGS += -I$(DRIVERS)/baremetal/include/
+RISCV_CFLAGS += -I$(MINI_ERA)/include
 
-$(SOFT_BUILD)/systest.exe: systest.c $(SOFT_BUILD)/uart.o
+SPX_CFLAGS += -DHW_FFT -DUSE_FFT_FX=32 -DUSE_FFT_ACCEL_TYPE=1 -DFFT_SPANDEX_MODE=4 -DHW_FFT_BITREV
+SPX_CFLAGS += -DHW_VIT -DVIT_DEVICE_NUM=0 -DVIT_SPANDEX_MODE=4
+SPX_CFLAGS += -DDOUBLE_WORD
+SPX_CFLAGS += -DUSE_ESP_INTERFACE -DITERATIONS=1000
+SPX_CFLAGS += -DTWO_CORE_SCHED
+SPX_CFLAGS += -DUSE_FFT_SENSOR
+SPX_CFLAGS += -DUSE_VIT_SENSOR
+
+$(SOFT_BUILD)/get_counter.o: $(MINI_ERA)/src/get_counter.c
+	@mkdir -p $(SOFT_BUILD)
+	$(QUIET_CC) $(CROSS_COMPILE_ELF)gcc \
+		-O2 \
+		-Wall -Werror \
+		-mcmodel=medany -mexplicit-relocs $(SPX_CFLAGS) \
+		-I$(MINI_ERA)/include \
+		-I$(BOOTROM_PATH) \
+		-I$(DESIGN_PATH)/$(ESP_CFG_BUILD) \
+		-c $< -o $@
+
+# $(SOFT_BUILD)/calculate_dist_from_fmcw.o: $(MINI_ERA)/src/calculate_dist_from_fmcw.c
+# 	@mkdir -p $(SOFT_BUILD)
+# 	$(QUIET_CC) $(CROSS_COMPILE_ELF)gcc \
+# 		-O2 \
+# 		-Wall -Werror \
+# 		-mcmodel=medany -mexplicit-relocs \
+# 		-I$(MINI_ERA)/include \
+# 		-I$(BOOTROM_PATH) \
+# 		-I$(DESIGN_PATH)/$(ESP_CFG_BUILD) \
+# 		-c $< -o $@
+# 
+# $(SOFT_BUILD)/fft.o: $(MINI_ERA)/src/fft.c
+# 	@mkdir -p $(SOFT_BUILD)
+# 	$(QUIET_CC) $(CROSS_COMPILE_ELF)gcc \
+# 		-O2 \
+# 		-mcmodel=medany -mexplicit-relocs \
+# 		-I$(MINI_ERA)/include \
+# 		-I$(BOOTROM_PATH) \
+# 		-I$(DESIGN_PATH)/$(ESP_CFG_BUILD) \
+# 		-c $< -o $@
+
+$(SOFT_BUILD)/descrambler_function.o: $(MINI_ERA)/src/descrambler_function.c
+	@mkdir -p $(SOFT_BUILD)
+	$(QUIET_CC) $(CROSS_COMPILE_ELF)gcc \
+		-O2 \
+		-mcmodel=medany -mexplicit-relocs $(SPX_CFLAGS) \
+		-I$(MINI_ERA)/include \
+		-I$(BOOTROM_PATH) \
+		-I$(DESIGN_PATH)/$(ESP_CFG_BUILD) \
+		-c $< -o $@
+
+$(SOFT_BUILD)/viterbi_flat.o: $(MINI_ERA)/src/viterbi_flat.c
 	@mkdir -p $(SOFT_BUILD)
 	$(QUIET_CC) $(CROSS_COMPILE_ELF)gcc $(RISCV_CFLAGS) \
-	$(SOFT)/common/syscalls.c \
+		-O2 \
+		-mcmodel=medany -mexplicit-relocs $(SPX_CFLAGS) \
+		-I$(MINI_ERA)/include \
+		-I$(BOOTROM_PATH) \
+		-I$(DESIGN_PATH)/$(ESP_CFG_BUILD) \
+		-c $< -o $@
+
+
+$(SOFT_BUILD)/viterbi_parms.o: $(MINI_ERA)/src/viterbi_parms.c
+	@mkdir -p $(SOFT_BUILD)
+	$(QUIET_CC) $(CROSS_COMPILE_ELF)gcc \
+		-O2 \
+		-mcmodel=medany -mexplicit-relocs $(SPX_CFLAGS) \
+		-I$(MINI_ERA)/include \
+		-I$(BOOTROM_PATH) \
+		-I$(DESIGN_PATH)/$(ESP_CFG_BUILD) \
+		-c $< -o $@
+
+
+# $(SOFT_BUILD)/kernels_api.o: $(MINI_ERA)/src/kernels_api.c
+# 	@mkdir -p $(SOFT_BUILD)
+# 	$(QUIET_CC) $(CROSS_COMPILE_ELF)gcc \
+# 		-O2 \
+# 		-mcmodel=medany -mexplicit-relocs \
+# 		-I$(MINI_ERA)/include \
+# 		-I$(BOOTROM_PATH) \
+# 		-I$(DESIGN_PATH)/$(ESP_CFG_BUILD) \
+# 		-c $< -o $@
+# 
+# $(SOFT_BUILD)/read_trace.o: $(MINI_ERA)/src/read_trace.c
+# 	@mkdir -p $(SOFT_BUILD)
+# 	$(QUIET_CC) $(CROSS_COMPILE_ELF)gcc \
+# 		-O2 \
+# 		-mcmodel=medany -mexplicit-relocs \
+# 		-I$(MINI_ERA)/include \
+# 		-I$(BOOTROM_PATH) \
+# 		-I$(DESIGN_PATH)/$(ESP_CFG_BUILD) \
+# 		-c $< -o $@
+# 
+OBJ =	$(SOFT_BUILD)/get_counter.o \
+		$(SOFT_BUILD)/descrambler_function.o \
+		$(SOFT_BUILD)/viterbi_parms.o \
+		$(SOFT_BUILD)/viterbi_flat.o
+		#$(SOFT_BUILD)/fft.o \
+		#$(SOFT_BUILD)/calculate_dist_from_fmcw.o \
+
+$(SOFT_BUILD)/systest.exe: $(MINI_ERA)/src/read_trace.c $(MINI_ERA)/src/calculate_dist_from_fmcw.c $(MINI_ERA)/src/fft.c $(MINI_ERA)/src/kernels_api.c $(MINI_ERA)/src/mini_main.c $(OBJ) $(SOFT_BUILD)/uart.o
+	@mkdir -p $(SOFT_BUILD)
+	$(QUIET_CC) $(CROSS_COMPILE_ELF)gcc $(RISCV_CFLAGS) $(SPX_CFLAGS) \
 	$(RISCV_TESTS)/benchmarks/common/crt.S  \
+	$(SOFT)/common/syscalls.c \
 	-T $(RISCV_TESTS)/benchmarks/common/test.ld -o $@ \
-	-I$(DESIGN_PATH)/$(ESP_CFG_BUILD) \
-	$(SOFT_BUILD)/uart.o $<
+	$(OBJ) \
+	$(SOFT_BUILD)/uart.o $(MINI_ERA)/src/read_trace.c $(MINI_ERA)/src/calculate_dist_from_fmcw.c $(MINI_ERA)/src/fft.c $(MINI_ERA)/src/kernels_api.c $(MINI_ERA)/src/mini_main.c \
+	$(SOFT_BUILD)/drivers/probe/libprobe.a \
+	$(SOFT_BUILD)/drivers/utils/baremetal/libutils.a
 
 $(SOFT_BUILD)/systest.bin: $(TEST_PROGRAM)
 	@mkdir -p $(SOFT_BUILD)
@@ -154,19 +269,10 @@ $(SOFT_BUILD)/pk-build/bbl: $(SOFT_BUILD)/pk-build sysroot-update
 		fi;
 	$(QUIET_MAKE) $(MAKE) -C $(SOFT_BUILD)/pk-build
 
-$(SOFT_BUILD)/opensbi-build:
-	$(QUIET_MKDIR)mkdir -p $@
 
-$(SOFT_BUILD)/opensbi-build/platform/esp-fpga/firmware/fw_payload.bin: $(SOFT_BUILD)/opensbi-build sysroot-update
-	$(QUIET_MAKE) CROSS_COMPILE=$(CROSS_COMPILE_LINUX) $(MAKE) -C $(OPENSBI) PLATFORM=esp-fpga \
-		FW_PAYLOAD_PATH=$(SOFT_BUILD)/linux-build/arch/riscv/boot/Image O=$<
+$(SOFT_BUILD)/linux.bin: $(SOFT_BUILD)/pk-build/bbl
+	$(QUIET_OBJCP) riscv64-unknown-elf-objcopy -S -O binary --change-addresses -0x80000000 $< $@
 
-$(SOFT_BUILD)/linux.bin: $(SOFT_BUILD)/opensbi-build/platform/esp-fpga/firmware/fw_payload.bin
-	$(QUIET_CP) cp $< $@
-
-# can switch between openSBI and riscv-pk by uncommenting this and commenting above
-#$(SOFT_BUILD)/linux.bin: $(SOFT_BUILD)/pk-build/bbl
-	#$(QUIET_OBJCP) riscv64-unknown-elf-objcopy -S -O binary --change-addresses -0x80000000 $< $@
 
 linux: $(SOFT_BUILD)/linux.bin $(SOFT_BUILD)/prom.bin
 
