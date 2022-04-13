@@ -82,6 +82,8 @@ public:
     int64_t *in;
     int64_t *out;
     int64_t *gold;
+    int64_t *ping;
+    int64_t *pong;
 
     // Other Functions
 };

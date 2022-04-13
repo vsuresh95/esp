@@ -17,9 +17,6 @@
 #define DATA_WIDTH 64
 #define DMA_SIZE SIZE_DWORD
 
-#define WEIGHT_DMA 0
-#define BIAS_DMA 1
-
 #define LAYER_N_DIMS 256
 #define LAYER_0_INPUTS 60
 #define LAYER_0_OUTPUTS 256
@@ -31,6 +28,8 @@
 #define LAYER_9_OUTPUTS 128
 #define LAYER_10_INPUTS 128
 #define LAYER_10_OUTPUTS 3
+
+#define MAC_TILE_SIZE 4
 
 class nerf_mlp : public esp_accelerator_3P<DMA_WIDTH>
 {
@@ -78,10 +77,11 @@ public:
 
     // Load the input data
     void load_input();
-    void load_input_dma(uint32_t len, uint32_t offset, uint32_t wgt_or_bias, uint32_t plm_num);
+    void load_input_dma(uint32_t len, uint32_t offset, sc_dt::sc_int<DATA_WIDTH> *plm_input);
 
     // Computation
     void compute_kernel();
+    void compute_kernel_tile(uint16_t input_dim, uint16_t output_dim, sc_dt::sc_int<DATA_WIDTH> *plm_wgt, sc_dt::sc_int<DATA_WIDTH> *plm_bias, int64_t *regs_input, int64_t *regs_output, int64_t *regs_mul, int64_t *regs_wgt);
 
     // Store the output data
     void store_output();
@@ -119,12 +119,14 @@ public:
     sc_dt::sc_int<DATA_WIDTH> plm_pos[60];
     sc_dt::sc_int<DATA_WIDTH> plm_dir[24];
     
-    uint64_t regs_ping[316];
-    uint64_t regs_wgt[316];
-    uint64_t regs_bias[256];
-    uint64_t regs_mul[256];
-    uint64_t regs_pong[316];
-    uint64_t regs_out[3];
+    int64_t regs_ping[316];
+    int64_t regs_wgt[MAC_TILE_SIZE];
+    int64_t regs_bias[256];
+    int64_t regs_mul[MAC_TILE_SIZE];
+    int64_t regs_pong[316];
+    int64_t regs_out[3];
+
+    unsigned store_offset;
 };
 
 
