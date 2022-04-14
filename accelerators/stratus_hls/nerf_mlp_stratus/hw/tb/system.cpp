@@ -105,7 +105,7 @@ void system_t::load_memory()
     in = new int64_t[in_size];
     for (int i = 0; i < 1; i++)
         for (int j = 0; j < in_size; j++)
-            in[i * in_words_adj + j] = (int64_t) (j%100);
+            in[i * in_words_adj + j] = (int64_t) (j%10);
 
     // Compute golden output
     gold = new int64_t[out_size];
@@ -298,7 +298,7 @@ int system_t::validate()
     // Check for mismatches
     uint32_t errors = 0;
 
-    for (int i = 0; i < 256; i++)
+    for (int i = 0; i < out_size; i++)
         if (gold[i] != out[i])
         {
             errors++;
