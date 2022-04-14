@@ -296,7 +296,6 @@ void system_t::load_memory()
         for (int j = 0; j < DMA_WORD_PER_BEAT; j++)
             data_bv.range((j+1) * DATA_WIDTH - 1, j * DATA_WIDTH) = in[i * DMA_WORD_PER_BEAT + j];
         mem[i] = data_bv;
-        // ESP_REPORT_INFO("i = %d", i);
     }
 
     ESP_REPORT_INFO("load memory completed");

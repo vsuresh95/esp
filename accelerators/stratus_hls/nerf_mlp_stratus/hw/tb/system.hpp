@@ -11,7 +11,7 @@
 
 #include "esp_templates.hpp"
 
-const size_t MEM_SIZE = 2097160 / (DMA_WIDTH/8);
+const size_t MEM_SIZE = 10 * 2097160 / (DMA_WIDTH/8);
 
 #include "core/systems/esp_system.hpp"
 
