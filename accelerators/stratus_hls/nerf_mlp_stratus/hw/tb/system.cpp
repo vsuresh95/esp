@@ -128,8 +128,6 @@ void system_t::load_memory()
 
     in_offset += LAYER_0_INPUTS*LAYER_0_OUTPUTS + LAYER_0_OUTPUTS;
 
-    ESP_REPORT_INFO("after layer 0");
-
     // Layer 1
     for (uint16_t col_wgt = 0; col_wgt < LAYER_N_DIMS; col_wgt++)
     {
@@ -142,8 +140,6 @@ void system_t::load_memory()
     }
 
     in_offset += LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS;
-
-    ESP_REPORT_INFO("after layer 1");
 
     // Layer 2
     for (uint16_t col_wgt = 0; col_wgt < LAYER_N_DIMS; col_wgt++)
@@ -158,8 +154,6 @@ void system_t::load_memory()
 
     in_offset += LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS;
 
-    ESP_REPORT_INFO("after layer 2");
-
     // Layer 3
     for (uint16_t col_wgt = 0; col_wgt < LAYER_N_DIMS; col_wgt++)
     {
@@ -172,8 +166,6 @@ void system_t::load_memory()
     }
 
     in_offset += LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS;
-
-    ESP_REPORT_INFO("after layer 3");
 
     // Layer 4
     for (uint16_t row_wgt = LAYER_N_DIMS; row_wgt < LAYER_4_INPUTS; row_wgt++)
@@ -193,8 +185,6 @@ void system_t::load_memory()
 
     in_offset += LAYER_4_INPUTS*LAYER_4_OUTPUTS + LAYER_4_OUTPUTS;
 
-    ESP_REPORT_INFO("after layer 4");
-
     // Layer 5
     for (uint16_t col_wgt = 0; col_wgt < LAYER_N_DIMS; col_wgt++)
     {
@@ -207,8 +197,6 @@ void system_t::load_memory()
     }
 
     in_offset += LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS;
-
-    ESP_REPORT_INFO("after layer 5");
 
     // Layer 6
     for (uint16_t col_wgt = 0; col_wgt < LAYER_N_DIMS; col_wgt++)
@@ -223,8 +211,6 @@ void system_t::load_memory()
 
     in_offset += LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS;
 
-    ESP_REPORT_INFO("after layer 6");
-
     // Layer 7
     for (uint16_t col_wgt = 0; col_wgt < LAYER_N_DIMS; col_wgt++)
     {
@@ -237,8 +223,6 @@ void system_t::load_memory()
     }
 
     in_offset += LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS;
-
-    ESP_REPORT_INFO("after layer 7");
 
     // Layer 8
     for (uint16_t row_wgt = LAYER_N_DIMS; row_wgt < LAYER_8_INPUTS; row_wgt++)
@@ -258,8 +242,6 @@ void system_t::load_memory()
 
     in_offset += LAYER_8_INPUTS*LAYER_8_OUTPUTS + LAYER_8_OUTPUTS;
 
-    ESP_REPORT_INFO("after layer 8");
-
     // Layer 9
     for (uint16_t col_wgt = 0; col_wgt < LAYER_9_OUTPUTS; col_wgt++)
     {
@@ -273,8 +255,6 @@ void system_t::load_memory()
 
     in_offset += LAYER_9_INPUTS*LAYER_9_OUTPUTS + LAYER_9_OUTPUTS;
 
-    ESP_REPORT_INFO("after layer 9");
-
     // Layer 10
     for (uint16_t col_wgt = 0; col_wgt < LAYER_10_OUTPUTS; col_wgt++)
     {
@@ -287,8 +267,6 @@ void system_t::load_memory()
     }
 
     in_offset += LAYER_10_INPUTS*LAYER_10_OUTPUTS + LAYER_10_OUTPUTS;
-
-    ESP_REPORT_INFO("after layer 10");
 
     // Memory initialization:
     for (int i = 0; i < in_size / DMA_WORD_PER_BEAT; i++)  {

@@ -17,7 +17,7 @@ void nerf_mlp::load_input_dma(uint32_t len, uint32_t offset, sc_dt::sc_int<DATA_
 
     this->dma_read_ctrl.put(dma_info);
 
-    for (uint16_t i = 0; i < len; i += DMA_WORD_PER_BEAT)
+    for (uint32_t i = 0; i < len; i += DMA_WORD_PER_BEAT)
     {
         HLS_BREAK_DEP(plm_input);
 
