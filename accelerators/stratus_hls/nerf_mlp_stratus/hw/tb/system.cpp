@@ -320,10 +320,10 @@ int system_t::validate()
     uint32_t errors = 0;
 
     for (int i = 0; i < out_size; i++)
-        if (pong[i] != out[i])
+        if (gold[i] != out[i])
         {
             errors++;
-            ESP_REPORT_INFO("pong[%d] = %ld out[%d] = %ld\n", i, pong[i], i, out[i]);
+            ESP_REPORT_INFO("gold[%d] = %lu out[%d] = %lu\n", i, gold[i], i, out[i]);
         }
 
     delete [] in;

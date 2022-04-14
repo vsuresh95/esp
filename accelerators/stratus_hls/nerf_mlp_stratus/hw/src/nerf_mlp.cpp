@@ -243,12 +243,12 @@ void nerf_mlp::store_output()
         /* layer 2 */    LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS + 
         /* layer 3 */    LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS + 
         /* layer 4 */    LAYER_4_INPUTS*LAYER_4_OUTPUTS + LAYER_4_OUTPUTS + 
-        /* layer 5 */    // LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS + 
-        /* layer 6 */    // LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS + 
-        /* layer 7 */    // LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS + 
-        /* layer 8 */    // LAYER_8_INPUTS*LAYER_8_OUTPUTS + LAYER_8_OUTPUTS + 
-        /* layer 9 */    // LAYER_9_INPUTS*LAYER_9_OUTPUTS + LAYER_9_OUTPUTS + 
-        /* layer 10 */   // LAYER_10_INPUTS*LAYER_10_OUTPUTS + LAYER_10_OUTPUTS;
+        /* layer 5 */    LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS + 
+        /* layer 6 */    LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS + 
+        /* layer 7 */    LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS + 
+        /* layer 8 */    LAYER_8_INPUTS*LAYER_8_OUTPUTS + LAYER_8_OUTPUTS + 
+        /* layer 9 */    LAYER_9_INPUTS*LAYER_9_OUTPUTS + LAYER_9_OUTPUTS + 
+        /* layer 10 */   LAYER_10_INPUTS*LAYER_10_OUTPUTS + LAYER_10_OUTPUTS +
         /* pos inputs */ LAYER_0_INPUTS +
         /* dir inputs */ (LAYER_8_INPUTS-LAYER_N_DIMS);
 
@@ -275,7 +275,7 @@ void nerf_mlp::store_output()
             for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
             {
                 HLS_UNROLL_SIMPLE;
-                dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH) = regs_pong[i];
+                dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH) = regs_pong[i+k];
             }
             this->dma_write_chnl.put(dataBv);
         }
@@ -292,7 +292,7 @@ void nerf_mlp::store_output()
 void nerf_mlp::compute_kernel_tile(uint16_t input_dim, uint16_t output_dim, sc_dt::sc_int<DATA_WIDTH> *plm_wgt, sc_dt::sc_int<DATA_WIDTH> *plm_bias, int64_t *regs_input, int64_t *regs_output, int64_t *regs_mul, int64_t *regs_wgt)
 {
     // Read from biases from scratchpad
-    for (uint16_t bias_index = 0; bias_index < LAYER_0_OUTPUTS; bias_index++)
+    for (uint16_t bias_index = 0; bias_index < output_dim; bias_index++)
     {
         HLS_UNROLL_LOOP(ON, "read_bias");
         HLS_BREAK_ARRAY_DEPENDENCY(plm_bias);
