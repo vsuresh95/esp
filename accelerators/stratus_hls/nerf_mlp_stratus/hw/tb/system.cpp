@@ -82,11 +82,11 @@ void system_t::load_memory()
 
     // Input data and golden output (aligned to DMA_WIDTH makes your life easier)
     unsigned weights_offset = 
-    /* layer 0 */ LAYER_0_INPUTS*LAYER_0_OUTPUTS + LAYER_0_OUTPUTS + 
-    /* layer 1 */ LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS + 
+    /* layer 0 */ LAYER_0_INPUTS*LAYER_0_OUTPUTS + LAYER_0_OUTPUTS +
+    /* layer 1 */ LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS +
     /* layer 2 */ LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS + 
-    /* layer 3 */ LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS + 
-    /* layer 4 */ LAYER_4_INPUTS*LAYER_4_OUTPUTS + LAYER_4_OUTPUTS + 
+    /* layer 3 */ LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS;
+    /* layer 4 */ LAYER_4_INPUTS*LAYER_4_OUTPUTS + LAYER_4_OUTPUTS;
     /* layer 5 */ LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS + 
     /* layer 6 */ LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS + 
     /* layer 7 */ LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS + 
@@ -97,7 +97,8 @@ void system_t::load_memory()
     in_words_adj = weights_offset +
     /* pos inputs */ LAYER_0_INPUTS +
     /* dir inputs */ (LAYER_8_INPUTS-LAYER_N_DIMS);
-    out_words_adj = 3;
+
+    out_words_adj = LAYER_10_OUTPUTS;
 
     in_size = in_words_adj * (1);
     out_size = out_words_adj * (1);
@@ -124,6 +125,8 @@ void system_t::load_memory()
         {
             ping[col_wgt] += in[in_offset+col_wgt*LAYER_0_INPUTS+row_wgt] * in[weights_offset+row_wgt];
         }
+
+        if (ping[col_wgt] < 0) ping[col_wgt] = 0;
     }
 
     in_offset += LAYER_0_INPUTS*LAYER_0_OUTPUTS + LAYER_0_OUTPUTS;
@@ -137,6 +140,8 @@ void system_t::load_memory()
         {
             pong[col_wgt] += in[in_offset+col_wgt*LAYER_N_DIMS+row_wgt] * ping[row_wgt];
         }
+
+        if (pong[col_wgt] < 0) pong[col_wgt] = 0;
     }
 
     in_offset += LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS;
@@ -150,6 +155,8 @@ void system_t::load_memory()
         {
             ping[col_wgt] += in[in_offset+col_wgt*LAYER_N_DIMS+row_wgt] * pong[row_wgt];
         }
+
+        if (ping[col_wgt] < 0) ping[col_wgt] = 0;
     }
 
     in_offset += LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS;
@@ -163,6 +170,8 @@ void system_t::load_memory()
         {
             pong[col_wgt] += in[in_offset+col_wgt*LAYER_N_DIMS+row_wgt] * ping[row_wgt];
         }
+
+        if (pong[col_wgt] < 0) pong[col_wgt] = 0;
     }
 
     in_offset += LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS;
@@ -181,6 +190,8 @@ void system_t::load_memory()
         {
             ping[col_wgt] += in[in_offset+col_wgt*LAYER_4_INPUTS+row_wgt] * pong[row_wgt];
         }
+
+        if (ping[col_wgt] < 0) ping[col_wgt] = 0;
     }
 
     in_offset += LAYER_4_INPUTS*LAYER_4_OUTPUTS + LAYER_4_OUTPUTS;
@@ -194,6 +205,8 @@ void system_t::load_memory()
         {
             pong[col_wgt] += in[in_offset+col_wgt*LAYER_N_DIMS+row_wgt] * ping[row_wgt];
         }
+
+        if (pong[col_wgt] < 0) pong[col_wgt] = 0;
     }
 
     in_offset += LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS;
@@ -207,6 +220,8 @@ void system_t::load_memory()
         {
             ping[col_wgt] += in[in_offset+col_wgt*LAYER_N_DIMS+row_wgt] * pong[row_wgt];
         }
+
+        if (ping[col_wgt] < 0) ping[col_wgt] = 0;
     }
 
     in_offset += LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS;
@@ -238,6 +253,8 @@ void system_t::load_memory()
         {
             ping[col_wgt] += in[in_offset+col_wgt*LAYER_8_INPUTS+row_wgt] * pong[row_wgt];
         }
+
+        if (ping[col_wgt] < 0) ping[col_wgt] = 0;
     }
 
     in_offset += LAYER_8_INPUTS*LAYER_8_OUTPUTS + LAYER_8_OUTPUTS;
@@ -251,6 +268,8 @@ void system_t::load_memory()
         {
             pong[col_wgt] += in[in_offset+col_wgt*LAYER_9_INPUTS+row_wgt] * ping[row_wgt];
         }
+
+        if (pong[col_wgt] < 0) pong[col_wgt] = 0;
     }
 
     in_offset += LAYER_9_INPUTS*LAYER_9_OUTPUTS + LAYER_9_OUTPUTS;
@@ -264,6 +283,8 @@ void system_t::load_memory()
         {
             gold[col_wgt] += in[in_offset+col_wgt*LAYER_10_INPUTS+row_wgt] * pong[row_wgt];
         }
+
+        if (gold[col_wgt] < 0) gold[col_wgt] = 0;
     }
 
     in_offset += LAYER_10_INPUTS*LAYER_10_OUTPUTS + LAYER_10_OUTPUTS;
@@ -299,10 +320,10 @@ int system_t::validate()
     uint32_t errors = 0;
 
     for (int i = 0; i < out_size; i++)
-        if (gold[i] != out[i])
+        if (pong[i] != out[i])
         {
             errors++;
-            ESP_REPORT_INFO("gold[%d] = %lu out[%d] = %lu\n", i, gold[i], i, out[i]);
+            ESP_REPORT_INFO("pong[%d] = %ld out[%d] = %ld\n", i, pong[i], i, out[i]);
         }
 
     delete [] in;

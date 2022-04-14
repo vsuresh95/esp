@@ -125,8 +125,6 @@ public:
     int64_t regs_mul[MAC_TILE_SIZE];
     int64_t regs_pong[316];
     int64_t regs_out[3];
-
-    unsigned store_offset;
 };
 
 
