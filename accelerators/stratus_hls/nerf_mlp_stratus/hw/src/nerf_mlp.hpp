@@ -92,39 +92,39 @@ public:
     // Functions
 
     // Private local memories
-    sc_dt::sc_int<DATA_WIDTH> plm_wgt_0[15360];
-    sc_dt::sc_int<DATA_WIDTH> plm_wgt_1[65536];
-    sc_dt::sc_int<DATA_WIDTH> plm_wgt_2[65536];
-    sc_dt::sc_int<DATA_WIDTH> plm_wgt_3[65536];
-    sc_dt::sc_int<DATA_WIDTH> plm_wgt_4[80896];
-    sc_dt::sc_int<DATA_WIDTH> plm_wgt_5[65536];
-    sc_dt::sc_int<DATA_WIDTH> plm_wgt_6[65536];
-    sc_dt::sc_int<DATA_WIDTH> plm_wgt_7[65536];
-    sc_dt::sc_int<DATA_WIDTH> plm_wgt_8[71680];
-    sc_dt::sc_int<DATA_WIDTH> plm_wgt_9[32768];
-    sc_dt::sc_int<DATA_WIDTH> plm_wgt_10[384];
+    sc_dt::sc_int<DATA_WIDTH> plm_wgt_0[LAYER_0_INPUTS*LAYER_0_OUTPUTS];
+    sc_dt::sc_int<DATA_WIDTH> plm_wgt_1[LAYER_N_DIMS*LAYER_N_DIMS];
+    sc_dt::sc_int<DATA_WIDTH> plm_wgt_2[LAYER_N_DIMS*LAYER_N_DIMS];
+    sc_dt::sc_int<DATA_WIDTH> plm_wgt_3[LAYER_N_DIMS*LAYER_N_DIMS];
+    sc_dt::sc_int<DATA_WIDTH> plm_wgt_4[LAYER_4_INPUTS*LAYER_4_OUTPUTS];
+    sc_dt::sc_int<DATA_WIDTH> plm_wgt_5[LAYER_N_DIMS*LAYER_N_DIMS];
+    sc_dt::sc_int<DATA_WIDTH> plm_wgt_6[LAYER_N_DIMS*LAYER_N_DIMS];
+    sc_dt::sc_int<DATA_WIDTH> plm_wgt_7[LAYER_N_DIMS*LAYER_N_DIMS];
+    sc_dt::sc_int<DATA_WIDTH> plm_wgt_8[LAYER_8_INPUTS*LAYER_8_OUTPUTS];
+    sc_dt::sc_int<DATA_WIDTH> plm_wgt_9[LAYER_9_INPUTS*LAYER_9_OUTPUTS];
+    sc_dt::sc_int<DATA_WIDTH> plm_wgt_10[LAYER_10_INPUTS*LAYER_10_OUTPUTS];
 
-    sc_dt::sc_int<DATA_WIDTH> plm_bias_0[256];
-    sc_dt::sc_int<DATA_WIDTH> plm_bias_1[256];
-    sc_dt::sc_int<DATA_WIDTH> plm_bias_2[256];
-    sc_dt::sc_int<DATA_WIDTH> plm_bias_3[256];
-    sc_dt::sc_int<DATA_WIDTH> plm_bias_4[256];
-    sc_dt::sc_int<DATA_WIDTH> plm_bias_5[256];
-    sc_dt::sc_int<DATA_WIDTH> plm_bias_6[256];
-    sc_dt::sc_int<DATA_WIDTH> plm_bias_7[256];
-    sc_dt::sc_int<DATA_WIDTH> plm_bias_8[256];
-    sc_dt::sc_int<DATA_WIDTH> plm_bias_9[256];
-    sc_dt::sc_int<DATA_WIDTH> plm_bias_10[256];
+    sc_dt::sc_int<DATA_WIDTH> plm_bias_0[LAYER_0_OUTPUTS];
+    sc_dt::sc_int<DATA_WIDTH> plm_bias_1[LAYER_N_DIMS];
+    sc_dt::sc_int<DATA_WIDTH> plm_bias_2[LAYER_N_DIMS];
+    sc_dt::sc_int<DATA_WIDTH> plm_bias_3[LAYER_N_DIMS];
+    sc_dt::sc_int<DATA_WIDTH> plm_bias_4[LAYER_4_OUTPUTS];
+    sc_dt::sc_int<DATA_WIDTH> plm_bias_5[LAYER_N_DIMS];
+    sc_dt::sc_int<DATA_WIDTH> plm_bias_6[LAYER_N_DIMS];
+    sc_dt::sc_int<DATA_WIDTH> plm_bias_7[LAYER_N_DIMS];
+    sc_dt::sc_int<DATA_WIDTH> plm_bias_8[LAYER_8_OUTPUTS];
+    sc_dt::sc_int<DATA_WIDTH> plm_bias_9[LAYER_9_OUTPUTS];
+    sc_dt::sc_int<DATA_WIDTH> plm_bias_10[LAYER_10_OUTPUTS];
 
-    sc_dt::sc_int<DATA_WIDTH> plm_pos[60];
-    sc_dt::sc_int<DATA_WIDTH> plm_dir[24];
+    sc_dt::sc_int<DATA_WIDTH> plm_pos[LAYER_0_INPUTS];
+    sc_dt::sc_int<DATA_WIDTH> plm_dir[LAYER_8_INPUTS-LAYER_N_DIMS];
     
-    int64_t regs_ping[316];
+    int64_t regs_ping[LAYER_4_INPUTS];
     int64_t regs_wgt[MAC_TILE_SIZE];
-    int64_t regs_bias[256];
+    int64_t regs_bias[LAYER_N_DIMS];
     int64_t regs_mul[MAC_TILE_SIZE];
-    int64_t regs_pong[316];
-    int64_t regs_out[3];
+    int64_t regs_pong[LAYER_4_INPUTS];
+    int64_t regs_out[LAYER_10_OUTPUTS];
 };
 
 
