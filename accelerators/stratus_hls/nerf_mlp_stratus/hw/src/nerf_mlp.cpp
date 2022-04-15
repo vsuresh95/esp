@@ -13,8 +13,6 @@
 // Function to manage load operations for all layers
 void nerf_mlp::load_input_dma(uint32_t len, uint32_t offset, sc_dt::sc_int<DATA_WIDTH> *plm_input)
 {
-    ESP_REPORT_INFO("offset = %d", offset);
- 
     dma_info_t dma_info(offset / DMA_WORD_PER_BEAT, len / DMA_WORD_PER_BEAT, DMA_SIZE);
 
     this->dma_read_ctrl.put(dma_info);
@@ -85,7 +83,7 @@ void nerf_mlp::load_input()
         len = round_up(LAYER_0_OUTPUTS, DMA_WORD_PER_BEAT);
         load_input_dma(len, offset, plm_bias_0);
         offset += len; 
- 
+
         // Load layer 1 weights
         len = round_up(LAYER_N_DIMS*LAYER_N_DIMS, DMA_WORD_PER_BEAT);
         load_input_dma(len, offset, plm_wgt_1);
@@ -174,7 +172,7 @@ void nerf_mlp::load_input()
         // Load layer 9 biases
         len = round_up(LAYER_9_OUTPUTS, DMA_WORD_PER_BEAT);
         load_input_dma(len, offset, plm_bias_9);
-        offset += len; 
+        offset += len;
  
         // Load layer 10 weights
         len = round_up(LAYER_10_INPUTS*LAYER_10_OUTPUTS, DMA_WORD_PER_BEAT);
@@ -299,7 +297,6 @@ void nerf_mlp::compute_kernel_tile(uint16_t input_dim, uint16_t output_dim, sc_d
         HLS_UNROLL_LOOP(ON, "read_bias");
         HLS_BREAK_ARRAY_DEPENDENCY(plm_bias);
         regs_output[bias_index] = plm_bias[bias_index];
-        ESP_REPORT_INFO("design regs_output[%d] = %ld", bias_index, regs_output[bias_index]);
     }
 
     for (uint16_t col_wgt = 0; col_wgt < output_dim; col_wgt++)

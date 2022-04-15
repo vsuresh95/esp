@@ -102,7 +102,7 @@ public:
     sc_dt::sc_int<DATA_WIDTH> plm_wgt_7[65536];
     sc_dt::sc_int<DATA_WIDTH> plm_wgt_8[71680];
     sc_dt::sc_int<DATA_WIDTH> plm_wgt_9[32768];
-    sc_dt::sc_int<DATA_WIDTH> plm_wgt_10[372];
+    sc_dt::sc_int<DATA_WIDTH> plm_wgt_10[384];
 
     sc_dt::sc_int<DATA_WIDTH> plm_bias_0[256];
     sc_dt::sc_int<DATA_WIDTH> plm_bias_1[256];

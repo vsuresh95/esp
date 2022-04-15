@@ -121,19 +121,12 @@ void system_t::load_memory()
     {
         gold[col_wgt] = in[in_offset+LAYER_0_INPUTS*LAYER_0_OUTPUTS + col_wgt];
 
-        ESP_REPORT_INFO("TB gold[%d] = %ld", col_wgt, gold[col_wgt]);
- 
         for (uint16_t row_wgt = 0; row_wgt < LAYER_0_INPUTS; row_wgt++)
         {
             gold[col_wgt] += in[in_offset+col_wgt*LAYER_0_INPUTS+row_wgt] * in[weights_offset+row_wgt];
         }
 
         if (gold[col_wgt] < 0) gold[col_wgt] = 0;
-    }
-
-    for (uint16_t col_wgt = 0; col_wgt < LAYER_0_OUTPUTS; col_wgt++)
-    {
-        ESP_REPORT_INFO("design from TB in[%d] = %ld", in_offset+LAYER_0_INPUTS*LAYER_0_OUTPUTS + col_wgt, in[in_offset+LAYER_0_INPUTS*LAYER_0_OUTPUTS + col_wgt]);
     }
 
     // in_offset += LAYER_0_INPUTS*LAYER_0_OUTPUTS + LAYER_0_OUTPUTS;
