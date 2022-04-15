@@ -98,7 +98,7 @@ void system_t::load_memory()
     /* pos inputs */ LAYER_0_INPUTS +
     /* dir inputs */ (LAYER_8_INPUTS-LAYER_N_DIMS);
 
-    out_words_adj = LAYER_0_OUTPUTS;
+    out_words_adj = LAYER_10_OUTPUTS;
 
     in_size = in_words_adj * (1);
     out_size = out_words_adj * (1);
@@ -106,7 +106,7 @@ void system_t::load_memory()
     in = new int64_t[in_size];
     for (int i = 0; i < 1; i++)
         for (int j = 0; j < in_size; j++)
-            in[i * in_words_adj + j] = (int64_t) (j%10);
+            in[i * in_words_adj + j] = (int64_t) ((rand()%50)-50);
 
     // Compute golden output
     gold = new int64_t[out_size];
@@ -119,175 +119,173 @@ void system_t::load_memory()
     // Layer 0
     for (uint16_t col_wgt = 0; col_wgt < LAYER_0_OUTPUTS; col_wgt++)
     {
-        gold[col_wgt] = in[in_offset+LAYER_0_INPUTS*LAYER_0_OUTPUTS + col_wgt];
+        ping[col_wgt] = in[in_offset+LAYER_0_INPUTS*LAYER_0_OUTPUTS + col_wgt];
 
         for (uint16_t row_wgt = 0; row_wgt < LAYER_0_INPUTS; row_wgt++)
         {
-            gold[col_wgt] += in[in_offset+col_wgt*LAYER_0_INPUTS+row_wgt] * in[weights_offset+row_wgt];
+            ping[col_wgt] += in[in_offset+col_wgt*LAYER_0_INPUTS+row_wgt] * in[weights_offset+row_wgt];
         }
 
-        if (gold[col_wgt] < 0) gold[col_wgt] = 0;
+        if (ping[col_wgt] < 0) ping[col_wgt] = 0;
     }
 
-    // in_offset += LAYER_0_INPUTS*LAYER_0_OUTPUTS + LAYER_0_OUTPUTS;
+    in_offset += LAYER_0_INPUTS*LAYER_0_OUTPUTS + LAYER_0_OUTPUTS;
 
-    // // Layer 1
-    // for (uint16_t col_wgt = 0; col_wgt < LAYER_N_DIMS; col_wgt++)
-    // {
-    //     pong[col_wgt] = in[in_offset+LAYER_N_DIMS*LAYER_N_DIMS + col_wgt];
+    // Layer 1
+    for (uint16_t col_wgt = 0; col_wgt < LAYER_N_DIMS; col_wgt++)
+    {
+        pong[col_wgt] = in[in_offset+LAYER_N_DIMS*LAYER_N_DIMS + col_wgt];
 
-    //     for (uint16_t row_wgt = 0; row_wgt < LAYER_N_DIMS; row_wgt++)
-    //     {
-    //         pong[col_wgt] += in[in_offset+col_wgt*LAYER_N_DIMS+row_wgt] * ping[row_wgt];
-    //     }
+        for (uint16_t row_wgt = 0; row_wgt < LAYER_N_DIMS; row_wgt++)
+        {
+            pong[col_wgt] += in[in_offset+col_wgt*LAYER_N_DIMS+row_wgt] * ping[row_wgt];
+        }
 
-    //     if (pong[col_wgt] < 0) pong[col_wgt] = 0;
-    // }
+        if (pong[col_wgt] < 0) pong[col_wgt] = 0;
+    }
 
-    // in_offset += LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS;
+    in_offset += LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS;
 
-    // // Layer 2
-    // for (uint16_t col_wgt = 0; col_wgt < LAYER_N_DIMS; col_wgt++)
-    // {
-    //     ping[col_wgt] = in[in_offset+LAYER_N_DIMS*LAYER_N_DIMS + col_wgt];
+    // Layer 2
+    for (uint16_t col_wgt = 0; col_wgt < LAYER_N_DIMS; col_wgt++)
+    {
+        ping[col_wgt] = in[in_offset+LAYER_N_DIMS*LAYER_N_DIMS + col_wgt];
 
-    //     for (uint16_t row_wgt = 0; row_wgt < LAYER_N_DIMS; row_wgt++)
-    //     {
-    //         ping[col_wgt] += in[in_offset+col_wgt*LAYER_N_DIMS+row_wgt] * pong[row_wgt];
-    //     }
+        for (uint16_t row_wgt = 0; row_wgt < LAYER_N_DIMS; row_wgt++)
+        {
+            ping[col_wgt] += in[in_offset+col_wgt*LAYER_N_DIMS+row_wgt] * pong[row_wgt];
+        }
 
-    //     if (ping[col_wgt] < 0) ping[col_wgt] = 0;
-    // }
+        if (ping[col_wgt] < 0) ping[col_wgt] = 0;
+    }
 
-    // in_offset += LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS;
+    in_offset += LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS;
 
-    // // Layer 3
-    // for (uint16_t col_wgt = 0; col_wgt < LAYER_N_DIMS; col_wgt++)
-    // {
-    //     pong[col_wgt] = in[in_offset+LAYER_N_DIMS*LAYER_N_DIMS + col_wgt];
+    // Layer 3
+    for (uint16_t col_wgt = 0; col_wgt < LAYER_N_DIMS; col_wgt++)
+    {
+        pong[col_wgt] = in[in_offset+LAYER_N_DIMS*LAYER_N_DIMS + col_wgt];
 
-    //     for (uint16_t row_wgt = 0; row_wgt < LAYER_N_DIMS; row_wgt++)
-    //     {
-    //         pong[col_wgt] += in[in_offset+col_wgt*LAYER_N_DIMS+row_wgt] * ping[row_wgt];
-    //     }
+        for (uint16_t row_wgt = 0; row_wgt < LAYER_N_DIMS; row_wgt++)
+        {
+            pong[col_wgt] += in[in_offset+col_wgt*LAYER_N_DIMS+row_wgt] * ping[row_wgt];
+        }
 
-    //     if (pong[col_wgt] < 0) pong[col_wgt] = 0;
-    // }
+        if (pong[col_wgt] < 0) pong[col_wgt] = 0;
+    }
 
-    // in_offset += LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS;
+    in_offset += LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS;
 
-    // // Layer 4
-    // for (uint16_t row_wgt = LAYER_N_DIMS; row_wgt < LAYER_4_INPUTS; row_wgt++)
-    // {
-    //     pong[row_wgt] = in[weights_offset+row_wgt-LAYER_N_DIMS];
-    // }
+    // Layer 4
+    for (uint16_t row_wgt = LAYER_N_DIMS; row_wgt < LAYER_4_INPUTS; row_wgt++)
+    {
+        pong[row_wgt] = in[weights_offset+row_wgt-LAYER_N_DIMS];
+    }
 
-    // for (uint16_t col_wgt = 0; col_wgt < LAYER_4_OUTPUTS; col_wgt++)
-    // {
-    //     ping[col_wgt] = in[in_offset+LAYER_4_INPUTS*LAYER_4_OUTPUTS + col_wgt];
+    for (uint16_t col_wgt = 0; col_wgt < LAYER_4_OUTPUTS; col_wgt++)
+    {
+        ping[col_wgt] = in[in_offset+LAYER_4_INPUTS*LAYER_4_OUTPUTS + col_wgt];
 
-    //     for (uint16_t row_wgt = 0; row_wgt < LAYER_4_INPUTS; row_wgt++)
-    //     {
-    //         ping[col_wgt] += in[in_offset+col_wgt*LAYER_4_INPUTS+row_wgt] * pong[row_wgt];
-    //     }
+        for (uint16_t row_wgt = 0; row_wgt < LAYER_4_INPUTS; row_wgt++)
+        {
+            ping[col_wgt] += in[in_offset+col_wgt*LAYER_4_INPUTS+row_wgt] * pong[row_wgt];
+        }
 
-    //     if (ping[col_wgt] < 0) ping[col_wgt] = 0;
-    // }
+        if (ping[col_wgt] < 0) ping[col_wgt] = 0;
+    }
 
-    // in_offset += LAYER_4_INPUTS*LAYER_4_OUTPUTS + LAYER_4_OUTPUTS;
+    in_offset += LAYER_4_INPUTS*LAYER_4_OUTPUTS + LAYER_4_OUTPUTS;
 
-    // // Layer 5
-    // for (uint16_t col_wgt = 0; col_wgt < LAYER_N_DIMS; col_wgt++)
-    // {
-    //     pong[col_wgt] = in[in_offset+LAYER_N_DIMS*LAYER_N_DIMS + col_wgt];
+    // Layer 5
+    for (uint16_t col_wgt = 0; col_wgt < LAYER_N_DIMS; col_wgt++)
+    {
+        pong[col_wgt] = in[in_offset+LAYER_N_DIMS*LAYER_N_DIMS + col_wgt];
 
-    //     for (uint16_t row_wgt = 0; row_wgt < LAYER_N_DIMS; row_wgt++)
-    //     {
-    //         pong[col_wgt] += in[in_offset+col_wgt*LAYER_N_DIMS+row_wgt] * ping[row_wgt];
-    //     }
+        for (uint16_t row_wgt = 0; row_wgt < LAYER_N_DIMS; row_wgt++)
+        {
+            pong[col_wgt] += in[in_offset+col_wgt*LAYER_N_DIMS+row_wgt] * ping[row_wgt];
+        }
 
-    //     if (pong[col_wgt] < 0) pong[col_wgt] = 0;
-    // }
+        if (pong[col_wgt] < 0) pong[col_wgt] = 0;
+    }
 
-    // in_offset += LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS;
+    in_offset += LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS;
 
-    // // Layer 6
-    // for (uint16_t col_wgt = 0; col_wgt < LAYER_N_DIMS; col_wgt++)
-    // {
-    //     ping[col_wgt] = in[in_offset+LAYER_N_DIMS*LAYER_N_DIMS + col_wgt];
+    // Layer 6
+    for (uint16_t col_wgt = 0; col_wgt < LAYER_N_DIMS; col_wgt++)
+    {
+        ping[col_wgt] = in[in_offset+LAYER_N_DIMS*LAYER_N_DIMS + col_wgt];
 
-    //     for (uint16_t row_wgt = 0; row_wgt < LAYER_N_DIMS; row_wgt++)
-    //     {
-    //         ping[col_wgt] += in[in_offset+col_wgt*LAYER_N_DIMS+row_wgt] * pong[row_wgt];
-    //     }
+        for (uint16_t row_wgt = 0; row_wgt < LAYER_N_DIMS; row_wgt++)
+        {
+            ping[col_wgt] += in[in_offset+col_wgt*LAYER_N_DIMS+row_wgt] * pong[row_wgt];
+        }
 
-    //     if (ping[col_wgt] < 0) ping[col_wgt] = 0;
-    // }
+        if (ping[col_wgt] < 0) ping[col_wgt] = 0;
+    }
 
-    // in_offset += LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS;
+    in_offset += LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS;
 
-    // // Layer 7
-    // for (uint16_t col_wgt = 0; col_wgt < LAYER_N_DIMS; col_wgt++)
-    // {
-    //     pong[col_wgt] = in[in_offset+LAYER_N_DIMS*LAYER_N_DIMS + col_wgt];
+    // Layer 7
+    for (uint16_t col_wgt = 0; col_wgt < LAYER_N_DIMS; col_wgt++)
+    {
+        pong[col_wgt] = in[in_offset+LAYER_N_DIMS*LAYER_N_DIMS + col_wgt];
 
-    //     for (uint16_t row_wgt = 0; row_wgt < LAYER_N_DIMS; row_wgt++)
-    //     {
-    //         pong[col_wgt] += in[in_offset+col_wgt*LAYER_N_DIMS+row_wgt] * ping[row_wgt];
-    //     }
-    // }
+        for (uint16_t row_wgt = 0; row_wgt < LAYER_N_DIMS; row_wgt++)
+        {
+            pong[col_wgt] += in[in_offset+col_wgt*LAYER_N_DIMS+row_wgt] * ping[row_wgt];
+        }
+    }
 
-    // in_offset += LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS;
+    in_offset += LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS;
 
-    // // Layer 8
-    // for (uint16_t row_wgt = LAYER_N_DIMS; row_wgt < LAYER_8_INPUTS; row_wgt++)
-    // {
-    //     pong[row_wgt] = in[weights_offset+LAYER_0_INPUTS+row_wgt-LAYER_N_DIMS];
-    // }
+    // Layer 8
+    for (uint16_t row_wgt = LAYER_N_DIMS; row_wgt < LAYER_8_INPUTS; row_wgt++)
+    {
+        pong[row_wgt] = in[weights_offset+LAYER_0_INPUTS+row_wgt-LAYER_N_DIMS];
+    }
 
-    // for (uint16_t col_wgt = 0; col_wgt < LAYER_8_OUTPUTS; col_wgt++)
-    // {
-    //     ping[col_wgt] = in[in_offset+LAYER_4_INPUTS*LAYER_8_OUTPUTS + col_wgt];
+    for (uint16_t col_wgt = 0; col_wgt < LAYER_8_OUTPUTS; col_wgt++)
+    {
+        ping[col_wgt] = in[in_offset+LAYER_8_INPUTS*LAYER_8_OUTPUTS + col_wgt];
 
-    //     for (uint16_t row_wgt = 0; row_wgt < LAYER_8_INPUTS; row_wgt++)
-    //     {
-    //         ping[col_wgt] += in[in_offset+col_wgt*LAYER_8_INPUTS+row_wgt] * pong[row_wgt];
-    //     }
+        for (uint16_t row_wgt = 0; row_wgt < LAYER_8_INPUTS; row_wgt++)
+        {
+            ping[col_wgt] += in[in_offset+col_wgt*LAYER_8_INPUTS+row_wgt] * pong[row_wgt];
+        }
 
-    //     if (ping[col_wgt] < 0) ping[col_wgt] = 0;
-    // }
+        if (ping[col_wgt] < 0) ping[col_wgt] = 0;
+    }
 
-    // in_offset += LAYER_8_INPUTS*LAYER_8_OUTPUTS + LAYER_8_OUTPUTS;
+    in_offset += LAYER_8_INPUTS*LAYER_8_OUTPUTS + LAYER_8_OUTPUTS;
 
-    // // Layer 9
-    // for (uint16_t col_wgt = 0; col_wgt < LAYER_9_OUTPUTS; col_wgt++)
-    // {
-    //     pong[col_wgt] = in[in_offset+LAYER_9_INPUTS*LAYER_9_OUTPUTS + col_wgt];
+    // Layer 9
+    for (uint16_t col_wgt = 0; col_wgt < LAYER_9_OUTPUTS; col_wgt++)
+    {
+        pong[col_wgt] = in[in_offset+LAYER_9_INPUTS*LAYER_9_OUTPUTS + col_wgt];
 
-    //     for (uint16_t row_wgt = 0; row_wgt < LAYER_9_INPUTS; row_wgt++)
-    //     {
-    //         pong[col_wgt] += in[in_offset+col_wgt*LAYER_9_INPUTS+row_wgt] * ping[row_wgt];
-    //     }
+        for (uint16_t row_wgt = 0; row_wgt < LAYER_9_INPUTS; row_wgt++)
+        {
+            pong[col_wgt] += in[in_offset+col_wgt*LAYER_9_INPUTS+row_wgt] * ping[row_wgt];
+        }
 
-    //     if (pong[col_wgt] < 0) pong[col_wgt] = 0;
-    // }
+        if (pong[col_wgt] < 0) pong[col_wgt] = 0;
+    }
 
-    // in_offset += LAYER_9_INPUTS*LAYER_9_OUTPUTS + LAYER_9_OUTPUTS;
+    in_offset += LAYER_9_INPUTS*LAYER_9_OUTPUTS + LAYER_9_OUTPUTS;
 
-    // // Layer 10
-    // for (uint16_t col_wgt = 0; col_wgt < LAYER_10_OUTPUTS; col_wgt++)
-    // {
-    //     gold[col_wgt] = in[in_offset+LAYER_10_INPUTS*LAYER_10_OUTPUTS + col_wgt];
+    // Layer 10
+    for (uint16_t col_wgt = 0; col_wgt < LAYER_10_OUTPUTS; col_wgt++)
+    {
+        gold[col_wgt] = in[in_offset+LAYER_10_INPUTS*LAYER_10_OUTPUTS + col_wgt];
 
-    //     for (uint16_t row_wgt = 0; row_wgt < LAYER_10_INPUTS; row_wgt++)
-    //     {
-    //         gold[col_wgt] += in[in_offset+col_wgt*LAYER_10_INPUTS+row_wgt] * pong[row_wgt];
-    //     }
+        for (uint16_t row_wgt = 0; row_wgt < LAYER_10_INPUTS; row_wgt++)
+        {
+            gold[col_wgt] += in[in_offset+col_wgt*LAYER_10_INPUTS+row_wgt] * pong[row_wgt];
+        }
+    }
 
-    //     if (gold[col_wgt] < 0) gold[col_wgt] = 0;
-    // }
-
-    // in_offset += LAYER_10_INPUTS*LAYER_10_OUTPUTS + LAYER_10_OUTPUTS;
+    in_offset += LAYER_10_INPUTS*LAYER_10_OUTPUTS + LAYER_10_OUTPUTS;
 
     // Memory initialization:
     for (int i = 0; i < in_size / DMA_WORD_PER_BEAT; i++)  {

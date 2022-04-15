@@ -256,7 +256,7 @@ void nerf_mlp::store_output()
 
         wait();
 
-        uint32_t len = round_up(LAYER_0_OUTPUTS, DMA_WORD_PER_BEAT);
+        uint32_t len = round_up(LAYER_10_OUTPUTS, DMA_WORD_PER_BEAT);
 
         this->store_compute_handshake();
 
@@ -275,7 +275,7 @@ void nerf_mlp::store_output()
             for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
             {
                 HLS_UNROLL_SIMPLE;
-                dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH) = regs_pong[i+k];
+                dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH) = regs_out[i+k];
             }
             this->dma_write_chnl.put(dataBv);
         }
@@ -398,157 +398,157 @@ void nerf_mlp::compute_kernel()
         }
     }
 
-    // ////////////////////////////////
-    // // Layer 1 1x256 x 256x256
-    // ///////////////////////////////// 
-    // {
-    //     compute_kernel_tile(LAYER_N_DIMS, LAYER_N_DIMS, plm_wgt_1, plm_bias_1,
-    //                         regs_pong, regs_ping, regs_mul, regs_wgt);
+    ////////////////////////////////
+    // Layer 1 1x256 x 256x256
+    ///////////////////////////////// 
+    {
+        compute_kernel_tile(LAYER_N_DIMS, LAYER_N_DIMS, plm_wgt_1, plm_bias_1,
+                            regs_pong, regs_ping, regs_mul, regs_wgt);
  
-    //     // ReLU on the output values
-    //     for (uint16_t row_wgt = 0; row_wgt < LAYER_N_DIMS; row_wgt++)
-    //     {
-    //         HLS_UNROLL_LOOP(ON, "relu_1");
-    //         if (regs_ping[row_wgt] < 0) regs_ping[row_wgt] = 0;
-    //     }
-    // }
+        // ReLU on the output values
+        for (uint16_t row_wgt = 0; row_wgt < LAYER_N_DIMS; row_wgt++)
+        {
+            HLS_UNROLL_LOOP(ON, "relu_1");
+            if (regs_ping[row_wgt] < 0) regs_ping[row_wgt] = 0;
+        }
+    }
 
-    // /////////////////////////////////
-    // // Layer 2 1x256 x 256x256
-    // ///////////////////////////////// 
-    // {
-    //     compute_kernel_tile(LAYER_N_DIMS, LAYER_N_DIMS, plm_wgt_2, plm_bias_2,
-    //                         regs_ping, regs_pong, regs_mul, regs_wgt);
+    /////////////////////////////////
+    // Layer 2 1x256 x 256x256
+    ///////////////////////////////// 
+    {
+        compute_kernel_tile(LAYER_N_DIMS, LAYER_N_DIMS, plm_wgt_2, plm_bias_2,
+                            regs_ping, regs_pong, regs_mul, regs_wgt);
 
-    //     // ReLU on the output values
-    //     for (uint16_t row_wgt = 0; row_wgt < LAYER_N_DIMS; row_wgt++)
-    //     {
-    //         HLS_UNROLL_LOOP(ON, "relu_2");
-    //         if (regs_pong[row_wgt] < 0) regs_pong[row_wgt] = 0;
-    //     }
-    // }
+        // ReLU on the output values
+        for (uint16_t row_wgt = 0; row_wgt < LAYER_N_DIMS; row_wgt++)
+        {
+            HLS_UNROLL_LOOP(ON, "relu_2");
+            if (regs_pong[row_wgt] < 0) regs_pong[row_wgt] = 0;
+        }
+    }
 
-    // /////////////////////////////////
-    // // Layer 3 1x256 x 256x256
-    // ///////////////////////////////// 
-    // {
-    //     compute_kernel_tile(LAYER_N_DIMS, LAYER_N_DIMS, plm_wgt_3, plm_bias_3,
-    //                         regs_pong, regs_ping, regs_mul, regs_wgt);
+    /////////////////////////////////
+    // Layer 3 1x256 x 256x256
+    ///////////////////////////////// 
+    {
+        compute_kernel_tile(LAYER_N_DIMS, LAYER_N_DIMS, plm_wgt_3, plm_bias_3,
+                            regs_pong, regs_ping, regs_mul, regs_wgt);
 
-    //     // ReLU on the output values
-    //     for (uint16_t row_wgt = 0; row_wgt < LAYER_N_DIMS; row_wgt++)
-    //     {
-    //         HLS_UNROLL_LOOP(ON, "relu_3");
-    //         if (regs_ping[row_wgt] < 0) regs_ping[row_wgt] = 0;
-    //     }
-    // }
+        // ReLU on the output values
+        for (uint16_t row_wgt = 0; row_wgt < LAYER_N_DIMS; row_wgt++)
+        {
+            HLS_UNROLL_LOOP(ON, "relu_3");
+            if (regs_ping[row_wgt] < 0) regs_ping[row_wgt] = 0;
+        }
+    }
     
-    // /////////////////////////////////
-    // // Layer 4 1x316 x 316x256
-    // ///////////////////////////////// 
-    // {
-    //     // Read from Layer 0 inputs from scratchpad
-    //     for (uint16_t elem_in = LAYER_N_DIMS; elem_in < LAYER_4_INPUTS; elem_in++)
-    //     {
-    //         HLS_UNROLL_LOOP(ON, "read_inputs_4");
-    //         HLS_BREAK_ARRAY_DEPENDENCY(plm_pos);
-    //         regs_ping[elem_in] = plm_pos[elem_in-LAYER_N_DIMS];
-    //     }
+    /////////////////////////////////
+    // Layer 4 1x316 x 316x256
+    ///////////////////////////////// 
+    {
+        // Read from Layer 0 inputs from scratchpad
+        for (uint16_t elem_in = LAYER_N_DIMS; elem_in < LAYER_4_INPUTS; elem_in++)
+        {
+            HLS_UNROLL_LOOP(ON, "read_inputs_4");
+            HLS_BREAK_ARRAY_DEPENDENCY(plm_pos);
+            regs_ping[elem_in] = plm_pos[elem_in-LAYER_N_DIMS];
+        }
 
-    //     compute_kernel_tile(LAYER_4_INPUTS, LAYER_4_OUTPUTS, plm_wgt_4, plm_bias_4,
-    //                         regs_ping, regs_pong, regs_mul, regs_wgt);
+        compute_kernel_tile(LAYER_4_INPUTS, LAYER_4_OUTPUTS, plm_wgt_4, plm_bias_4,
+                            regs_ping, regs_pong, regs_mul, regs_wgt);
 
-    //     // ReLU on the output values
-    //     for (uint16_t row_wgt = 0; row_wgt < LAYER_4_OUTPUTS; row_wgt++)
-    //     {
-    //         HLS_UNROLL_LOOP(ON, "relu_4");
-    //         if (regs_pong[row_wgt] < 0) regs_pong[row_wgt] = 0;
-    //     }
-    // }
+        // ReLU on the output values
+        for (uint16_t row_wgt = 0; row_wgt < LAYER_4_OUTPUTS; row_wgt++)
+        {
+            HLS_UNROLL_LOOP(ON, "relu_4");
+            if (regs_pong[row_wgt] < 0) regs_pong[row_wgt] = 0;
+        }
+    }
     
-    // /////////////////////////////////
-    // // Layer 5 1x256 x 256x256
-    // ///////////////////////////////// 
-    // {
-    //     compute_kernel_tile(LAYER_N_DIMS, LAYER_N_DIMS, plm_wgt_5, plm_bias_5,
-    //                         regs_pong, regs_ping, regs_mul, regs_wgt);
+    /////////////////////////////////
+    // Layer 5 1x256 x 256x256
+    ///////////////////////////////// 
+    {
+        compute_kernel_tile(LAYER_N_DIMS, LAYER_N_DIMS, plm_wgt_5, plm_bias_5,
+                            regs_pong, regs_ping, regs_mul, regs_wgt);
 
-    //     // ReLU on the output values
-    //     for (uint16_t row_wgt = 0; row_wgt < LAYER_N_DIMS; row_wgt++)
-    //     {
-    //         HLS_UNROLL_LOOP(ON, "relu_5");
-    //         if (regs_ping[row_wgt] < 0) regs_ping[row_wgt] = 0;
-    //     }
-    // }
+        // ReLU on the output values
+        for (uint16_t row_wgt = 0; row_wgt < LAYER_N_DIMS; row_wgt++)
+        {
+            HLS_UNROLL_LOOP(ON, "relu_5");
+            if (regs_ping[row_wgt] < 0) regs_ping[row_wgt] = 0;
+        }
+    }
     
-    // /////////////////////////////////
-    // // Layer 6 1x256 x 256x256
-    // ///////////////////////////////// 
-    // {
-    //     compute_kernel_tile(LAYER_N_DIMS, LAYER_N_DIMS, plm_wgt_6, plm_bias_6,
-    //                         regs_ping, regs_pong, regs_mul, regs_wgt);
+    /////////////////////////////////
+    // Layer 6 1x256 x 256x256
+    ///////////////////////////////// 
+    {
+        compute_kernel_tile(LAYER_N_DIMS, LAYER_N_DIMS, plm_wgt_6, plm_bias_6,
+                            regs_ping, regs_pong, regs_mul, regs_wgt);
 
-    //     // ReLU on the output values
-    //     for (uint16_t row_wgt = 0; row_wgt < LAYER_N_DIMS; row_wgt++)
-    //     {
-    //         HLS_UNROLL_LOOP(ON, "relu_6");
-    //         if (regs_pong[row_wgt] < 0) regs_pong[row_wgt] = 0;
-    //     }
-    // }
+        // ReLU on the output values
+        for (uint16_t row_wgt = 0; row_wgt < LAYER_N_DIMS; row_wgt++)
+        {
+            HLS_UNROLL_LOOP(ON, "relu_6");
+            if (regs_pong[row_wgt] < 0) regs_pong[row_wgt] = 0;
+        }
+    }
     
-    // /////////////////////////////////
-    // // Layer 7 1x256 x 256x256
-    // ///////////////////////////////// 
-    // {
-    //     compute_kernel_tile(LAYER_N_DIMS, LAYER_N_DIMS, plm_wgt_7, plm_bias_7,
-    //                         regs_pong, regs_ping, regs_mul, regs_wgt);
-    // }
+    /////////////////////////////////
+    // Layer 7 1x256 x 256x256
+    ///////////////////////////////// 
+    {
+        compute_kernel_tile(LAYER_N_DIMS, LAYER_N_DIMS, plm_wgt_7, plm_bias_7,
+                            regs_pong, regs_ping, regs_mul, regs_wgt);
+    }
 
-    // /////////////////////////////////
-    // // Layer 8 1x280 x 256x256
-    // ///////////////////////////////// 
-    // {
-    //     // Read from Layer 0 inputs from scratchpad
-    //     for (uint16_t elem_in = LAYER_N_DIMS; elem_in < LAYER_8_INPUTS; elem_in++)
-    //     {
-    //         HLS_UNROLL_LOOP(ON, "read_inputs_8");
-    //         HLS_BREAK_ARRAY_DEPENDENCY(plm_dir);
-    //         regs_ping[elem_in] = plm_dir[elem_in-LAYER_N_DIMS];
-    //     }
-    //     
-    //     compute_kernel_tile(LAYER_8_INPUTS, LAYER_8_OUTPUTS, plm_wgt_8, plm_bias_8,
-    //                         regs_ping, regs_pong, regs_mul, regs_wgt);
+    /////////////////////////////////
+    // Layer 8 1x280 x 256x256
+    ///////////////////////////////// 
+    {
+        // Read from Layer 0 inputs from scratchpad
+        for (uint16_t elem_in = LAYER_N_DIMS; elem_in < LAYER_8_INPUTS; elem_in++)
+        {
+            HLS_UNROLL_LOOP(ON, "read_inputs_8");
+            HLS_BREAK_ARRAY_DEPENDENCY(plm_dir);
+            regs_ping[elem_in] = plm_dir[elem_in-LAYER_N_DIMS];
+        }
+        
+        compute_kernel_tile(LAYER_8_INPUTS, LAYER_8_OUTPUTS, plm_wgt_8, plm_bias_8,
+                            regs_ping, regs_pong, regs_mul, regs_wgt);
 
-    //     // ReLU on the output values
-    //     for (uint16_t row_wgt = 0; row_wgt < LAYER_8_OUTPUTS; row_wgt++)
-    //     {
-    //         HLS_UNROLL_LOOP(ON, "relu_8");
-    //         if (regs_pong[row_wgt] < 0) regs_pong[row_wgt] = 0;
-    //     }
-    // }
+        // ReLU on the output values
+        for (uint16_t row_wgt = 0; row_wgt < LAYER_8_OUTPUTS; row_wgt++)
+        {
+            HLS_UNROLL_LOOP(ON, "relu_8");
+            if (regs_pong[row_wgt] < 0) regs_pong[row_wgt] = 0;
+        }
+    }
 
-    // /////////////////////////////////
-    // // Layer 9 1x256 x 256x128
-    // ///////////////////////////////// 
-    // {
-    //     compute_kernel_tile(LAYER_9_INPUTS, LAYER_9_OUTPUTS, plm_wgt_9, plm_bias_9,
-    //                         regs_pong, regs_ping, regs_mul, regs_wgt);
+    /////////////////////////////////
+    // Layer 9 1x256 x 256x128
+    ///////////////////////////////// 
+    {
+        compute_kernel_tile(LAYER_9_INPUTS, LAYER_9_OUTPUTS, plm_wgt_9, plm_bias_9,
+                            regs_pong, regs_ping, regs_mul, regs_wgt);
 
-    //     // ReLU on the output values
-    //     for (uint16_t row_wgt = 0; row_wgt < LAYER_9_OUTPUTS; row_wgt++)
-    //     {
-    //         HLS_UNROLL_LOOP(ON, "relu_9");
-    //         if (regs_ping[row_wgt] < 0) regs_ping[row_wgt] = 0;
-    //     }
-    // }
+        // ReLU on the output values
+        for (uint16_t row_wgt = 0; row_wgt < LAYER_9_OUTPUTS; row_wgt++)
+        {
+            HLS_UNROLL_LOOP(ON, "relu_9");
+            if (regs_ping[row_wgt] < 0) regs_ping[row_wgt] = 0;
+        }
+    }
 
-    // /////////////////////////////////
-    // // Layer 10 1x128 x 128x3
-    // ///////////////////////////////// 
-    // {
-    //     compute_kernel_tile(LAYER_10_INPUTS, LAYER_10_OUTPUTS, plm_wgt_10, plm_bias_10,
-    //                         regs_ping, regs_pong, regs_mul, regs_wgt);
-    // }
+    /////////////////////////////////
+    // Layer 10 1x128 x 128x3
+    ///////////////////////////////// 
+    {
+        compute_kernel_tile(LAYER_10_INPUTS, LAYER_10_OUTPUTS, plm_wgt_10, plm_bias_10,
+                            regs_ping, regs_out, regs_mul, regs_wgt);
+    }
 
     // Conclude
     {
