@@ -30,6 +30,14 @@
 #define HLS_UNROLL_SIMPLE                       \
     HLS_UNROLL_LOOP(ON)
 
+#define PRESERVE_SIGNALS				\
+    HLS_PRESERVE_SIGNAL(cur_load_data_dbg, true);   \
+    HLS_PRESERVE_SIGNAL(cur_output_valid_dbg, true);   \
+    HLS_PRESERVE_SIGNAL(cur_output_dbg, true);   \
+    HLS_PRESERVE_SIGNAL(cur_input_valid_dbg, true);   \
+    HLS_PRESERVE_SIGNAL(cur_wgt_dbg, true);   \
+    HLS_PRESERVE_SIGNAL(cur_input_dbg, true);
+
 #if defined(HLS_DIRECTIVES_BASIC)
 
 #else
@@ -45,6 +53,7 @@
 #define HLS_FLAT(_a)
 #define HLS_BREAK_DEP(_a)
 #define HLS_UNROLL_SIMPLE
+#define PRESERVE_SIGNALS
 
 #endif /* STRATUS_HLS */
 

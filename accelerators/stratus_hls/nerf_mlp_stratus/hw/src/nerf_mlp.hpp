@@ -46,31 +46,33 @@ public:
         // Map arrays to memories
         /* <<--plm-bind-->> */
         HLS_MAP_plm(plm_wgt_0, "plm_wgt_0_name");
-        HLS_MAP_plm(plm_wgt_1, "plm_wgt_1_name");
-        HLS_MAP_plm(plm_wgt_2, "plm_wgt_2_name");
-        HLS_MAP_plm(plm_wgt_3, "plm_wgt_3_name");
-        HLS_MAP_plm(plm_wgt_4, "plm_wgt_4_name");
-        HLS_MAP_plm(plm_wgt_5, "plm_wgt_5_name");
-        HLS_MAP_plm(plm_wgt_6, "plm_wgt_6_name");
-        HLS_MAP_plm(plm_wgt_7, "plm_wgt_7_name");
-        HLS_MAP_plm(plm_wgt_8, "plm_wgt_8_name");
-        HLS_MAP_plm(plm_wgt_9, "plm_wgt_9_name");
-        HLS_MAP_plm(plm_wgt_10, "plm_wgt_10_name");
+        // HLS_MAP_plm(plm_wgt_1, "plm_wgt_1_name");
+        // HLS_MAP_plm(plm_wgt_2, "plm_wgt_2_name");
+        // HLS_MAP_plm(plm_wgt_3, "plm_wgt_3_name");
+        // HLS_MAP_plm(plm_wgt_4, "plm_wgt_4_name");
+        // HLS_MAP_plm(plm_wgt_5, "plm_wgt_5_name");
+        // HLS_MAP_plm(plm_wgt_6, "plm_wgt_6_name");
+        // HLS_MAP_plm(plm_wgt_7, "plm_wgt_7_name");
+        // HLS_MAP_plm(plm_wgt_8, "plm_wgt_8_name");
+        // HLS_MAP_plm(plm_wgt_9, "plm_wgt_9_name");
+        // HLS_MAP_plm(plm_wgt_10, "plm_wgt_10_name");
 
         HLS_MAP_plm(plm_bias_0, "plm_bias_0_name");
-        HLS_MAP_plm(plm_bias_1, "plm_bias_1_name");
-        HLS_MAP_plm(plm_bias_2, "plm_bias_2_name");
-        HLS_MAP_plm(plm_bias_3, "plm_bias_3_name");
-        HLS_MAP_plm(plm_bias_4, "plm_bias_4_name");
-        HLS_MAP_plm(plm_bias_5, "plm_bias_5_name");
-        HLS_MAP_plm(plm_bias_6, "plm_bias_6_name");
-        HLS_MAP_plm(plm_bias_7, "plm_bias_7_name");
-        HLS_MAP_plm(plm_bias_8, "plm_bias_8_name");
-        HLS_MAP_plm(plm_bias_9, "plm_bias_9_name");
-        HLS_MAP_plm(plm_bias_10, "plm_bias_10_name");
+        // HLS_MAP_plm(plm_bias_1, "plm_bias_1_name");
+        // HLS_MAP_plm(plm_bias_2, "plm_bias_2_name");
+        // HLS_MAP_plm(plm_bias_3, "plm_bias_3_name");
+        // HLS_MAP_plm(plm_bias_4, "plm_bias_4_name");
+        // HLS_MAP_plm(plm_bias_5, "plm_bias_5_name");
+        // HLS_MAP_plm(plm_bias_6, "plm_bias_6_name");
+        // HLS_MAP_plm(plm_bias_7, "plm_bias_7_name");
+        // HLS_MAP_plm(plm_bias_8, "plm_bias_8_name");
+        // HLS_MAP_plm(plm_bias_9, "plm_bias_9_name");
+        // HLS_MAP_plm(plm_bias_10, "plm_bias_10_name");
 
         HLS_MAP_plm(plm_pos, "plm_pos_name");
         HLS_MAP_plm(plm_dir, "plm_dir_name");
+
+        PRESERVE_SIGNALS;
     }
 
     // Processes
@@ -81,7 +83,6 @@ public:
 
     // Computation
     void compute_kernel();
-    void compute_kernel_tile(uint16_t input_dim, uint16_t output_dim, sc_dt::sc_int<DATA_WIDTH> *plm_wgt, sc_dt::sc_int<DATA_WIDTH> *plm_bias, int64_t *regs_input, int64_t *regs_output, int64_t *regs_mul, int64_t *regs_wgt);
 
     // Store the output data
     void store_output();
@@ -93,38 +94,44 @@ public:
 
     // Private local memories
     sc_dt::sc_int<DATA_WIDTH> plm_wgt_0[LAYER_0_INPUTS*LAYER_0_OUTPUTS];
-    sc_dt::sc_int<DATA_WIDTH> plm_wgt_1[LAYER_N_DIMS*LAYER_N_DIMS];
-    sc_dt::sc_int<DATA_WIDTH> plm_wgt_2[LAYER_N_DIMS*LAYER_N_DIMS];
-    sc_dt::sc_int<DATA_WIDTH> plm_wgt_3[LAYER_N_DIMS*LAYER_N_DIMS];
-    sc_dt::sc_int<DATA_WIDTH> plm_wgt_4[LAYER_4_INPUTS*LAYER_4_OUTPUTS];
-    sc_dt::sc_int<DATA_WIDTH> plm_wgt_5[LAYER_N_DIMS*LAYER_N_DIMS];
-    sc_dt::sc_int<DATA_WIDTH> plm_wgt_6[LAYER_N_DIMS*LAYER_N_DIMS];
-    sc_dt::sc_int<DATA_WIDTH> plm_wgt_7[LAYER_N_DIMS*LAYER_N_DIMS];
-    sc_dt::sc_int<DATA_WIDTH> plm_wgt_8[LAYER_8_INPUTS*LAYER_8_OUTPUTS];
-    sc_dt::sc_int<DATA_WIDTH> plm_wgt_9[LAYER_9_INPUTS*LAYER_9_OUTPUTS];
-    sc_dt::sc_int<DATA_WIDTH> plm_wgt_10[LAYER_10_INPUTS*LAYER_10_OUTPUTS];
+    // sc_dt::sc_int<DATA_WIDTH> plm_wgt_1[LAYER_N_DIMS*LAYER_N_DIMS];
+    // sc_dt::sc_int<DATA_WIDTH> plm_wgt_2[LAYER_N_DIMS*LAYER_N_DIMS];
+    // sc_dt::sc_int<DATA_WIDTH> plm_wgt_3[LAYER_N_DIMS*LAYER_N_DIMS];
+    // sc_dt::sc_int<DATA_WIDTH> plm_wgt_4[LAYER_4_INPUTS*LAYER_4_OUTPUTS];
+    // sc_dt::sc_int<DATA_WIDTH> plm_wgt_5[LAYER_N_DIMS*LAYER_N_DIMS];
+    // sc_dt::sc_int<DATA_WIDTH> plm_wgt_6[LAYER_N_DIMS*LAYER_N_DIMS];
+    // sc_dt::sc_int<DATA_WIDTH> plm_wgt_7[LAYER_N_DIMS*LAYER_N_DIMS];
+    // sc_dt::sc_int<DATA_WIDTH> plm_wgt_8[LAYER_8_INPUTS*LAYER_8_OUTPUTS];
+    // sc_dt::sc_int<DATA_WIDTH> plm_wgt_9[LAYER_9_INPUTS*LAYER_9_OUTPUTS];
+    // sc_dt::sc_int<DATA_WIDTH> plm_wgt_10[LAYER_10_INPUTS*LAYER_10_OUTPUTS];
 
     sc_dt::sc_int<DATA_WIDTH> plm_bias_0[LAYER_0_OUTPUTS];
-    sc_dt::sc_int<DATA_WIDTH> plm_bias_1[LAYER_N_DIMS];
-    sc_dt::sc_int<DATA_WIDTH> plm_bias_2[LAYER_N_DIMS];
-    sc_dt::sc_int<DATA_WIDTH> plm_bias_3[LAYER_N_DIMS];
-    sc_dt::sc_int<DATA_WIDTH> plm_bias_4[LAYER_4_OUTPUTS];
-    sc_dt::sc_int<DATA_WIDTH> plm_bias_5[LAYER_N_DIMS];
-    sc_dt::sc_int<DATA_WIDTH> plm_bias_6[LAYER_N_DIMS];
-    sc_dt::sc_int<DATA_WIDTH> plm_bias_7[LAYER_N_DIMS];
-    sc_dt::sc_int<DATA_WIDTH> plm_bias_8[LAYER_8_OUTPUTS];
-    sc_dt::sc_int<DATA_WIDTH> plm_bias_9[LAYER_9_OUTPUTS];
-    sc_dt::sc_int<DATA_WIDTH> plm_bias_10[LAYER_10_OUTPUTS];
+    // sc_dt::sc_int<DATA_WIDTH> plm_bias_1[LAYER_N_DIMS];
+    // sc_dt::sc_int<DATA_WIDTH> plm_bias_2[LAYER_N_DIMS];
+    // sc_dt::sc_int<DATA_WIDTH> plm_bias_3[LAYER_N_DIMS];
+    // sc_dt::sc_int<DATA_WIDTH> plm_bias_4[LAYER_4_OUTPUTS];
+    // sc_dt::sc_int<DATA_WIDTH> plm_bias_5[LAYER_N_DIMS];
+    // sc_dt::sc_int<DATA_WIDTH> plm_bias_6[LAYER_N_DIMS];
+    // sc_dt::sc_int<DATA_WIDTH> plm_bias_7[LAYER_N_DIMS];
+    // sc_dt::sc_int<DATA_WIDTH> plm_bias_8[LAYER_8_OUTPUTS];
+    // sc_dt::sc_int<DATA_WIDTH> plm_bias_9[LAYER_9_OUTPUTS];
+    // sc_dt::sc_int<DATA_WIDTH> plm_bias_10[LAYER_10_OUTPUTS];
 
     sc_dt::sc_int<DATA_WIDTH> plm_pos[LAYER_0_INPUTS];
     sc_dt::sc_int<DATA_WIDTH> plm_dir[LAYER_8_INPUTS-LAYER_N_DIMS];
     
     int64_t regs_ping[LAYER_4_INPUTS];
-    int64_t regs_wgt[MAC_TILE_SIZE];
-    int64_t regs_bias[LAYER_N_DIMS];
-    int64_t regs_mul[MAC_TILE_SIZE];
+    int64_t regs_wgt[LAYER_4_INPUTS];
+    int64_t regs_mul[LAYER_4_INPUTS];
     int64_t regs_pong[LAYER_4_INPUTS];
     int64_t regs_out[LAYER_10_OUTPUTS];
+
+    sc_signal< sc_int<DATA_WIDTH> > cur_load_data_dbg;
+    sc_signal< bool > cur_output_valid_dbg;
+    sc_signal< sc_int<DATA_WIDTH> > cur_output_dbg;
+    sc_signal< sc_int<DATA_WIDTH> > cur_wgt_dbg;
+    sc_signal< bool > cur_input_valid_dbg;
+    sc_signal< sc_int<DATA_WIDTH> > cur_input_dbg;
 };
 
 

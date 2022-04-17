@@ -64,6 +64,21 @@ static void init_buf (token_t *in, token_t * gold)
 {
 	int i;
 	int j;
+   
+    // weights
+    for (int i = 0; i < 1; i++)
+        for (int j = 0; j < 60*256; j++)
+            in[i * in_words_adj + j] = (token_t) (j%5);
+
+    // biases
+    for (int i = 0; i < 1; i++)
+        for (int j = 60*256; j < 60*256 + 256; j++)
+            in[i * in_words_adj + j] = (token_t) (j%5);
+
+    // inputs
+    for (int i = 0; i < 1; i++)
+        for (int j = 60*256 + 256; j < 60*256 + 256 + 60; j++)
+            in[i * in_words_adj + j] = (token_t) (j%5);
 
 	// for (i = 0; i < 1; i++)
 	// 	for (j = 0; j < 256*256*batch_size; j++)
