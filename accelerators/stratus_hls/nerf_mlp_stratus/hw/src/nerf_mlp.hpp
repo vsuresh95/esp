@@ -45,7 +45,7 @@ public:
 
         // Map arrays to memories
         /* <<--plm-bind-->> */
-        HLS_MAP_plm(plm_wgt_0, "plm_wgt_0_name");
+        HLS_MAP_plm(plm_wgt_0, PLM_WGT_0_NAME);
         // HLS_MAP_plm(plm_wgt_1, "plm_wgt_1_name");
         // HLS_MAP_plm(plm_wgt_2, "plm_wgt_2_name");
         // HLS_MAP_plm(plm_wgt_3, "plm_wgt_3_name");
@@ -57,7 +57,7 @@ public:
         // HLS_MAP_plm(plm_wgt_9, "plm_wgt_9_name");
         // HLS_MAP_plm(plm_wgt_10, "plm_wgt_10_name");
 
-        HLS_MAP_plm(plm_bias_0, "plm_bias_0_name");
+        HLS_MAP_plm(plm_bias_0, PLM_BIAS_0_NAME);
         // HLS_MAP_plm(plm_bias_1, "plm_bias_1_name");
         // HLS_MAP_plm(plm_bias_2, "plm_bias_2_name");
         // HLS_MAP_plm(plm_bias_3, "plm_bias_3_name");
@@ -69,8 +69,8 @@ public:
         // HLS_MAP_plm(plm_bias_9, "plm_bias_9_name");
         // HLS_MAP_plm(plm_bias_10, "plm_bias_10_name");
 
-        HLS_MAP_plm(plm_pos, "plm_pos_name");
-        HLS_MAP_plm(plm_dir, "plm_dir_name");
+        HLS_MAP_plm(plm_pos, PLM_POS_NAME);
+        HLS_MAP_plm(plm_dir, PLM_DIR_NAME);
 
         PRESERVE_SIGNALS;
     }

@@ -12,6 +12,32 @@
 #define DMA_WORD_PER_BEAT 1
 #endif
 
+#define PLM_WGT_0_NAME "nerf_plm_wgt_0"
+#define PLM_WGT_1_NAME "nerf_plm_wgt_1"
+#define PLM_WGT_2_NAME "nerf_plm_wgt_2"
+#define PLM_WGT_3_NAME "nerf_plm_wgt_3"
+#define PLM_WGT_4_NAME "nerf_plm_wgt_4"
+#define PLM_WGT_5_NAME "nerf_plm_wgt_5"
+#define PLM_WGT_6_NAME "nerf_plm_wgt_6"
+#define PLM_WGT_7_NAME "nerf_plm_wgt_7"
+#define PLM_WGT_8_NAME "nerf_plm_wgt_8"
+#define PLM_WGT_9_NAME "nerf_plm_wgt_9"
+#define PLM_WGT_10_NAME "nerf_plm_wgt_10"
+
+#define PLM_BIAS_0_NAME "nerf_plm_bias_0"
+#define PLM_BIAS_1_NAME "nerf_plm_bias_1"
+#define PLM_BIAS_2_NAME "nerf_plm_bias_2"
+#define PLM_BIAS_3_NAME "nerf_plm_bias_3"
+#define PLM_BIAS_4_NAME "nerf_plm_bias_4"
+#define PLM_BIAS_5_NAME "nerf_plm_bias_5"
+#define PLM_BIAS_6_NAME "nerf_plm_bias_6"
+#define PLM_BIAS_7_NAME "nerf_plm_bias_7"
+#define PLM_BIAS_8_NAME "nerf_plm_bias_8"
+#define PLM_BIAS_9_NAME "nerf_plm_bias_9"
+#define PLM_BIAS_10_NAME "nerf_plm_bias_10"
+
+#define PLM_POS_NAME "nerf_plm_pos"
+#define PLM_DIR_NAME "nerf_plm_dir"
 
 #if defined(STRATUS_HLS)
 

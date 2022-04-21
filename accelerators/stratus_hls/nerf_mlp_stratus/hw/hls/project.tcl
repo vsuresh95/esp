@@ -82,7 +82,7 @@ foreach dma [list 64] {
 
     foreach cfg [list BASIC] {
 	set cname $cfg\_DMA$dma
-	define_hls_config nerf_mlp $cname -io_config IOCFG_DMA$dma --clock_period=$CLOCK_PERIOD --relax_timing=on $COMMON_HLS_FLAGS -DHLS_DIRECTIVES_$cfg
+	define_hls_config nerf_mlp $cname -io_config IOCFG_DMA$dma --clock_period=$CLOCK_PERIOD $COMMON_HLS_FLAGS -DHLS_DIRECTIVES_$cfg
 	if {$TECH_IS_XILINX == 1} {
 	    define_sim_config "$cname\_V" "nerf_mlp RTL_V $cname" "tb TESTBENCH_DMA$dma" -io_config IOCFG_DMA$dma -argv $DEFAULT_ARGV -verilog_top_modules glbl
 	} else {

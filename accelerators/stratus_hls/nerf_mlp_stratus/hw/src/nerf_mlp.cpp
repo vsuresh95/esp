@@ -31,7 +31,6 @@ void nerf_mlp::load_input_dma(uint32_t len, uint32_t offset, sc_dt::sc_int<DATA_
         {
             HLS_UNROLL_SIMPLE;
             plm_input[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
-            cur_load_data_dbg.write(dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64());
         }
     }
 
@@ -345,59 +344,36 @@ void nerf_mlp::compute_kernel()
     ///////////////////////////////// 
     {
         // Read from Layer 0 inputs from scratchpad
-        for (uint16_t elem_in = 0; elem_in < LAYER_0_INPUTS; elem_in++)
+        input_loop: for (uint16_t elem_in = 0; elem_in < LAYER_0_INPUTS; elem_in++)
         {
-            HLS_UNROLL_LOOP(ON, "read_inputs_0");
-            HLS_BREAK_ARRAY_DEPENDENCY(plm_pos);
             regs_ping[elem_in] = plm_pos[elem_in];
         }
 
         // Read from biases from scratchpad
-        for (uint16_t bias_index = 0; bias_index < LAYER_0_OUTPUTS; bias_index++)
+        bias_loop: for (uint16_t bias_index = 0; bias_index < LAYER_0_OUTPUTS; bias_index++)
         {
-            HLS_UNROLL_LOOP(ON, "read_bias");
-            HLS_BREAK_ARRAY_DEPENDENCY(plm_bias_0);
             regs_pong[bias_index] = plm_bias_0[bias_index];
         }
 
-        for (uint16_t col_wgt = 0; col_wgt < LAYER_0_OUTPUTS; col_wgt++)
+        // Loop across the weight column
+        col_loop: for (uint16_t col_wgt = 0; col_wgt < LAYER_0_OUTPUTS; col_wgt++)
         {
-            HLS_UNROLL_LOOP(OFF, "per row sequential");
-
             uint16_t col_wgt_offset = col_wgt*LAYER_0_INPUTS;
 
-            // Read tile sized weights from scratchpad into registers
-            for (uint16_t row_wgt = 0; row_wgt < LAYER_0_INPUTS; row_wgt++)
-            {
-                HLS_UNROLL_LOOP(OFF, "read_weights");
-                HLS_BREAK_ARRAY_DEPENDENCY(plm_wgt_0);
-                regs_wgt[row_wgt] = plm_wgt_0[col_wgt_offset + row_wgt];
-            }
+            uint64_t partial_sum = 0;
 
             // Loop across the weight row
-            for (uint16_t row_wgt = 0; row_wgt < LAYER_0_INPUTS; row_wgt += MAC_TILE_SIZE)
+            row_loop: for (uint16_t row_wgt = 0; row_wgt < LAYER_0_INPUTS; row_wgt++)
             {
-                // Multiply and store products in registers
-                for (uint16_t tile_index = 0; tile_index < MAC_TILE_SIZE; tile_index++)
-                {
-                    HLS_UNROLL_LOOP(OFF, "multiply");
-                    regs_mul[tile_index] = regs_wgt[row_wgt + tile_index] * regs_ping[row_wgt + tile_index];
-                }
-
-                // Sum the products
-                for (uint16_t tile_index = 0; tile_index < MAC_TILE_SIZE; tile_index++)
-                {
-                    HLS_PROTO("output block");
-                    HLS_UNROLL_LOOP(OFF, "sum");
-                    regs_pong[col_wgt] += regs_mul[tile_index];
-                }
+                partial_sum = partial_sum + (plm_wgt_0[col_wgt_offset + row_wgt] * regs_ping[row_wgt]);
             }
+
+            regs_pong[col_wgt] = regs_pong[col_wgt] + partial_sum;
         }
 
         // ReLU on the output values
-        for (uint16_t row_wgt = 0; row_wgt < LAYER_0_OUTPUTS; row_wgt++)
+        relu_loop: for (uint16_t row_wgt = 0; row_wgt < LAYER_0_OUTPUTS; row_wgt++)
         {
-            HLS_UNROLL_LOOP(ON, "relu_0");
             if (regs_pong[row_wgt] < 0) regs_pong[row_wgt] = 0;
         }
     }
