@@ -20,5 +20,16 @@ nerf_plm_bias_7 256 64 1w:0r 0w:2r
 nerf_plm_bias_8 256 64 1w:0r 0w:2r
 nerf_plm_bias_9 128 64 1w:0r 0w:2r
 nerf_plm_bias_10 3 64 1w:0r 0w:2r
+nerf_plm_act_1 256 64 1w:0r 0w:2r
+nerf_plm_act_2 256 64 1w:0r 0w:2r
+nerf_plm_act_3 256 64 1w:0r 0w:2r
+nerf_plm_act_4 316 64 1w:0r 0w:2r
+nerf_plm_act_5 256 64 1w:0r 0w:2r
+nerf_plm_act_6 256 64 1w:0r 0w:2r
+nerf_plm_act_7 256 64 1w:0r 0w:2r
+nerf_plm_act_8 280 64 1w:0r 0w:2r
+nerf_plm_act_9 256 64 1w:0r 0w:2r
+nerf_plm_act_10 128 64 1w:0r 0w:2r
 nerf_plm_pos 60 64 1w:0r 0w:2r
 nerf_plm_dir 24 64 1w:0r 0w:2r
+nerf_plm_out 3 64 1w:0r 0w:2r
