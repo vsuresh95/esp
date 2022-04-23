@@ -83,7 +83,7 @@ static void init_buf (token_t *in, token_t * gold)
    
     for (int i = 0; i < 1; i++)
         for (int j = 0; j < 596823; j++)
-            in[i * in_words_adj + j] = (token_t) (rand()%5);
+            in[i * in_words_adj + j] = (token_t) ((rand()%5) - 5);
 
     // // weights
     // for (int i = 0; i < 1; i++)
