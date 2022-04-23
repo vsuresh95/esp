@@ -36,8 +36,21 @@
 #define PLM_BIAS_9_NAME "nerf_plm_bias_9"
 #define PLM_BIAS_10_NAME "nerf_plm_bias_10"
 
+#define PLM_ACT_1_NAME "nerf_plm_act_1"
+#define PLM_ACT_2_NAME "nerf_plm_act_2"
+#define PLM_ACT_3_NAME "nerf_plm_act_3"
+#define PLM_ACT_4_NAME "nerf_plm_act_4"
+#define PLM_ACT_5_NAME "nerf_plm_act_5"
+#define PLM_ACT_6_NAME "nerf_plm_act_6"
+#define PLM_ACT_7_NAME "nerf_plm_act_7"
+#define PLM_ACT_8_NAME "nerf_plm_act_8"
+#define PLM_ACT_9_NAME "nerf_plm_act_9"
+#define PLM_ACT_10_NAME "nerf_plm_act_10"
+
 #define PLM_POS_NAME "nerf_plm_pos"
 #define PLM_DIR_NAME "nerf_plm_dir"
+
+#define PLM_OUT_NAME "nerf_plm_out"
 
 #if defined(STRATUS_HLS)
 

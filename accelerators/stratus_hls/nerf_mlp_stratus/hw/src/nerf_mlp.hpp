@@ -69,8 +69,21 @@ public:
         HLS_MAP_plm(plm_bias_9, PLM_BIAS_9_NAME);
         HLS_MAP_plm(plm_bias_10, PLM_BIAS_10_NAME);
 
+        HLS_MAP_plm(plm_act_1, PLM_ACT_1_NAME);
+        HLS_MAP_plm(plm_act_2, PLM_ACT_2_NAME);
+        HLS_MAP_plm(plm_act_3, PLM_ACT_3_NAME);
+        HLS_MAP_plm(plm_act_4, PLM_ACT_4_NAME);
+        HLS_MAP_plm(plm_act_5, PLM_ACT_5_NAME);
+        HLS_MAP_plm(plm_act_6, PLM_ACT_6_NAME);
+        HLS_MAP_plm(plm_act_7, PLM_ACT_7_NAME);
+        HLS_MAP_plm(plm_act_8, PLM_ACT_8_NAME);
+        HLS_MAP_plm(plm_act_9, PLM_ACT_9_NAME);
+        HLS_MAP_plm(plm_act_10, PLM_ACT_10_NAME);
+
         HLS_MAP_plm(plm_pos, PLM_POS_NAME);
         HLS_MAP_plm(plm_dir, PLM_DIR_NAME);
+
+        HLS_MAP_plm(plm_out, PLM_OUT_NAME);
 
         PRESERVE_SIGNALS;
     }
@@ -117,14 +130,21 @@ public:
     sc_dt::sc_int<DATA_WIDTH> plm_bias_9[LAYER_9_OUTPUTS];
     sc_dt::sc_int<DATA_WIDTH> plm_bias_10[LAYER_10_OUTPUTS];
 
+    sc_dt::sc_int<DATA_WIDTH> plm_act_1[LAYER_N_DIMS];
+    sc_dt::sc_int<DATA_WIDTH> plm_act_2[LAYER_N_DIMS];
+    sc_dt::sc_int<DATA_WIDTH> plm_act_3[LAYER_N_DIMS];
+    sc_dt::sc_int<DATA_WIDTH> plm_act_4[LAYER_4_INPUTS];
+    sc_dt::sc_int<DATA_WIDTH> plm_act_5[LAYER_N_DIMS];
+    sc_dt::sc_int<DATA_WIDTH> plm_act_6[LAYER_N_DIMS];
+    sc_dt::sc_int<DATA_WIDTH> plm_act_7[LAYER_N_DIMS];
+    sc_dt::sc_int<DATA_WIDTH> plm_act_8[LAYER_8_INPUTS];
+    sc_dt::sc_int<DATA_WIDTH> plm_act_9[LAYER_9_INPUTS];
+    sc_dt::sc_int<DATA_WIDTH> plm_act_10[LAYER_10_INPUTS];
+
     sc_dt::sc_int<DATA_WIDTH> plm_pos[LAYER_0_INPUTS];
     sc_dt::sc_int<DATA_WIDTH> plm_dir[LAYER_8_INPUTS-LAYER_N_DIMS];
     
-    int64_t regs_ping[LAYER_4_INPUTS];
-    int64_t regs_wgt[LAYER_4_INPUTS];
-    int64_t regs_mul[LAYER_4_INPUTS];
-    int64_t regs_pong[LAYER_4_INPUTS];
-    int64_t regs_out[LAYER_10_OUTPUTS];
+    sc_dt::sc_int<DATA_WIDTH> plm_out[LAYER_10_OUTPUTS];
 
     sc_signal< sc_int<DATA_WIDTH> > cur_load_data_dbg;
     sc_signal< bool > cur_output_valid_dbg;
