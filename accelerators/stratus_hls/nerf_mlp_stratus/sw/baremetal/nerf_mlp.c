@@ -34,6 +34,13 @@ static unsigned out_size;
 static unsigned out_offset;
 static unsigned mem_size;
 
+uint64_t cpu_start;
+uint64_t cpu_end;
+uint64_t cpu_diff;
+uint64_t acc_start;
+uint64_t acc_end;
+uint64_t acc_diff;
+
 #define LAYER_N_DIMS 256
 #define LAYER_0_INPUTS 60
 #define LAYER_0_OUTPUTS 256
@@ -57,6 +64,19 @@ static unsigned mem_size;
 /* <<--regs-->> */
 #define NERF_MLP_BATCH_SIZE_REG 0x40
 
+static uint64_t get_counter() {
+  uint64_t counter;
+  asm volatile (
+    "li t0, 0;"
+    "csrr t0, mcycle;"
+    "mv %0, t0"
+    : "=r" ( counter )
+    :
+    : "t0"
+  );
+
+  return counter;
+}
 
 static int validate_buf(token_t *out, token_t *gold)
 {
@@ -74,7 +94,6 @@ static int validate_buf(token_t *out, token_t *gold)
 
 	return errors;
 }
-
 
 static void init_buf (token_t *in, token_t * gold)
 {
@@ -114,6 +133,8 @@ static void init_buf (token_t *in, token_t * gold)
 
 	ping = aligned_malloc(LAYER_4_INPUTS * sizeof(token_t));
 	pong = aligned_malloc(LAYER_4_INPUTS * sizeof(token_t));
+
+    cpu_start = get_counter();
 
     // Layer 0
     for (uint16_t col_wgt = 0; col_wgt < LAYER_0_OUTPUTS; col_wgt++)
@@ -285,6 +306,9 @@ static void init_buf (token_t *in, token_t * gold)
     }
 
     in_offset += LAYER_10_INPUTS*LAYER_10_OUTPUTS + LAYER_10_OUTPUTS;
+
+    cpu_end = get_counter();
+    cpu_diff = cpu_end - cpu_start;
 }
 
 
@@ -393,6 +417,9 @@ int main(int argc, char * argv[])
 
 			// Start accelerators
 			printf("  Start...\n");
+
+            acc_start = get_counter();
+
 			iowrite32(dev, CMD_REG, CMD_MASK_START);
 
 			// Wait for completion
@@ -403,6 +430,9 @@ int main(int argc, char * argv[])
 			}
 			iowrite32(dev, CMD_REG, 0x0);
 
+            acc_end = get_counter();
+            acc_diff = acc_end - acc_start;
+
 			printf("  Done\n");
 			printf("  validating...\n");
 
@@ -412,6 +442,9 @@ int main(int argc, char * argv[])
 				printf("  ... FAIL\n");
 			else
 				printf("  ... PASS\n");
+
+            printf("CPU time = %lu\n", cpu_diff);
+            printf("ACC time = %lu\n", acc_diff);
 		}
 		aligned_free(ptable);
 		aligned_free(mem);
