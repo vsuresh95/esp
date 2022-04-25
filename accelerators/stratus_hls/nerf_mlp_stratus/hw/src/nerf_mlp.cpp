@@ -250,7 +250,7 @@ void nerf_mlp::store_output()
         /* layer 8 */    LAYER_8_INPUTS*LAYER_8_OUTPUTS + LAYER_8_OUTPUTS + 
         /* layer 9 */    LAYER_9_INPUTS*LAYER_9_OUTPUTS + LAYER_9_OUTPUTS + 
         /* layer 10 */   LAYER_10_INPUTS*LAYER_10_OUTPUTS + LAYER_10_OUTPUTS +
-        /* pos inputs */ LAYER_0_INPUTS +
+        /* pos inputs */ LAYER_0_INPUTS_ROUND +
         /* dir inputs */ (LAYER_8_INPUTS-LAYER_N_DIMS);
 
         uint32_t offset = round_up(output_offset, DMA_WORD_PER_BEAT) * 1;
@@ -269,6 +269,8 @@ void nerf_mlp::store_output()
 
         for (uint16_t i = 0; i < len; i += DMA_WORD_PER_BEAT)
         {
+            HLS_BREAK_DEP(plm_out);
+
             sc_dt::sc_bv<DMA_WIDTH> dataBv;
 
             // Read from PLM
@@ -344,7 +346,7 @@ void nerf_mlp::compute_kernel()
         {
             uint32_t col_wgt_offset = col_wgt*LAYER_0_INPUTS;
 
-            int64_t partial_sum = plm_bias_0[col_wgt];
+            int8_t partial_sum = plm_bias_0[col_wgt];
 
             // Loop across the weight row
             row_loop_0: for (uint16_t row_wgt = 0; row_wgt < LAYER_0_INPUTS; row_wgt++)
@@ -368,7 +370,7 @@ void nerf_mlp::compute_kernel()
         {
             uint32_t col_wgt_offset = col_wgt*LAYER_N_DIMS;
 
-            int64_t partial_sum = plm_bias_1[col_wgt];
+            int8_t partial_sum = plm_bias_1[col_wgt];
 
             // Loop across the weight row
             row_loop_1: for (uint16_t row_wgt = 0; row_wgt < LAYER_N_DIMS; row_wgt++)
@@ -392,7 +394,7 @@ void nerf_mlp::compute_kernel()
         {
             uint32_t col_wgt_offset = col_wgt*LAYER_N_DIMS;
 
-            int64_t partial_sum = plm_bias_2[col_wgt];
+            int8_t partial_sum = plm_bias_2[col_wgt];
 
             // Loop across the weight row
             row_loop_2: for (uint16_t row_wgt = 0; row_wgt < LAYER_N_DIMS; row_wgt++)
@@ -416,7 +418,7 @@ void nerf_mlp::compute_kernel()
         {
             uint32_t col_wgt_offset = col_wgt*LAYER_N_DIMS;
 
-            int64_t partial_sum = plm_bias_3[col_wgt];
+            int8_t partial_sum = plm_bias_3[col_wgt];
 
             // Loop across the weight row
             row_loop_3: for (uint16_t row_wgt = 0; row_wgt < LAYER_N_DIMS; row_wgt++)
@@ -446,7 +448,7 @@ void nerf_mlp::compute_kernel()
         {
             uint32_t col_wgt_offset = col_wgt*LAYER_4_INPUTS;
 
-            int64_t partial_sum = plm_bias_4[col_wgt];
+            int8_t partial_sum = plm_bias_4[col_wgt];
 
             // Loop across the weight row
             row_loop_4: for (uint16_t row_wgt = 0; row_wgt < LAYER_4_INPUTS; row_wgt++)
@@ -470,7 +472,7 @@ void nerf_mlp::compute_kernel()
         {
             uint32_t col_wgt_offset = col_wgt*LAYER_N_DIMS;
 
-            int64_t partial_sum = plm_bias_5[col_wgt];
+            int8_t partial_sum = plm_bias_5[col_wgt];
 
             // Loop across the weight row
             row_loop_5: for (uint16_t row_wgt = 0; row_wgt < LAYER_N_DIMS; row_wgt++)
@@ -494,7 +496,7 @@ void nerf_mlp::compute_kernel()
         {
             uint32_t col_wgt_offset = col_wgt*LAYER_N_DIMS;
 
-            int64_t partial_sum = plm_bias_6[col_wgt];
+            int8_t partial_sum = plm_bias_6[col_wgt];
 
             // Loop across the weight row
             row_loop_6: for (uint16_t row_wgt = 0; row_wgt < LAYER_N_DIMS; row_wgt++)
@@ -518,7 +520,7 @@ void nerf_mlp::compute_kernel()
         {
             uint32_t col_wgt_offset = col_wgt*LAYER_N_DIMS;
 
-            int64_t partial_sum = plm_bias_7[col_wgt];
+            int8_t partial_sum = plm_bias_7[col_wgt];
 
             // Loop across the weight row
             row_loop_7: for (uint16_t row_wgt = 0; row_wgt < LAYER_N_DIMS; row_wgt++)
@@ -546,7 +548,7 @@ void nerf_mlp::compute_kernel()
         {
             uint32_t col_wgt_offset = col_wgt*LAYER_8_INPUTS;
 
-            int64_t partial_sum = plm_bias_8[col_wgt];
+            int8_t partial_sum = plm_bias_8[col_wgt];
 
             // Loop across the weight row
             row_loop_8: for (uint16_t row_wgt = 0; row_wgt < LAYER_8_INPUTS; row_wgt++)
@@ -570,7 +572,7 @@ void nerf_mlp::compute_kernel()
         {
             uint32_t col_wgt_offset = col_wgt*LAYER_9_INPUTS;
 
-            int64_t partial_sum = plm_bias_9[col_wgt];
+            int8_t partial_sum = plm_bias_9[col_wgt];
 
             // Loop across the weight row
             row_loop_9: for (uint16_t row_wgt = 0; row_wgt < LAYER_9_INPUTS; row_wgt++)
@@ -594,7 +596,7 @@ void nerf_mlp::compute_kernel()
         {
             uint32_t col_wgt_offset = col_wgt*LAYER_10_INPUTS;
 
-            int64_t partial_sum = plm_bias_10[col_wgt];
+            int8_t partial_sum = plm_bias_10[col_wgt];
 
             // Loop across the weight row
             row_loop_10: for (uint16_t row_wgt = 0; row_wgt < LAYER_10_INPUTS; row_wgt++)

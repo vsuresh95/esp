@@ -9,7 +9,7 @@
 #define DMA_WORD_PER_BEAT 0
 #elif (DMA_WIDTH == 64)
 #define DMA_BEAT_PER_WORD 1
-#define DMA_WORD_PER_BEAT 1
+#define DMA_WORD_PER_BEAT 8
 #endif
 
 #define PLM_WGT_0_NAME "nerf_plm_wgt_0"

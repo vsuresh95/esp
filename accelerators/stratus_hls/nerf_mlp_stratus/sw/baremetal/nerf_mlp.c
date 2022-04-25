@@ -11,7 +11,7 @@
 #include <fixed_point.h>
 #include <stdlib.h>
 
-typedef int64_t token_t;
+typedef int8_t token_t;
 
 static unsigned DMA_WORD_PER_BEAT(unsigned _st)
 {
@@ -89,7 +89,7 @@ static int validate_buf(token_t *out, token_t *gold)
 			if (gold[i * out_words_adj + j] != out[i * out_words_adj + j])
             {
 				errors++;
-			    printf("gold[%d] = %lu out[%d] = %lu\n", i, gold[i], i, out[i]);
+			    printf("gold[%d] = %d out[%d] = %d\n", i, (token_t) gold[i], i, (token_t) out[i]);
             }
 
 	return errors;
@@ -128,8 +128,8 @@ static void init_buf (token_t *in, token_t * gold)
     /* layer 10 */ LAYER_10_INPUTS*LAYER_10_OUTPUTS + LAYER_10_OUTPUTS;
 
     unsigned in_offset = 0;
-    int64_t *ping;
-    int64_t *pong;
+    token_t *ping;
+    token_t *pong;
 
 	ping = aligned_malloc(LAYER_4_INPUTS * sizeof(token_t));
 	pong = aligned_malloc(LAYER_4_INPUTS * sizeof(token_t));

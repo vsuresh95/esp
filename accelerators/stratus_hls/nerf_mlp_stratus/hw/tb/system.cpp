@@ -95,26 +95,26 @@ void system_t::load_memory()
     /* layer 10 */ LAYER_10_INPUTS*LAYER_10_OUTPUTS + LAYER_10_OUTPUTS;
 
     in_words_adj = weights_offset +
-    /* pos inputs */ LAYER_0_INPUTS +
+    /* pos inputs */ LAYER_0_INPUTS_ROUND +
     /* dir inputs */ (LAYER_8_INPUTS-LAYER_N_DIMS);
 
     out_words_adj = LAYER_10_OUTPUTS;
 
-    in_size = in_words_adj * (1);
-    out_size = out_words_adj * (1);
+    in_size = round_up(in_words_adj, DMA_WORD_PER_BEAT) * 1;
+    out_size = round_up(out_words_adj, DMA_WORD_PER_BEAT) * 1;
 
-    in = new int64_t[in_size];
+    in = new int8_t[in_size];
     
     // inputs
     for (int i = 0; i < 1; i++)
         for (int j = 0; j < in_size; j++)
-            in[i * in_words_adj + j] = (int64_t) (rand()%5);
+            in[i * in_words_adj + j] = (int8_t) (j%5);
 
     // Compute golden output
-    gold = new int64_t[out_size];
+    gold = new int8_t[out_size];
 
-    ping = new int64_t[LAYER_4_INPUTS];
-    pong = new int64_t[LAYER_4_INPUTS];
+    ping = new int8_t[round_up(LAYER_4_INPUTS, DMA_WORD_PER_BEAT) * 1];
+    pong = new int8_t[round_up(LAYER_4_INPUTS, DMA_WORD_PER_BEAT) * 1];
 
     unsigned in_offset = 0;
 
@@ -303,8 +303,8 @@ void system_t::load_memory()
 void system_t::dump_memory()
 {
     // Get results from memory
-    out = new int64_t[out_size];
-    uint32_t offset = in_size;
+    out = new int8_t[out_size];
+    uint32_t offset = round_up(in_size, DMA_WORD_PER_BEAT) * 1;
 
     offset = offset / DMA_WORD_PER_BEAT;
     for (int i = 0; i < out_size / DMA_WORD_PER_BEAT; i++)
@@ -319,11 +319,11 @@ int system_t::validate()
     // Check for mismatches
     uint32_t errors = 0;
 
-    for (int i = 0; i < out_size; i++)
+    for (int i = 0; i < LAYER_10_OUTPUTS; i++)
         if (gold[i] != out[i])
         {
             errors++;
-            ESP_REPORT_INFO("gold[%d] = %lu out[%d] = %lu\n", i, gold[i], i, out[i]);
+            ESP_REPORT_INFO("gold[%d] = %d out[%d] = %d", i, gold[i], i, out[i]);
         }
 
     delete [] in;

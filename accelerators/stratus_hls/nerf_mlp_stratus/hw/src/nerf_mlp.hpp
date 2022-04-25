@@ -14,7 +14,7 @@
 #define __round_mask(x, y) ((y)-1)
 #define round_up(x, y) ((((x)-1) | __round_mask(x, y))+1)
 /* <<--defines-->> */
-#define DATA_WIDTH 64
+#define DATA_WIDTH 8
 #define DMA_SIZE SIZE_DWORD
 
 #define LAYER_N_DIMS 256
@@ -28,6 +28,8 @@
 #define LAYER_9_OUTPUTS 128
 #define LAYER_10_INPUTS 128
 #define LAYER_10_OUTPUTS 3
+#define LAYER_0_INPUTS_ROUND 64
+#define LAYER_10_OUTPUTS_ROUND 8
 
 #define MAC_TILE_SIZE 4
 
@@ -128,7 +130,7 @@ public:
     sc_dt::sc_int<DATA_WIDTH> plm_bias_7[LAYER_N_DIMS];
     sc_dt::sc_int<DATA_WIDTH> plm_bias_8[LAYER_8_OUTPUTS];
     sc_dt::sc_int<DATA_WIDTH> plm_bias_9[LAYER_9_OUTPUTS];
-    sc_dt::sc_int<DATA_WIDTH> plm_bias_10[LAYER_10_OUTPUTS];
+    sc_dt::sc_int<DATA_WIDTH> plm_bias_10[LAYER_10_OUTPUTS_ROUND];
 
     sc_dt::sc_int<DATA_WIDTH> plm_act_1[LAYER_N_DIMS];
     sc_dt::sc_int<DATA_WIDTH> plm_act_2[LAYER_N_DIMS];
@@ -141,10 +143,10 @@ public:
     sc_dt::sc_int<DATA_WIDTH> plm_act_9[LAYER_9_INPUTS];
     sc_dt::sc_int<DATA_WIDTH> plm_act_10[LAYER_10_INPUTS];
 
-    sc_dt::sc_int<DATA_WIDTH> plm_pos[LAYER_0_INPUTS];
+    sc_dt::sc_int<DATA_WIDTH> plm_pos[LAYER_0_INPUTS_ROUND];
     sc_dt::sc_int<DATA_WIDTH> plm_dir[LAYER_8_INPUTS-LAYER_N_DIMS];
     
-    sc_dt::sc_int<DATA_WIDTH> plm_out[LAYER_10_OUTPUTS];
+    sc_dt::sc_int<DATA_WIDTH> plm_out[LAYER_10_OUTPUTS_ROUND];
 
     sc_signal< sc_int<DATA_WIDTH> > cur_load_data_dbg;
     sc_signal< bool > cur_output_valid_dbg;

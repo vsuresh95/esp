@@ -79,11 +79,11 @@ public:
     uint32_t out_words_adj;
     uint32_t in_size;
     uint32_t out_size;
-    int64_t *in;
-    int64_t *out;
-    int64_t *gold;
-    int64_t *ping;
-    int64_t *pong;
+    int8_t *in;
+    int8_t *out;
+    int8_t *gold;
+    int8_t *ping;
+    int8_t *pong;
 
     // Other Functions
 };
