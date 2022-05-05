@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sld>
+  <accelerator name="mesh_gen" desc="Accelerator MESH_GEN" data_size="4" device_id="040" hls_tool="stratus_hls">
+    <param name="num_hash_table" desc="num_hash_table" />
+  </accelerator>
+</sld>

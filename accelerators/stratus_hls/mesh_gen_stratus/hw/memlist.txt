@@ -1,0 +1,4 @@
+mesh_gen_plm_block_in_dma32 8192 64 1w:0r 0w:1r
+mesh_gen_plm_block_out_dma32 8192 64 1w:0r 0w:1r
+mesh_gen_plm_block_in_dma64 8192 64 1w:0r 0w:1r
+mesh_gen_plm_block_out_dma64 8192 64 1w:0r 0w:1r
