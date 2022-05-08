@@ -86,7 +86,7 @@ public:
     void load_input();
 
     // Computation
-    Vector3f sdfInterp(Vector3f &p1, Vector3f &p2, float valp1, float valp2);
+    Vector3f sdfInterp(Vector3f p1, Vector3f p2, float valp1, float valp2);
     void compute_kernel();
 
     // Store the output data

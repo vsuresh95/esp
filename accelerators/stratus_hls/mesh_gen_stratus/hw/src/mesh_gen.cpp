@@ -52,53 +52,57 @@ void mesh_gen::load_input()
         // Fetch hash entries one by one
         for (uint16_t offset = 0; offset < length; offset += HASH_ENTRY_LEN)
         {
-            dma_info_t dma_info(offset / DMA_WORD_PER_BEAT, HASH_ENTRY_LEN / DMA_WORD_PER_BEAT, DMA_SIZE);
-
-            this->dma_read_ctrl.put(dma_info);
-
-            sc_dt::sc_bv<DMA_WIDTH> dataBv;
-
-            // HashEntry.pos.x
-            dataBv = this->dma_read_chnl.get();
-            wait();
-            plm_hashtable[offset/HASH_ENTRY_LEN].pos.x = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
-            wait();
-
-            // HashEntry.pos.y
-            dataBv = this->dma_read_chnl.get();
-            wait();
-            plm_hashtable[offset/HASH_ENTRY_LEN].pos.y = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
-            wait();
-
-            // HashEntry.pos.z
-            dataBv = this->dma_read_chnl.get();
-            wait();
-            plm_hashtable[offset/HASH_ENTRY_LEN].pos.z = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
-            wait();
-
-            // HashEntry.ptr
-            dataBv = this->dma_read_chnl.get();
-            wait();
-            plm_hashtable[offset/HASH_ENTRY_LEN].ptr = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
-            wait();
-
-            int64_t voxel_offset = plm_hashtable[offset/HASH_ENTRY_LEN].ptr;
-
-            // Read voxel block
-            uint32_t len = round_up(SDF_BLOCK_SIZE3, DMA_WORD_PER_BEAT);
-
-            dma_info_t dma_info(voxel_offset / DMA_WORD_PER_BEAT, len / DMA_WORD_PER_BEAT, DMA_SIZE);
-
-            this->dma_read_ctrl.put(dma_info);
-
-            for (uint16_t j = 0; j < len; j += DMA_WORD_PER_BEAT)
             {
+                dma_info_t dma_info(offset / DMA_WORD_PER_BEAT, HASH_ENTRY_LEN / DMA_WORD_PER_BEAT, DMA_SIZE);
+
+                this->dma_read_ctrl.put(dma_info);
+
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
 
+                // HashEntry.pos.x
                 dataBv = this->dma_read_chnl.get();
                 wait();
+                plm_hashtable[offset/HASH_ENTRY_LEN].pos.x = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
+                wait();
 
-                plm_voxelblock[j] = dataBv.range(DATA_WIDTH - 1, 0).to_int64();                
+                // HashEntry.pos.y
+                dataBv = this->dma_read_chnl.get();
+                wait();
+                plm_hashtable[offset/HASH_ENTRY_LEN].pos.y = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
+                wait();
+
+                // HashEntry.pos.z
+                dataBv = this->dma_read_chnl.get();
+                wait();
+                plm_hashtable[offset/HASH_ENTRY_LEN].pos.z = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
+                wait();
+
+                // HashEntry.ptr
+                dataBv = this->dma_read_chnl.get();
+                wait();
+                plm_hashtable[offset/HASH_ENTRY_LEN].ptr = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
+                wait();
+            }
+
+            // Read voxel block
+            {
+                int64_t voxel_offset = plm_hashtable[offset/HASH_ENTRY_LEN].ptr;
+
+                uint32_t len = round_up(SDF_BLOCK_SIZE3*NUM_VERT, DMA_WORD_PER_BEAT);
+
+                dma_info_t dma_info(voxel_offset / DMA_WORD_PER_BEAT, len / DMA_WORD_PER_BEAT, DMA_SIZE);
+
+                this->dma_read_ctrl.put(dma_info);
+
+                for (uint16_t j = 0; j < len; j += DMA_WORD_PER_BEAT)
+                {
+                    sc_dt::sc_bv<DMA_WIDTH> dataBv;
+
+                    dataBv = this->dma_read_chnl.get();
+                    wait();
+
+                    plm_voxelblock[j] = dataBv.range(DATA_WIDTH - 1, 0).to_int64(); // TODO: check double
+                }
             }
 
             this->load_compute_handshake();
@@ -224,7 +228,7 @@ void mesh_gen::store_output()
     }
 }
 
-Vector3f sdfInterp(Vector3f &p1, Vector3f &p2, double valp1, double valp2)
+Vector3f sdfInterp(Vector3f p1, Vector3f p2, double valp1, double valp2)
 {
 	if (fabs(0.0f - valp1) < 0.00001f) return p1;
 	if (fabs(0.0f - valp2) < 0.00001f) return p2;
@@ -310,6 +314,8 @@ void mesh_gen::compute_kernel()
 
                         double sdf[NUM_VERT];
                         Vector3f p[NUM_VERT];
+                        HLS_FLATTEN_ARRAY(sdf);
+                        HLS_FLATTEN_ARRAY(p);
 
                         // assign sdf value for each vertex of the cube to register
                         for (uint16_t vert = 0; vert < NUM_VERT; vert++)
@@ -322,7 +328,7 @@ void mesh_gen::compute_kernel()
                             p[0].x = globalPos.x + x + 0; p[0].y = globalPos.y + y + 0; p[0].z = globalPos.z + z + 0;
                             p[1].x = globalPos.x + x + 1; p[1].y = globalPos.y + y + 0; p[1].z = globalPos.z + z + 0;
                             p[2].x = globalPos.x + x + 1; p[2].y = globalPos.y + y + 1; p[2].z = globalPos.z + z + 0;
-                            p[3].x = globalPos.x + x + 0; p[3].y = globalPos.y + y + 1; p[3].z = globalPos.z + z + 0; 
+                            p[3].x = globalPos.x + x + 0; p[3].y = globalPos.y + y + 1; p[3].z = globalPos.z + z + 0;
                             p[4].x = globalPos.x + x + 0; p[4].y = globalPos.y + y + 0; p[4].z = globalPos.z + z + 1;
                             p[5].x = globalPos.x + x + 1; p[5].y = globalPos.y + y + 0; p[5].z = globalPos.z + z + 1;
                             p[6].x = globalPos.x + x + 1; p[6].y = globalPos.y + y + 1; p[6].z = globalPos.z + z + 1;
@@ -338,8 +344,10 @@ void mesh_gen::compute_kernel()
                         }
 
 			            if (plm_edgeTable[cubeIndex] == 0) continue;
+                        wait();
 
                         Vector3f vertList[12];
+                        HLS_FLATTEN_ARRAY(vertList);
 
                         {
                             if (plm_edgeTable[cubeIndex] & 1) vertList[0] = sdfInterp(p[0], p[1], sdf[0], sdf[1]);
@@ -367,8 +375,6 @@ void mesh_gen::compute_kernel()
                     }
                 }
             }
-
-            // Triangle calculation
 
             this->compute_store_handshake();
         }
