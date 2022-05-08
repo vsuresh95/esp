@@ -12,8 +12,11 @@
 #elif (DMA_WIDTH == 64)
 #define DMA_BEAT_PER_WORD 1
 #define DMA_WORD_PER_BEAT 1
-#define PLM_IN_NAME "mesh_gen_plm_block_in_dma64"
-#define PLM_OUT_NAME "mesh_gen_plm_block_out_dma64"
+#define PLM_TRIANGLETABLE_NAME "plm_triangletable"
+#define PLM_TRIANGLES_NAME "plm_triangles"
+#define PLM_VOXELBLOCK_NAME "plm_voxelblock"
+#define PLM_EDGETABLE_NAME "plm_edgetable"
+#define PLM_TRIANGLETABLE_NAME "plm_triangletable"
 #endif
 
 

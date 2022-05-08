@@ -19,6 +19,46 @@
 #define PLM_OUT_WORD 8192
 #define PLM_IN_WORD 8192
 
+#define HASH_ENTRY_LEN 4
+#define TRIANGLE_LEN 9
+#define MAX_TRIANGLE 5
+#define NUM_VERT 8
+#define NUM_EDGE 12
+#define SDF_BLOCK_SIZE 8
+#define SDF_BLOCK_SIZE3 256
+#define VOXEL_SIZE 5
+
+struct Vector3f {
+    double x;
+    double y;
+    double z;
+
+    // scalar multiply
+    friend Vector3f operator * (Vector3f &lhs, double rhs) {
+        lhs.x *= rhs;
+        lhs.y *= rhs;
+        lhs.z *= rhs;
+        return lhs;
+    }
+};
+
+struct Vector3i {
+   int64_t x;
+   int64_t y;
+   int64_t z;
+};
+
+struct Triangle {
+    Vector3f p0;
+    Vector3f p1;
+    Vector3f p2;
+};
+
+struct HashEntry {
+    Vector3i pos;
+    int64_t ptr;
+};
+
 class mesh_gen : public esp_accelerator_3P<DMA_WIDTH>
 {
 public:
@@ -33,10 +73,11 @@ public:
 
         // Map arrays to memories
         /* <<--plm-bind-->> */
-        HLS_MAP_plm(plm_out_pong, PLM_OUT_NAME);
-        HLS_MAP_plm(plm_out_ping, PLM_OUT_NAME);
-        HLS_MAP_plm(plm_in_pong, PLM_IN_NAME);
-        HLS_MAP_plm(plm_in_ping, PLM_IN_NAME);
+        HLS_MAP_plm(plm_hashtable, PLM_TRIANGLETABLE_NAME);
+        HLS_MAP_plm(plm_triangles, PLM_TRIANGLES_NAME);
+        HLS_MAP_plm(plm_voxelblock, PLM_VOXELBLOCK_NAME);
+        HLS_MAP_plm(plm_edgeTable, PLM_EDGETABLE_NAME);
+        HLS_MAP_plm(plm_triangleTable, PLM_TRIANGLETABLE_NAME);
     }
 
     // Processes
@@ -45,6 +86,7 @@ public:
     void load_input();
 
     // Computation
+    Vector3f sdfInterp(Vector3f &p1, Vector3f &p2, float valp1, float valp2);
     void compute_kernel();
 
     // Store the output data
@@ -54,13 +96,15 @@ public:
     esp_config_proc cfg;
 
     // Functions
+    void initialize_edgetable(sc_dt::sc_int<DATA_WIDTH> *plm_input);
+    void initialize_triangletable(sc_dt::sc_int<DATA_WIDTH> *plm_input);
 
     // Private local memories
-    sc_dt::sc_int<DATA_WIDTH> plm_in_ping[PLM_IN_WORD];
-    sc_dt::sc_int<DATA_WIDTH> plm_in_pong[PLM_IN_WORD];
-    sc_dt::sc_int<DATA_WIDTH> plm_out_ping[PLM_OUT_WORD];
-    sc_dt::sc_int<DATA_WIDTH> plm_out_pong[PLM_OUT_WORD];
-
+    HashEntry plm_hashtable[PLM_IN_WORD];
+    Triangle plm_triangles[SDF_BLOCK_SIZE3*MAX_TRIANGLE];
+    double plm_voxelblock[SDF_BLOCK_SIZE3*NUM_VERT];
+    sc_dt::sc_int<DATA_WIDTH> plm_edgeTable[256];
+    sc_dt::sc_int<DATA_WIDTH> plm_triangleTable[256*16];
 };
 
 
