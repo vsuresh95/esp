@@ -101,7 +101,7 @@ void mesh_gen::load_input()
                     dataBv = this->dma_read_chnl.get();
                     wait();
 
-                    plm_voxelblock[j] = dataBv.range(DATA_WIDTH - 1, 0).to_int64(); // TODO: check double
+                    plm_voxelblock[j] = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
                 }
             }
 
@@ -228,7 +228,7 @@ void mesh_gen::store_output()
     }
 }
 
-Vector3f sdfInterp(Vector3f p1, Vector3f p2, double valp1, double valp2)
+Vector3f sdfInterp(Vector3f p1, Vector3f p2, int64_t valp1, int64_t valp2)
 {
 	if (fabs(0.0f - valp1) < 0.00001f) return p1;
 	if (fabs(0.0f - valp2) < 0.00001f) return p2;
@@ -239,7 +239,7 @@ Vector3f sdfInterp(Vector3f p1, Vector3f p2, double valp1, double valp2)
     p.y = p2.y - p1.y; 
     p.z = p2.z - p1.z; 
 
-    double val = ((0.0f - valp1) / (valp2 - valp1));
+    int64_t val = ((0.0f - valp1) / (valp2 - valp1));
     p.x = val * p.x; 
     p.y = val * p.y; 
     p.z = val * p.z; 
@@ -312,7 +312,7 @@ void mesh_gen::compute_kernel()
                     {
                         uint16_t sdf_offset_x = x*NUM_VERT;
 
-                        double sdf[NUM_VERT];
+                        int64_t sdf[NUM_VERT];
                         Vector3f p[NUM_VERT];
                         HLS_FLATTEN_ARRAY(sdf);
                         HLS_FLATTEN_ARRAY(p);

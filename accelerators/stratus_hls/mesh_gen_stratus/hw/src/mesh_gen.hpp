@@ -29,17 +29,9 @@
 #define VOXEL_SIZE 5
 
 struct Vector3f {
-    double x;
-    double y;
-    double z;
-
-    // scalar multiply
-    friend Vector3f operator * (Vector3f &lhs, double rhs) {
-        lhs.x *= rhs;
-        lhs.y *= rhs;
-        lhs.z *= rhs;
-        return lhs;
-    }
+    int64_t x;
+    int64_t y;
+    int64_t z;
 };
 
 struct Vector3i {
@@ -102,7 +94,7 @@ public:
     // Private local memories
     HashEntry plm_hashtable[PLM_IN_WORD];
     Triangle plm_triangles[SDF_BLOCK_SIZE3*MAX_TRIANGLE];
-    double plm_voxelblock[SDF_BLOCK_SIZE3*NUM_VERT];
+    int64_t plm_voxelblock[SDF_BLOCK_SIZE3*NUM_VERT];
     sc_dt::sc_int<DATA_WIDTH> plm_edgeTable[256];
     sc_dt::sc_int<DATA_WIDTH> plm_triangleTable[256*16];
 };
