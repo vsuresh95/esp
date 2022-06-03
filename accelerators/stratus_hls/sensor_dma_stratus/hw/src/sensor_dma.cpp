@@ -39,7 +39,7 @@ void sensor_dma::load_input()
         rd_sp_offset = config.rd_sp_offset;
         rd_wr_enable = config.rd_wr_enable;
         rd_size = config.rd_size;
-        src_offset = config.src_offset;
+        src_offset = config.src_offset + 2;
     }
 
     // Load - only if rd_wr_enable is 0
@@ -47,6 +47,27 @@ void sensor_dma::load_input()
     {
         HLS_PROTO("load-dma");
         wait();
+
+        // Synchronization unit - polling
+        {
+            HLS_PROTO("load-dma-poll");
+
+            dma_info_t dma_info(0, 1, DMA_SIZE);
+            sc_dt::sc_bv<DMA_WIDTH> dataBvin;
+            uint64_t data;
+
+            //Wait for 1
+            do
+            {
+                HLS_UNROLL_LOOP(OFF);
+                this->dma_read_ctrl.put(dma_info);
+                wait();
+                dataBvin.range(DMA_WIDTH - 1, 0) = this->dma_read_chnl.get();
+                wait();
+                data = dataBvin.range(DMA_WIDTH - 1, 0).to_int64();
+                wait();
+            } while(data != 1);
+        }
 
         // Calculating the length of our transfer
         uint32_t length = round_up(rd_size, DMA_WORD_PER_BEAT);
@@ -71,6 +92,20 @@ void sensor_dma::load_input()
             }
         }
 
+        // Synchronization unit - update
+        {
+            HLS_PROTO("load-dma-update");
+
+            dma_info_t dma_info(0, 1, DMA_SIZE);
+            sc_dt::sc_bv<DMA_WIDTH> dataBvout;
+            dataBvout.range(DMA_WIDTH - 1, 0) = 0;
+
+            this->dma_write_ctrl.put(dma_info);
+            wait();
+            this->dma_write_chnl.put(dataBvout);
+            wait();
+        }
+
         this->accelerator_done();
     }
 
@@ -79,8 +114,6 @@ void sensor_dma::load_input()
         this->process_done();
     }
 }
-
-
 
 void sensor_dma::store_output()
 {
@@ -110,7 +143,7 @@ void sensor_dma::store_output()
         rd_wr_enable = config.rd_wr_enable;
         wr_size = config.wr_size;
         wr_sp_offset = config.wr_sp_offset;
-        dst_offset = config.dst_offset;
+        dst_offset = config.dst_offset + 2;
     }
 
     // Store - only if rd_wr_enable is 1
@@ -118,6 +151,27 @@ void sensor_dma::store_output()
     {
         HLS_PROTO("store-dma");
         wait();
+
+        // Synchronization unit - polling
+        {
+            HLS_PROTO("store-dma-poll");
+
+            dma_info_t dma_info(1, 1, DMA_SIZE);
+            sc_dt::sc_bv<DMA_WIDTH> dataBvin;
+            uint64_t data;
+
+            //Wait for 1
+            do
+            {
+                HLS_UNROLL_LOOP(OFF);
+                this->dma_read_ctrl.put(dma_info);
+                wait();
+                dataBvin.range(DMA_WIDTH - 1, 0) = this->dma_read_chnl.get();
+                wait();
+                data = dataBvin.range(DMA_WIDTH - 1, 0).to_int64();
+                wait();
+            } while(data != 1);
+        }
 
         // Calculating the length of our transfer
         uint32_t length = round_up(wr_size, DMA_WORD_PER_BEAT);
@@ -143,6 +197,20 @@ void sensor_dma::store_output()
             this->dma_write_chnl.put(dataBv);
         }
 
+        // Synchronization unit - update
+        {
+            HLS_PROTO("store-dma-update");
+
+            dma_info_t dma_info(1, 1, DMA_SIZE);
+            sc_dt::sc_bv<DMA_WIDTH> dataBvout;
+            dataBvout.range(DMA_WIDTH - 1, 0) = 0;
+
+            this->dma_write_ctrl.put(dma_info);
+            wait();
+            this->dma_write_chnl.put(dataBvout);
+            wait();
+        }
+
         this->accelerator_done();
     }
 
@@ -151,7 +219,6 @@ void sensor_dma::store_output()
         this->process_done();
     }
 }
-
 
 void sensor_dma::compute_kernel()
 {
