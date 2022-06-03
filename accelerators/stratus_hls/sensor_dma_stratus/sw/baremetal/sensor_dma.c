@@ -154,55 +154,35 @@ int main(int argc, char * argv[])
 	/* ********************************************************** */
 	printf("Fully Coherent MESI\n");
 
+	/* TODO: Restore full test once ESP caches are integrated */
+	coherence = ACC_COH_FULL;
+
+	// Pass common configuration parameters 
+	iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
+	iowrite32(dev, COHERENCE_REG, coherence);
+
+	iowrite32(dev, PT_ADDRESS_REG, (unsigned long) ptable);
+	iowrite32(dev, PT_NCHUNK_REG, NCHUNK(2*mem_size));
+	iowrite32(dev, PT_SHIFT_REG, CHUNK_SHIFT);
+
+	// Use the following if input and output data are not allocated at the default offsets
+	iowrite32(dev, SRC_OFFSET_REG, 0);
+	iowrite32(dev, DST_OFFSET_REG, 0);
+
+	// Pass accelerator-specific configuration parameters
+	/* <<--regs-config-->> */
+	iowrite32(dev, SENSOR_DMA_RD_SP_OFFSET_REG, mem_words);
+	iowrite32(dev, SENSOR_DMA_RD_WR_ENABLE_REG, 0);
+	iowrite32(dev, SENSOR_DMA_RD_SIZE_REG, mem_words);
+	iowrite32(dev, SENSOR_DMA_SRC_OFFSET_REG, 0);
+
+	// Start accelerators
+	iowrite32(dev, CMD_REG, CMD_MASK_START);
+
 	for (i = 0; i < ITERATIONS; i++)
 	{
-		/* TODO: Restore full test once ESP caches are integrated */
-		coherence = ACC_COH_FULL;
-
-		// Pass common configuration parameters 
-		iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
-		iowrite32(dev, COHERENCE_REG, coherence);
-
-		iowrite32(dev, PT_ADDRESS_REG, (unsigned long) ptable);
-		iowrite32(dev, PT_NCHUNK_REG, NCHUNK(2*mem_size));
-		iowrite32(dev, PT_SHIFT_REG, CHUNK_SHIFT);
-
-		// Use the following if input and output data are not allocated at the default offsets
-		iowrite32(dev, SRC_OFFSET_REG, 0);
-		iowrite32(dev, DST_OFFSET_REG, 0);
-
-		// Pass accelerator-specific configuration parameters
-		/* <<--regs-config-->> */
-	    iowrite32(dev, SENSOR_DMA_RD_SP_OFFSET_REG, mem_words);
-	    iowrite32(dev, SENSOR_DMA_RD_WR_ENABLE_REG, 0);
-	    iowrite32(dev, SENSOR_DMA_RD_SIZE_REG, mem_words);
-	    iowrite32(dev, SENSOR_DMA_SRC_OFFSET_REG, 0);
-
-		// Start accelerators
-		iowrite32(dev, CMD_REG, CMD_MASK_START);
-
 		sm_sync[0] = 1;
 		while(sm_sync[0] != 0);
-
-		// Wait for completion
-		done = 0;
-		while (!done) {
-			done = ioread32(dev, STATUS_REG);
-			done &= STATUS_MASK_DONE;
-		}
-
-		iowrite32(dev, CMD_REG, 0x0);
-
-	    iowrite32(dev, SENSOR_DMA_RD_WR_ENABLE_REG, 1);
-	    iowrite32(dev, SENSOR_DMA_WR_SIZE_REG, mem_words);
-	    iowrite32(dev, SENSOR_DMA_WR_SP_OFFSET_REG, mem_words);
-	    iowrite32(dev, SENSOR_DMA_DST_OFFSET_REG, mem_words);
-
-		// Start accelerators
-		iowrite32(dev, CMD_REG, CMD_MASK_START);
-
-		sm_sync[1] = 1;
-		while(sm_sync[1] != 0);
 
 		// Wait for completion
 		done = 0;
