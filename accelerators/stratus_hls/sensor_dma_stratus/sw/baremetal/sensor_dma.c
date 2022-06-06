@@ -62,7 +62,7 @@ uint64_t start_acc_read;
 uint64_t stop_acc_read;
 uint64_t intvl_acc_read;
 
-#define ITERATIONS 1
+#define ITERATIONS 10
 #define ESP
 #define COH_MODE 0
 /* 3 - Owner Prediction, 2 - Write-through forwarding, 1 - Baseline Spandex (ReqV), 0 - Baseline Spandex (MESI) */
@@ -126,7 +126,7 @@ int main(int argc, char * argv[])
 	}
 
 	// Allocate memory
-	mem = (token_t *) aligned_malloc(2*mem_size+2);
+	mem = (token_t *) aligned_malloc(((ITERATIONS+2)*mem_size)+10);
 	gold = mem + mem_words;
 	printf("  memory = %p\n", mem);
 	printf("  gold = %p\n", gold);
@@ -141,11 +141,8 @@ int main(int argc, char * argv[])
 	printf("  ptable = %p\n", ptable);
 	printf("  nchunk = %lu\n", NCHUNK(2*mem_size));
 
-	sm_sync[0] = 0;
-	sm_sync[1] = 0;
-
-	for (j = 0; j < mem_words; j++)
-		mem[j+2] = j*2;
+	for (j = 0; j < 10; j++)
+		sm_sync[j] = 0;
 
     asm volatile ("fence rw, rw");
 
@@ -171,35 +168,54 @@ int main(int argc, char * argv[])
 
 	// Pass accelerator-specific configuration parameters
 	/* <<--regs-config-->> */
-	iowrite32(dev, SENSOR_DMA_RD_SP_OFFSET_REG, mem_words);
-	iowrite32(dev, SENSOR_DMA_RD_WR_ENABLE_REG, 0);
-	iowrite32(dev, SENSOR_DMA_RD_SIZE_REG, mem_words);
-	iowrite32(dev, SENSOR_DMA_SRC_OFFSET_REG, 0);
 
 	// Start accelerators
 	iowrite32(dev, CMD_REG, CMD_MASK_START);
 
 	for (i = 0; i < ITERATIONS; i++)
 	{
+		for (j = 0; j < mem_words; j++)
+			mem[j+10] = (j+i)*2;
+
+		// Op 1 - load mem_words data from 0 in mem to mem_words in SP
+		sm_sync[1] = 0; // load/store
+		sm_sync[2] = 0; // abort
+		sm_sync[3] = mem_words; // rd_size
+		sm_sync[4] = mem_words; // rd_sp_offset
+		sm_sync[5] = 0; // src_offset
+
 		sm_sync[0] = 1;
 		while(sm_sync[0] != 0);
 
-		// Wait for completion
-		done = 0;
-		while (!done) {
-			done = ioread32(dev, STATUS_REG);
-			done &= STATUS_MASK_DONE;
+		// Op 2 - store mem_words data from mem_words in SP to mem_words in mem, and abort
+		sm_sync[1] = 1; // load/store
+		sm_sync[6] = (i+1)/ITERATIONS; // abort
+		sm_sync[7] = mem_words; // wr_size
+		sm_sync[8] = mem_words; // wr_sp_offset
+		sm_sync[9] = (i+1)*mem_words; // dst_offset
+
+		sm_sync[0] = 1;
+		while(sm_sync[0] != 0);
+
+		if(i == ITERATIONS)
+		{
+			// Wait for completion
+			done = 0;
+			while (!done) {
+				done = ioread32(dev, STATUS_REG);
+				done &= STATUS_MASK_DONE;
+			}
+
+			iowrite32(dev, CMD_REG, 0x0);
 		}
 
-		iowrite32(dev, CMD_REG, 0x0);
-
- 	   	for (j = 0; j < mem_words; j++)
- 	   	{
-			if (gold[j+2] != 2*j)
+		for (j = 0; j < mem_words; j++)
+		{
+			if (gold[i*mem_words+j+10] != (j+i)*2)
 			{
 				errors++;
 			}
- 	   	}
+		}
 
 		printf("Errors = %d\n", errors);
 	}

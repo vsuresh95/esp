@@ -24,10 +24,10 @@ void sensor_dma::load_input()
 
     // Config
     /* <<--params-->> */
-    int32_t rd_sp_offset;
-    int32_t rd_wr_enable;
-    int32_t rd_size;
-    int32_t src_offset;
+    int64_t rd_op;
+    int64_t rd_size;
+    int64_t rd_sp_offset;
+    int64_t src_offset;
     {
         HLS_PROTO("load-config");
 
@@ -36,66 +36,47 @@ void sensor_dma::load_input()
 
         // User-defined config code
         /* <<--local-params-->> */
-        rd_sp_offset = config.rd_sp_offset;
-        rd_wr_enable = config.rd_wr_enable;
-        rd_size = config.rd_size;
-        src_offset = config.src_offset + 2;
     }
 
-    // Load - only if rd_wr_enable is 0
-    if(rd_wr_enable == 0)
+    // Load
+    while(true)
     {
-        HLS_PROTO("load-dma");
         wait();
 
-        // Synchronization unit - polling
+        this->compute_load_ready_handshake();
+
+        // Configuration unit - reading load op, size, src, dst
         {
-            HLS_PROTO("load-dma-poll");
-
-            dma_info_t dma_info(0, 1, DMA_SIZE);
-            sc_dt::sc_bv<DMA_WIDTH> dataBvin;
-            uint64_t data;
-
-            //Wait for 1
-            do
-            {
-                HLS_UNROLL_LOOP(OFF);
-                this->dma_read_ctrl.put(dma_info);
-                wait();
-                dataBvin.range(DMA_WIDTH - 1, 0) = this->dma_read_chnl.get();
-                wait();
-                data = dataBvin.range(DMA_WIDTH - 1, 0).to_int64();
-                wait();
-            } while(data != 1);
+            rd_op = plm_cfg[RD_OP];
+            rd_size = plm_cfg[RD_SIZE];
+            rd_sp_offset = plm_cfg[RD_SP_OFFSET];
+            src_offset = plm_cfg[SRC_OFFSET];
+            src_offset += 10;
         }
 
-        // Calculating the length of our transfer
-        uint32_t length = round_up(rd_size, DMA_WORD_PER_BEAT);
+        {
+            rd_op_dbg.write(rd_op);
+            rd_size_dbg.write(rd_size);
+            rd_sp_offset_dbg.write(rd_sp_offset);
+            src_offset_dbg.write(src_offset);
+        }
 
         // Configure DMA transaction
-        dma_info_t dma_info(src_offset / DMA_WORD_PER_BEAT, length / DMA_WORD_PER_BEAT, DMA_SIZE);
+        dma_info_t dma_info(src_offset, rd_size, DMA_SIZE);
 
         this->dma_read_ctrl.put(dma_info);
 
-        for (uint16_t i = 0; i < length; i += DMA_WORD_PER_BEAT)
+        for (int i = 0; i < rd_size; i++)
         {
             sc_dt::sc_bv<DMA_WIDTH> dataBv;
 
             dataBv = this->dma_read_chnl.get();
             wait();
-
-            // Write to PLM (all DMA_WORD_PER_BEAT words in one cycle)
-            for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
-            {
-                HLS_UNROLL_SIMPLE;
-                plm[rd_sp_offset + i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
-            }
+            plm_data[rd_sp_offset + i] = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
         }
 
         // Synchronization unit - update
         {
-            HLS_PROTO("load-dma-update");
-
             dma_info_t dma_info(0, 1, DMA_SIZE);
             sc_dt::sc_bv<DMA_WIDTH> dataBvout;
             dataBvout.range(DMA_WIDTH - 1, 0) = 0;
@@ -106,12 +87,15 @@ void sensor_dma::load_input()
             wait();
         }
 
-        this->accelerator_done();
-    }
+        if (rd_op == 1)
+        {
+            this->accelerator_done();
+            this->process_done();
+        }
 
-    // Conclude
-    {
-        this->process_done();
+        wait();
+
+        this->load_compute_done_handshake();
     }
 }
 
@@ -128,10 +112,10 @@ void sensor_dma::store_output()
 
     // Config
     /* <<--params-->> */
-    int32_t rd_wr_enable;
-    int32_t wr_size;
-    int32_t wr_sp_offset;
-    int32_t dst_offset;
+    int64_t wr_op;
+    int64_t wr_size;
+    int64_t wr_sp_offset;
+    int64_t dst_offset;
     {
         HLS_PROTO("store-config");
 
@@ -140,68 +124,48 @@ void sensor_dma::store_output()
 
         // User-defined config code
         /* <<--local-params-->> */
-        rd_wr_enable = config.rd_wr_enable;
-        wr_size = config.wr_size;
-        wr_sp_offset = config.wr_sp_offset;
-        dst_offset = config.dst_offset + 2;
     }
 
-    // Store - only if rd_wr_enable is 1
-    if(rd_wr_enable == 1)
+    // Store
+    while(true)
     {
-        HLS_PROTO("store-dma");
         wait();
 
-        // Synchronization unit - polling
+        this->store_compute_ready_handshake();
+
+        // Configuration unit - reading store op, size, src, dst
         {
-            HLS_PROTO("store-dma-poll");
-
-            dma_info_t dma_info(1, 1, DMA_SIZE);
-            sc_dt::sc_bv<DMA_WIDTH> dataBvin;
-            uint64_t data;
-
-            //Wait for 1
-            do
-            {
-                HLS_UNROLL_LOOP(OFF);
-                this->dma_read_ctrl.put(dma_info);
-                wait();
-                dataBvin.range(DMA_WIDTH - 1, 0) = this->dma_read_chnl.get();
-                wait();
-                data = dataBvin.range(DMA_WIDTH - 1, 0).to_int64();
-                wait();
-            } while(data != 1);
+            wr_op = plm_cfg[WR_OP];
+            wr_size = plm_cfg[WR_SIZE];
+            wr_sp_offset = plm_cfg[WR_SP_OFFSET];
+            dst_offset = plm_cfg[DST_OFFSET];
+            dst_offset += 10;
         }
 
-        // Calculating the length of our transfer
-        uint32_t length = round_up(wr_size, DMA_WORD_PER_BEAT);
+        {
+            wr_op_dbg.write(wr_op);
+            wr_size_dbg.write(wr_size);
+            wr_sp_offset_dbg.write(wr_sp_offset);
+            dst_offset_dbg.write(dst_offset);
+        }
 
         // Configure DMA transaction
-        dma_info_t dma_info(dst_offset / DMA_WORD_PER_BEAT, length / DMA_WORD_PER_BEAT, DMA_SIZE);
+        dma_info_t dma_info(dst_offset, wr_size, DMA_SIZE);
 
         this->dma_write_ctrl.put(dma_info);
 
-        for (uint16_t i = 0; i < length; i += DMA_WORD_PER_BEAT)
+        for (int i = 0; i < wr_size; i++)
         {
             sc_dt::sc_bv<DMA_WIDTH> dataBv;
 
             wait();
-
-            // Write to PLM (all DMA_WORD_PER_BEAT words in one cycle)
-            for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
-            {
-                HLS_UNROLL_SIMPLE;
-                dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH) = plm[wr_sp_offset + i + k];
-            }
-
+            dataBv.range(DATA_WIDTH - 1, 0) = plm_data[wr_sp_offset + i];
             this->dma_write_chnl.put(dataBv);
         }
 
         // Synchronization unit - update
         {
-            HLS_PROTO("store-dma-update");
-
-            dma_info_t dma_info(1, 1, DMA_SIZE);
+            dma_info_t dma_info(0, 1, DMA_SIZE);
             sc_dt::sc_bv<DMA_WIDTH> dataBvout;
             dataBvout.range(DMA_WIDTH - 1, 0) = 0;
 
@@ -211,12 +175,15 @@ void sensor_dma::store_output()
             wait();
         }
 
-        this->accelerator_done();
-    }
+        if (wr_op == 1)
+        {
+            this->accelerator_done();
+            this->process_done();
+        }
 
-    // Conclude
-    {
-        this->process_done();
+        wait();
+
+        this->compute_store_done_handshake();
     }
 }
 
@@ -226,13 +193,84 @@ void sensor_dma::compute_kernel()
     {
         HLS_PROTO("compute-reset");
 
+        load_store_dbg.write(0);
+        rd_op_dbg.write(0);
+        rd_size_dbg.write(0);
+        rd_sp_offset_dbg.write(0);
+        src_offset_dbg.write(0);
+        wr_op_dbg.write(0);
+        wr_size_dbg.write(0);
+        wr_sp_offset_dbg.write(0);
+        dst_offset_dbg.write(0);
+
         this->reset_compute_kernel();
 
         wait();
     } 
 
-    // Conclude
+    int64_t new_task = 0;
+    int64_t load_store;
+
+    // Synchronization unit - polling new message location
+    while(true)
     {
-        this->process_done();
-    } 
+        {
+            dma_info_t dma_info(0, 1, DMA_SIZE);
+            sc_dt::sc_bv<DMA_WIDTH> dataBvin;
+
+            //Wait for 1
+            while (new_task != 1)
+            {
+                HLS_UNROLL_LOOP(OFF);
+                this->dma_read_ctrl.put(dma_info);
+                dataBvin = this->dma_read_chnl.get();
+                wait();
+                new_task = dataBvin.range(DMA_WIDTH - 1, 0).to_int64();
+            }
+        }
+
+        {
+            dma_info_t dma_info(1, 1, DMA_SIZE);
+            sc_dt::sc_bv<DMA_WIDTH> dataBvin;
+
+            this->dma_read_ctrl.put(dma_info);
+            dataBvin = this->dma_read_chnl.get();
+            wait();
+            load_store = dataBvin.range(DMA_WIDTH - 1, 0).to_int64();
+        }
+
+        {
+            dma_info_t dma_info(0, NUM_CFG_REG, DMA_SIZE);
+            sc_dt::sc_bv<DMA_WIDTH> dataBvin;
+
+            this->dma_read_ctrl.put(dma_info);
+
+            for (int i = 0; i < NUM_CFG_REG; i++)
+            {
+                dataBvin = this->dma_read_chnl.get();
+                wait();
+                plm_cfg[i] = dataBvin.range(DMA_WIDTH - 1, 0).to_int64();
+            }
+        }
+
+        {
+            load_store = plm_cfg[1];
+            load_store_dbg.write(load_store);
+        
+            if (load_store == 1)
+            {
+                this->compute_store_ready_handshake();
+                wait();
+                this->store_compute_done_handshake();
+                wait();
+            }
+            else
+            {
+                this->load_compute_ready_handshake();
+                wait();
+                this->compute_load_done_handshake();
+                wait();
+            }
+        }     
+    }
 }
