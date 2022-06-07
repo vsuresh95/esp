@@ -32,6 +32,12 @@
 #define WR_SP_OFFSET 8
 #define DST_OFFSET 9
 
+#define POLL_REQ 0
+#define CFG_REQ 1
+#define LOAD_DATA_REQ 2
+#define UPDATE_REQ 0
+#define STORE_DATA_REQ 1
+
 class sensor_dma : public esp_accelerator_3P<DMA_WIDTH>
 {
 public:
@@ -69,6 +75,9 @@ public:
     sc_signal< sc_int<64> > wr_size_dbg;
     sc_signal< sc_int<64> > wr_sp_offset_dbg;
     sc_signal< sc_int<64> > dst_offset_dbg;
+
+    sc_int<64> load_state_req;
+    sc_int<64> store_state_req;
 
     // Processes
 
