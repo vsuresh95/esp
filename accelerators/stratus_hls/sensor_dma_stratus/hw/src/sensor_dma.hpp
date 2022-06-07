@@ -17,9 +17,8 @@
 #define DATA_WIDTH 64
 #define DMA_SIZE SIZE_DWORD
 #define PLM_DATA_WORD 12 * 1024
-#define PLM_CFG_WORD 10
 
-#define NUM_CFG_REG PLM_CFG_WORD
+#define NUM_CFG_REG 10
 
 #define NEW_TASK 0
 #define LOAD_STORE 1
@@ -63,7 +62,6 @@ public:
         // Map arrays to memories
         /* <<--plm-bind-->> */
         HLS_MAP_plm(plm_data, PLM_DATA_NAME);
-        HLS_MAP_plm(plm_cfg, PLM_CFG_NAME);
     }
 
     sc_signal< sc_int<64> > load_store_dbg;
@@ -78,6 +76,8 @@ public:
 
     sc_int<64> load_state_req;
     sc_int<64> store_state_req;
+
+    sc_int<64> cfg_registers[NUM_CFG_REG];
 
     // Processes
 
@@ -97,7 +97,6 @@ public:
 
     // Private local memories
     sc_dt::sc_int<DATA_WIDTH> plm_data[PLM_DATA_WORD];
-    sc_dt::sc_int<DATA_WIDTH> plm_cfg[PLM_CFG_WORD];
 
 };
 

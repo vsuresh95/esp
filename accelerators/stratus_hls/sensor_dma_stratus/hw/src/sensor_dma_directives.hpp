@@ -7,7 +7,6 @@
 #define DMA_BEAT_PER_WORD 1
 #define DMA_WORD_PER_BEAT 1
 #define PLM_DATA_NAME "sensor_dma_plm_data_dma64"
-#define PLM_CFG_NAME "sensor_dma_plm_cfg_dma64"
 
 
 #if defined(STRATUS_HLS)
