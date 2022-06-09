@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sld>
+  <accelerator name="sensor_dma_tiled" desc="Accelerator SENSOR_DMA_TILED" data_size="4" device_id="060" hls_tool="stratus_hls">
+    <param name="size" desc="size" />
+  </accelerator>
+</sld>
