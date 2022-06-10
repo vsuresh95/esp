@@ -17,115 +17,126 @@ void sensor_dma_tiled::load_input()
     {
         HLS_PROTO("load-reset");
 
+        rd_size_dbg.write(0);
+        rd_sp_offset_dbg.write(0);
+        src_offset_dbg.write(0);
+
+        for (int i = 0; i < NUM_CFG_REG; i++)
+        {
+            cfg_registers[i] = 0;
+        }
+
         this->reset_load_input();
-
-        // explicit PLM ports reset if any
-
-        // User-defined reset code
 
         wait();
     }
 
     // Config
     /* <<--params-->> */
-    int32_t size;
+    int64_t rd_size;
+    int64_t rd_sp_offset;
+    int64_t src_offset;
     {
         HLS_PROTO("load-config");
 
         cfg.wait_for_config(); // config process
-        conf_info_t config = this->conf_info.read();
 
         // User-defined config code
         /* <<--local-params-->> */
-        size = config.size;
     }
 
     // Load
+    while(true)
     {
         HLS_PROTO("load-dma");
+
         wait();
 
-        bool ping = true;
-        uint32_t offset = 0;
+        this->compute_load_ready_handshake();
 
-        // Batching
-        for (uint16_t b = 0; b < 1; b++)
+        switch (load_state_req)
         {
-            wait();
-#if (DMA_WORD_PER_BEAT == 0)
-            uint32_t length = size;
-#else
-            uint32_t length = round_up(size, DMA_WORD_PER_BEAT);
-#endif
-            // Chunking
-            for (int rem = length; rem > 0; rem -= PLM_IN_WORD)
+            case POLL_REQ:
             {
+                dma_info_t dma_info(0, 1, DMA_SIZE);
+                sc_dt::sc_bv<DMA_WIDTH> dataBvin;
+                int64_t new_task = 0;
+
                 wait();
-                // Configure DMA transaction
-                uint32_t len = rem > PLM_IN_WORD ? PLM_IN_WORD : rem;
-#if (DMA_WORD_PER_BEAT == 0)
-                // data word is wider than NoC links
-                dma_info_t dma_info(offset * DMA_BEAT_PER_WORD, len * DMA_BEAT_PER_WORD, DMA_SIZE);
-#else
-                dma_info_t dma_info(offset / DMA_WORD_PER_BEAT, len / DMA_WORD_PER_BEAT, DMA_SIZE);
-#endif
-                offset += len;
+
+                //Wait for 1
+                while (new_task != 1)
+                {
+                    HLS_UNROLL_LOOP(OFF);
+                    this->dma_read_ctrl.put(dma_info);
+                    dataBvin = this->dma_read_chnl.get();
+                    wait();
+                    new_task = dataBvin.range(DMA_WIDTH - 1, 0).to_int64();
+                }
+            }
+            break;
+            case CFG_REQ:
+            {
+                dma_info_t dma_info(0, NUM_CFG_REG, DMA_SIZE);
+                sc_dt::sc_bv<DMA_WIDTH> dataBvin;
+
+                wait();
 
                 this->dma_read_ctrl.put(dma_info);
 
-#if (DMA_WORD_PER_BEAT == 0)
-                // data word is wider than NoC links
-                for (uint16_t i = 0; i < len; i++)
+                for (int i = 0; i < NUM_CFG_REG; i++)
                 {
-                    sc_dt::sc_bv<DATA_WIDTH> dataBv;
-
-                    for (uint16_t k = 0; k < DMA_BEAT_PER_WORD; k++)
-                    {
-                        dataBv.range((k+1) * DMA_WIDTH - 1, k * DMA_WIDTH) = this->dma_read_chnl.get();
-                        wait();
-                    }
-
-                    // Write to PLM
-                    if (ping)
-                        plm_in_ping[i] = dataBv.to_int64();
-                    else
-                        plm_in_pong[i] = dataBv.to_int64();
+                    dataBvin = this->dma_read_chnl.get();
+                    wait();
+                    cfg_registers[i] = dataBvin.range(DMA_WIDTH - 1, 0).to_int64();
                 }
-#else
-                for (uint16_t i = 0; i < len; i += DMA_WORD_PER_BEAT)
+            }
+            break;
+            case LOAD_DATA_REQ:
+            {
+                // Configuration unit - reading load op, size, src, dst
                 {
-                    HLS_BREAK_DEP(plm_in_ping);
-                    HLS_BREAK_DEP(plm_in_pong);
+                    rd_size = cfg_registers[RD_SIZE];
+                    rd_sp_offset = cfg_registers[RD_SP_OFFSET];
+                    src_offset = cfg_registers[SRC_OFFSET];
+                    src_offset += 10;
+                    wait();
+                }
 
+                {
+                    rd_size_dbg.write(rd_size);
+                    rd_sp_offset_dbg.write(rd_sp_offset);
+                    src_offset_dbg.write(src_offset);
+                    wait();
+                }
+
+                // Main load operation
+                {
+                    dma_info_t dma_info(src_offset, rd_size, DMA_SIZE);
                     sc_dt::sc_bv<DMA_WIDTH> dataBv;
 
-                    dataBv = this->dma_read_chnl.get();
                     wait();
 
-                    // Write to PLM (all DMA_WORD_PER_BEAT words in one cycle)
-                    for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
+                    this->dma_read_ctrl.put(dma_info);
+
+                    for (int i = 0; i < rd_size; i++)
                     {
-                        HLS_UNROLL_SIMPLE;
-                        if (ping)
-                            plm_in_ping[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
-                        else
-                            plm_in_pong[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
+                        dataBv = this->dma_read_chnl.get();
+                        wait();
+                        plm_data[rd_sp_offset + i] = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
                     }
                 }
-#endif
-                this->load_compute_handshake();
-                ping = !ping;
             }
+            break;
+            default:
+            break;
         }
-    }
 
-    // Conclude
-    {
-        this->process_done();
+        wait();
+
+        this->load_compute_done_handshake();
     }
 }
-
-
 
 void sensor_dma_tiled::store_output()
 {
@@ -133,123 +144,98 @@ void sensor_dma_tiled::store_output()
     {
         HLS_PROTO("store-reset");
 
+        wr_size_dbg.write(0);
+        wr_sp_offset_dbg.write(0);
+        dst_offset_dbg.write(0);
+
         this->reset_store_output();
-
-        // explicit PLM ports reset if any
-
-        // User-defined reset code
 
         wait();
     }
 
     // Config
     /* <<--params-->> */
-    int32_t size;
+    int64_t wr_size;
+    int64_t wr_sp_offset;
+    int64_t dst_offset;
     {
         HLS_PROTO("store-config");
 
         cfg.wait_for_config(); // config process
-        conf_info_t config = this->conf_info.read();
 
         // User-defined config code
         /* <<--local-params-->> */
-        size = config.size;
     }
 
     // Store
+    while(true)
     {
         HLS_PROTO("store-dma");
-        wait();
-
-        bool ping = true;
-#if (DMA_WORD_PER_BEAT == 0)
-        uint32_t store_offset = (size) * 1;
-#else
-        uint32_t store_offset = round_up(size, DMA_WORD_PER_BEAT) * 1;
-#endif
-        uint32_t offset = store_offset;
 
         wait();
-        // Batching
-        for (uint16_t b = 0; b < 1; b++)
+
+        this->store_compute_ready_handshake();
+
+        switch (store_state_req)
         {
-            wait();
-#if (DMA_WORD_PER_BEAT == 0)
-            uint32_t length = size;
-#else
-            uint32_t length = round_up(size, DMA_WORD_PER_BEAT);
-#endif
-            // Chunking
-            for (int rem = length; rem > 0; rem -= PLM_OUT_WORD)
+            case UPDATE_REQ:
             {
+                dma_info_t dma_info(0, 1, DMA_SIZE);
+                sc_dt::sc_bv<DMA_WIDTH> dataBvout;
+                dataBvout.range(DMA_WIDTH - 1, 0) = 0;
 
-                this->store_compute_handshake();
-
-                // Configure DMA transaction
-                uint32_t len = rem > PLM_OUT_WORD ? PLM_OUT_WORD : rem;
-#if (DMA_WORD_PER_BEAT == 0)
-                // data word is wider than NoC links
-                dma_info_t dma_info(offset * DMA_BEAT_PER_WORD, len * DMA_BEAT_PER_WORD, DMA_SIZE);
-#else
-                dma_info_t dma_info(offset / DMA_WORD_PER_BEAT, len / DMA_WORD_PER_BEAT, DMA_SIZE);
-#endif
-                offset += len;
+                wait();
 
                 this->dma_write_ctrl.put(dma_info);
-
-#if (DMA_WORD_PER_BEAT == 0)
-                // data word is wider than NoC links
-                for (uint16_t i = 0; i < len; i++)
+                wait();
+                this->dma_write_chnl.put(dataBvout);
+                wait();
+            }
+            break;
+            case STORE_DATA_REQ:
+            {
+                // Configuration unit - reading store op, size, src, dst
                 {
-                    // Read from PLM
-                    sc_dt::sc_int<DATA_WIDTH> data;
+                    wr_size = cfg_registers[WR_SIZE];
+                    wr_sp_offset = cfg_registers[WR_SP_OFFSET];
+                    dst_offset = cfg_registers[DST_OFFSET];
+                    dst_offset += 10;
                     wait();
-                    if (ping)
-                        data = plm_out_ping[i];
-                    else
-                        data = plm_out_pong[i];
-                    sc_dt::sc_bv<DATA_WIDTH> dataBv(data);
-
-                    uint16_t k = 0;
-                    for (k = 0; k < DMA_BEAT_PER_WORD - 1; k++)
-                    {
-                        this->dma_write_chnl.put(dataBv.range((k+1) * DMA_WIDTH - 1, k * DMA_WIDTH));
-                        wait();
-                    }
-                    // Last beat on the bus does not require wait(), which is
-                    // placed before accessing the PLM
-                    this->dma_write_chnl.put(dataBv.range((k+1) * DMA_WIDTH - 1, k * DMA_WIDTH));
                 }
-#else
-                for (uint16_t i = 0; i < len; i += DMA_WORD_PER_BEAT)
+
                 {
+                    wr_size_dbg.write(wr_size);
+                    wr_sp_offset_dbg.write(wr_sp_offset);
+                    dst_offset_dbg.write(dst_offset);
+                    wait();
+                }
+
+                {
+                    dma_info_t dma_info(dst_offset, wr_size, DMA_SIZE);
                     sc_dt::sc_bv<DMA_WIDTH> dataBv;
 
-                    // Read from PLM
                     wait();
-                    for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
-                    {
-                        HLS_UNROLL_SIMPLE;
-                        if (ping)
-                            dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH) = plm_out_ping[i + k];
-                        else
-                            dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH) = plm_out_pong[i + k];
-                    }
-                    this->dma_write_chnl.put(dataBv);
-                }
-#endif
-                ping = !ping;
-            }
-        }
-    }
 
-    // Conclude
-    {
-        this->accelerator_done();
-        this->process_done();
+                    this->dma_write_ctrl.put(dma_info);
+
+                    for (int i = 0; i < wr_size; i++)
+                    {
+                        wait();
+                        dataBv.range(DATA_WIDTH - 1, 0) = plm_data[wr_sp_offset + i];
+                        this->dma_write_chnl.put(dataBv);
+                    }
+                }
+            }
+            break;
+            default:
+            break;
+        }
+
+        wait();
+
+        this->compute_store_done_handshake();
     }
 }
-
 
 void sensor_dma_tiled::compute_kernel()
 {
@@ -257,64 +243,100 @@ void sensor_dma_tiled::compute_kernel()
     {
         HLS_PROTO("compute-reset");
 
+        load_store_dbg.write(0);
+        rd_op_dbg.write(0);
+        wr_op_dbg.write(0);
+
+        load_state_req = 0;
+        store_state_req = 0;
+
         this->reset_compute_kernel();
-
-        // explicit PLM ports reset if any
-
-        // User-defined reset code
 
         wait();
     }
 
-    // Config
-    /* <<--params-->> */
-    int32_t size;
+    int64_t load_store;
+    int64_t rd_op;
+    int64_t wr_op;
+
+    // Synchronization unit - polling new message location
+    while(true)
     {
-        HLS_PROTO("compute-config");
-
-        cfg.wait_for_config(); // config process
-        conf_info_t config = this->conf_info.read();
-
-        // User-defined config code
-        /* <<--local-params-->> */
-        size = config.size;
-    }
-
-
-    // Compute
-    bool ping = true;
-    {
-        for (uint16_t b = 0; b < 1; b++)
+        // Poll for new task
         {
-            uint32_t in_length = size;
-            uint32_t out_length = size;
-            int out_rem = out_length;
+            HLS_PROTO("poll-for-new-task");
 
-            for (int in_rem = in_length; in_rem > 0; in_rem -= PLM_IN_WORD)
+            load_state_req = POLL_REQ;
+
+            this->load_compute_ready_handshake();
+            wait();
+            this->compute_load_done_handshake();
+            wait();
+        }
+
+        // Read config registers
+        {
+            HLS_PROTO("read-config-registers");
+
+            load_state_req = CFG_REQ;
+
+            this->load_compute_ready_handshake();
+            wait();
+            this->compute_load_done_handshake();
+            wait();
+        }
+
+        // Schedule new task
+        {
+            HLS_PROTO("schedule-new-task");
+
+            load_store = cfg_registers[LOAD_STORE];
+            rd_op = cfg_registers[RD_OP];
+            wr_op = cfg_registers[WR_OP];
+
+            load_store_dbg.write(load_store);
+            rd_op_dbg.write(rd_op);
+            wr_op_dbg.write(wr_op);
+        
+            if (load_store == 1)
             {
+                store_state_req = STORE_DATA_REQ;
 
-                uint32_t in_len  = in_rem  > PLM_IN_WORD  ? PLM_IN_WORD  : in_rem;
-                uint32_t out_len = out_rem > PLM_OUT_WORD ? PLM_OUT_WORD : out_rem;
+                this->compute_store_ready_handshake();
+                wait();
+                this->store_compute_done_handshake();
+                wait();
+            }
+            else
+            {
+                load_state_req = LOAD_DATA_REQ;
 
-                this->compute_load_handshake();
-
-                // Computing phase implementation
-                for (int i = 0; i < in_len; i++) {
-                    if (ping)
-                        plm_out_ping[i] = plm_in_ping[i];
-                    else
-                        plm_out_pong[i] = plm_in_pong[i];
-                }
-
-                out_rem -= PLM_OUT_WORD;
-                this->compute_store_handshake();
-                ping = !ping;
+                this->load_compute_ready_handshake();
+                wait();
+                this->compute_load_done_handshake();
+                wait();
             }
         }
 
-        // Conclude
+        // Update lock
         {
-            this->process_done();
+            HLS_PROTO("schedule-new-task");
+
+            store_state_req = UPDATE_REQ;
+
+            this->compute_store_ready_handshake();
+            wait();
+            this->store_compute_done_handshake();
+            wait();
+        }
+
+        // Decide next iteration
+        {
+            if (rd_op == 1 || wr_op == 1)
+            {
+                this->accelerator_done();
+                this->process_done();
+            }
         }
     }
 }

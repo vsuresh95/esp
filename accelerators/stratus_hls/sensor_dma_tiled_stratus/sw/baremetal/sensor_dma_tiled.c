@@ -12,26 +12,64 @@
 
 typedef int64_t token_t;
 
+typedef union
+{
+  struct
+  {
+    unsigned char r_en   : 1;
+    unsigned char r_op   : 1;
+    unsigned char r_type : 2;
+    unsigned char r_cid  : 4;
+    unsigned char w_en   : 1;
+    unsigned char w_op   : 1;
+    unsigned char w_type : 2;
+    unsigned char w_cid  : 4;
+	uint16_t reserved: 16;
+  };
+  uint32_t spandex_reg;
+} spandex_config_t;
+
 static unsigned DMA_WORD_PER_BEAT(unsigned _st)
 {
         return (sizeof(void *) / _st);
 }
 
+static uint64_t get_counter() {
+  uint64_t counter;
+  asm volatile (
+    "li t0, 0;"
+    "csrr t0, mcycle;"
+    "mv %0, t0"
+    : "=r" ( counter )
+    :
+    : "t0"
+  );
+
+  return counter;
+}
+
+uint64_t start_write;
+uint64_t stop_write;
+uint64_t intvl_write;
+uint64_t start_read;
+uint64_t stop_read;
+uint64_t intvl_read;
+
+uint64_t start_acc_write;
+uint64_t stop_acc_write;
+uint64_t intvl_acc_write;
+uint64_t start_acc_read;
+uint64_t stop_acc_read;
+uint64_t intvl_acc_read;
+
+#define ITERATIONS 10
+#define ESP
+#define COH_MODE 0
+/* 3 - Owner Prediction, 2 - Write-through forwarding, 1 - Baseline Spandex (ReqV), 0 - Baseline Spandex (MESI) */
+/* 3 - Non-Coherent DMA, 2 - LLC Coherent DMA, 1 - Coherent DMA, 0 - Fully Coherent MESI */
 
 #define SLD_SENSOR_DMA_TILED 0x060
 #define DEV_NAME "sld,sensor_dma_tiled_stratus"
-
-/* <<--params-->> */
-const int32_t size = 1;
-
-static unsigned in_words_adj;
-static unsigned out_words_adj;
-static unsigned in_len;
-static unsigned out_len;
-static unsigned in_size;
-static unsigned out_size;
-static unsigned out_offset;
-static unsigned mem_size;
 
 /* Size of the contiguous chunks for scatter/gather */
 #define CHUNK_SHIFT 20
@@ -42,42 +80,10 @@ static unsigned mem_size;
 
 /* User defined registers */
 /* <<--regs-->> */
-#define SENSOR_DMA_TILED_SIZE_REG 0x40
-
-
-static int validate_buf(token_t *out, token_t *gold)
-{
-	int i;
-	int j;
-	unsigned errors = 0;
-
-	for (i = 0; i < 1; i++)
-		for (j = 0; j < size; j++)
-			if (gold[i * out_words_adj + j] != out[i * out_words_adj + j])
-				errors++;
-
-	return errors;
-}
-
-
-static void init_buf (token_t *in, token_t * gold)
-{
-	int i;
-	int j;
-
-	for (i = 0; i < 1; i++)
-		for (j = 0; j < size; j++)
-			in[i * in_words_adj + j] = (token_t) j;
-
-	for (i = 0; i < 1; i++)
-		for (j = 0; j < size; j++)
-			gold[i * out_words_adj + j] = (token_t) j;
-}
-
 
 int main(int argc, char * argv[])
 {
-	int i;
+	int i, j;
 	int n;
 	int ndev;
 	struct esp_device *espdevs;
@@ -89,121 +95,129 @@ int main(int argc, char * argv[])
 	unsigned errors = 0;
 	unsigned coherence;
 
-	if (DMA_WORD_PER_BEAT(sizeof(token_t)) == 0) {
-		in_words_adj = size;
-		out_words_adj = size;
-	} else {
-		in_words_adj = round_up(size, DMA_WORD_PER_BEAT(sizeof(token_t)));
-		out_words_adj = round_up(size, DMA_WORD_PER_BEAT(sizeof(token_t)));
-	}
-	in_len = in_words_adj * (1);
-	out_len = out_words_adj * (1);
-	in_size = in_len * sizeof(token_t);
-	out_size = out_len * sizeof(token_t);
-	out_offset  = in_len;
-	mem_size = (out_offset * sizeof(token_t)) + out_size;
-
+    unsigned mem_words = 2048; 
+    unsigned mem_size = mem_words*sizeof(token_t); 
 
 	// Search for the device
-	printf("Scanning device tree... \n");
-
-	ndev = probe(&espdevs, SLD_SENSOR_DMA_TILED, DEV_NAME);
+	ndev = probe(&espdevs, VENDOR_SLD, SLD_SENSOR_DMA_TILED, DEV_NAME);
 	if (ndev == 0) {
-		printf("sensor_dma_tiled not found\n");
+		printf("sensor_dma not found\n");
 		return 0;
 	}
 
-	for (n = 0; n < ndev; n++) {
+	dev = &espdevs[0];
 
-		printf("**************** %s.%d ****************\n", DEV_NAME, n);
+	// Check DMA capabilities
+	if (ioread32(dev, PT_NCHUNK_MAX_REG) == 0) {
+		printf("  -> scatter-gather DMA is disabled. Abort.\n");
+		return 0;
+	}
 
-		dev = &espdevs[n];
+	if (ioread32(dev, PT_NCHUNK_MAX_REG) < NCHUNK(mem_size)) {
+		printf("  -> Not enough TLB entries available. Abort.\n");
+		return 0;
+	}
 
-		// Check DMA capabilities
-		if (ioread32(dev, PT_NCHUNK_MAX_REG) == 0) {
-			printf("  -> scatter-gather DMA is disabled. Abort.\n");
-			return 0;
-		}
+	// Allocate memory
+	mem = (token_t *) aligned_malloc(((ITERATIONS+2)*mem_size)+10);
+	gold = mem + mem_words;
+	printf("  memory = %p\n", mem);
+	printf("  gold = %p\n", gold);
 
-		if (ioread32(dev, PT_NCHUNK_MAX_REG) < NCHUNK(mem_size)) {
-			printf("  -> Not enough TLB entries available. Abort.\n");
-			return 0;
-		}
+	volatile token_t* sm_sync = (volatile token_t*) mem;
+		
+	// Alocate and populate page table
+	ptable = aligned_malloc(NCHUNK(2*mem_size) * sizeof(unsigned *));
+	for (i = 0; i < NCHUNK(2*mem_size); i++)
+		ptable[i] = (unsigned *) &mem[i * (CHUNK_SIZE / sizeof(token_t))];
 
-		// Allocate memory
-		gold = aligned_malloc(out_size);
-		mem = aligned_malloc(mem_size);
-		printf("  memory buffer base-address = %p\n", mem);
+	printf("  ptable = %p\n", ptable);
+	printf("  nchunk = %lu\n", NCHUNK(2*mem_size));
 
-		// Alocate and populate page table
-		ptable = aligned_malloc(NCHUNK(mem_size) * sizeof(unsigned *));
-		for (i = 0; i < NCHUNK(mem_size); i++)
-			ptable[i] = (unsigned *) &mem[i * (CHUNK_SIZE / sizeof(token_t))];
+	for (j = 0; j < 10; j++)
+		sm_sync[j] = 0;
 
-		printf("  ptable = %p\n", ptable);
-		printf("  nchunk = %lu\n", NCHUNK(mem_size));
+    asm volatile ("fence rw, rw");
 
-#ifndef __riscv
-		for (coherence = ACC_COH_NONE; coherence <= ACC_COH_FULL; coherence++) {
-#else
+	/* ********************************************************** */
+	/* Fully Coherent MESI */
+	/* ********************************************************** */
+	printf("Fully Coherent MESI\n");
+
+	/* TODO: Restore full test once ESP caches are integrated */
+	coherence = ACC_COH_FULL;
+
+	// Pass common configuration parameters 
+	iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
+	iowrite32(dev, COHERENCE_REG, coherence);
+
+	iowrite32(dev, PT_ADDRESS_REG, (unsigned long) ptable);
+	iowrite32(dev, PT_NCHUNK_REG, NCHUNK(2*mem_size));
+	iowrite32(dev, PT_SHIFT_REG, CHUNK_SHIFT);
+
+	// Use the following if input and output data are not allocated at the default offsets
+	iowrite32(dev, SRC_OFFSET_REG, 0);
+	iowrite32(dev, DST_OFFSET_REG, 0);
+
+	// Pass accelerator-specific configuration parameters
+	/* <<--regs-config-->> */
+
+	// Start accelerators
+	iowrite32(dev, CMD_REG, CMD_MASK_START);
+
+	for (i = 0; i < ITERATIONS; i++)
+	{
+		for (j = 0; j < mem_words; j++)
+			mem[j+10] = (j+i)*2;
+
+		// Op 1 - load mem_words data from 0 in mem to mem_words in SP
+		sm_sync[1] = 0; // load/store
+		sm_sync[2] = 0; // abort
+		sm_sync[3] = mem_words; // rd_size
+		sm_sync[4] = mem_words; // rd_sp_offset
+		sm_sync[5] = 0; // src_offset
+
+		sm_sync[0] = 1;
+		while(sm_sync[0] != 0);
+
+		// Op 2 - store mem_words data from mem_words in SP to mem_words in mem, and abort
+		sm_sync[1] = 1; // load/store
+		sm_sync[6] = (i+1)/ITERATIONS; // abort
+		sm_sync[7] = mem_words; // wr_size
+		sm_sync[8] = mem_words; // wr_sp_offset
+		sm_sync[9] = (i+1)*mem_words; // dst_offset
+
+		sm_sync[0] = 1;
+		while(sm_sync[0] != 0);
+
+		if(i == ITERATIONS)
 		{
-			/* TODO: Restore full test once ESP caches are integrated */
-			coherence = ACC_COH_NONE;
-#endif
-			printf("  --------------------\n");
-			printf("  Generate input...\n");
-			init_buf(mem, gold);
-
-			// Pass common configuration parameters
-
-			iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
-			iowrite32(dev, COHERENCE_REG, coherence);
-
-#ifndef __sparc
-			iowrite32(dev, PT_ADDRESS_REG, (unsigned long long) ptable);
-#else
-			iowrite32(dev, PT_ADDRESS_REG, (unsigned) ptable);
-#endif
-			iowrite32(dev, PT_NCHUNK_REG, NCHUNK(mem_size));
-			iowrite32(dev, PT_SHIFT_REG, CHUNK_SHIFT);
-
-			// Use the following if input and output data are not allocated at the default offsets
-			iowrite32(dev, SRC_OFFSET_REG, 0x0);
-			iowrite32(dev, DST_OFFSET_REG, 0x0);
-
-			// Pass accelerator-specific configuration parameters
-			/* <<--regs-config-->> */
-		iowrite32(dev, SENSOR_DMA_TILED_SIZE_REG, size);
-
-			// Flush (customize coherence model here)
-			esp_flush(coherence);
-
-			// Start accelerators
-			printf("  Start...\n");
-			iowrite32(dev, CMD_REG, CMD_MASK_START);
-
 			// Wait for completion
 			done = 0;
 			while (!done) {
 				done = ioread32(dev, STATUS_REG);
 				done &= STATUS_MASK_DONE;
 			}
+
 			iowrite32(dev, CMD_REG, 0x0);
-
-			printf("  Done\n");
-			printf("  validating...\n");
-
-			/* Validation */
-			errors = validate_buf(&mem[out_offset], gold);
-			if (errors)
-				printf("  ... FAIL\n");
-			else
-				printf("  ... PASS\n");
 		}
-		aligned_free(ptable);
-		aligned_free(mem);
-		aligned_free(gold);
+
+		for (j = 0; j < mem_words; j++)
+		{
+			if (gold[i*mem_words+j+10] != (j+i)*2)
+			{
+				errors++;
+			}
+		}
+
+		printf("Errors = %d\n", errors);
 	}
+
+	aligned_free(ptable);
+	aligned_free(mem);
+	aligned_free(gold);
+
+	// while(1);
 
 	return 0;
 }
