@@ -120,6 +120,7 @@ package gencaches is
       l2_bresp_ready : in std_ulogic;
       l2_stats_ready : in std_ulogic;
       flush_done : out std_ulogic;
+      acc_flush_done : out std_ulogic;
       l2_cpu_req_ready : out std_ulogic;
       l2_fwd_in_ready : out std_ulogic;
       l2_rsp_in_ready : out std_ulogic;
