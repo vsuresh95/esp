@@ -809,7 +809,6 @@ begin  -- rtl
           end if;
         elsif rd_request = '1' then
           if scatter_gather = 0 then
-          if scatter_gather = 0 then
             sample_flits <= '1';
           end if;
           sample_rd_size <= '1';
