@@ -31,6 +31,7 @@ void vitdodec::load_input()
     int32_t cbps;
     int32_t ntraceback;
     int32_t data_bits;
+    int32_t in_length;
     {
         HLS_PROTO("load-config");
 
@@ -42,6 +43,7 @@ void vitdodec::load_input()
         cbps = config.cbps;
         ntraceback = config.ntraceback;
         data_bits = config.data_bits;
+        in_length = config.in_length;
     }
 
     // Load
@@ -56,9 +58,9 @@ void vitdodec::load_input()
         {
             wait();
 #if (DMA_WORD_PER_BEAT == 0)
-            uint32_t length = 24852;
+            uint32_t length = in_length;
 #else
-            uint32_t length = round_up(24852, DMA_WORD_PER_BEAT);
+            uint32_t length = round_up(in_length, DMA_WORD_PER_BEAT);
 #endif
             // Chunking
             for (int rem = length; rem > 0; rem -= PLM_IN_WORD)
@@ -186,6 +188,7 @@ void vitdodec::store_output()
     int32_t cbps;
     int32_t ntraceback;
     int32_t data_bits;
+    int32_t out_length;
     {
         HLS_PROTO("store-config");
 
@@ -197,6 +200,7 @@ void vitdodec::store_output()
         cbps = config.cbps;
         ntraceback = config.ntraceback;
         data_bits = config.data_bits;
+        out_length = config.out_length;
     }
 
     // Store
@@ -216,9 +220,9 @@ void vitdodec::store_output()
         {
             wait();
 #if (DMA_WORD_PER_BEAT == 0)
-            uint32_t length = 18585;
+            uint32_t length = out_length;
 #else
-            uint32_t length = round_up(18585, DMA_WORD_PER_BEAT);
+            uint32_t length = round_up(out_length, DMA_WORD_PER_BEAT);
 #endif
             // Chunking
             for (int rem = length; rem > 0; rem -= PLM_OUT_WORD)

@@ -4,5 +4,7 @@
     <param name="data_bits" desc="data_bits" />
     <param name="ntraceback" desc="ntraceback" />
     <param name="cbps" desc="cbps" />
+    <param name="in_length" desc="in_length" />
+    <param name="out_length" desc="out_length" />
   </accelerator>
 </sld>
