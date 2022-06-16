@@ -47,3 +47,7 @@
 [submodule "soft/ariane/opensbi"]
 	path = soft/ariane/opensbi
 	url = https://github.com/sld-columbia/opensbi.git
+[submodule "soft/ariane/mini-era"]
+	path = soft/ariane/mini-era
+	url = git@github.com:vsuresh95/mini-era.git
+	branch = f_sensor_dev
