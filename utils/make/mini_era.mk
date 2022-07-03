@@ -11,7 +11,7 @@ OPENSBI = $(SOFT)/opensbi
 
 MINI_ERA = $(ESP_ROOT)/soft/ariane/mini-era
 
-mini-era: soft-clean mini-era-distclean soft $(MINI_ERA_BUILD)/prom.srec $(MINI_ERA_BUILD)/ram.srec $(MINI_ERA_BUILD)/prom.bin $(MINI_ERA_BUILD)/mini_era.bin
+mini-era: mini-era-distclean $(MINI_ERA_BUILD)/prom.srec $(MINI_ERA_BUILD)/ram.srec $(MINI_ERA_BUILD)/prom.bin $(MINI_ERA_BUILD)/mini_era.bin
 
 mini-era-distclean: mini-era-clean
 
@@ -79,6 +79,7 @@ $(MINI_ERA_BUILD)/prom.exe: $(MINI_ERA_BUILD)/startup.o $(MINI_ERA_BUILD)/uart.o
 		-T$(BOOTROM_PATH)/linker.lds \
 		$(MINI_ERA_BUILD)/startup.o $(MINI_ERA_BUILD)/uart.o $(MINI_ERA_BUILD)/main.o \
 		-o $@
+	@cp $(MINI_ERA_BUILD)/prom.exe $(SOFT_BUILD)/prom.exe
 
 $(MINI_ERA_BUILD)/prom.srec: $(MINI_ERA_BUILD)/prom.exe
 	@mkdir -p $(MINI_ERA_BUILD)
@@ -88,6 +89,7 @@ $(MINI_ERA_BUILD)/prom.srec: $(MINI_ERA_BUILD)/prom.exe
 $(MINI_ERA_BUILD)/prom.bin: $(MINI_ERA_BUILD)/prom.exe
 	@mkdir -p $(MINI_ERA_BUILD)
 	$(QUIET_OBJCP) $(CROSS_COMPILE_ELF)objcopy -O binary $< $@
+	@cp $(MINI_ERA_BUILD)/prom.bin $(SOFT_BUILD)/prom.bin
 
 RISCV_CFLAGS  = -I$(RISCV_TESTS)/env
 RISCV_CFLAGS += -I$(RISCV_TESTS)/benchmarks/common
@@ -110,8 +112,8 @@ ADDN_RISCV_CFLAGS += -I$(DRIVERS)/common/include/
 ADDN_RISCV_CFLAGS += -I$(DRIVERS)/baremetal/include/
 ADDN_RISCV_CFLAGS += -I$(MINI_ERA)/include 
 
-SPX_CFLAGS += -DHW_FFT -DUSE_FFT_FX=32 -DUSE_FFT_ACCEL_TYPE=1 -DFFT_SPANDEX_MODE=1 -DHW_FFT_BITREV
-SPX_CFLAGS += -DHW_VIT -DVIT_DEVICE_NUM=0 -DVIT_SPANDEX_MODE=1
+SPX_CFLAGS += -DHW_FFT -DUSE_FFT_FX=32 -DUSE_FFT_ACCEL_TYPE=1 -DFFT_SPANDEX_MODE=4 -DHW_FFT_BITREV
+SPX_CFLAGS += -DHW_VIT -DVIT_DEVICE_NUM=0 -DVIT_SPANDEX_MODE=4
 SPX_CFLAGS += -DDOUBLE_WORD
 SPX_CFLAGS += -DUSE_ESP_INTERFACE -DITERATIONS=1000
 SPX_CFLAGS += -DTWO_CORE_SCHED
@@ -179,8 +181,36 @@ $(MINI_ERA_BUILD)/mini_era.exe: $(MINI_ERA)/src/read_trace.c $(MINI_ERA)/src/cal
 $(MINI_ERA_BUILD)/mini_era.bin: $(MINI_ERA_BUILD)/mini_era.exe
 	@mkdir -p $(MINI_ERA_BUILD)
 	$(QUIET_OBJCP) riscv64-unknown-elf-objcopy -O binary $(MINI_ERA_BUILD)/mini_era.exe $@
+	@cp $(MINI_ERA_BUILD)/mini_era.bin $(SOFT_BUILD)/systest.bin
 	
 $(MINI_ERA_BUILD)/ram.srec: $(MINI_ERA_BUILD)/mini_era.exe
 	@mkdir -p $(MINI_ERA_BUILD)
 	$(QUIET_OBJCP) riscv64-unknown-elf-objcopy -O srec --gap-fill 0 $< $@
 	@cp $(MINI_ERA_BUILD)/ram.srec $(SOFT_BUILD)/ram.srec
+
+fpga-run-mini-era: esplink mini-era
+	@./$(ESP_CFG_BUILD)/esplink --reset
+	@./$(ESP_CFG_BUILD)/esplink --brom -i $(SOFT_BUILD)/prom.bin
+	@./$(ESP_CFG_BUILD)/esplink --dram -i $(SOFT_BUILD)/systest.bin
+	@./$(ESP_CFG_BUILD)/esplink --reset
+
+xmsim-compile-mini-era: socketgen check_all_srcs mini-era xcelium/xmready xcelium/xmsim.in
+	$(QUIET_MAKE) \
+	cd xcelium; \
+	rm -f prom.srec ram.srec; \
+	ln -s $(SOFT_BUILD)/prom.srec; \
+	ln -s $(SOFT_BUILD)/ram.srec; \
+	echo $(SPACES)"$(XMUPDATE) $(SIMTOP)"; \
+	$(XMUPDATE) $(SIMTOP);
+
+xmsim-mini-era: xmsim-compile-mini-era
+	@cd xcelium; \
+	echo $(SPACES)"$(XMSIM)"; \
+	$(XMSIM); \
+	cd ../
+
+xmsim-gui-mini-era: xmsim-compile-mini-era
+	@cd xcelium; \
+	echo $(SPACES)"$(XMSIM) -gui"; \
+	$(XMSIM) -gui; \
+	cd ../
