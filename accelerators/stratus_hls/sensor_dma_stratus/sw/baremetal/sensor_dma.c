@@ -165,11 +165,6 @@ int main(int argc, char * argv[])
 	gold = mem + mem_words;
 	printf("  memory = %p\n", mem);
 	printf("  gold = %p\n", gold);
-
-    for (i = 0; i < mem_words; i++)
-    {
-        mem[i] = i;
-    }
 		
 	// Alocate and populate page table
 	ptable = aligned_malloc(NCHUNK(2*mem_size) * sizeof(unsigned *));
