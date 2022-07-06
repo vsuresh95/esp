@@ -36,6 +36,7 @@
 #define LOAD_DATA_REQ 2
 #define UPDATE_REQ 0
 #define STORE_DATA_REQ 1
+#define STORE_FENCE 2
 
 class sm_sensor : public esp_accelerator_3P<DMA_WIDTH>
 {

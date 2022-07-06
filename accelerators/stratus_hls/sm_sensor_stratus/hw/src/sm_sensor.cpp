@@ -189,12 +189,12 @@ void sm_sensor::store_output()
                 dma_info_t dma_info(0, 1, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBvout;
                 dataBvout.range(DMA_WIDTH - 1, 0) = 0;
-
-                wait();
-
+                
                 this->dma_write_ctrl.put(dma_info);
                 wait();
-                this->dma_write_chnl.put(dataBvout);
+                this->dma_write_chnl.put(dataBvout); 
+                wait(); 
+                while (!dma_write_chnl.ready) wait();
                 wait();
             }
             break;
@@ -231,6 +231,14 @@ void sm_sensor::store_output()
                         this->dma_write_chnl.put(dataBv);
                     }
                 }
+            }
+            break;
+            case STORE_FENCE:
+            {
+                acc_fence.write(0x2); 
+                wait(); 
+                acc_fence.write(0x0); 
+                wait(); 
             }
             break;
             default:
@@ -334,6 +342,13 @@ void sm_sensor::compute_kernel()
             HLS_PROTO("schedule-new-task");
 
             store_state_req = UPDATE_REQ;
+
+            this->compute_store_ready_handshake();
+            wait();
+            this->compute_store_done_handshake();
+            wait();
+
+            store_state_req = STORE_FENCE;
 
             this->compute_store_ready_handshake();
             wait();
