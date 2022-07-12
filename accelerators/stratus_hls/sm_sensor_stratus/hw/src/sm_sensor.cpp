@@ -21,6 +21,8 @@ void sm_sensor::load_input()
         rd_sp_offset_dbg.write(0);
         src_offset_dbg.write(0);
 
+        load_state_req_dbg.write(0);
+
         for (int i = 0; i < NUM_CFG_REG; i++)
         {
             cfg_registers[i] = 0;
@@ -56,6 +58,8 @@ void sm_sensor::load_input()
         wait();
 
         this->load_compute_ready_handshake();
+
+        load_state_req_dbg.write(load_state_req);
 
         switch (load_state_req)
         {
@@ -151,6 +155,8 @@ void sm_sensor::store_output()
         wr_sp_offset_dbg.write(0);
         dst_offset_dbg.write(0);
 
+        store_state_req_dbg.write(0);
+
         this->reset_store_output();
 
         store_ready.ack.reset_ack();
@@ -182,10 +188,13 @@ void sm_sensor::store_output()
 
         this->store_compute_ready_handshake();
 
+        store_state_req_dbg.write(store_state_req);
+
         switch (store_state_req)
         {
             case UPDATE_REQ:
             {
+                // Send the lock variable update
                 dma_info_t dma_info(0, 1, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBvout;
                 dataBvout.range(DMA_WIDTH - 1, 0) = 0;
@@ -193,8 +202,10 @@ void sm_sensor::store_output()
                 this->dma_write_ctrl.put(dma_info);
                 wait();
                 this->dma_write_chnl.put(dataBvout); 
-                wait(); 
-                while (!dma_write_chnl.ready) wait();
+                wait();
+
+                // Wait till the write is accepted at the cache (and previous fences)
+                while (!(this->dma_write_chnl.ready)) wait();
                 wait();
             }
             break;
@@ -230,15 +241,27 @@ void sm_sensor::store_output()
                         dataBv.range(DATA_WIDTH - 1, 0) = plm_data[wr_sp_offset + i];
                         this->dma_write_chnl.put(dataBv);
                     }
+
+                    // Wait till the last write is accepted at the cache
+                    wait();
+                    while (!(this->dma_write_chnl.ready)) wait();
                 }
             }
             break;
             case STORE_FENCE:
             {
-                acc_fence.write(0x2); 
-                wait(); 
-                acc_fence.write(0x0); 
-                wait(); 
+                // Block till L2 to be ready to receive a fence, then send
+                this->acc_fence.put(0x2);
+                wait();
+            }
+            break;
+            case ACC_DONE:
+            {
+                // Ensure the previous fence was accepted, then acc_done
+                while (!(this->acc_fence.ready)) wait();
+                wait();
+                this->accelerator_done();
+                wait();
             }
             break;
             default:
@@ -264,6 +287,8 @@ void sm_sensor::compute_kernel()
         load_state_req = 0;
         store_state_req = 0;
 
+        compute_state_req_dbg.write(0);
+
         this->reset_compute_kernel();
 
         load_ready.req.reset_req();
@@ -287,6 +312,8 @@ void sm_sensor::compute_kernel()
 
             load_state_req = POLL_REQ;
 
+            compute_state_req_dbg.write(1);
+
             this->compute_load_ready_handshake();
             wait();
             this->compute_load_done_handshake();
@@ -298,6 +325,8 @@ void sm_sensor::compute_kernel()
             HLS_PROTO("read-config-registers");
 
             load_state_req = CFG_REQ;
+
+            compute_state_req_dbg.write(2);
 
             this->compute_load_ready_handshake();
             wait();
@@ -319,7 +348,21 @@ void sm_sensor::compute_kernel()
         
             if (load_store == 1)
             {
+                // Start a store transfer
                 store_state_req = STORE_DATA_REQ;
+
+                this->compute_store_ready_handshake();
+
+                compute_state_req_dbg.write(3);
+
+                wait();
+                this->compute_store_done_handshake();
+                wait();
+
+                // Stall till all writes are received at the cache
+                store_state_req = STORE_FENCE;
+
+                compute_state_req_dbg.write(4);
 
                 this->compute_store_ready_handshake();
                 wait();
@@ -328,7 +371,10 @@ void sm_sensor::compute_kernel()
             }
             else
             {
+                // Start a store transfer
                 load_state_req = LOAD_DATA_REQ;
+
+                compute_state_req_dbg.write(5);
 
                 this->compute_load_ready_handshake();
                 wait();
@@ -343,12 +389,17 @@ void sm_sensor::compute_kernel()
 
             store_state_req = UPDATE_REQ;
 
+            compute_state_req_dbg.write(6);
+
             this->compute_store_ready_handshake();
             wait();
             this->compute_store_done_handshake();
             wait();
 
+            // Stall till lock variable update write is received at the cache
             store_state_req = STORE_FENCE;
+
+            compute_state_req_dbg.write(7);
 
             this->compute_store_ready_handshake();
             wait();
@@ -358,9 +409,18 @@ void sm_sensor::compute_kernel()
 
         // Decide next iteration
         {
+            HLS_PROTO("end-acc");
+
             if (rd_op == 1 || wr_op == 1)
             {
-                this->accelerator_done();
+                store_state_req = ACC_DONE;
+
+                compute_state_req_dbg.write(8);
+
+                this->compute_store_ready_handshake();
+                wait();
+                this->compute_store_done_handshake();
+                wait();
                 this->process_done();
             }
         }
