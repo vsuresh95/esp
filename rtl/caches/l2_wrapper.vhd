@@ -795,7 +795,7 @@ begin  -- architecture rtl of l2_wrapper
   ----------------------------------------------------------------------------
   -- Fence signal state
   -----------------------------------------------------------------------------
-  fence_update : process (clk, rst) is
+  fence_update : process (clk, rst, sample_fence) is
   begin
     if rst = '0' then
       fence_state <= idle;

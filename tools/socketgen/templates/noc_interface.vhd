@@ -217,6 +217,9 @@ end;
   signal acc_done                   : std_ulogic;
   signal flush                      : std_ulogic;
   signal acc_flush_done             : std_ulogic;
+  signal acc_fence_valid            : std_ulogic;
+  signal acc_fence_ready            : std_ulogic;
+  signal acc_fence_data             : std_logic_vector(1 downto 0);
   -- Register control, interrupt and monitor signals
   signal pllclk_int        : std_ulogic;
   signal mon_dvfs_feedthru : monitor_dvfs_type;
@@ -307,6 +310,9 @@ begin
         flush                      => flush,
         aq                         => conf_done,
         rl                         => acc_done,
+        acc_fence_ready            => acc_fence_ready,
+        acc_fence_data             => acc_fence_data ,
+        acc_fence_valid            => acc_fence_valid,
         spandex_conf               => bank(SPANDEX_REG),
         acc_flush_done             => acc_flush_done,
         coherence_req_wrreq        => coherence_req_wrreq,

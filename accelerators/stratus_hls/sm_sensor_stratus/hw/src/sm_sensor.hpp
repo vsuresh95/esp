@@ -36,6 +36,8 @@
 #define LOAD_DATA_REQ 2
 #define UPDATE_REQ 0
 #define STORE_DATA_REQ 1
+#define STORE_FENCE 2
+#define ACC_DONE 3
 
 class sm_sensor : public esp_accelerator_3P<DMA_WIDTH>
 {
@@ -67,6 +69,9 @@ public:
         cfg.bind_with(*this);
 
         HLS_PRESERVE_SIGNAL(load_store_dbg, true);
+        HLS_PRESERVE_SIGNAL(load_state_req_dbg, true);
+        HLS_PRESERVE_SIGNAL(store_state_req_dbg, true);
+        HLS_PRESERVE_SIGNAL(compute_state_req_dbg, true);
         HLS_PRESERVE_SIGNAL(rd_op_dbg, true);
         HLS_PRESERVE_SIGNAL(rd_size_dbg, true);
         HLS_PRESERVE_SIGNAL(rd_sp_offset_dbg, true);
@@ -86,6 +91,9 @@ public:
         store_done.bind_with(*this);
     }
 
+    sc_signal< sc_int<64> > load_state_req_dbg;
+    sc_signal< sc_int<64> > store_state_req_dbg;
+    sc_signal< sc_int<64> > compute_state_req_dbg;
     sc_signal< sc_int<64> > load_store_dbg;
     sc_signal< sc_int<64> > rd_op_dbg;
     sc_signal< sc_int<64> > rd_size_dbg;
