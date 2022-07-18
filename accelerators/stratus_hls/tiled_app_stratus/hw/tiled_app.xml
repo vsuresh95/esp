@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sld>
+  <accelerator name="tiled_app" desc="Accelerator TILED_APP" data_size="4" device_id="033" hls_tool="stratus_hls">
+    <param name="rd_wr_enable" desc="rd_wr_enable" />
+    <param name="tile_size" desc="tile_size" />
+    <param name="num_tiles" desc="num_tiles" />
+  </accelerator>
+</sld>
