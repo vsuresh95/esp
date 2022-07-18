@@ -11,22 +11,23 @@
 #include <esp_accelerator.h>
 #include <esp_probe.h>
 #include <fixed_point.h>
-
+#define QUAUX(X) #X
+#define QU(X) QUAUX(X)
 typedef int64_t token_t;
 
 typedef union
 {
   struct
   {
-    unsigned char r_en   : 1;
-    unsigned char r_op   : 1;
-    unsigned char r_type : 2;
-    unsigned char r_cid  : 4;
-    unsigned char w_en   : 1;
-    unsigned char w_op   : 1;
-    unsigned char w_type : 2;
-    unsigned char w_cid  : 4;
-	uint16_t reserved: 16;
+    unsigned int r_en   : 1;
+    unsigned int r_op   : 1;
+    unsigned int r_type : 2;
+    unsigned int r_cid  : 4;
+    unsigned int w_en   : 1;
+    unsigned int w_op   : 1;
+    unsigned int w_type : 2;
+    unsigned int w_cid  : 4;
+	unsigned int reserved: 16;
   };
   uint32_t spandex_reg;
 } spandex_config_t;
@@ -215,28 +216,33 @@ static inline uint32_t read_sync(){
 	int64_t value_64 = 0;
 	asm volatile (
 		"mv t0, %1;"
-		".word 0x0002B30B;"
+		".word " QU(READ_CODE) ";"
 		"mv %0, t1"
 		: "=r" (value_64)
 		: "r" (dst)
 		: "t0", "t1", "memory"
 	);
-	int count = 0;
-	while(count < 10) count++;
-	return ((value_64 != 0)&&(value_64 != 1));
+	return (value_64 == 2);
 }
 
 static inline void update_load_sync(){
 	void* dst = (void*)(mem+2*tile_size);
 	int64_t value_64 = 1;
+	#if (COH_MODE == 0) && !defined(ESP)
+	mem[tile_size*2] = value_64;
+	#else
 	asm volatile (
 		"mv t0, %0;"
 		"mv t1, %1;"
-		".word 0x0062B02B"
+		".word " QU(WRITE_CODE) 
 		: 
 		: "r" (dst), "r" (value_64)
 		: "t0", "t1", "memory"
 	);
+	#endif
+
+	//Fence to push the write out from the write buffer
+	asm volatile ("fence rw, rw");	
 	stop_write = get_counter();
 	intvl_write += stop_write - start_write;
 	start_sync = stop_write ; //get_counter();
@@ -261,16 +267,20 @@ static inline void load_mem(){
 	#endif
 	for (int j = 0; j < tile_size; j++){
 		//int64_t value_64 = gold[(read_tile)*out_words_adj + j];
+		#if (COH_MODE == 0) && !defined(ESP)
+			mem[j] = val_64;
+		#else
 		asm volatile (
 			"mv t0, %0;"
 			"mv t1, %1;"
-			".word 0x0062B02B"
+			".word " QU(WRITE_CODE)
 			: 
 			: "r" (dst), "r" (val_64)
 			: "t0", "t1", "memory"
 		); //: "r" (dst), "r" (gold[(read_tile)*out_words_adj + j])
 
 		dst += 8;
+		#endif
 #ifdef VALIDATE
 		val_64++;
 #endif
@@ -290,7 +300,7 @@ static inline void store_mem(){
 		//int64_t value_64 = gold[(read_tile)*out_words_adj + j];
 		asm volatile (
 			"mv t0, %1;"
-			".word 0x0002B30B;"
+			".word " QU(READ_CODE) ";"
 			"mv %0, t1"
 			: "=r" (out_val)
 			: "r" (src)
@@ -314,7 +324,9 @@ static int validate_buf(token_t *out, token_t *gold)
 	for (i = 0; i < num_tiles; i++)
 		for (j = 0; j < tile_size; j++){
 			if (gold[i * out_words_adj + j] != out[i * out_words_adj + j]){
+#ifdef PRINT_DEBUG
 				printf("tile: %d loc:%d gold: %d -- found: %d \n",i, loc, gold[i * out_words_adj + j], out[i * out_words_adj + j]);
+#endif
 				errors++;
 			}
 			loc++;
@@ -393,6 +405,37 @@ inline static void print_mem(int read ){
 	printf("\t||\t%d\n", mem[2*tile_size]);
 }
 
+inline static void print_coherence_mode(){
+#ifdef ESP
+// ESP COHERENCE PROTOCOLS
+printf("ESP Coherence: ");
+#if(COH_MODE == 3)
+printf("ACC_COH_NONE\n");
+#elif (COH_MODE == 2)
+printf("ACC_COH_LLC\n");
+#elif (COH_MODE == 1)
+printf("ACC_COH_FULL\n");
+#else
+printf("ACC_COH_NONE\n");
+#endif
+#else
+//SPANDEX COHERENCE PROTOCOLS
+printf("Spandex Coherence: (%d) : ", spandex_config.spandex_reg);
+#if (COH_MODE == 3)
+// Owner Prediction
+printf("Owner Prediction\n");
+#elif (COH_MODE == 2)
+// Write-through forwarding
+printf("Write-through forwarding\n");
+#elif (COH_MODE == 1)
+// Baseline Spandex ReqV
+printf("Baseline Spandex ReqV\n");
+#else
+// Fully Coherent MESI
+printf("MESI\n");
+#endif
+#endif
+}
 
 int main(int argc, char * argv[])
 {
@@ -464,7 +507,7 @@ int main(int argc, char * argv[])
 		out = aligned_malloc(out_size*num_tiles+10);
 		mem = aligned_malloc(mem_size+10);
 
-		
+		print_coherence_mode();
 		printf("  gold buffer base-address = %p\n", gold);
 		printf("  out buffer base-address = %p\n", out);
 		printf("  memory buffer base-address = %p\n", mem);
@@ -556,7 +599,7 @@ int main(int argc, char * argv[])
 			while ( !done ) {
 				done = ioread32(dev, STATUS_REG);
 #ifdef PRINT_DEBUG
-				printf("done:%d\n", done);
+				printf("Done:%d\n", done);
 				print_mem(2);
 #endif
 				int32_t read_done = read_sync();

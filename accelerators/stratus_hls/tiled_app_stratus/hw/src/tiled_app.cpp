@@ -256,6 +256,10 @@ void tiled_app::store_output()
                         this->dma_write_chnl.put(dataBvSync2);
                         wait();
                     }
+                    while (!(this->dma_write_chnl.ready)) wait();
+                    // Block till L2 to be ready to receive a fence, then send
+                    this->acc_fence.put(0x2);
+                    wait();
                             
                     store_state = STORE_STATE_LOAD_HANDSHAKE;
                     // store_state = STORE_STATE_SYNC;
@@ -275,6 +279,8 @@ void tiled_app::store_output()
                 // break;
 
                 case STORE_STATE_LOAD_HANDSHAKE:{
+                    while (!(this->acc_fence.ready)) wait();
+                    wait();
                     this->compute_store_handshake();
 		            wait();
                     curr_tile++;
