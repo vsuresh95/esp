@@ -10,7 +10,7 @@
 #include <esp_probe.h>
 #include <fixed_point.h>
 
-#include "input.h"	// for the new test
+#include "data.h"	// for the new test
 
 #define SOC_COLS 2
 #define SOC_ROWS 4
