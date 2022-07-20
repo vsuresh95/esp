@@ -285,6 +285,7 @@ static int validate_buf(token_t* out, token_t* gold, unsigned* coherence_addr, s
 	// the cache coherence part
 	int64_t value_64;
 	void* dst = (void*) out;
+	printf("accOut = [\\\n");	// for the new testing
 #ifndef ESP
 	spandex_config_t spandex_config;
 	*coherence_addr = ACC_COH_FULL;
@@ -319,6 +320,11 @@ static int validate_buf(token_t* out, token_t* gold, unsigned* coherence_addr, s
 
 			value_32_1 = value_64 & 0xFFFFFFFF;
 			value_32_2 = (value_64 >> 32) & 0xFFFFFFFF;
+
+			printf("%ld, %ld, ", value_32_1, value_32_2);	// for the new test
+			if ((j + 2) % 32 == 0) {						// for the new test
+				printf("\\\n");								// for the new test
+			}												// for the new test
 
 			if (gold[j] != value_32_1) {
 				// printf("%d : %d <-- error \n", gold[j], value_32_1);
@@ -370,6 +376,11 @@ static int validate_buf(token_t* out, token_t* gold, unsigned* coherence_addr, s
 			value_32_1 = value_64 & 0xFFFFFFFF;
 			value_32_2 = (value_64 >> 32) & 0xFFFFFFFF;
 
+			printf("%ld, %ld, ", value_32_1, value_32_2);	// for the new test
+			if ((j + 2) % 32 == 0) {						// for the new test
+				printf("\\\n");								// for the new test
+			}												// for the new test
+
 			if (gold[j] != value_32_1) {
 				// printf("%d : %d <-- error \n", gold[j], value_32_1);
 				++errors;
@@ -419,6 +430,11 @@ static int validate_buf(token_t* out, token_t* gold, unsigned* coherence_addr, s
 			value_32_1 = value_64 & 0xFFFFFFFF;
 			value_32_2 = (value_64 >> 32) & 0xFFFFFFFF;
 
+			printf("%ld, %ld, ", value_32_1, value_32_2);	// for the new test
+			if ((j + 2) % 32 == 0) {						// for the new test
+				printf("\\\n");								// for the new test
+			}												// for the new test
+
 			if (gold[j] != value_32_1) {
 				// printf("%d : %d <-- error \n", gold[j], value_32_1);
 				++errors;
@@ -465,6 +481,11 @@ static int validate_buf(token_t* out, token_t* gold, unsigned* coherence_addr, s
 			value_32_1 = value_64 & 0xFFFFFFFF;
 			value_32_2 = (value_64 >> 32) & 0xFFFFFFFF;
 
+			printf("%ld, %ld, ", value_32_1, value_32_2);	// for the new test
+			if ((j + 2) % 32 == 0) {						// for the new test
+				printf("\\\n");								// for the new test
+			}												// for the new test
+
 			if (gold[j] != value_32_1) {
 				// printf("%d : %d <-- error \n", gold[j], value_32_1);
 				++errors;
@@ -510,6 +531,11 @@ static int validate_buf(token_t* out, token_t* gold, unsigned* coherence_addr, s
 			value_32_1 = value_64 & 0xFFFFFFFF;
 			value_32_2 = (value_64 >> 32) & 0xFFFFFFFF;
 
+			printf("%ld, %ld, ", value_32_1, value_32_2);	// for the new test
+			if ((j + 2) % 32 == 0) {						// for the new test
+				printf("\\\n");								// for the new test
+			}												// for the new test
+
 			if (gold[j] != value_32_1) {
 				// printf("%d : %d <-- error \n", gold[j], value_32_1);
 				++errors;
@@ -553,6 +579,11 @@ static int validate_buf(token_t* out, token_t* gold, unsigned* coherence_addr, s
 
 			value_32_1 = value_64 & 0xFFFFFFFF;
 			value_32_2 = (value_64 >> 32) & 0xFFFFFFFF;
+
+			printf("%ld, %ld, ", value_32_1, value_32_2);	// for the new test
+			if ((j + 2) % 32 == 0) {						// for the new test
+				printf("\\\n");								// for the new test
+			}												// for the new test
 
 			if (gold[j] != value_32_1) {
 				// printf("%d : %d <-- error \n", gold[j], value_32_1);
@@ -598,6 +629,11 @@ static int validate_buf(token_t* out, token_t* gold, unsigned* coherence_addr, s
 			value_32_1 = value_64 & 0xFFFFFFFF;
 			value_32_2 = (value_64 >> 32) & 0xFFFFFFFF;
 
+			printf("%ld, %ld, ", value_32_1, value_32_2);	// for the new test
+			if ((j + 2) % 32 == 0) {						// for the new test
+				printf("\\\n");								// for the new test
+			}												// for the new test
+
 			if (gold[j] != value_32_1) {
 				// printf("%d : %d <-- error \n", gold[j], value_32_1);
 				++errors;
@@ -642,6 +678,11 @@ static int validate_buf(token_t* out, token_t* gold, unsigned* coherence_addr, s
 			value_32_1 = value_64 & 0xFFFFFFFF;
 			value_32_2 = (value_64 >> 32) & 0xFFFFFFFF;
 
+			printf("%ld, %ld, ", value_32_1, value_32_2);	// for the new test
+			if ((j + 2) % 32 == 0) {						// for the new test
+				printf("\\\n");								// for the new test
+			}												// for the new test
+
 			if (gold[j] != value_32_1) {
 				// printf("%d : %d <-- error \n", gold[j], value_32_1);
 				++errors;
@@ -664,6 +705,8 @@ static int validate_buf(token_t* out, token_t* gold, unsigned* coherence_addr, s
 
 	#endif
 #endif
+
+	printf("]\n");	// for the new test
 
     return errors;
 }
