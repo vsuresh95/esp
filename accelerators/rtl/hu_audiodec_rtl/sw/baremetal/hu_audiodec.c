@@ -83,11 +83,11 @@ uint64_t intvl_sw;
 const int32_t conf_0  =  0;   // 0: dummy
 const int32_t conf_1  =  0;   // 1: dummy, channel is fixed a 16
 // const int32_t conf_2  =  8;   // audio block size					// for the original test
-const int32_t conf_2  =  8;   // audio block size					// for the new test
+const int32_t conf_2  =  1024;   // audio block size					// for the new test
 // FIXME need to set dma_read_index and dma_write_index properly
 const int32_t conf_3  =  0;   // dma_read_index  
 // const int32_t conf_4  =  64;  // dma_write_index 128*32b/64b = 64 	// for the original test
-const int32_t conf_4  =  8192;  // dma_write_index 128*32b/64b = 64 	// for the new test
+const int32_t conf_4  =  8192;  // dma_write_index 16*1024*32b/64b = 8192 	// for the new test
 const int32_t conf_5  =  0;   // 5-07: dummy
 const int32_t conf_6  =  0;
 const int32_t conf_7  =  0;
@@ -115,24 +115,24 @@ const int32_t conf_25 =  22878;   // 25: cfg_sin_3_gamma;
 
 // for the new test
 // Block 0
-const int32_t conf_8 = 0;	// 08: cfg_cos_alpha;
-const int32_t conf_9 = -65536;	// 09: cfg_sin_alpha;
-const int32_t conf_10 = 65535;	// 10: cfg_cos_beta;
-const int32_t conf_11 = 274;	// 11: cfg_sin_beta;
-const int32_t conf_12 = 0;	// 12: cfg_cos_gamma;
-const int32_t conf_13 = 65536;	// 13: cfg_sin_gamma;
-const int32_t conf_14 = -65536;	// 14: cfg_cos_2_alpha;
-const int32_t conf_15 = 0;	// 15: cfg_sin_2_alpha;
-const int32_t conf_16 = 65534;	// 16: cfg_cos_2_beta;
-const int32_t conf_17 = 549;	// 17: cfg_sin_2_beta;
-const int32_t conf_18 = -65536;	// 18: cfg_cos_2_gamma;
-const int32_t conf_19 = 0;	// 19: cfg_sin_2_gamma;
-const int32_t conf_20 = 0;	// 20: cfg_cos_3_alpha;
-const int32_t conf_21 = 65536;	// 21: cfg_sin_3_alpha;
-const int32_t conf_22 = 65531;	// 22: cfg_cos_3_beta;
-const int32_t conf_23 = 823;	// 23: cfg_sin_3_beta;
-const int32_t conf_24 = 0;	// 24: cfg_cos_3_gamma;
-const int32_t conf_25 = -65536;	// 25: cfg_sin_3_gamma;
+// const int32_t conf_8 = 0;	// 08: cfg_cos_alpha;
+// const int32_t conf_9 = -65536;	// 09: cfg_sin_alpha;
+// const int32_t conf_10 = 65535;	// 10: cfg_cos_beta;
+// const int32_t conf_11 = 274;	// 11: cfg_sin_beta;
+// const int32_t conf_12 = 0;	// 12: cfg_cos_gamma;
+// const int32_t conf_13 = 65536;	// 13: cfg_sin_gamma;
+// const int32_t conf_14 = -65536;	// 14: cfg_cos_2_alpha;
+// const int32_t conf_15 = 0;	// 15: cfg_sin_2_alpha;
+// const int32_t conf_16 = 65534;	// 16: cfg_cos_2_beta;
+// const int32_t conf_17 = 549;	// 17: cfg_sin_2_beta;
+// const int32_t conf_18 = -65536;	// 18: cfg_cos_2_gamma;
+// const int32_t conf_19 = 0;	// 19: cfg_sin_2_gamma;
+// const int32_t conf_20 = 0;	// 20: cfg_cos_3_alpha;
+// const int32_t conf_21 = 65536;	// 21: cfg_sin_3_alpha;
+// const int32_t conf_22 = 65531;	// 22: cfg_cos_3_beta;
+// const int32_t conf_23 = 823;	// 23: cfg_sin_3_beta;
+// const int32_t conf_24 = 0;	// 24: cfg_cos_3_gamma;
+// const int32_t conf_25 = -65536;	// 25: cfg_sin_3_gamma;
 
 // Block 1
 // const int32_t conf_8 = 0;	// 08: cfg_cos_alpha;
@@ -175,24 +175,24 @@ const int32_t conf_25 = -65536;	// 25: cfg_sin_3_gamma;
 // const int32_t conf_25 = -65536;	// 25: cfg_sin_3_gamma;
 
 // Block 3
-// const int32_t conf_8 = 0;	// 08: cfg_cos_alpha;
-// const int32_t conf_9 = -65536;	// 09: cfg_sin_alpha;
-// const int32_t conf_10 = 65508;	// 10: cfg_cos_beta;
-// const int32_t conf_11 = 1920;	// 11: cfg_sin_beta;
-// const int32_t conf_12 = 0;	// 12: cfg_cos_gamma;
-// const int32_t conf_13 = 65536;	// 13: cfg_sin_gamma;
-// const int32_t conf_14 = -65536;	// 14: cfg_cos_2_alpha;
-// const int32_t conf_15 = 0;	// 15: cfg_sin_2_alpha;
-// const int32_t conf_16 = 65423;	// 16: cfg_cos_2_beta;
-// const int32_t conf_17 = 3839;	// 17: cfg_sin_2_beta;
-// const int32_t conf_18 = -65536;	// 18: cfg_cos_2_gamma;
-// const int32_t conf_19 = 0;	// 19: cfg_sin_2_gamma;
-// const int32_t conf_20 = 0;	// 20: cfg_cos_3_alpha;
-// const int32_t conf_21 = 65536;	// 21: cfg_sin_3_alpha;
-// const int32_t conf_22 = 65283;	// 22: cfg_cos_3_beta;
-// const int32_t conf_23 = 5754;	// 23: cfg_sin_3_beta;
-// const int32_t conf_24 = 0;	// 24: cfg_cos_3_gamma;
-// const int32_t conf_25 = -65536;	// 25: cfg_sin_3_gamma;
+const int32_t conf_8 = 0;	// 08: cfg_cos_alpha;
+const int32_t conf_9 = -65536;	// 09: cfg_sin_alpha;
+const int32_t conf_10 = 65508;	// 10: cfg_cos_beta;
+const int32_t conf_11 = 1920;	// 11: cfg_sin_beta;
+const int32_t conf_12 = 0;	// 12: cfg_cos_gamma;
+const int32_t conf_13 = 65536;	// 13: cfg_sin_gamma;
+const int32_t conf_14 = -65536;	// 14: cfg_cos_2_alpha;
+const int32_t conf_15 = 0;	// 15: cfg_sin_2_alpha;
+const int32_t conf_16 = 65423;	// 16: cfg_cos_2_beta;
+const int32_t conf_17 = 3839;	// 17: cfg_sin_2_beta;
+const int32_t conf_18 = -65536;	// 18: cfg_cos_2_gamma;
+const int32_t conf_19 = 0;	// 19: cfg_sin_2_gamma;
+const int32_t conf_20 = 0;	// 20: cfg_cos_3_alpha;
+const int32_t conf_21 = 65536;	// 21: cfg_sin_3_alpha;
+const int32_t conf_22 = 65283;	// 22: cfg_cos_3_beta;
+const int32_t conf_23 = 5754;	// 23: cfg_sin_3_beta;
+const int32_t conf_24 = 0;	// 24: cfg_cos_3_gamma;
+const int32_t conf_25 = -65536;	// 25: cfg_sin_3_gamma;
 
 const int32_t conf_26 =  0;		// 26-31: dummy
 const int32_t conf_27 =  0;
@@ -244,7 +244,7 @@ static unsigned out_offset;
 static unsigned mem_size;
 
 // #define ESP
-#define COH_MODE 1
+#define COH_MODE 0
 /* 3 - Owner Prediction, 2 - Write-through forwarding, 1 - Baseline Spandex (ReqV), 0 - Baseline Spandex (MESI) */
 /* 3 - Non-Coherent DMA, 2 - LLC Coherent DMA, 1 - Coherent DMA, 0 - Fully Coherent MESI */
 
@@ -285,7 +285,7 @@ static int validate_buf(token_t* out, token_t* gold, unsigned* coherence_addr, s
 	// the cache coherence part
 	int64_t value_64;
 	void* dst = (void*) out;
-	printf("accOut = [\\\n");	// for the new testing
+	printf("accOut = [\n");	// for the new testing
 #ifndef ESP
 	spandex_config_t spandex_config;
 	*coherence_addr = ACC_COH_FULL;
@@ -322,8 +322,8 @@ static int validate_buf(token_t* out, token_t* gold, unsigned* coherence_addr, s
 			value_32_2 = (value_64 >> 32) & 0xFFFFFFFF;
 
 			printf("%ld, %ld, ", value_32_1, value_32_2);	// for the new test
-			if ((j + 2) % 32 == 0) {						// for the new test
-				printf("\\\n");								// for the new test
+			if ((j + 2) % 16 == 0) {						// for the new test
+				printf("\n");								// for the new test
 			}												// for the new test
 
 			if (gold[j] != value_32_1) {
@@ -377,8 +377,8 @@ static int validate_buf(token_t* out, token_t* gold, unsigned* coherence_addr, s
 			value_32_2 = (value_64 >> 32) & 0xFFFFFFFF;
 
 			printf("%ld, %ld, ", value_32_1, value_32_2);	// for the new test
-			if ((j + 2) % 32 == 0) {						// for the new test
-				printf("\\\n");								// for the new test
+			if ((j + 2) % 16 == 0) {						// for the new test
+				printf("\n");								// for the new test
 			}												// for the new test
 
 			if (gold[j] != value_32_1) {
@@ -431,8 +431,8 @@ static int validate_buf(token_t* out, token_t* gold, unsigned* coherence_addr, s
 			value_32_2 = (value_64 >> 32) & 0xFFFFFFFF;
 
 			printf("%ld, %ld, ", value_32_1, value_32_2);	// for the new test
-			if ((j + 2) % 32 == 0) {						// for the new test
-				printf("\\\n");								// for the new test
+			if ((j + 2) % 16 == 0) {						// for the new test
+				printf("\n");								// for the new test
 			}												// for the new test
 
 			if (gold[j] != value_32_1) {
@@ -482,8 +482,8 @@ static int validate_buf(token_t* out, token_t* gold, unsigned* coherence_addr, s
 			value_32_2 = (value_64 >> 32) & 0xFFFFFFFF;
 
 			printf("%ld, %ld, ", value_32_1, value_32_2);	// for the new test
-			if ((j + 2) % 32 == 0) {						// for the new test
-				printf("\\\n");								// for the new test
+			if ((j + 2) % 16 == 0) {						// for the new test
+				printf("\n");								// for the new test
 			}												// for the new test
 
 			if (gold[j] != value_32_1) {
@@ -532,8 +532,8 @@ static int validate_buf(token_t* out, token_t* gold, unsigned* coherence_addr, s
 			value_32_2 = (value_64 >> 32) & 0xFFFFFFFF;
 
 			printf("%ld, %ld, ", value_32_1, value_32_2);	// for the new test
-			if ((j + 2) % 32 == 0) {						// for the new test
-				printf("\\\n");								// for the new test
+			if ((j + 2) % 16 == 0) {						// for the new test
+				printf("\n");								// for the new test
 			}												// for the new test
 
 			if (gold[j] != value_32_1) {
@@ -581,8 +581,8 @@ static int validate_buf(token_t* out, token_t* gold, unsigned* coherence_addr, s
 			value_32_2 = (value_64 >> 32) & 0xFFFFFFFF;
 
 			printf("%ld, %ld, ", value_32_1, value_32_2);	// for the new test
-			if ((j + 2) % 32 == 0) {						// for the new test
-				printf("\\\n");								// for the new test
+			if ((j + 2) % 16 == 0) {						// for the new test
+				printf("\n");								// for the new test
 			}												// for the new test
 
 			if (gold[j] != value_32_1) {
@@ -630,8 +630,8 @@ static int validate_buf(token_t* out, token_t* gold, unsigned* coherence_addr, s
 			value_32_2 = (value_64 >> 32) & 0xFFFFFFFF;
 
 			printf("%ld, %ld, ", value_32_1, value_32_2);	// for the new test
-			if ((j + 2) % 32 == 0) {						// for the new test
-				printf("\\\n");								// for the new test
+			if ((j + 2) % 16 == 0) {						// for the new test
+				printf("\n");								// for the new test
 			}												// for the new test
 
 			if (gold[j] != value_32_1) {
@@ -679,8 +679,8 @@ static int validate_buf(token_t* out, token_t* gold, unsigned* coherence_addr, s
 			value_32_2 = (value_64 >> 32) & 0xFFFFFFFF;
 
 			printf("%ld, %ld, ", value_32_1, value_32_2);	// for the new test
-			if ((j + 2) % 32 == 0) {						// for the new test
-				printf("\\\n");								// for the new test
+			if ((j + 2) % 16 == 0) {						// for the new test
+				printf("\n");								// for the new test
 			}												// for the new test
 
 			if (gold[j] != value_32_1) {
@@ -1297,16 +1297,18 @@ void rotateOrder_sw() {
 		output[i] = audio_in[i];
 	}
 
+	/*
 	// Print out the baseline for error percentage checking
 	// for the new test
 	printf("baseline = [\n");
 	for (i = 0; i < 16384; ++i) {
 		printf("%f, ", output[i]);
 		if ((i + i) % 16 == 0) {
-			printf("\\\n");
+			printf("\n");
 		}
 	}
 	printf("]\n");
+	*/
 
 	// for (i = 0; i < 128; ++i) {
 	// 	if (output[i] - audio_out[i] > 0.0001 || output[i] - audio_out[i] < -0.0001) {
