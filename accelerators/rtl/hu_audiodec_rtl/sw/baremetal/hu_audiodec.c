@@ -84,13 +84,16 @@ const int32_t conf_0  =  0;   // 0: dummy
 const int32_t conf_1  =  0;   // 1: dummy, channel is fixed a 16
 // const int32_t conf_2  =  8;   // audio block size					// for the original test
 const int32_t conf_2  =  1024;   // audio block size					// for the new test
+// const int32_t conf_2  =  16;   // audio block size					// debug
 // FIXME need to set dma_read_index and dma_write_index properly
 const int32_t conf_3  =  0;   // dma_read_index  
 // const int32_t conf_4  =  64;  // dma_write_index 128*32b/64b = 64 	// for the original test
 const int32_t conf_4  =  8192;  // dma_write_index 16*1024*32b/64b = 8192 	// for the new test
+// const int32_t conf_4  =  128;  // dma_write_index 256*32b/64b = 128 	// debug
 const int32_t conf_5  =  0;   // 5-07: dummy
 const int32_t conf_6  =  0;
 const int32_t conf_7  =  0;
+
 /*
 // for the original test   
 const int32_t conf_8  =  39413;   // 08: cfg_cos_alpha;  
@@ -193,6 +196,7 @@ const int32_t conf_22 = 65283;	// 22: cfg_cos_3_beta;
 const int32_t conf_23 = 5754;	// 23: cfg_sin_3_beta;
 const int32_t conf_24 = 0;	// 24: cfg_cos_3_gamma;
 const int32_t conf_25 = -65536;	// 25: cfg_sin_3_gamma;
+
 
 const int32_t conf_26 =  0;		// 26-31: dummy
 const int32_t conf_27 =  0;
@@ -322,7 +326,7 @@ static int validate_buf(token_t* out, token_t* gold, unsigned* coherence_addr, s
 			value_32_2 = (value_64 >> 32) & 0xFFFFFFFF;
 
 			printf("%ld, %ld, ", value_32_1, value_32_2);	// for the new test
-			if ((j + 2) % 16 == 0) {						// for the new test
+			if ((j + 2) % 32 == 0) {						// for the new test
 				printf("\n");								// for the new test
 			}												// for the new test
 
@@ -377,7 +381,7 @@ static int validate_buf(token_t* out, token_t* gold, unsigned* coherence_addr, s
 			value_32_2 = (value_64 >> 32) & 0xFFFFFFFF;
 
 			printf("%ld, %ld, ", value_32_1, value_32_2);	// for the new test
-			if ((j + 2) % 16 == 0) {						// for the new test
+			if ((j + 2) % 32 == 0) {						// for the new test
 				printf("\n");								// for the new test
 			}												// for the new test
 
@@ -431,7 +435,7 @@ static int validate_buf(token_t* out, token_t* gold, unsigned* coherence_addr, s
 			value_32_2 = (value_64 >> 32) & 0xFFFFFFFF;
 
 			printf("%ld, %ld, ", value_32_1, value_32_2);	// for the new test
-			if ((j + 2) % 16 == 0) {						// for the new test
+			if ((j + 2) % 32 == 0) {						// for the new test
 				printf("\n");								// for the new test
 			}												// for the new test
 
@@ -468,6 +472,7 @@ static int validate_buf(token_t* out, token_t* gold, unsigned* coherence_addr, s
 		start_read = get_counter();
  	   	// for (j = 0; j < 128; j += 2)	// for the original test
 		for (j = 0; j < 16384; j += 2)	// for the new test
+		// for (j = 0; j < 256; j += 2)	// debug
  	   	{
 			asm volatile (
 				"mv t0, %1;"
@@ -482,7 +487,7 @@ static int validate_buf(token_t* out, token_t* gold, unsigned* coherence_addr, s
 			value_32_2 = (value_64 >> 32) & 0xFFFFFFFF;
 
 			printf("%ld, %ld, ", value_32_1, value_32_2);	// for the new test
-			if ((j + 2) % 16 == 0) {						// for the new test
+			if ((j + 2) % 32 == 0) {						// for the new test
 				printf("\n");								// for the new test
 			}												// for the new test
 
@@ -532,7 +537,7 @@ static int validate_buf(token_t* out, token_t* gold, unsigned* coherence_addr, s
 			value_32_2 = (value_64 >> 32) & 0xFFFFFFFF;
 
 			printf("%ld, %ld, ", value_32_1, value_32_2);	// for the new test
-			if ((j + 2) % 16 == 0) {						// for the new test
+			if ((j + 2) % 32 == 0) {						// for the new test
 				printf("\n");								// for the new test
 			}												// for the new test
 
@@ -581,7 +586,7 @@ static int validate_buf(token_t* out, token_t* gold, unsigned* coherence_addr, s
 			value_32_2 = (value_64 >> 32) & 0xFFFFFFFF;
 
 			printf("%ld, %ld, ", value_32_1, value_32_2);	// for the new test
-			if ((j + 2) % 16 == 0) {						// for the new test
+			if ((j + 2) % 32 == 0) {						// for the new test
 				printf("\n");								// for the new test
 			}												// for the new test
 
@@ -630,7 +635,7 @@ static int validate_buf(token_t* out, token_t* gold, unsigned* coherence_addr, s
 			value_32_2 = (value_64 >> 32) & 0xFFFFFFFF;
 
 			printf("%ld, %ld, ", value_32_1, value_32_2);	// for the new test
-			if ((j + 2) % 16 == 0) {						// for the new test
+			if ((j + 2) % 32 == 0) {						// for the new test
 				printf("\n");								// for the new test
 			}												// for the new test
 
@@ -679,7 +684,7 @@ static int validate_buf(token_t* out, token_t* gold, unsigned* coherence_addr, s
 			value_32_2 = (value_64 >> 32) & 0xFFFFFFFF;
 
 			printf("%ld, %ld, ", value_32_1, value_32_2);	// for the new test
-			if ((j + 2) % 16 == 0) {						// for the new test
+			if ((j + 2) % 32 == 0) {						// for the new test
 				printf("\n");								// for the new test
 			}												// for the new test
 
@@ -881,6 +886,7 @@ static void init_buf (token_t* in, token_t* gold, unsigned* coherence_addr, stru
 		start_write = get_counter();
     	// for (j = 0; j < 128; j += 2)	// for the original test
 		for (j = 0; j < 16384; j += 2)	// for the new test
+		// for (j = 0; j < 256; j += 2)	// debug
     	{
 			// value_32_1 = audio_in[j];	// for the original test
 			// value_32_2 = audio_in[j + 1];	// for the original test
@@ -1049,6 +1055,7 @@ static void init_buf (token_t* in, token_t* gold, unsigned* coherence_addr, stru
 
     // for (i = 0; i < 128; i++) {	// for the original test
 	for (i = 0; i < 16384; i++) {	// for the new test
+	// for (i = 0; i < 256; i++) {	// debug
 	// gold[i] = audio_out[i];		// for the original test
 	gold[i] = new_audio_out[i];		// for the new test
     }
@@ -1064,28 +1071,29 @@ void rotateOrder_sw() {
 	/* The new code */
 	// float output[128];	// for the original test
 	float output[16384];	// for the new test
+	// float output[256];	// debug
 	float valueX, valueY, valueZ, valueR, valueS, valueT, valueU, valueV, valueK, valueL, valueM, valueN, valueO, valueP, valueQ;
 	float vX, vY, vZ, vR, vS, vT, vU, vV, vK, vL, vM, vN, vO, vP, vQ;
 
 	/* The new code */	// for the original test
-	// float conf_8_f = 0.6013946533203125;
-	// float conf_9_f = 0.9302978515625;
-	// float conf_10_f = -0.7021026611328125;
-	// float conf_11_f = -0.8568115234375;
-	// float conf_12_f = -0.545501708984375;
-	// float conf_13_f = -0.3376007080078125;
-	// float conf_14_f = -0.601409912109375;
-	// float conf_15_f = 0.8702850341796875;
-	// float conf_16_f = -0.2321014404296875;
-	// float conf_17_f = 0.15679931640625;
-	// float conf_18_f = 0.4224853515625;
-	// float conf_19_f = -0.7432098388671875;
-	// float conf_20_f = -0.6514129638671875;
-	// float conf_21_f = -0.17230224609375;
-	// float conf_22_f = 0.732696533203125;
-	// float conf_23_f = 0.3527984619140625;
-	// float conf_24_f = -0.811614990234375;
-	// float conf_25_f = 0.349090576171875;
+	float conf_8_f = 0.6013946533203125;
+	float conf_9_f = 0.9302978515625;
+	float conf_10_f = -0.7021026611328125;
+	float conf_11_f = -0.8568115234375;
+	float conf_12_f = -0.545501708984375;
+	float conf_13_f = -0.3376007080078125;
+	float conf_14_f = -0.601409912109375;
+	float conf_15_f = 0.8702850341796875;
+	float conf_16_f = -0.2321014404296875;
+	float conf_17_f = 0.15679931640625;
+	float conf_18_f = 0.4224853515625;
+	float conf_19_f = -0.7432098388671875;
+	float conf_20_f = -0.6514129638671875;
+	float conf_21_f = -0.17230224609375;
+	float conf_22_f = 0.732696533203125;
+	float conf_23_f = 0.3527984619140625;
+	float conf_24_f = -0.811614990234375;
+	float conf_25_f = 0.349090576171875;
 
 	/* The original code */
 	// int32_t sinBetaSq = conf_11 * conf_11;
@@ -1230,6 +1238,7 @@ void rotateOrder_sw() {
 	/* The new code */
 	// for (i = 0; i < 128; i += 16) {	// for the original test
 	for (i = 0; i < 16384; i += 16) {	// for the new test
+	// for (i = 0; i < 256; i += 16) {	// debug
 		// Rotate Order 1
 		valueY = -audio_in[i + 3] * conf_9_f + audio_in[i + 1] * conf_8_f;
 		valueZ = audio_in[i + 2];
@@ -1292,8 +1301,9 @@ void rotateOrder_sw() {
 	intvl_sw += stop_sw - start_sw;
 
 	// The 0th channel has no calculation
-	// for (i = 0; i < 16384; i += 16) {	// for the original test
+	// for (i = 0; i < 128; i += 16) {	// for the original test
 	for (i = 0; i < 16384; i += 16) {	// for the new test
+	// for (i = 0; i < 256; i += 16) {	// debug
 		output[i] = audio_in[i];
 	}
 
@@ -1303,7 +1313,7 @@ void rotateOrder_sw() {
 	printf("baseline = [\n");
 	for (i = 0; i < 16384; ++i) {
 		printf("%f, ", output[i]);
-		if ((i + i) % 16 == 0) {
+		if ((i + i) % 32 == 0) {
 			printf("\n");
 		}
 	}
@@ -1336,8 +1346,12 @@ int main(int argc, char * argv[])
     unsigned errors = 0;
     unsigned coherence;
 
-    in_len = 128;
-    out_len = 128;
+    // in_len = 128;	// for the original test
+    // out_len = 128;	// for the original test
+	in_len = 16384;		// for the new test
+    out_len = 16384;	// for the new test
+	// in_len = 256;	// debug
+    // out_len = 256;	// debug
 
 	intvl_sw = 0;
 	intvl_write = 0;
@@ -1397,7 +1411,7 @@ int main(int argc, char * argv[])
 	// Many iterations for the timing measurement
 	for (i = 0; i < ITERATION; ++i) {
 	// Software execution for the accelerator
-	rotateOrder_sw();
+	// rotateOrder_sw();
 
 	init_buf(mem, gold, &coherence, dev);
 
