@@ -178,8 +178,10 @@ int main(int argc, char * argv[])
 		sm_sync[3] = mem_words; // rd_size
 		sm_sync[4] = mem_words; // rd_sp_offset
 		sm_sync[5] = 0; // src_offset
+        asm volatile ("fence w, w");
 
 		sm_sync[0] = 1;
+        asm volatile ("fence w, w");
 		while(sm_sync[0] != 0);
 
 		// Op 2 - store mem_words data from mem_words in SP to mem_words in mem, and abort
@@ -188,8 +190,10 @@ int main(int argc, char * argv[])
 		sm_sync[7] = mem_words; // wr_size
 		sm_sync[8] = mem_words; // wr_sp_offset
 		sm_sync[9] = (i+1)*mem_words; // dst_offset
+        asm volatile ("fence w, w");
 
 		sm_sync[0] = 1;
+        asm volatile ("fence w, w");
 		while(sm_sync[0] != 0);
 
 		if(i == ITERATIONS)

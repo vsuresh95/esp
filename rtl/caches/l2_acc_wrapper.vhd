@@ -71,6 +71,11 @@ entity l2_acc_wrapper is
     spandex_conf              : in  std_logic_vector(31 downto 0);
     acc_flush_done            : out std_ulogic;
 
+    -- fence to L2
+    acc_fence_valid           : in std_ulogic;
+    acc_fence_ready           : out std_ulogic;
+    acc_fence_data            : in std_logic_vector(1 downto 0);
+
     -- backend (cache - NoC)
     -- tile->NoC1
     coherence_req_wrreq        : out std_ulogic;
@@ -175,9 +180,13 @@ architecture rtl of l2_acc_wrapper is
   signal acc_done_l2_valid         : std_logic;
   signal acc_done_l2_data          : std_logic_vector(1 downto 0);
 
-  type acc_done_state_t is (idle, wait_for_cpu_ready, valid_acc_done);
+  type acc_done_state_t is (idle, wait_for_cpu_ready, valid_acc_done, wait_for_fence_done);
   signal acc_done_state, acc_done_next : acc_done_state_t;
   signal flush_sync : std_ulogic;
+  signal acc_fence_reg : std_logic_vector(1 downto 0);
+  signal sample_fence : std_logic;
+  signal pending_fence : std_logic;
+  signal acc_flush_done_sync : std_logic;
 
   -------------------------------------------------------------------------------
   -- Flush FSM signals
@@ -626,7 +635,7 @@ begin  -- architecture rtl of l2_acc_wrapper
       l2_rsp_in_data_word_mask  => rsp_in_data_word_mask,
       l2_rsp_in_data_invack_cnt => rsp_in_data_invack_cnt,
       flush_done                => flush_done,
-      acc_flush_done            => acc_flush_done,
+      acc_flush_done            => acc_flush_done_sync,
       -- debug
       --asserts                   => asserts,
       --bookmark                  => bookmark,
@@ -642,46 +651,68 @@ begin  -- architecture rtl of l2_acc_wrapper
 
   acc_ready_gen: if USE_SPANDEX = 0 generate
     acc_done_l2_ready <= '0';
-    acc_flush_done <= '0';
+    acc_flush_done_sync <= '0';
   end generate acc_ready_gen;
 
   ----------------------------------------------------------------------------
   -- acc_done signal state
   -----------------------------------------------------------------------------
-  acc_done_update : process (clk, rst) is
+  acc_done_update : process (clk, rst, sample_fence) is
   begin
     if rst = '0' then
       acc_done_state <= idle;
       flush_sync <= '0';
+      acc_flush_done <= '0';
+      acc_fence_reg <= (others => '0');
     elsif clk'event and clk = '1' then
       acc_done_state <= acc_done_next;
       flush_sync <= flush;
+      acc_flush_done <= acc_flush_done_sync;
+      if sample_fence = '1' then
+        acc_fence_reg <= acc_done_l2_data;
+      end if;
     end if;
   end process acc_done_update;
 
-  acc_done_state_fsm : process (flush_sync, cpu_req_ready, acc_done_l2_ready, acc_done_state) is
+  acc_done_state_fsm : process (acc_flush_done_sync, acc_fence_data, acc_fence_valid, flush_sync, cpu_req_ready, acc_done_l2_ready, acc_done_state, acc_fence_reg) is
   begin
     acc_done_next     <= acc_done_state;
-    acc_done_l2_data  <= "11";
     acc_done_l2_valid <= '0';
+    acc_done_l2_data <= (others => '0');
+    sample_fence   <= '0';
+    acc_fence_ready <= '0';
+    pending_fence   <= '0';
 
     case acc_done_state is
       when idle =>
-        if flush_sync = '1' and USE_SPANDEX /= 0 then
+        acc_fence_ready <= '1';
+        if acc_fence_valid = '1' and USE_SPANDEX /= 0 then
+          acc_done_l2_data  <= acc_fence_data;
+          sample_fence <= '1';
+          acc_done_next <= wait_for_cpu_ready;
+        elsif flush_sync = '1' and USE_SPANDEX /= 0 then
+          acc_done_l2_data  <= "11";
+          sample_fence <= '1';
           acc_done_next <= wait_for_cpu_ready;
         end if;
 
       when wait_for_cpu_ready =>
-        if cpu_req_ready = '1' then
+        acc_done_l2_data  <= acc_fence_reg;
+        pending_fence   <= '1';
+        if cpu_req_ready = '1' and acc_done_l2_ready = '1'then
           acc_done_l2_valid <= '1';
-          if acc_done_l2_ready = '0' then
-            acc_done_next <= valid_acc_done;
-          end if;
+          acc_done_next <= valid_acc_done;
         end if;
 
       when valid_acc_done =>
-        acc_done_l2_valid <= '1';
+        pending_fence   <= '1';
         if acc_done_l2_ready = '1' then
+          acc_done_next <= wait_for_fence_done;
+        end if;
+
+      when wait_for_fence_done =>
+        pending_fence   <= '1';
+        if acc_flush_done_sync = '1' then
           acc_done_next <= idle;
         end if;
 
@@ -815,7 +846,7 @@ begin  -- architecture rtl of l2_acc_wrapper
   fsm_req_acc : process (req_acc_reg, cpu_req_ready,
                          dma_read, dma_write, dma_length, dma_address,
                          dma_snd_valid, dma_snd_data, dma_rcv_ready,
-                         rd_rsp_valid, rd_rsp_data_line)
+                         rd_rsp_valid, rd_rsp_data_line, pending_fence)
 
     variable reg : req_acc_reg_type;
 
@@ -847,7 +878,7 @@ begin  -- architecture rtl of l2_acc_wrapper
       -- IDLE
       when idle =>
 
-        if cpu_req_ready = '1' then
+        if cpu_req_ready = '1' and pending_fence = '0' then
 
           dma_ready <= '1';
 
@@ -973,7 +1004,7 @@ begin  -- architecture rtl of l2_acc_wrapper
       -- STORE
       when store =>
 
-        if cpu_req_ready = '1' then
+        if cpu_req_ready = '1' and pending_fence = '0' then
 
           dma_snd_ready <= '1';
 
