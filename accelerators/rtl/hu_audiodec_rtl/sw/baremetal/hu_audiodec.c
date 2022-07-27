@@ -1076,24 +1076,24 @@ void rotateOrder_sw() {
 	float vX, vY, vZ, vR, vS, vT, vU, vV, vK, vL, vM, vN, vO, vP, vQ;
 
 	/* The new code */	// for the original test
-	float conf_8_f = 0.6013946533203125;
-	float conf_9_f = 0.9302978515625;
-	float conf_10_f = -0.7021026611328125;
-	float conf_11_f = -0.8568115234375;
-	float conf_12_f = -0.545501708984375;
-	float conf_13_f = -0.3376007080078125;
-	float conf_14_f = -0.601409912109375;
-	float conf_15_f = 0.8702850341796875;
-	float conf_16_f = -0.2321014404296875;
-	float conf_17_f = 0.15679931640625;
-	float conf_18_f = 0.4224853515625;
-	float conf_19_f = -0.7432098388671875;
-	float conf_20_f = -0.6514129638671875;
-	float conf_21_f = -0.17230224609375;
-	float conf_22_f = 0.732696533203125;
-	float conf_23_f = 0.3527984619140625;
-	float conf_24_f = -0.811614990234375;
-	float conf_25_f = 0.349090576171875;
+	// float conf_8_f = 0.6013946533203125;
+	// float conf_9_f = 0.9302978515625;
+	// float conf_10_f = -0.7021026611328125;
+	// float conf_11_f = -0.8568115234375;
+	// float conf_12_f = -0.545501708984375;
+	// float conf_13_f = -0.3376007080078125;
+	// float conf_14_f = -0.601409912109375;
+	// float conf_15_f = 0.8702850341796875;
+	// float conf_16_f = -0.2321014404296875;
+	// float conf_17_f = 0.15679931640625;
+	// float conf_18_f = 0.4224853515625;
+	// float conf_19_f = -0.7432098388671875;
+	// float conf_20_f = -0.6514129638671875;
+	// float conf_21_f = -0.17230224609375;
+	// float conf_22_f = 0.732696533203125;
+	// float conf_23_f = 0.3527984619140625;
+	// float conf_24_f = -0.811614990234375;
+	// float conf_25_f = 0.349090576171875;
 
 	/* The original code */
 	// int32_t sinBetaSq = conf_11 * conf_11;
