@@ -151,7 +151,7 @@ void rotateOrder_sw() {
 	printf("baseline = [\n");
 	for (i = 0; i < 16384; ++i) {
 		printf("%f, ", output[i]);
-		if ((i + i) % 16 == 0) {
+		if ((i + 1) % 16 == 0) {
 			printf("\n");
 		}
 	}
