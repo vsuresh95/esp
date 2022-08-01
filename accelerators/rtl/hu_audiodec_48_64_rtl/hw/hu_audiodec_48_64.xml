@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sld>
+  <accelerator name="hu_audiodec_48_64" desc="Accelerator HU_AUDIODEC_48_64" data_size="4" device_id="041" hls_tool="rtl">
+    <param name="cfg_regs_10" desc="cfg_regs_10" />
+    <param name="cfg_regs_11" desc="cfg_regs_11" />
+    <param name="cfg_regs_12" desc="cfg_regs_12" />
+    <param name="cfg_regs_13" desc="cfg_regs_13" />
+    <param name="cfg_regs_14" desc="cfg_regs_14" />
+    <param name="cfg_regs_15" desc="cfg_regs_15" />
+    <param name="cfg_regs_16" desc="cfg_regs_16" />
+    <param name="cfg_regs_17" desc="cfg_regs_17" />
+    <param name="cfg_regs_18" desc="cfg_regs_18" />
+    <param name="cfg_regs_19" desc="cfg_regs_19" />
+    <param name="cfg_regs_29" desc="cfg_regs_29" />
+    <param name="cfg_regs_1" desc="cfg_regs_1" />
+    <param name="cfg_regs_28" desc="cfg_regs_28" />
+    <param name="cfg_regs_0" desc="cfg_regs_0" />
+    <param name="cfg_regs_3" desc="cfg_regs_3" />
+    <param name="cfg_regs_2" desc="cfg_regs_2" />
+    <param name="cfg_regs_5" desc="cfg_regs_5" />
+    <param name="cfg_regs_4" desc="cfg_regs_4" />
+    <param name="cfg_regs_7" desc="cfg_regs_7" />
+    <param name="cfg_regs_6" desc="cfg_regs_6" />
+    <param name="cfg_regs_21" desc="cfg_regs_21" />
+    <param name="cfg_regs_9" desc="cfg_regs_9" />
+    <param name="cfg_regs_20" desc="cfg_regs_20" />
+    <param name="cfg_regs_8" desc="cfg_regs_8" />
+    <param name="cfg_regs_23" desc="cfg_regs_23" />
+    <param name="cfg_regs_22" desc="cfg_regs_22" />
+    <param name="cfg_regs_25" desc="cfg_regs_25" />
+    <param name="cfg_regs_24" desc="cfg_regs_24" />
+    <param name="cfg_regs_27" desc="cfg_regs_27" />
+    <param name="cfg_regs_26" desc="cfg_regs_26" />
+    <param name="cfg_regs_30" desc="cfg_regs_30" />
+    <param name="cfg_regs_31" desc="cfg_regs_31" />
+  </accelerator>
+</sld>
