@@ -25,8 +25,8 @@ struct sensor_dma_stratus_access {
 	unsigned wr_size;
 	unsigned wr_sp_offset;
 	unsigned rd_size;
-	unsigned dst_offset;
-	unsigned src_offset;
+	unsigned sensor_dst_offset;
+	unsigned sensor_src_offset;
 	unsigned src_offset;
 	unsigned dst_offset;
 };

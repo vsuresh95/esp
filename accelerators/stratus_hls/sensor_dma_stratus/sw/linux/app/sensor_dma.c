@@ -3,100 +3,75 @@
 #include "libesp.h"
 #include "cfg.h"
 
-static unsigned in_words_adj;
-static unsigned out_words_adj;
-static unsigned in_len;
-static unsigned out_len;
-static unsigned in_size;
-static unsigned out_size;
-static unsigned out_offset;
-static unsigned size;
-
-/* User-defined code */
-static int validate_buffer(token_t *out, token_t *gold)
-{
-	int i;
-	int j;
-	unsigned errors = 0;
-
-	for (i = 0; i < 1; i++)
-		for (j = 0; j < src_offset; j++)
-			if (gold[i * out_words_adj + j] != out[i * out_words_adj + j])
-				errors++;
-
-	return errors;
-}
-
-
-/* User-defined code */
-static void init_buffer(token_t *in, token_t * gold)
-{
-	int i;
-	int j;
-
-	for (i = 0; i < 1; i++)
-		for (j = 0; j < src_offset; j++)
-			in[i * in_words_adj + j] = (token_t) j;
-
-	for (i = 0; i < 1; i++)
-		for (j = 0; j < src_offset; j++)
-			gold[i * out_words_adj + j] = (token_t) j;
-}
-
-
-/* User-defined code */
-static void init_parameters()
-{
-	if (DMA_WORD_PER_BEAT(sizeof(token_t)) == 0) {
-		in_words_adj = src_offset;
-		out_words_adj = src_offset;
-	} else {
-		in_words_adj = round_up(src_offset, DMA_WORD_PER_BEAT(sizeof(token_t)));
-		out_words_adj = round_up(src_offset, DMA_WORD_PER_BEAT(sizeof(token_t)));
-	}
-	in_len = in_words_adj * (1);
-	out_len =  out_words_adj * (1);
-	in_size = in_len * sizeof(token_t);
-	out_size = out_len * sizeof(token_t);
-	out_offset = in_len;
-	size = (out_offset * sizeof(token_t)) + out_size;
-}
-
+double intvl_write;
+double intvl_read; 
+double intvl_acc_write;
+double intvl_acc_read;
 
 int main(int argc, char **argv)
 {
-	int errors;
+    clock_t t_start;
+    clock_t t_end;
+    double t_diff;
+
+	int errors = 0;
+    int j;
 
 	token_t *gold;
 	token_t *buf;
 
-	init_parameters();
+    unsigned mem_words = 1024; 
+    size_t mem_size = mem_words*sizeof(token_t); 
 
-	buf = (token_t *) esp_alloc(size);
+	buf = (token_t *) esp_alloc(2*mem_size);
 	cfg_000[0].hw_buf = buf;
-    
-	gold = malloc(out_size);
 
-	init_buffer(buf, gold);
+	gold = buf + mem_words;
+   
+    t_start = clock();
 
-	printf("\n====== %s ======\n\n", cfg_000[0].devname);
-	/* <<--print-params-->> */
-	printf("  .rd_sp_offset = %d\n", rd_sp_offset);
-	printf("  .rd_wr_enable = %d\n", rd_wr_enable);
-	printf("  .wr_size = %d\n", wr_size);
-	printf("  .wr_sp_offset = %d\n", wr_sp_offset);
-	printf("  .rd_size = %d\n", rd_size);
-	printf("  .dst_offset = %d\n", dst_offset);
-	printf("  .src_offset = %d\n", src_offset);
-	printf("\n  ** START **\n");
+	for (j = 0; j < mem_words; j++)
+		buf[j] = (token_t) j;
+
+    t_end = clock();
+    t_diff = (double) (t_end - t_start);
+    intvl_acc_read = t_diff;
+
+    sensor_dma_cfg_000[0].rd_sp_offset = 2*mem_words;
+    sensor_dma_cfg_000[0].rd_wr_enable = 0;
+    sensor_dma_cfg_000[0].rd_size = mem_words;
+    sensor_dma_cfg_000[0].sensor_src_offset = 0;
+
+    t_start = clock();
 
 	esp_run(cfg_000, NACC);
 
-	printf("\n  ** DONE **\n");
+    t_end = clock();
+    t_diff = (double) (t_end - t_start);
+    intvl_write = t_diff;
 
-	errors = validate_buffer(&buf[out_offset], gold);
+    sensor_dma_cfg_000[0].wr_sp_offset = 2*mem_words;
+    sensor_dma_cfg_000[0].rd_wr_enable = 1;
+    sensor_dma_cfg_000[0].wr_size = mem_words;
+    sensor_dma_cfg_000[0].sensor_dst_offset = mem_words;
 
-	free(gold);
+    t_start = clock();
+
+	esp_run(cfg_000, NACC);
+
+    t_end = clock();
+    t_diff = (double) (t_end - t_start);
+    intvl_acc_write = t_diff;
+
+    t_start = clock();
+
+	for (j = 0; j < mem_words; j++)
+		if (gold[j] != j) errors++;
+
+    t_end = clock();
+    t_diff = (double) (t_end - t_start);
+    intvl_read = t_diff;
+
 	esp_free(buf);
 
 	if (!errors)
@@ -104,7 +79,10 @@ int main(int argc, char **argv)
 	else
 		printf("+ Test FAILED\n");
 
-	printf("\n====== %s ======\n\n", cfg_000[0].devname);
+	printf("CPU write = %f\n", intvl_write);
+	printf("ACC read = %f\n", intvl_acc_read);
+	printf("ACC write = %f\n", intvl_acc_write);
+	printf("CPU read = %f\n", intvl_read);
 
 	return errors;
 }

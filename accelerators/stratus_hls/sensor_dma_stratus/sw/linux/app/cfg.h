@@ -14,8 +14,8 @@ typedef int64_t token_t;
 #define WR_SIZE 1
 #define WR_SP_OFFSET 1
 #define RD_SIZE 1
-#define DST_OFFSET 1
-#define SRC_OFFSET 1
+#define DST_OFFSET 0
+#define SRC_OFFSET 0
 
 /* <<--params-->> */
 const int32_t rd_sp_offset = RD_SP_OFFSET;
@@ -36,11 +36,11 @@ struct sensor_dma_stratus_access sensor_dma_cfg_000[] = {
 		.wr_size = WR_SIZE,
 		.wr_sp_offset = WR_SP_OFFSET,
 		.rd_size = RD_SIZE,
-		.dst_offset = DST_OFFSET,
-		.src_offset = SRC_OFFSET,
+		.sensor_dst_offset = DST_OFFSET,
+		.sensor_src_offset = SRC_OFFSET,
 		.src_offset = 0,
 		.dst_offset = 0,
-		.esp.coherence = ACC_COH_NONE,
+		.esp.coherence = ACC_COH_FULL,
 		.esp.p2p_store = 0,
 		.esp.p2p_nsrcs = 0,
 		.esp.p2p_srcs = {"", "", "", ""},

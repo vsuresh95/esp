@@ -57,8 +57,8 @@ static void sensor_dma_prep_xfer(struct esp_device *esp, void *arg)
 	iowrite32be(a->wr_size, esp->iomem + SENSOR_DMA_WR_SIZE_REG);
 	iowrite32be(a->wr_sp_offset, esp->iomem + SENSOR_DMA_WR_SP_OFFSET_REG);
 	iowrite32be(a->rd_size, esp->iomem + SENSOR_DMA_RD_SIZE_REG);
-	iowrite32be(a->dst_offset, esp->iomem + SENSOR_DMA_DST_OFFSET_REG);
-	iowrite32be(a->src_offset, esp->iomem + SENSOR_DMA_SRC_OFFSET_REG);
+	iowrite32be(a->sensor_dst_offset, esp->iomem + SENSOR_DMA_DST_OFFSET_REG);
+	iowrite32be(a->sensor_src_offset, esp->iomem + SENSOR_DMA_SRC_OFFSET_REG);
 	iowrite32be(a->src_offset, esp->iomem + SRC_OFFSET_REG);
 	iowrite32be(a->dst_offset, esp->iomem + DST_OFFSET_REG);
 
