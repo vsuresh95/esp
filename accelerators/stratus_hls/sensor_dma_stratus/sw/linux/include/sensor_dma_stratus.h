@@ -29,6 +29,7 @@ struct sensor_dma_stratus_access {
 	unsigned sensor_src_offset;
 	unsigned src_offset;
 	unsigned dst_offset;
+	unsigned spandex_conf;
 };
 
 #define SENSOR_DMA_STRATUS_IOC_ACCESS	_IOW ('S', 0, struct sensor_dma_stratus_access)

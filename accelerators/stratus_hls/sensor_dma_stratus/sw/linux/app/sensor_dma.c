@@ -8,6 +8,8 @@ double intvl_read;
 double intvl_acc_write;
 double intvl_acc_read;
 
+#define ITERATIONS 1000
+
 int main(int argc, char **argv)
 {
     clock_t t_start;
@@ -15,7 +17,7 @@ int main(int argc, char **argv)
     double t_diff;
 
 	int errors = 0;
-    int j;
+    int i, j;
 
 	token_t *gold;
 	token_t *buf;
@@ -27,50 +29,87 @@ int main(int argc, char **argv)
 	cfg_000[0].hw_buf = buf;
 
 	gold = buf + mem_words;
+
+	intvl_write = 0;
+	intvl_acc_write = 0;
+	intvl_read = 0;
+	intvl_acc_read = 0;
    
-    t_start = clock();
+	for (i = 0; i < ITERATIONS; i++)
+	{ 
+  	    void* dst = (void*)(buf);
+	    int64_t value_64 = 123;
 
-	for (j = 0; j < mem_words; j++)
-		buf[j] = (token_t) j;
+        t_start = clock();
 
-    t_end = clock();
-    t_diff = (double) (t_end - t_start);
-    intvl_acc_read = t_diff;
+        for (j = 0; j < mem_words; j+=2)
+        {
+	        asm volatile (
+	    		"mv t0, %0;"
+	    		"mv t1, %1;"
+	    		".word " QU(WRITE_CODE)
+	    		: 
+	    		: "r" (dst), "r" (value_64)
+	    		: "t0", "t1", "memory"
+	    	);
 
-    sensor_dma_cfg_000[0].rd_sp_offset = 2*mem_words;
-    sensor_dma_cfg_000[0].rd_wr_enable = 0;
-    sensor_dma_cfg_000[0].rd_size = mem_words;
-    sensor_dma_cfg_000[0].sensor_src_offset = 0;
+	    	dst += 16;
+        }
 
-    t_start = clock();
+        t_end = clock();
+        t_diff = (double) (t_end - t_start);
+        intvl_write += t_diff;
 
-	esp_run(cfg_000, NACC);
+        sensor_dma_cfg_000[0].rd_sp_offset = 2*mem_words;
+        sensor_dma_cfg_000[0].rd_wr_enable = 0;
+        sensor_dma_cfg_000[0].rd_size = mem_words;
+        sensor_dma_cfg_000[0].sensor_src_offset = 0;
+        sensor_dma_cfg_000[0].spandex_conf = spandex_config.spandex_reg;
 
-    t_end = clock();
-    t_diff = (double) (t_end - t_start);
-    intvl_write = t_diff;
+        t_start = clock();
 
-    sensor_dma_cfg_000[0].wr_sp_offset = 2*mem_words;
-    sensor_dma_cfg_000[0].rd_wr_enable = 1;
-    sensor_dma_cfg_000[0].wr_size = mem_words;
-    sensor_dma_cfg_000[0].sensor_dst_offset = mem_words;
+	    esp_run(cfg_000, NACC);
 
-    t_start = clock();
+        t_end = clock();
+        t_diff = (double) (t_end - t_start);
+        intvl_acc_read += t_diff;
 
-	esp_run(cfg_000, NACC);
+        sensor_dma_cfg_000[0].wr_sp_offset = 2*mem_words;
+        sensor_dma_cfg_000[0].rd_wr_enable = 1;
+        sensor_dma_cfg_000[0].wr_size = mem_words;
+        sensor_dma_cfg_000[0].sensor_dst_offset = mem_words;
+        sensor_dma_cfg_000[0].spandex_conf = spandex_config.spandex_reg;
 
-    t_end = clock();
-    t_diff = (double) (t_end - t_start);
-    intvl_acc_write = t_diff;
+        t_start = clock();
 
-    t_start = clock();
+	    esp_run(cfg_000, NACC);
 
-	for (j = 0; j < mem_words; j++)
-		if (gold[j] != j) errors++;
+        t_end = clock();
+        t_diff = (double) (t_end - t_start);
+        intvl_acc_write += t_diff;
 
-    t_end = clock();
-    t_diff = (double) (t_end - t_start);
-    intvl_read = t_diff;
+  	    dst = (void*)(gold);
+
+        t_start = clock();
+
+ 	    for (j = 0; j < mem_words; j+=2)
+ 	    {
+	    	asm volatile (
+	    		"mv t0, %1;"
+	    		".word " QU(READ_CODE) ";"
+	    		"mv %0, t1"
+	    		: "=r" (value_64)
+	    		: "r" (dst)
+	    		: "t0", "t1", "memory"
+	    	);
+
+	    	dst += 16;
+ 	    }
+
+        t_end = clock();
+        t_diff = (double) (t_end - t_start);
+        intvl_read += t_diff;
+    }
 
 	esp_free(buf);
 
@@ -79,10 +118,10 @@ int main(int argc, char **argv)
 	else
 		printf("+ Test FAILED\n");
 
-	printf("CPU write = %f\n", intvl_write);
-	printf("ACC read = %f\n", intvl_acc_read);
-	printf("ACC write = %f\n", intvl_acc_write);
-	printf("CPU read = %f\n", intvl_read);
+	printf("CPU write = %f\n", intvl_write/ITERATIONS);
+	printf("ACC read = %f\n", intvl_acc_read/ITERATIONS);
+	printf("ACC write = %f\n", intvl_acc_write/ITERATIONS);
+	printf("CPU read = %f\n", intvl_read/ITERATIONS);
 
 	return errors;
 }
