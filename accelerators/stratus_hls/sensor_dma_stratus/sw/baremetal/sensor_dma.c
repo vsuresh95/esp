@@ -10,12 +10,6 @@
 #include <esp_probe.h>
 #include <fixed_point.h>
 
-#define SOC_COLS 2
-#define SOC_ROWS 4
-#define REQ_PLANE 0
-#define FWD_PLANE 1
-#define RSP_PLANE 2
-
 typedef int64_t token_t;
 
 typedef union
@@ -38,25 +32,6 @@ typedef union
 static unsigned DMA_WORD_PER_BEAT(unsigned _st)
 {
         return (sizeof(void *) / _st);
-}
-
-static void start_network_counter()
-{
-    uint64_t tile_id;
-    for (tile_id = 0; tile_id < SOC_COLS * SOC_ROWS; tile_id++)
-    {
-        volatile void* monitor_base = (volatile void*)(0x60090000 + 0x200 * tile_id);
-        volatile uint32_t* control = ((volatile uint32_t*)monitor_base) + 1; // ctrl_window_size_offset
-        *control = 0xffffffff;
-    }
-}
-
-static uint32_t get_network_counter(int x, int y, int plane)
-{
-    uint64_t tile_id = x + y * SOC_COLS;
-    volatile void* monitor_base = (volatile void*)(0x60090000 + 0x200 * tile_id);
-    volatile uint32_t* mon_register = ((volatile uint32_t*)monitor_base) + 4 + 22 + plane;
-    return *mon_register;
 }
 
 static uint64_t get_counter() {
@@ -86,16 +61,6 @@ uint64_t intvl_acc_write;
 uint64_t start_acc_read;
 uint64_t stop_acc_read;
 uint64_t intvl_acc_read;
-
-uint64_t start_network_cpu[3];
-uint64_t stop_network_cpu[3];
-uint64_t intvl_network_cpu[3];
-uint64_t start_network_acc[3];
-uint64_t stop_network_acc[3];
-uint64_t intvl_network_acc[3];
-uint64_t start_network_llc[3];
-uint64_t stop_network_llc[3];
-uint64_t intvl_network_llc[3];
 
 #define ITERATIONS 1000
 // #define ESP
@@ -198,12 +163,6 @@ int main(int argc, char * argv[])
 	intvl_read = 0;
 	intvl_acc_read = 0;
 
-	for (j = 0; j < 3; j++) {
-		intvl_network_cpu[j] = 0;
-		intvl_network_llc[j] = 0;
-		intvl_network_acc[j] = 0;
-	}
-
 	for (i = 0; i < ITERATIONS; i++)
 	{
 		/* TODO: Restore full test once ESP caches are integrated */
@@ -231,12 +190,6 @@ int main(int argc, char * argv[])
   		void* dst = (void*)(mem);
 		int64_t value_64 = 123;
 
-		// for (j = 0; j < 3; j++) {
-		// 	start_network_cpu[j] = get_network_counter(1,1,j);
-		// 	start_network_acc[j] = get_network_counter(1,0,j);
-		// 	start_network_llc[j] = get_network_counter(0,0,j);
-		// }
-
       	start_write = get_counter();
 
     	for (j = 0; j < mem_words; j+=2)
@@ -255,15 +208,6 @@ int main(int argc, char * argv[])
 
       	stop_write = get_counter();
 		intvl_write += stop_write - start_write;
-
-		// for (j = 0; j < 3; j++) {
-		// 	stop_network_cpu[j] = get_network_counter(1,1,j);
-		// 	stop_network_llc[j] = get_network_counter(0,0,j);
-		// 	stop_network_acc[j] = get_network_counter(1,0,j);
-		// 	intvl_network_cpu[j] += stop_network_cpu[j] - start_network_cpu[j];
-		// 	intvl_network_llc[j] += stop_network_llc[j] - start_network_llc[j];
-		// 	intvl_network_acc[j] += stop_network_acc[j] - start_network_acc[j];
-		// }
 
 		// if(i == 2) printf("CPU write %d = %lu\n", i, stop_write - start_write);
 
@@ -339,19 +283,6 @@ int main(int argc, char * argv[])
 	printf("ACC write = %lu\n", intvl_acc_write/ITERATIONS);
 	printf("CPU read = %lu\n", intvl_read/ITERATIONS);
 	printf("Total time = %lu\n", (intvl_write + intvl_acc_read + intvl_acc_write + intvl_read)/ITERATIONS);
-
-	// printf("REQ Plane:\n");
-	// printf("CPU = %lu\n", intvl_network_cpu[0]);
-	// printf("LLC = %lu\n", intvl_network_llc[0]);
-	// printf("ACC = %lu\n", intvl_network_acc[0]);
-	// printf("FWD Plane:\n");
-	// printf("CPU = %lu\n", intvl_network_cpu[1]);
-	// printf("LLC = %lu\n", intvl_network_llc[1]);
-	// printf("ACC = %lu\n", intvl_network_acc[1]);
-	// printf("RSP Plane:\n");
-	// printf("CPU = %lu\n", intvl_network_cpu[2]);
-	// printf("LLC = %lu\n", intvl_network_llc[2]);
-	// printf("ACC = %lu\n", intvl_network_acc[2]);
 
 #elif (COH_MODE == 2)
 	/* ********************************************************** */
