@@ -34,12 +34,28 @@ public:
     // Handshake between store and load for auto-refills
     handshake_t store_to_load;
 
+    // Compute -> Load
+    handshake_t load_ready;
+
+    // Compute -> Store
+    handshake_t store_ready;
+
+    // Load -> Compute
+    handshake_t load_done;
+
+    // Store -> Compute
+    handshake_t store_done;
+
     // Constructor
     SC_HAS_PROCESS(fft2);
     fft2(const sc_module_name& name)
     : esp_accelerator_3P<DMA_WIDTH>(name)
         , cfg("config")
         , store_to_load("store-to-load")
+        , load_ready("load_ready")
+        , store_ready("store_ready")
+        , load_done("load_done")
+        , store_done("store_done")
     {
         // Signal binding
         cfg.bind_with(*this);
@@ -50,6 +66,11 @@ public:
         // Map arrays to memories
         /* <<--plm-bind-->> */
         HLS_MAP_plm(A0, PLM_IN_NAME);
+        
+        load_ready.bind_with(*this);
+        store_ready.bind_with(*this);
+        load_done.bind_with(*this);
+        store_done.bind_with(*this);
     }
 
     // Processes
@@ -95,6 +116,15 @@ public:
     // Private local memories
     sc_dt::sc_int<DATA_WIDTH> A0[PLM_IN_WORD];
 
+    // Handshakes
+    inline void compute_load_ready_handshake();
+    inline void load_compute_ready_handshake();
+    inline void compute_store_ready_handshake();
+    inline void store_compute_ready_handshake();
+    inline void compute_load_done_handshake();
+    inline void load_compute_done_handshake();
+    inline void compute_store_done_handshake();
+    inline void store_compute_done_handshake();
 };
 
 
