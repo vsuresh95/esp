@@ -12,7 +12,6 @@
 
 void fft2::load_input()
 {
-
     // Reset
     {
         HLS_PROTO("load-reset");
@@ -20,9 +19,17 @@ void fft2::load_input()
         this->reset_load_input();
         this->reset_load_to_store();
 
-        // explicit PLM ports reset if any
+        load_logn_samples_dbg.write(0);
 
-        // User-defined reset code
+        load_state_req_dbg.write(0);
+
+        for (int i = 0; i < NUM_CFG_REG; i++)
+        {
+            cfg_registers[i] = 0;
+        }
+
+        load_ready.ack.reset_ack();
+        load_done.req.reset_req();
 
         wait();
     }
@@ -31,86 +38,116 @@ void fft2::load_input()
     /* <<--params-->> */
     int32_t logn_samples;
     int32_t num_samples;
-    int32_t num_ffts;
     {
         HLS_PROTO("load-config");
 
         cfg.wait_for_config(); // config process
-        conf_info_t config = this->conf_info.read();
 
         // User-defined config code
         /* <<--local-params-->> */
-        logn_samples = config.logn_samples;
-        num_samples = 1 << logn_samples;
-        num_ffts = config.num_ffts;
     }
 
     // Load
+    while(true)
     {
         HLS_PROTO("load-dma");
-        uint32_t offset = 0;
 
         wait();
-#if (DMA_WORD_PER_BEAT == 0)
-        uint32_t length = 2 * num_ffts * num_samples;
-#else
-        uint32_t length = round_up(2 * num_ffts * num_samples, DMA_WORD_PER_BEAT);
-#endif
-        // Configure DMA transaction
-        uint32_t len = length;
-#if (DMA_WORD_PER_BEAT == 0)
-        // data word is wider than NoC links
-        dma_info_t dma_info(offset * DMA_BEAT_PER_WORD, len * DMA_BEAT_PER_WORD, DMA_SIZE);
-#else
-        dma_info_t dma_info(offset / DMA_WORD_PER_BEAT, len / DMA_WORD_PER_BEAT, DMA_SIZE);
-#endif
-        offset += len;
 
-        this->dma_read_ctrl.put(dma_info);
+        this->load_compute_ready_handshake();
 
-#if (DMA_WORD_PER_BEAT == 0)
-        // data word is wider than NoC links
-        for (uint16_t i = 0; i < len; i++)
+        load_state_req_dbg.write(load_state_req);
+
+        switch (load_state_req)
         {
-            sc_dt::sc_bv<DATA_WIDTH> dataBv;
-
-            for (uint16_t k = 0; k < DMA_BEAT_PER_WORD; k++)
+            case POLL_REQ:
             {
-                dataBv.range((k+1) * DMA_WIDTH - 1, k * DMA_WIDTH) = this->dma_read_chnl.get();
+                dma_info_t dma_info(0, 1, DMA_SIZE);
+                sc_dt::sc_bv<DMA_WIDTH> dataBv;
+                int64_t new_task = 0;
+
                 wait();
+
+                //Wait for 1
+                while (new_task != 1)
+                {
+                    HLS_UNROLL_LOOP(OFF);
+                    this->dma_read_ctrl.put(dma_info);
+                    dataBv = this->dma_read_chnl.get();
+                    wait();
+                    new_task = dataBv.range(DMA_WIDTH - 1, 0).to_int64();
+                }
             }
-
-            // Write to PLM
-            A0[i] = dataBv.to_int64();
-        }
-#else
-        for (uint16_t i = 0; i < len; i += DMA_WORD_PER_BEAT)
-        {
-            HLS_BREAK_DEP(A0);
-
-            sc_dt::sc_bv<DMA_WIDTH> dataBv;
-
-            dataBv = this->dma_read_chnl.get();
-            wait();
-
-            // Write to PLM (all DMA_WORD_PER_BEAT words in one cycle)
-            for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
+            break;
+            case CFG_REQ:
             {
-                HLS_UNROLL_SIMPLE;
-                A0[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
+                dma_info_t dma_info(0, NUM_CFG_REG / DMA_WORD_PER_BEAT, DMA_SIZE);
+                sc_dt::sc_bv<DMA_WIDTH> dataBv;
+
+                wait();
+
+                this->dma_read_ctrl.put(dma_info);
+
+                for (int i = 0; i < NUM_CFG_REG; i += DMA_WORD_PER_BEAT)
+                {
+                    dataBv = this->dma_read_chnl.get();
+                    wait();
+                    for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
+                    {
+                        HLS_UNROLL_SIMPLE;
+                        cfg_registers[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
+                    }
+                }
             }
+            break;
+            case LOAD_DATA_REQ:
+            {
+                // Configuration unit - reading size of FFT
+                {
+                    logn_samples = cfg_registers[LOGN_SAMPLES];
+                    num_samples = 1 << logn_samples;
+                    wait();
+                }
+
+                // Debug
+                {
+                    load_logn_samples_dbg.write(logn_samples);
+                    wait();
+                }
+
+                // Main load operation
+                {
+                    dma_info_t dma_info(NUM_CFG_REG / DMA_WORD_PER_BEAT, 2 * num_samples / DMA_WORD_PER_BEAT, DMA_SIZE);
+                    sc_dt::sc_bv<DMA_WIDTH> dataBv;
+
+                    wait();
+
+                    this->dma_read_ctrl.put(dma_info);
+
+                    for (int i = 0; i < 2 * num_samples; i += DMA_WORD_PER_BEAT)
+                    {
+                        HLS_BREAK_DEP(A0);
+
+                        dataBv = this->dma_read_chnl.get();
+                        wait();
+                        for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
+                        {
+                            HLS_UNROLL_SIMPLE;
+                            A0[i + k] = dataBv.range(DATA_WIDTH - 1, 0).to_int64();;
+                        }
+                    }
+                }
+            }
+            break;
+            default:
+            break;
         }
-#endif
-        this->load_compute_handshake();
-    } // Load scope
 
-    // Conclude
-    {
-        this->process_done();
+        wait();
+
+        this->load_compute_done_handshake();
     }
-}
-
-
+} // Function : load_input
 
 void fft2::store_output()
 {
@@ -121,9 +158,12 @@ void fft2::store_output()
         this->reset_store_output();
         this->reset_store_to_load();
 
-        // explicit PLM ports reset if any
+        store_logn_samples_dbg.write(0);
 
-        // User-defined reset code
+        store_state_req_dbg.write(0);
+
+        store_ready.ack.reset_ack();
+        store_done.req.reset_req();
 
         wait();
     }
@@ -132,90 +172,109 @@ void fft2::store_output()
     /* <<--params-->> */
     int32_t logn_samples;
     int32_t num_samples;
-    int32_t num_ffts;
     {
         HLS_PROTO("store-config");
 
         cfg.wait_for_config(); // config process
-        conf_info_t config = this->conf_info.read();
 
         // User-defined config code
         /* <<--local-params-->> */
-        logn_samples = config.logn_samples;
-        num_samples = 1 << logn_samples;
-        num_ffts = config.num_ffts;
     }
 
     // Store
+    while(true)
     {
         HLS_PROTO("store-dma");
+
         wait();
 
-        uint32_t offset = 0;
+        this->store_compute_ready_handshake();
 
-#if (DMA_WORD_PER_BEAT == 0)
-        uint32_t length = 2 * num_ffts * num_samples;
-#else
-        uint32_t length = round_up(2 * num_ffts * num_samples, DMA_WORD_PER_BEAT);
-#endif
-        this->store_compute_handshake();
+        store_state_req_dbg.write(store_state_req);
 
-        // Configure DMA transaction
-        uint32_t len = length;
-#if (DMA_WORD_PER_BEAT == 0)
-        // data word is wider than NoC links
-        dma_info_t dma_info(offset * DMA_BEAT_PER_WORD, len * DMA_BEAT_PER_WORD, DMA_SIZE);
-#else
-        dma_info_t dma_info(offset / DMA_WORD_PER_BEAT, len / DMA_WORD_PER_BEAT, DMA_SIZE);
-#endif
-        offset += len;
-
-        this->dma_write_ctrl.put(dma_info);
-
-#if (DMA_WORD_PER_BEAT == 0)
-        // data word is wider than NoC links
-        for (uint16_t i = 0; i < len; i++)
+        switch (store_state_req)
         {
-            // Read from PLM
-            sc_dt::sc_int<DATA_WIDTH> data;
-            wait();
-            data = A0[i];
-            sc_dt::sc_bv<DATA_WIDTH> dataBv(data);
-
-            uint16_t k = 0;
-            for (k = 0; k < DMA_BEAT_PER_WORD - 1; k++)
+            case UPDATE_REQ:
             {
-                this->dma_write_chnl.put(dataBv.range((k+1) * DMA_WIDTH - 1, k * DMA_WIDTH));
+                // Send the lock variable update
+                dma_info_t dma_info(0, 1, DMA_SIZE);
+                sc_dt::sc_bv<DMA_WIDTH> dataBv;
+                dataBv.range(DMA_WIDTH - 1, 0) = 0;
+
+                this->dma_write_ctrl.put(dma_info);
+                wait();
+                this->dma_write_chnl.put(dataBv);
+                wait();
+
+                // Wait till the write is accepted at the cache (and previous fences)
+                while (!(this->dma_write_chnl.ready)) wait();
                 wait();
             }
-            // Last beat on the bus does not require wait(), which is
-            // placed before accessing the PLM
-            this->dma_write_chnl.put(dataBv.range((k+1) * DMA_WIDTH - 1, k * DMA_WIDTH));
-        }
-#else
-        for (uint16_t i = 0; i < len; i += DMA_WORD_PER_BEAT)
-        {
-            sc_dt::sc_bv<DMA_WIDTH> dataBv;
-
-            // Read from PLM
-            wait();
-            for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
+            break;
+            case STORE_DATA_REQ:
             {
-                HLS_UNROLL_SIMPLE;
-                dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH) = A0[i + k];
+                // Configuration unit - reading size of FFT
+                {
+                    logn_samples = cfg_registers[LOGN_SAMPLES];
+                    num_samples = 1 << logn_samples;
+                    wait();
+                }
+
+                // Debug
+                {
+                    store_logn_samples_dbg.write(logn_samples);
+                    wait();
+                }
+
+                // DMA transfer
+                {
+                    dma_info_t dma_info(NUM_CFG_REG / DMA_WORD_PER_BEAT, 2 * num_samples / DMA_WORD_PER_BEAT, DMA_SIZE);
+                    sc_dt::sc_bv<DMA_WIDTH> dataBv;
+
+                    wait();
+
+                    this->dma_write_ctrl.put(dma_info);
+
+                    for (int i = 0; i < 2 * num_samples; i += DMA_WORD_PER_BEAT)
+                    {
+                        wait();
+
+                        for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
+                        {
+                            HLS_UNROLL_SIMPLE;
+                            dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH) = A0[i + k];
+                        }
+
+                        this->dma_write_chnl.put(dataBv);
+                    }
+
+                    // Wait till the last write is accepted at the cache
+                    wait();
+                    while (!(this->dma_write_chnl.ready)) wait();
+                }
             }
-            this->dma_write_chnl.put(dataBv);
+            break;
+            case STORE_FENCE:
+            {
+                // Block till L2 to be ready to receive a fence, then send
+                this->acc_fence.put(0x2);
+                wait();
+            }
+            break;
+            case ACC_DONE:
+            {
+                // Ensure the previous fence was accepted, then acc_done
+                while (!(this->acc_fence.ready)) wait();
+                wait();
+                this->accelerator_done();
+                wait();
+            }
+            break;
+            default:
+            break;
         }
-#endif
-    } // Store scope
-
-    // Conclude
-    {
-        this->accelerator_done();
-        this->process_done();
     }
-}
-
+} // Function : store_output
 
 void fft2::compute_kernel()
 {
@@ -225,9 +284,20 @@ void fft2::compute_kernel()
 
         this->reset_compute_kernel();
 
-        // explicit PLM ports reset if any
+        compute_state_req_dbg.write(0);
 
-        // User-defined reset code
+        compute_logn_samples_dbg.write(0);
+        do_inverse_dbg.write(0);
+        do_shift_dbg.write(0);
+        end_fft_dbg.write(0);
+
+        load_ready.req.reset_req();
+        load_done.ack.reset_ack();
+        store_ready.req.reset_req();
+        store_done.ack.reset_ack();
+
+        load_state_req = 0;
+        store_state_req = 0;
 
         wait();
     }
@@ -238,99 +308,213 @@ void fft2::compute_kernel()
     int32_t num_samples;
     int32_t do_inverse;
     int32_t do_shift;
+    int32_t end_fft;
     {
         HLS_PROTO("compute-config");
 
         cfg.wait_for_config(); // config process
-        conf_info_t config = this->conf_info.read();
 
         // User-defined config code
         /* <<--local-params-->> */
-        logn_samples = config.logn_samples;
-#ifndef STRATUS_HLS
-        sc_assert(logn_samples < MAX_LOGN_SAMPLES);
-#endif
-        num_samples = 1 << logn_samples;
-        do_inverse = config.do_inverse;
-        do_shift = config.do_shift;
     }
 
-    // Compute
+    while(true)
     {
-        // Compute FFT(s) in the PLM
-        this->compute_load_handshake();
+        // Poll lock for new task
+        {
+            HLS_PROTO("poll-for-new-task");
 
-        unsigned offset = 0;  // Offset into Mem for start of this FFT
-        int sin_sign = (do_inverse) ? -1 : 1; // This modifes the mySin
-                                              // values used below
-        if (do_inverse && do_shift) {
-            fft2_do_shift(offset, num_samples, logn_samples);
+            load_state_req = POLL_REQ;
+
+            compute_state_req_dbg.write(1);
+
+            this->compute_load_ready_handshake();
+            wait();
+            this->compute_load_done_handshake();
+            wait();
         }
 
-        // Do the bit-reverse
-        fft2_bit_reverse(offset, num_samples, logn_samples);
+        // Read config registers
+        {
+            HLS_PROTO("read-config-registers");
 
-        // Computing phase implementation
-        int m = 1;  // iterative FFT
+            load_state_req = CFG_REQ;
 
-        FFT2_SINGLE_L1:
-            for(unsigned s = 1; s <= logn_samples; s++) {
-                m = 1 << s;
-                CompNum wm(myCos(s), sin_sign*mySin(s));
+            compute_state_req_dbg.write(2);
 
-            FFT2_SINGLE_L2:
-                for(unsigned k = 0; k < num_samples; k +=m) {
-
-                    CompNum w((FPDATA) 1, (FPDATA) 0);
-                    int md2 = m / 2;
-
-                FFT2_SINGLE_L3:
-                    for(int j = 0; j < md2; j++) {
-
-                        int kj = offset + k + j;
-                        int kjm = offset + k + j + md2;
-                        CompNum akj, akjm;
-                        CompNum bkj, bkjm;
-
-                        akj.re = int2fp<FPDATA, WORD_SIZE>(A0[2 * kj]);
-                        akj.im = int2fp<FPDATA, WORD_SIZE>(A0[2 * kj + 1]);
-                        akjm.re = int2fp<FPDATA, WORD_SIZE>(A0[2 * kjm]);
-                        akjm.im = int2fp<FPDATA, WORD_SIZE>(A0[2 * kjm + 1]);
-
-                        CompNum t;
-                        compMul(w, akjm, t);
-                        CompNum u(akj.re, akj.im);
-                        compAdd(u, t, bkj);
-                        compSub(u, t, bkjm);
-                        CompNum wwm;
-                        wwm.re = w.re - (wm.im * w.im + wm.re * w.re);
-                        wwm.im = w.im + (wm.im * w.re - wm.re * w.im);
-                        w = wwm;
-
-                        {
-                            HLS_PROTO("compute_write_A0");
-                            HLS_BREAK_DEP(A0);
-                            wait();
-                            A0[2 * kj] = fp2int<FPDATA, WORD_SIZE>(bkj.re);
-                            A0[2 * kj + 1] = fp2int<FPDATA, WORD_SIZE>(bkj.im);
-                            wait();
-                            A0[2 * kjm] = fp2int<FPDATA, WORD_SIZE>(bkjm.re);
-                            A0[2 * kjm + 1] = fp2int<FPDATA, WORD_SIZE>(bkjm.im);
-                        }
-                    } // for (j = 0 .. md2)
-                } // for (k = 0 .. num_samples)
-            } // for (s = 1 .. logn_samples)
-
-        if ((!do_inverse) && (do_shift)) {
-            fft2_do_shift(offset, num_samples, logn_samples);
+            this->compute_load_ready_handshake();
+            wait();
+            this->compute_load_done_handshake();
+            wait();
         }
 
-        this->compute_store_handshake();
-    } // Compute scope
+        // Load input data
+        {
+            HLS_PROTO("load-input-data");
 
-    // Conclude
-    {
-        this->process_done();
-    }
+            load_state_req = LOAD_DATA_REQ;
 
+            compute_state_req_dbg.write(3);
+
+            this->compute_load_ready_handshake();
+            wait();
+            this->compute_load_done_handshake();
+            wait();
+        }
+
+        // Read back registers
+        {
+            compute_state_req_dbg.write(4);
+
+            // Configuration unit - reading parameters of FFT
+            logn_samples = cfg_registers[LOGN_SAMPLES];
+            do_inverse = cfg_registers[DO_INVERSE];
+            do_shift = cfg_registers[DO_SHIFT];
+            end_fft = cfg_registers[END_FFT];
+            num_samples = 1 << logn_samples;
+
+            compute_logn_samples_dbg.write(logn_samples);
+            do_inverse_dbg.write(do_inverse);
+            do_shift_dbg.write(do_shift);
+            end_fft_dbg.write(end_fft);
+            wait();
+        }
+
+        // Compute FFT
+        {
+            compute_state_req_dbg.write(5);
+
+            unsigned offset = 0;  // Offset into Mem for start of this FFT
+            int sin_sign = (do_inverse) ? -1 : 1; // This modifes the mySin
+                                                  // values used below
+            if (do_inverse && do_shift) {
+                fft2_do_shift(offset, num_samples, logn_samples);
+            }
+
+            // Do the bit-reverse
+            fft2_bit_reverse(offset, num_samples, logn_samples);
+
+            // Computing phase implementation
+            int m = 1;  // iterative FFT
+
+            FFT2_SINGLE_L1:
+                for(unsigned s = 1; s <= logn_samples; s++) {
+                    m = 1 << s;
+                    CompNum wm(myCos(s), sin_sign*mySin(s));
+
+                FFT2_SINGLE_L2:
+                    for(unsigned k = 0; k < num_samples; k +=m) {
+
+                        CompNum w((FPDATA) 1, (FPDATA) 0);
+                        int md2 = m / 2;
+
+                    FFT2_SINGLE_L3:
+                        for(int j = 0; j < md2; j++) {
+
+                            int kj = offset + k + j;
+                            int kjm = offset + k + j + md2;
+                            CompNum akj, akjm;
+                            CompNum bkj, bkjm;
+
+                            akj.re = int2fp<FPDATA, WORD_SIZE>(A0[2 * kj]);
+                            akj.im = int2fp<FPDATA, WORD_SIZE>(A0[2 * kj + 1]);
+                            akjm.re = int2fp<FPDATA, WORD_SIZE>(A0[2 * kjm]);
+                            akjm.im = int2fp<FPDATA, WORD_SIZE>(A0[2 * kjm + 1]);
+
+                            CompNum t;
+                            compMul(w, akjm, t);
+                            CompNum u(akj.re, akj.im);
+                            compAdd(u, t, bkj);
+                            compSub(u, t, bkjm);
+                            CompNum wwm;
+                            wwm.re = w.re - (wm.im * w.im + wm.re * w.re);
+                            wwm.im = w.im + (wm.im * w.re - wm.re * w.im);
+                            w = wwm;
+
+                            {
+                                HLS_PROTO("compute_write_A0");
+                                HLS_BREAK_DEP(A0);
+                                wait();
+                                A0[2 * kj] = fp2int<FPDATA, WORD_SIZE>(bkj.re);
+                                A0[2 * kj + 1] = fp2int<FPDATA, WORD_SIZE>(bkj.im);
+                                wait();
+                                A0[2 * kjm] = fp2int<FPDATA, WORD_SIZE>(bkjm.re);
+                                A0[2 * kjm + 1] = fp2int<FPDATA, WORD_SIZE>(bkjm.im);
+                            }
+                        } // for (j = 0 .. md2)
+                    } // for (k = 0 .. num_samples)
+                } // for (s = 1 .. logn_samples)
+
+            if ((!do_inverse) && (do_shift)) {
+                fft2_do_shift(offset, num_samples, logn_samples);
+            }
+        } // Compute
+
+        // Store output data
+        {
+            HLS_PROTO("store-output-data");
+
+            store_state_req = STORE_DATA_REQ;
+
+            this->compute_store_ready_handshake();
+
+            compute_state_req_dbg.write(6);
+
+            wait();
+            this->compute_store_done_handshake();
+            wait();
+
+            // Wait for all writes to be done and then issue fence
+            store_state_req = STORE_FENCE;
+
+            compute_state_req_dbg.write(7);
+
+            this->compute_store_ready_handshake();
+            wait();
+            this->compute_store_done_handshake();
+            wait();
+        }
+
+        // update lock for task complete
+        {
+            HLS_PROTO("update-lock");
+
+            store_state_req = UPDATE_REQ;
+
+            compute_state_req_dbg.write(8);
+
+            this->compute_store_ready_handshake();
+            wait();
+            this->compute_store_done_handshake();
+            wait();
+
+            // Wait for all writes to be done and then issue fence
+            store_state_req = STORE_FENCE;
+
+            compute_state_req_dbg.write(9);
+
+            this->compute_store_ready_handshake();
+            wait();
+            this->compute_store_done_handshake();
+            wait();
+        }
+
+        // Decide next iteration
+        {
+            HLS_PROTO("end-acc");
+
+            if (end_fft == 1)
+            {
+                store_state_req = ACC_DONE;
+
+                compute_state_req_dbg.write(10);
+
+                this->compute_store_ready_handshake();
+                wait();
+                this->compute_store_done_handshake();
+                wait();
+                this->process_done();
+            }
+        }
+    } // while (true)
 } // Function : compute_kernel

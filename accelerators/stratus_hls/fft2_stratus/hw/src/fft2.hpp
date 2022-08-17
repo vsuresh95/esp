@@ -28,6 +28,22 @@
 #define PLM_IN_WORD  (MAX_NUM_SAMPLES << 1)
 #define PLM_OUT_WORD (MAX_NUM_SAMPLES << 1)
 
+#define NUM_CFG_REG 6
+
+#define NEW_TASK 0
+#define LOGN_SAMPLES 1
+#define DO_INVERSE 2
+#define DO_SHIFT 3
+#define END_FFT 4
+
+#define POLL_REQ 0
+#define CFG_REQ 1
+#define LOAD_DATA_REQ 2
+#define UPDATE_REQ 0
+#define STORE_DATA_REQ 1
+#define STORE_FENCE 2
+#define ACC_DONE 3
+
 class fft2 : public esp_accelerator_3P<DMA_WIDTH>
 {
 public:
@@ -63,6 +79,16 @@ public:
         // Clock and signal binding for additional handshake
         store_to_load.bind_with(*this);
 
+        HLS_PRESERVE_SIGNAL(load_state_req_dbg, true);
+        HLS_PRESERVE_SIGNAL(store_state_req_dbg, true);
+        HLS_PRESERVE_SIGNAL(compute_state_req_dbg, true);
+        HLS_PRESERVE_SIGNAL(load_logn_samples_dbg, true);
+        HLS_PRESERVE_SIGNAL(store_logn_samples_dbg, true);
+        HLS_PRESERVE_SIGNAL(compute_logn_samples_dbg, true);
+        HLS_PRESERVE_SIGNAL(do_inverse_dbg, true);
+        HLS_PRESERVE_SIGNAL(do_shift_dbg, true);
+        HLS_PRESERVE_SIGNAL(end_fft_dbg, true);
+
         // Map arrays to memories
         /* <<--plm-bind-->> */
         HLS_MAP_plm(A0, PLM_IN_NAME);
@@ -72,6 +98,21 @@ public:
         load_done.bind_with(*this);
         store_done.bind_with(*this);
     }
+
+    sc_signal< sc_int<32> > load_state_req_dbg;
+    sc_signal< sc_int<32> > store_state_req_dbg;
+    sc_signal< sc_int<32> > compute_state_req_dbg; 
+    sc_signal< sc_int<32> > load_logn_samples_dbg;
+    sc_signal< sc_int<32> > store_logn_samples_dbg;
+    sc_signal< sc_int<32> > compute_logn_samples_dbg;
+    sc_signal< sc_int<32> > do_inverse_dbg;
+    sc_signal< sc_int<32> > do_shift_dbg;
+    sc_signal< sc_int<32> > end_fft_dbg;
+
+    sc_int<32> load_state_req;
+    sc_int<32> store_state_req;
+
+    sc_int<32> cfg_registers[NUM_CFG_REG];
 
     // Processes
 
