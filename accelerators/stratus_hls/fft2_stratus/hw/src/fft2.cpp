@@ -151,11 +151,6 @@ void fft2::store_output()
         HLS_PROTO("store-dma");
         wait();
 
-#if (DMA_WORD_PER_BEAT == 0)
-        uint32_t store_offset = (2 * num_samples);
-#else
-        uint32_t store_offset = round_up(2 * num_samples, DMA_WORD_PER_BEAT);
-#endif
         uint32_t offset = 0;
 
 #if (DMA_WORD_PER_BEAT == 0)
@@ -212,7 +207,6 @@ void fft2::store_output()
             this->dma_write_chnl.put(dataBv);
         }
 #endif
-        this->store_to_load_handshake();
     } // Store scope
 
     // Conclude
@@ -242,7 +236,6 @@ void fft2::compute_kernel()
     /* <<--params-->> */
     int32_t logn_samples;
     int32_t num_samples;
-    int32_t num_ffts;
     int32_t do_inverse;
     int32_t do_shift;
     {
@@ -258,13 +251,11 @@ void fft2::compute_kernel()
         sc_assert(logn_samples < MAX_LOGN_SAMPLES);
 #endif
         num_samples = 1 << logn_samples;
-        num_ffts = config.num_ffts;
         do_inverse = config.do_inverse;
         do_shift = config.do_shift;
     }
 
     // Compute
-    // Loop through the num_ffts successive FFT computations
     {
         // Compute FFT(s) in the PLM
         this->compute_load_handshake();
