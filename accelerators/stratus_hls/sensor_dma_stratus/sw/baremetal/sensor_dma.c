@@ -9,6 +9,7 @@
 #include <esp_accelerator.h>
 #include <esp_probe.h>
 #include <fixed_point.h>
+#include "monitors.h"
 
 typedef int64_t token_t;
 
@@ -143,6 +144,23 @@ const char print_coh[] = "Baseline Spandex\n";
 #define ESP_COH ACC_COH_FULL
 #endif
 
+esp_monitor_vals_t vals_start, vals_end, vals_diff;
+esp_monitor_args_t mon_args;
+
+static void start_mon()
+{
+	mon_args.read_mode = ESP_MON_READ_ALL;
+    esp_monitor(mon_args, &vals_start);
+}
+
+static void end_mon()
+{
+    esp_monitor(mon_args, &vals_end);
+    vals_diff = esp_monitor_diff(vals_start, vals_end);
+
+    esp_monitor_print(mon_args, vals_diff);
+}
+
 int main(int argc, char * argv[])
 {
 	int i, j;
@@ -232,6 +250,8 @@ int main(int argc, char * argv[])
   		void* dst = (void*)(mem);
 		int64_t value_64 = 123;
 
+        if (i == 5) start_mon();
+
       	start_write = get_counter();
 
     	for (j = 0; j < mem_words; j+=2)
@@ -251,8 +271,12 @@ int main(int argc, char * argv[])
       	stop_write = get_counter();
 		intvl_write += stop_write - start_write;
 
+        if (i == 5) end_mon();
+
 		// Start accelerators
 		iowrite32(dev, CMD_REG, CMD_MASK_START);
+
+        if (i == 5) start_mon();
 
       	start_acc_read = get_counter();
 
@@ -268,6 +292,8 @@ int main(int argc, char * argv[])
 
 		iowrite32(dev, CMD_REG, 0x0);
 
+        if (i == 5) end_mon();
+
 	    iowrite32(dev, SENSOR_DMA_RD_WR_ENABLE_REG, 1);
 	    iowrite32(dev, SENSOR_DMA_WR_SIZE_REG, mem_words);
 	    iowrite32(dev, SENSOR_DMA_WR_SP_OFFSET_REG, 2*mem_words);
@@ -275,6 +301,8 @@ int main(int argc, char * argv[])
 
 		// Start accelerators
 		iowrite32(dev, CMD_REG, CMD_MASK_START);
+
+        if (i == 5) start_mon();
 
       	start_acc_write = get_counter();
 
@@ -290,7 +318,11 @@ int main(int argc, char * argv[])
 
 		iowrite32(dev, CMD_REG, 0x0);
 
+        if (i == 5) end_mon();
+
   		dst = (void*)(gold);
+
+        if (i == 5) start_mon();
 
       	start_read = get_counter();
 
@@ -310,6 +342,8 @@ int main(int argc, char * argv[])
 
       	stop_read = get_counter();
 		intvl_read += stop_read - start_read;
+
+        if (i == 5) end_mon();
 	}
 
 	printf("CPU write = %lu\n", intvl_write/ITERATIONS);
