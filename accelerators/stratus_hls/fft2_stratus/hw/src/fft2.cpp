@@ -19,14 +19,7 @@ void fft2::load_input()
         this->reset_load_input();
         this->reset_load_to_store();
 
-        load_logn_samples_dbg.write(0);
-
         load_state_req_dbg.write(0);
-
-        for (int i = 0; i < NUM_CFG_REG; i++)
-        {
-            cfg_registers[i] = 0;
-        }
 
         load_ready.ack.reset_ack();
         load_done.req.reset_req();
@@ -42,9 +35,12 @@ void fft2::load_input()
         HLS_PROTO("load-config");
 
         cfg.wait_for_config(); // config process
+        conf_info_t config = this->conf_info.read();
 
         // User-defined config code
         /* <<--local-params-->> */
+        logn_samples = config.logn_samples;
+        num_samples = 1 << logn_samples;
     }
 
     // Load
@@ -79,62 +75,25 @@ void fft2::load_input()
                 }
             }
             break;
-            case CFG_REQ:
+            case LOAD_DATA_REQ:
             {
-                dma_info_t dma_info(0, NUM_CFG_REG / DMA_WORD_PER_BEAT, DMA_SIZE);
+                dma_info_t dma_info(SYNC_VAR_SIZE / DMA_WORD_PER_BEAT, 2 * num_samples / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
 
                 wait();
 
                 this->dma_read_ctrl.put(dma_info);
 
-                for (int i = 0; i < NUM_CFG_REG; i += DMA_WORD_PER_BEAT)
+                for (int i = 0; i < 2 * num_samples; i += DMA_WORD_PER_BEAT)
                 {
+                    HLS_BREAK_DEP(A0);
+
                     dataBv = this->dma_read_chnl.get();
                     wait();
                     for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
                     {
                         HLS_UNROLL_SIMPLE;
-                        cfg_registers[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
-                    }
-                }
-            }
-            break;
-            case LOAD_DATA_REQ:
-            {
-                // Configuration unit - reading size of FFT
-                {
-                    logn_samples = cfg_registers[LOGN_SAMPLES];
-                    num_samples = 1 << logn_samples;
-                    wait();
-                }
-
-                // Debug
-                {
-                    load_logn_samples_dbg.write(logn_samples);
-                    wait();
-                }
-
-                // Main load operation
-                {
-                    dma_info_t dma_info(NUM_CFG_REG / DMA_WORD_PER_BEAT, 2 * num_samples / DMA_WORD_PER_BEAT, DMA_SIZE);
-                    sc_dt::sc_bv<DMA_WIDTH> dataBv;
-
-                    wait();
-
-                    this->dma_read_ctrl.put(dma_info);
-
-                    for (int i = 0; i < 2 * num_samples; i += DMA_WORD_PER_BEAT)
-                    {
-                        HLS_BREAK_DEP(A0);
-
-                        dataBv = this->dma_read_chnl.get();
-                        wait();
-                        for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
-                        {
-                            HLS_UNROLL_SIMPLE;
-                            A0[i + k] = dataBv.range(DATA_WIDTH - 1, 0).to_int64();;
-                        }
+                        A0[i + k] = dataBv.range(DATA_WIDTH - 1, 0).to_int64();;
                     }
                 }
             }
@@ -158,8 +117,6 @@ void fft2::store_output()
         this->reset_store_output();
         this->reset_store_to_load();
 
-        store_logn_samples_dbg.write(0);
-
         store_state_req_dbg.write(0);
 
         store_ready.ack.reset_ack();
@@ -177,8 +134,12 @@ void fft2::store_output()
 
         cfg.wait_for_config(); // config process
 
+        conf_info_t config = this->conf_info.read();
+
         // User-defined config code
         /* <<--local-params-->> */
+        logn_samples = config.logn_samples;
+        num_samples = 1 << logn_samples;
     }
 
     // Store
@@ -213,47 +174,31 @@ void fft2::store_output()
             break;
             case STORE_DATA_REQ:
             {
-                // Configuration unit - reading size of FFT
-                {
-                    logn_samples = cfg_registers[LOGN_SAMPLES];
-                    num_samples = 1 << logn_samples;
-                    wait();
-                }
+                dma_info_t dma_info(SYNC_VAR_SIZE / DMA_WORD_PER_BEAT, 2 * num_samples / DMA_WORD_PER_BEAT, DMA_SIZE);
+                sc_dt::sc_bv<DMA_WIDTH> dataBv;
 
-                // Debug
-                {
-                    store_logn_samples_dbg.write(logn_samples);
-                    wait();
-                }
+                wait();
 
-                // DMA transfer
+                this->dma_write_ctrl.put(dma_info);
+
+                for (int i = 0; i < 2 * num_samples; i += DMA_WORD_PER_BEAT)
                 {
-                    dma_info_t dma_info(NUM_CFG_REG / DMA_WORD_PER_BEAT, 2 * num_samples / DMA_WORD_PER_BEAT, DMA_SIZE);
-                    sc_dt::sc_bv<DMA_WIDTH> dataBv;
+                    HLS_BREAK_DEP(A0);
 
                     wait();
 
-                    this->dma_write_ctrl.put(dma_info);
-
-                    for (int i = 0; i < 2 * num_samples; i += DMA_WORD_PER_BEAT)
+                    for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
                     {
-                        HLS_BREAK_DEP(A0);
-
-                        wait();
-
-                        for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
-                        {
-                            HLS_UNROLL_SIMPLE;
-                            dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH) = A0[i + k];
-                        }
-
-                        this->dma_write_chnl.put(dataBv);
+                        HLS_UNROLL_SIMPLE;
+                        dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH) = A0[i + k];
                     }
 
-                    // Wait till the last write is accepted at the cache
-                    wait();
-                    while (!(this->dma_write_chnl.ready)) wait();
+                    this->dma_write_chnl.put(dataBv);
                 }
+
+                // Wait till the last write is accepted at the cache
+                wait();
+                while (!(this->dma_write_chnl.ready)) wait();
             }
             break;
             case STORE_FENCE:
@@ -292,11 +237,6 @@ void fft2::compute_kernel()
 
         compute_state_req_dbg.write(0);
 
-        compute_logn_samples_dbg.write(0);
-        do_inverse_dbg.write(0);
-        do_shift_dbg.write(0);
-        end_fft_dbg.write(0);
-
         load_ready.req.reset_req();
         load_done.ack.reset_ack();
         store_ready.req.reset_req();
@@ -314,14 +254,18 @@ void fft2::compute_kernel()
     int32_t num_samples;
     int32_t do_inverse;
     int32_t do_shift;
-    int32_t end_fft;
     {
         HLS_PROTO("compute-config");
 
         cfg.wait_for_config(); // config process
+        conf_info_t config = this->conf_info.read();
 
         // User-defined config code
         /* <<--local-params-->> */
+        logn_samples = config.logn_samples;
+        num_samples = 1 << logn_samples;
+        do_inverse = config.do_inverse;
+        do_shift = config.do_shift;
     }
 
     while(true)
@@ -340,20 +284,6 @@ void fft2::compute_kernel()
             wait();
         }
 
-        // Read config registers
-        {
-            HLS_PROTO("read-config-registers");
-
-            load_state_req = CFG_REQ;
-
-            compute_state_req_dbg.write(2);
-
-            this->compute_load_ready_handshake();
-            wait();
-            this->compute_load_done_handshake();
-            wait();
-        }
-
         // Load input data
         {
             HLS_PROTO("load-input-data");
@@ -365,24 +295,6 @@ void fft2::compute_kernel()
             this->compute_load_ready_handshake();
             wait();
             this->compute_load_done_handshake();
-            wait();
-        }
-
-        // Read back registers
-        {
-            compute_state_req_dbg.write(4);
-
-            // Configuration unit - reading parameters of FFT
-            logn_samples = cfg_registers[LOGN_SAMPLES];
-            do_inverse = cfg_registers[DO_INVERSE];
-            do_shift = cfg_registers[DO_SHIFT];
-            end_fft = cfg_registers[END_FFT];
-            num_samples = 1 << logn_samples;
-
-            compute_logn_samples_dbg.write(logn_samples);
-            do_inverse_dbg.write(do_inverse);
-            do_shift_dbg.write(do_shift);
-            end_fft_dbg.write(end_fft);
             wait();
         }
 
@@ -505,22 +417,19 @@ void fft2::compute_kernel()
             wait();
         }
 
-        // Decide next iteration
+        // End operation
         {
             HLS_PROTO("end-acc");
 
-            if (end_fft == 1)
-            {
-                store_state_req = ACC_DONE;
+            store_state_req = ACC_DONE;
 
-                compute_state_req_dbg.write(10);
+            compute_state_req_dbg.write(10);
 
-                this->compute_store_ready_handshake();
-                wait();
-                this->compute_store_done_handshake();
-                wait();
-                this->process_done();
-            }
+            this->compute_store_ready_handshake();
+            wait();
+            this->compute_store_done_handshake();
+            wait();
+            this->process_done();
         }
     } // while (true)
 } // Function : compute_kernel
