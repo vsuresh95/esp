@@ -64,7 +64,7 @@ void fft2::load_input()
             {
                 dma_info_t dma_info(0, 1, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
-                int64_t new_task = 0;
+                int32_t new_task = 0;
 
                 wait();
 
@@ -75,7 +75,7 @@ void fft2::load_input()
                     this->dma_read_ctrl.put(dma_info);
                     dataBv = this->dma_read_chnl.get();
                     wait();
-                    new_task = dataBv.range(DMA_WIDTH - 1, 0).to_int64();
+                    new_task = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
                 }
             }
             break;
@@ -273,6 +273,10 @@ void fft2::store_output()
             default:
             break;
         }
+
+        wait();
+
+        this->store_compute_done_handshake();
     }
 } // Function : store_output
 
