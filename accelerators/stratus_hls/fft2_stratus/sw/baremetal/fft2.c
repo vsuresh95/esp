@@ -36,7 +36,7 @@ static unsigned DMA_WORD_PER_BEAT(unsigned _st)
 #define DEV_NAME "sld,fft2_stratus"
 
 /* <<--params-->> */
-const int32_t logn_samples = 3;
+const int32_t logn_samples = 10;
 const int32_t num_samples = (1 << logn_samples);
 const int32_t num_ffts = 1;
 const int32_t do_inverse = 0;
@@ -77,7 +77,7 @@ static int validate_buf(token_t *out, float *gold)
 	for (j = 0; j < 2 * len; j++) {
 		native_t val = fx2float(out[j], FX_IL);
 		uint32_t ival = *((uint32_t*)&val);
-		printf("  GOLD[%u] = 0x%08x  :  OUT[%u] = 0x%08x\n", j, ((uint32_t*)gold)[j], j, ival);
+		// printf("  GOLD[%u] = 0x%08x  :  OUT[%u] = 0x%08x\n", j, ((uint32_t*)gold)[j], j, ival);
 		if ((fabs(gold[j] - val) / fabs(gold[j])) > ERR_TH)
 			errors++;
 	}
@@ -99,7 +99,7 @@ static void init_buf(token_t *in, float *gold)
 		float scaling_factor = (float) rand () / (float) RAND_MAX;
 		gold[j] = LO + scaling_factor * (HI - LO);
 		uint32_t ig = ((uint32_t*)gold)[j];
-		printf("  IN[%u] = 0x%08x\n", j, ig);
+		// printf("  IN[%u] = 0x%08x\n", j, ig);
 	}
 
 	// convert input to fixed point
@@ -141,7 +141,7 @@ int main(int argc, char * argv[])
 	in_size = in_len * sizeof(token_t);
 	out_size = out_len * sizeof(token_t);
 	out_offset  = 0;
-	mem_size = (out_offset * sizeof(token_t)) + out_size;
+	mem_size = (out_offset * sizeof(token_t)) + out_size + 6;
 
 	printf("ilen %u isize %u o_off %u olen %u osize %u msize %u\n", in_len, out_len, in_size, out_size, out_offset, mem_size);
 	// Search for the device
@@ -175,6 +175,8 @@ int main(int argc, char * argv[])
 		mem = aligned_malloc(mem_size);
 		printf("  memory buffer base-address = %p\n", mem);
 
+    	volatile token_t* sm_sync = (volatile token_t*) mem;
+
 		// Allocate and populate page table
 		ptable = aligned_malloc(NCHUNK(mem_size) * sizeof(unsigned *));
 		for (i = 0; i < NCHUNK(mem_size); i++)
@@ -183,12 +185,15 @@ int main(int argc, char * argv[])
 		printf("  ptable = %p\n", ptable);
 		printf("  nchunk = %lu\n", NCHUNK(mem_size));
 
+	    for (i = 0; i < 10; i++)
+	    	sm_sync[i] = 0;
+
 #ifndef __riscv
 		for (coherence = ACC_COH_NONE; coherence <= ACC_COH_FULL; coherence++) {
 #else
 		{
 			/* TODO: Restore full test once ESP caches are integrated */
-			coherence = ACC_COH_NONE;
+			coherence = ACC_COH_FULL;
 #endif
 			printf("  --------------------\n");
 			printf("  Generate input...\n");
@@ -225,6 +230,15 @@ int main(int argc, char * argv[])
 			// Start accelerators
 			printf("  Start...\n");
 			iowrite32(dev, CMD_REG, CMD_MASK_START);
+
+		    // Op 1 - load mem_words data from 0 in mem to mem_words in SP
+		    sm_sync[1] = logn_samples; // LOGN_SAMPLES
+		    sm_sync[2] = 0; // DO_INVERSE
+		    sm_sync[3] = 0; // DO_SHIFT
+		    sm_sync[4] = 1; // END_FFT
+
+		    sm_sync[0] = 1;
+		    while(sm_sync[0] != 0); 
 
 			// Wait for completion
 			done = 0;
