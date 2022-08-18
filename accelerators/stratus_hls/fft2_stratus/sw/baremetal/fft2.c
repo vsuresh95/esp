@@ -68,6 +68,7 @@ static unsigned mem_size;
 #define FFT2_DO_SHIFT_REG 0x4c
 #define FFT2_SCALE_FACTOR_REG 0x50
 
+#define NUM_CFG_REG 6
 
 static int validate_buf(token_t *out, float *gold)
 {
@@ -75,7 +76,7 @@ static int validate_buf(token_t *out, float *gold)
 	unsigned errors = 0;
 
 	for (j = 0; j < 2 * len; j++) {
-		native_t val = fx2float(out[j], FX_IL);
+		native_t val = fx2float(out[j+NUM_CFG_REG], FX_IL);
 		uint32_t ival = *((uint32_t*)&val);
 		// printf("  GOLD[%u] = 0x%08x  :  OUT[%u] = 0x%08x\n", j, ((uint32_t*)gold)[j], j, ival);
 		if ((fabs(gold[j] - val) / fabs(gold[j])) > ERR_TH)
@@ -104,7 +105,7 @@ static void init_buf(token_t *in, float *gold)
 
 	// convert input to fixed point
 	for (j = 0; j < 2 * len; j++)
-		in[j] = float2fx((native_t) gold[j], FX_IL);
+		in[j+NUM_CFG_REG] = float2fx((native_t) gold[j], FX_IL);
 
 	// Compute golden output
 	fft2_comp(gold, num_ffts, num_samples, logn_samples, do_inverse, do_shift);
@@ -141,7 +142,7 @@ int main(int argc, char * argv[])
 	in_size = in_len * sizeof(token_t);
 	out_size = out_len * sizeof(token_t);
 	out_offset  = 0;
-	mem_size = (out_offset * sizeof(token_t)) + out_size + 6;
+	mem_size = (out_offset * sizeof(token_t)) + out_size + NUM_CFG_REG;
 
 	printf("ilen %u isize %u o_off %u olen %u osize %u msize %u\n", in_len, out_len, in_size, out_size, out_offset, mem_size);
 	// Search for the device
@@ -185,7 +186,7 @@ int main(int argc, char * argv[])
 		printf("  ptable = %p\n", ptable);
 		printf("  nchunk = %lu\n", NCHUNK(mem_size));
 
-	    for (i = 0; i < 10; i++)
+	    for (i = 0; i < NUM_CFG_REG; i++)
 	    	sm_sync[i] = 0;
 
 #ifndef __riscv
@@ -233,8 +234,8 @@ int main(int argc, char * argv[])
 
 		    // Op 1 - load mem_words data from 0 in mem to mem_words in SP
 		    sm_sync[1] = logn_samples; // LOGN_SAMPLES
-		    sm_sync[2] = 0; // DO_INVERSE
-		    sm_sync[3] = 0; // DO_SHIFT
+		    sm_sync[2] = do_inverse; // DO_INVERSE
+		    sm_sync[3] = do_shift; // DO_SHIFT
 		    sm_sync[4] = 1; // END_FFT
 
 		    sm_sync[0] = 1;
@@ -264,6 +265,8 @@ int main(int argc, char * argv[])
 		aligned_free(mem);
 		aligned_free(gold);
 	}
+
+    while(1);
 
 	return 0;
 }
