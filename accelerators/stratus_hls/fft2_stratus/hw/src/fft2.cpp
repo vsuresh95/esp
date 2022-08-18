@@ -93,7 +93,7 @@ void fft2::load_input()
                     for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
                     {
                         HLS_UNROLL_SIMPLE;
-                        A0[i + k] = dataBv.range(DATA_WIDTH - 1, 0).to_int64();;
+                        A0[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
                     }
                 }
             }
