@@ -237,6 +237,8 @@ void fft2::store_output()
 
                     for (int i = 0; i < 2 * num_samples; i += DMA_WORD_PER_BEAT)
                     {
+                        HLS_BREAK_DEP(A0);
+
                         wait();
 
                         for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
