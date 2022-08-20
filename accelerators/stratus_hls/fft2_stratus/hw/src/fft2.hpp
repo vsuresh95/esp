@@ -30,12 +30,14 @@
 
 #define SYNC_VAR_SIZE 2
 
-#define POLL_REQ 0
-#define LOAD_DATA_REQ 1
-#define UPDATE_REQ 0
-#define STORE_DATA_REQ 1
-#define STORE_FENCE 2
-#define ACC_DONE 3
+#define POLL_PREV_REQ 0
+#define POLL_NEXT_REQ 1
+#define LOAD_DATA_REQ 2
+#define UPDATE_PREV_REQ 0
+#define UPDATE_NEXT_REQ 1
+#define STORE_DATA_REQ 2
+#define STORE_FENCE 3
+#define ACC_DONE 4
 
 class fft2 : public esp_accelerator_3P<DMA_WIDTH>
 {

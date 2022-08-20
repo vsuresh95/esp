@@ -68,7 +68,9 @@ static unsigned mem_size;
 #define FFT2_DO_SHIFT_REG 0x4c
 #define FFT2_SCALE_FACTOR_REG 0x50
 
-#define NUM_CFG_REG 6
+#define SYNC_VAR_SIZE 2
+
+#define NUM_DEVICES 2
 
 static int validate_buf(token_t *out, float *gold)
 {
@@ -76,7 +78,7 @@ static int validate_buf(token_t *out, float *gold)
 	unsigned errors = 0;
 
 	for (j = 0; j < 2 * len; j++) {
-		native_t val = fx2float(out[j+NUM_CFG_REG], FX_IL);
+		native_t val = fx2float(out[j+SYNC_VAR_SIZE], FX_IL);
 		uint32_t ival = *((uint32_t*)&val);
 		// printf("  GOLD[%u] = 0x%08x  :  OUT[%u] = 0x%08x\n", j, ((uint32_t*)gold)[j], j, ival);
 		if ((fabs(gold[j] - val) / fabs(gold[j])) > ERR_TH)
@@ -105,12 +107,17 @@ static void init_buf(token_t *in, float *gold)
 
 	// convert input to fixed point
 	for (j = 0; j < 2 * len; j++)
-		in[j+NUM_CFG_REG] = float2fx((native_t) gold[j], FX_IL);
+		in[j+SYNC_VAR_SIZE] = float2fx((native_t) gold[j], FX_IL);
 
 	// Compute golden output
-	fft2_comp(gold, num_ffts, num_samples, logn_samples, do_inverse, do_shift);
-}
+	fft2_comp(gold, num_ffts, num_samples, logn_samples, 0 /* do_inverse */, do_shift);
 
+	// for (j = 0; j < 2 * len; j++) {
+	// 	printf("  INT GOLD[%u] = 0x%08x\n", j, ((uint32_t*)gold)[j]);
+    // }
+
+	fft2_comp(gold, num_ffts, num_samples, logn_samples, 1 /* do_inverse */, do_shift);
+}
 
 int main(int argc, char * argv[])
 {
@@ -142,10 +149,33 @@ int main(int argc, char * argv[])
 	in_size = in_len * sizeof(token_t);
 	out_size = out_len * sizeof(token_t);
 	out_offset  = 0;
-	mem_size = (out_offset * sizeof(token_t)) + out_size + NUM_CFG_REG;
+	mem_size = (out_offset * sizeof(token_t)) + out_size + (SYNC_VAR_SIZE * sizeof(token_t));
+
+    unsigned acc_offset = mem_size;
+    mem_size *= NUM_DEVICES+1;
 
 	printf("ilen %u isize %u o_off %u olen %u osize %u msize %u\n", in_len, out_len, in_size, out_size, out_offset, mem_size);
-	// Search for the device
+
+	// Allocate memory
+	gold = aligned_malloc(out_len * sizeof(float));
+	mem = aligned_malloc(mem_size);
+	printf("  memory buffer base-address = %p\n", mem);
+
+    volatile token_t* sm_sync = (volatile token_t*) mem;
+
+	// Allocate and populate page table
+	ptable = aligned_malloc(NCHUNK(mem_size) * sizeof(unsigned *));
+	for (i = 0; i < NCHUNK(mem_size); i++)
+		ptable[i] = (unsigned *) &mem[i * (CHUNK_SIZE / sizeof(token_t))];
+
+	printf("  ptable = %p\n", ptable);
+	printf("  nchunk = %lu\n", NCHUNK(mem_size));
+
+	coherence = ACC_COH_FULL;
+	printf("  --------------------\n");
+	printf("  Generate input...\n");
+	init_buf(mem, gold);
+
 	printf("Scanning device tree... \n");
 
 	ndev = probe(&espdevs, VENDOR_SLD, SLD_FFT2, DEV_NAME);
@@ -171,102 +201,72 @@ int main(int argc, char * argv[])
 			return 0;
 		}
 
-		// Allocate memory
-		gold = aligned_malloc(out_len * sizeof(float));
-		mem = aligned_malloc(mem_size);
-		printf("  memory buffer base-address = %p\n", mem);
+		// Pass common configuration parameters
+		iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
+		iowrite32(dev, COHERENCE_REG, coherence);
 
-    	volatile token_t* sm_sync = (volatile token_t*) mem;
+		iowrite32(dev, PT_ADDRESS_REG, (unsigned long long) ptable);
+		iowrite32(dev, PT_NCHUNK_REG, NCHUNK(mem_size));
+		iowrite32(dev, PT_SHIFT_REG, CHUNK_SHIFT);
 
-		// Allocate and populate page table
-		ptable = aligned_malloc(NCHUNK(mem_size) * sizeof(unsigned *));
-		for (i = 0; i < NCHUNK(mem_size); i++)
-			ptable[i] = (unsigned *) &mem[i * (CHUNK_SIZE / sizeof(token_t))];
+		// Use the following if input and output data are not allocated at the default offsets
+		iowrite32(dev, SRC_OFFSET_REG, n * acc_offset);
+		iowrite32(dev, DST_OFFSET_REG, n * acc_offset);
 
-		printf("  ptable = %p\n", ptable);
-		printf("  nchunk = %lu\n", NCHUNK(mem_size));
+		// Pass accelerator-specific configuration parameters
+		/* <<--regs-config-->> */
+		iowrite32(dev, FFT2_LOGN_SAMPLES_REG, logn_samples);
+		iowrite32(dev, FFT2_NUM_FFTS_REG, num_ffts);
+		iowrite32(dev, FFT2_SCALE_FACTOR_REG, scale_factor);
+		iowrite32(dev, FFT2_DO_SHIFT_REG, do_shift);
+		iowrite32(dev, FFT2_DO_INVERSE_REG, n);
 
-	    for (i = 0; i < NUM_CFG_REG; i++)
-	    	sm_sync[i] = 0;
+		// Flush (customize coherence model here)
+		esp_flush(coherence);
 
-#ifndef __riscv
-		for (coherence = ACC_COH_NONE; coherence <= ACC_COH_FULL; coherence++) {
-#else
-		{
-			/* TODO: Restore full test once ESP caches are integrated */
-			coherence = ACC_COH_FULL;
-#endif
-			printf("  --------------------\n");
-			printf("  Generate input...\n");
-			init_buf(mem, gold);
+		// Start accelerators
+		printf("  Start...\n");
+		iowrite32(dev, CMD_REG, CMD_MASK_START);
+    }
 
-			// Pass common configuration parameters
+	sm_sync[0] = 1;
+	while(sm_sync[2*acc_offset] != 0);
 
-			iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
-			iowrite32(dev, COHERENCE_REG, coherence);
+	for (n = 0; n < ndev; n++) {
 
-#ifndef __sparc
-			iowrite32(dev, PT_ADDRESS_REG, (unsigned long long) ptable);
-#else
-			iowrite32(dev, PT_ADDRESS_REG, (unsigned) ptable);
-#endif
-			iowrite32(dev, PT_NCHUNK_REG, NCHUNK(mem_size));
-			iowrite32(dev, PT_SHIFT_REG, CHUNK_SHIFT);
+		printf("**************** %s.%d ****************\n", DEV_NAME, n);
 
-			// Use the following if input and output data are not allocated at the default offsets
-			iowrite32(dev, SRC_OFFSET_REG, 0x0);
-			iowrite32(dev, DST_OFFSET_REG, 0x0);
+		dev = &espdevs[n];
 
-			// Pass accelerator-specific configuration parameters
-			/* <<--regs-config-->> */
-			iowrite32(dev, FFT2_LOGN_SAMPLES_REG, logn_samples);
-			iowrite32(dev, FFT2_NUM_FFTS_REG, num_ffts);
-			iowrite32(dev, FFT2_SCALE_FACTOR_REG, scale_factor);
-			iowrite32(dev, FFT2_DO_SHIFT_REG, do_shift);
-			iowrite32(dev, FFT2_DO_INVERSE_REG, do_inverse);
+	    // Wait for completion
+	    done = 0;
+	    spin_ct = 0;
+	    while (!done) {
+	        done = ioread32(dev, STATUS_REG);
+	        done &= STATUS_MASK_DONE;
+	        spin_ct++;
+	    }
+	    iowrite32(dev, CMD_REG, 0x0);
 
-			// Flush (customize coherence model here)
-			esp_flush(coherence);
+        printf("  Done : spin_count = %u\n", spin_ct);
+    }
 
-			// Start accelerators
-			printf("  Start...\n");
-			iowrite32(dev, CMD_REG, CMD_MASK_START);
+	printf("  validating...\n");
 
-		    // Op 1 - load mem_words data from 0 in mem to mem_words in SP
-		    sm_sync[1] = logn_samples; // LOGN_SAMPLES
-		    sm_sync[2] = do_inverse; // DO_INVERSE
-		    sm_sync[3] = do_shift; // DO_SHIFT
-		    sm_sync[4] = 1; // END_FFT
+    unsigned cpu_arr_offset = out_offset + out_len + SYNC_VAR_SIZE;
 
-		    sm_sync[0] = 1;
-		    while(sm_sync[0] != 0); 
+	/* Validation */
+	errors = validate_buf(&mem[(2*cpu_arr_offset)], gold);
+	if ((float)((float)errors / (2.0 * (float)len)) > ERROR_COUNT_TH)
+		printf("  ... FAIL : %u errors out of %u\n", errors, 2*len);
+	else
+		printf("  ... PASS : %u errors out of %u\n", errors, 2*len);
 
-			// Wait for completion
-			done = 0;
-			spin_ct = 0;
-			while (!done) {
-				done = ioread32(dev, STATUS_REG);
-				done &= STATUS_MASK_DONE;
-				spin_ct++;
-			}
-			iowrite32(dev, CMD_REG, 0x0);
+	aligned_free(ptable);
+	aligned_free(mem);
+	aligned_free(gold);
 
-			printf("  Done : spin_count = %u\n", spin_ct);
-			printf("  validating...\n");
-
-			/* Validation */
-			errors = validate_buf(&mem[out_offset], gold);
-			if ((float)((float)errors / (2.0 * (float)len)) > ERROR_COUNT_TH)
-				printf("  ... FAIL : %u errors out of %u\n", errors, 2*len);
-			else
-				printf("  ... PASS : %u errors out of %u\n", errors, 2*len);
-		}
-		aligned_free(ptable);
-		aligned_free(mem);
-		aligned_free(gold);
-	}
-
-    while(1);
+    // while(1);
 
 	return 0;
 }
