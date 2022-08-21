@@ -229,8 +229,10 @@ int main(int argc, char * argv[])
 		iowrite32(dev, CMD_REG, CMD_MASK_START);
     }
 
+    unsigned cpu_arr_offset = out_offset + out_len + SYNC_VAR_SIZE;
+
 	sm_sync[0] = 1;
-	while(sm_sync[2*acc_offset] != 0);
+	while(sm_sync[2*cpu_arr_offset] != 1);
 
 	for (n = 0; n < ndev; n++) {
 
@@ -252,8 +254,6 @@ int main(int argc, char * argv[])
     }
 
 	printf("  validating...\n");
-
-    unsigned cpu_arr_offset = out_offset + out_len + SYNC_VAR_SIZE;
 
 	/* Validation */
 	errors = validate_buf(&mem[(2*cpu_arr_offset)], gold);
