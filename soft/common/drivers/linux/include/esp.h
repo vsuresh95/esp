@@ -30,6 +30,7 @@ struct esp_access {
         unsigned int ddr_node;
 	unsigned int in_place;
 	unsigned int reuse_factor;
+	uint8_t start_stop;
 };
 
 #define ESP_IOC_RUN _IO('E', 0)

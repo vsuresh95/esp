@@ -26,7 +26,7 @@ typedef float native_t;
 //#define NUM_FFTS     13
 /*#define NUM_SAMPLES (NUM_FFTS * (1 << LOGN_SAMPLES))*/
 #define DO_INVERSE   0
-#define DO_SHIFT     1
+#define DO_SHIFT     0
 #define SCALE_FACTOR 0
 
 /* <<--params-->> */
@@ -39,17 +39,38 @@ const int32_t scale_factor = SCALE_FACTOR;
 
 #define NACC 1
 
+#define SYNC_VAR_SIZE 2
+
+#define NUM_DEVICES 2
+
 struct fft2_stratus_access fft2_cfg_000[] = {
 	{
 		/* <<--descriptor-->> */
 		.logn_samples = LOGN_SAMPLES,
 		.num_ffts = NUM_FFTS,
-		.do_inverse = DO_INVERSE,
+		.do_inverse = 0,
 		.do_shift = DO_SHIFT,
 		.scale_factor = SCALE_FACTOR,
 		.src_offset = 0,
 		.dst_offset = 0,
-		.esp.coherence = ACC_COH_NONE,
+		.esp.coherence = ACC_COH_FULL,
+		.esp.p2p_store = 0,
+		.esp.p2p_nsrcs = 0,
+		.esp.p2p_srcs = {"", "", "", ""},
+	}
+};
+
+struct fft2_stratus_access fft2_cfg_001[] = {
+	{
+		/* <<--descriptor-->> */
+		.logn_samples = LOGN_SAMPLES,
+		.num_ffts = NUM_FFTS,
+		.do_inverse = 1,
+		.do_shift = DO_SHIFT,
+		.scale_factor = SCALE_FACTOR,
+		.src_offset = 0,
+		.dst_offset = 0,
+		.esp.coherence = ACC_COH_FULL,
 		.esp.p2p_store = 0,
 		.esp.p2p_nsrcs = 0,
 		.esp.p2p_srcs = {"", "", "", ""},
@@ -62,6 +83,15 @@ esp_thread_info_t cfg_000[] = {
 		.devname = "fft2_stratus.0",
 		.ioctl_req = FFT2_STRATUS_IOC_ACCESS,
 		.esp_desc = &(fft2_cfg_000[0].esp),
+	}
+};
+
+esp_thread_info_t cfg_001[] = {
+	{
+		.run = true,
+		.devname = "fft2_stratus.1",
+		.ioctl_req = FFT2_STRATUS_IOC_ACCESS,
+		.esp_desc = &(fft2_cfg_001[0].esp),
 	}
 };
 
