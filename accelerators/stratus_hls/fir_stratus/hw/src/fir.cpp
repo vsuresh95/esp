@@ -358,70 +358,27 @@ void fir::compute_kernel()
         {
             compute_state_req_dbg.write(3);
 
-            unsigned offset = 0;  // Offset into Mem for start of this FIR
-            int sin_sign = (do_inverse) ? -1 : 1; // This modifes the mySin
-                                                  // values used below
-            if (do_inverse && do_shift) {
-                fir_do_shift(offset, num_samples, logn_samples);
-            }
+            for (unsigned k = 0; k < num_samples; k+=2) {
 
-            // Do the bit-reverse
-            fir_bit_reverse(offset, num_samples, logn_samples);
+                CompNum akj, akjm;
+                CompNum bkj, bkjm;
 
-            // Computing phase implementation
-            int m = 1;  // iterative FIR
+                akj.re = int2fp<FPDATA, WORD_SIZE>(A0[k]);
+                akj.im = int2fp<FPDATA, WORD_SIZE>(A0[k + 1]);
+                akjm.re = int2fp<FPDATA, WORD_SIZE>(F0[k]);
+                akjm.im = int2fp<FPDATA, WORD_SIZE>(F0[k + 1]);
 
-            FIR_SINGLE_L1:
-                for(unsigned s = 1; s <= logn_samples; s++) {
-                    m = 1 << s;
-                    CompNum wm(myCos(s), sin_sign*mySin(s));
+                CompNum t;
+                compMul(t, akj, akjm);
 
-                FIR_SINGLE_L2:
-                    for(unsigned k = 0; k < num_samples; k +=m) {
-
-                        CompNum w((FPDATA) 1, (FPDATA) 0);
-                        int md2 = m / 2;
-
-                    FIR_SINGLE_L3:
-                        for(int j = 0; j < md2; j++) {
-
-                            int kj = offset + k + j;
-                            int kjm = offset + k + j + md2;
-                            CompNum akj, akjm;
-                            CompNum bkj, bkjm;
-
-                            akj.re = int2fp<FPDATA, WORD_SIZE>(A0[2 * kj]);
-                            akj.im = int2fp<FPDATA, WORD_SIZE>(A0[2 * kj + 1]);
-                            akjm.re = int2fp<FPDATA, WORD_SIZE>(A0[2 * kjm]);
-                            akjm.im = int2fp<FPDATA, WORD_SIZE>(A0[2 * kjm + 1]);
-
-                            CompNum t;
-                            compMul(w, akjm, t);
-                            CompNum u(akj.re, akj.im);
-                            compAdd(u, t, bkj);
-                            compSub(u, t, bkjm);
-                            CompNum wwm;
-                            wwm.re = w.re - (wm.im * w.im + wm.re * w.re);
-                            wwm.im = w.im + (wm.im * w.re - wm.re * w.im);
-                            w = wwm;
-
-                            {
-                                HLS_PROTO("compute_write_A0");
-                                HLS_BREAK_DEP(A0);
-                                wait();
-                                A0[2 * kj] = fp2int<FPDATA, WORD_SIZE>(bkj.re);
-                                A0[2 * kj + 1] = fp2int<FPDATA, WORD_SIZE>(bkj.im);
-                                wait();
-                                A0[2 * kjm] = fp2int<FPDATA, WORD_SIZE>(bkjm.re);
-                                A0[2 * kjm + 1] = fp2int<FPDATA, WORD_SIZE>(bkjm.im);
-                            }
-                        } // for (j = 0 .. md2)
-                    } // for (k = 0 .. num_samples)
-                } // for (s = 1 .. logn_samples)
-
-            if ((!do_inverse) && (do_shift)) {
-                fir_do_shift(offset, num_samples, logn_samples);
-            }
+                {
+                    HLS_PROTO("compute_write_A0");
+                    HLS_BREAK_DEP(A0);
+                    wait();
+                    A0[k] = fp2int<FPDATA, WORD_SIZE>(t.re);
+                    A0[k + 1] = fp2int<FPDATA, WORD_SIZE>(t.im);
+                } 
+            } // for (k = 0 .. num_samples)
         } // Compute
 
         // Poll lock for consumer's ready
