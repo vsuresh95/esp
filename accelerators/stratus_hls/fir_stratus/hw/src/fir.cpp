@@ -96,6 +96,7 @@ void fir::load_input()
             }
             break;
             case LOAD_DATA_REQ:
+            // Load input data
             {
                 dma_info_t dma_info(SYNC_VAR_SIZE / DMA_WORD_PER_BEAT, 2 * num_samples / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
@@ -114,6 +115,28 @@ void fir::load_input()
                     {
                         HLS_UNROLL_SIMPLE;
                         A0[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
+                    }
+                }
+            }
+            // Load filters
+            {
+                dma_info_t dma_info(4 * 2 * num_samples / DMA_WORD_PER_BEAT, 2 * num_samples / DMA_WORD_PER_BEAT, DMA_SIZE);
+                sc_dt::sc_bv<DMA_WIDTH> dataBv;
+
+                wait();
+
+                this->dma_read_ctrl.put(dma_info);
+
+                for (int i = 0; i < 2 * num_samples; i += DMA_WORD_PER_BEAT)
+                {
+                    HLS_BREAK_DEP(A0);
+
+                    dataBv = this->dma_read_chnl.get();
+                    wait();
+                    for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
+                    {
+                        HLS_UNROLL_SIMPLE;
+                        F0[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
                     }
                 }
             }
@@ -289,8 +312,6 @@ void fir::compute_kernel()
     /* <<--params-->> */
     int32_t logn_samples;
     int32_t num_samples;
-    int32_t do_inverse;
-    int32_t do_shift;
     {
         HLS_PROTO("compute-config");
 
@@ -301,8 +322,6 @@ void fir::compute_kernel()
         /* <<--local-params-->> */
         logn_samples = config.logn_samples;
         num_samples = 1 << logn_samples;
-        do_inverse = config.do_inverse;
-        do_shift = config.do_shift;
     }
 
     while(true)
