@@ -129,7 +129,7 @@ void fir::load_input()
 
                 for (int i = 0; i < 2 * num_samples; i += DMA_WORD_PER_BEAT)
                 {
-                    HLS_BREAK_DEP(A0);
+                    HLS_BREAK_DEP(F0);
 
                     dataBv = this->dma_read_chnl.get();
                     wait();
