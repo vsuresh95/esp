@@ -369,7 +369,7 @@ void fir::compute_kernel()
                 akjm.im = int2fp<FPDATA, WORD_SIZE>(F0[k + 1]);
 
                 CompNum t;
-                compMul(t, akj, akjm);
+                compMul(akj, akjm, t);
 
                 {
                     HLS_PROTO("compute_write_A0");
