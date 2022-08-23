@@ -20,7 +20,7 @@ public:
     {
         /* <<--ctor-->> */
         this->logn_samples = 6;
-        this->num_ffts = 1;
+        this->num_firs = 1;
         this->do_inverse = 0;
         this->do_shift = 0;
         this->scale_factor = 1;
@@ -29,7 +29,7 @@ public:
     conf_info_t(
         /* <<--ctor-args-->> */
         int32_t logn_samples,
-        int32_t num_ffts,
+        int32_t num_firs,
         int32_t do_inverse,
         int32_t do_shift,
         int32_t scale_factor
@@ -37,7 +37,7 @@ public:
     {
         /* <<--ctor-custom-->> */
         this->logn_samples = logn_samples;
-        this->num_ffts   = num_ffts;
+        this->num_firs   = num_firs;
         this->do_inverse = do_inverse;
         this->do_shift   = do_shift;
         this->scale_factor = scale_factor;
@@ -48,7 +48,7 @@ public:
     {
         /* <<--eq-->> */
         if (logn_samples != rhs.logn_samples) return false;
-        if (num_ffts != rhs.num_ffts) return false;
+        if (num_firs != rhs.num_firs) return false;
         if (do_inverse != rhs.do_inverse) return false;
         if (do_shift != rhs.do_shift) return false;
         if (scale_factor != rhs.scale_factor) return false;
@@ -60,7 +60,7 @@ public:
     {
         /* <<--assign-->> */
         logn_samples = other.logn_samples;
-        num_ffts = other.num_ffts;
+        num_firs = other.num_firs;
         do_inverse = other.do_inverse;
         do_shift = other.do_shift;
         scale_factor = other.scale_factor;
@@ -77,7 +77,7 @@ public:
         os << "{";
         /* <<--print-->> */
         os << "logn_samples = " << conf_info.logn_samples << ", ";
-        os << "num_ffts = " << conf_info.num_ffts << ", ";
+        os << "num_firs = " << conf_info.num_firs << ", ";
         os << "do_inverse = " << conf_info.do_inverse << ", ";
         os << "do_shift = " << conf_info.do_shift << ", ";
         os << "scale_factor = " << conf_info.scale_factor << "";
@@ -87,7 +87,7 @@ public:
 
     /* <<--params-->> */
     int32_t logn_samples;
-    int32_t num_ffts;
+    int32_t num_firs;
     int32_t do_inverse;
     int32_t do_shift;
     int32_t scale_factor;

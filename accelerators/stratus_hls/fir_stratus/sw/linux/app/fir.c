@@ -19,7 +19,7 @@ static int validate_buffer(token_t *out, float *gold)
 	unsigned errors = 0;
 	const unsigned num_samples = 1<<logn_samples;
 
-	for (j = 0; j < 2 * num_ffts * num_samples; j++) {
+	for (j = 0; j < 2 * num_firs * num_samples; j++) {
 		native_t val = fx2float(out[j], FX_IL);
 
 		if ((fabs(gold[j] - val) / fabs(gold[j])) > ERR_TH) {
@@ -29,7 +29,7 @@ static int validate_buffer(token_t *out, float *gold)
 			errors++;
 		}
 	}
-	printf("  + Relative error > %.02f for %d values out of %d\n", ERR_TH, errors, 2 * num_ffts * num_samples);
+	printf("  + Relative error > %.02f for %d values out of %d\n", ERR_TH, errors, 2 * num_firs * num_samples);
 
 	return errors;
 }
@@ -45,18 +45,18 @@ static void init_buffer(token_t *in, float *gold)
 
 	srand((unsigned int) time(NULL));
 
-	for (j = 0; j < 2 * num_ffts * num_samples; j++) {
+	for (j = 0; j < 2 * num_firs * num_samples; j++) {
 		float scaling_factor = (float) rand () / (float) RAND_MAX;
 		gold[j] = LO + scaling_factor * (HI - LO);
 	}
 
 	// convert input to fixed point
-	for (j = 0; j < 2 * num_ffts * num_samples; j++) {
+	for (j = 0; j < 2 * num_firs * num_samples; j++) {
 		in[j] = float2fx((native_t) gold[j], FX_IL);
 	}
 
 	// Compute golden output
-	fir_comp(gold, num_ffts, (1<<logn_samples), logn_samples, do_inverse, do_shift);
+	fir_comp(gold, num_firs, (1<<logn_samples), logn_samples, do_inverse, do_shift);
 }
 
 
@@ -66,11 +66,11 @@ static void init_parameters()
 	const unsigned num_samples = (1 << logn_samples);
 
 	if (DMA_WORD_PER_BEAT(sizeof(token_t)) == 0) {
-		in_words_adj = 2 * num_ffts * num_samples;
-		out_words_adj = 2 * num_ffts * num_samples;
+		in_words_adj = 2 * num_firs * num_samples;
+		out_words_adj = 2 * num_firs * num_samples;
 	} else {
-		in_words_adj = round_up(2 * num_ffts * num_samples, DMA_WORD_PER_BEAT(sizeof(token_t)));
-		out_words_adj = round_up(2 * num_ffts * num_samples, DMA_WORD_PER_BEAT(sizeof(token_t)));
+		in_words_adj = round_up(2 * num_firs * num_samples, DMA_WORD_PER_BEAT(sizeof(token_t)));
+		out_words_adj = round_up(2 * num_firs * num_samples, DMA_WORD_PER_BEAT(sizeof(token_t)));
 	}
 	in_len = in_words_adj;
 	out_len =  out_words_adj;
@@ -101,7 +101,7 @@ int main(int argc, char **argv)
 	/* <<--print-params-->> */
 	printf("  .logn_samples = %d\n", logn_samples);
 	printf("   num_samples  = %d\n", (1 << logn_samples));
-	printf("  .num_ffts = %d\n", num_ffts);
+	printf("  .num_firs = %d\n", num_firs);
 	printf("  .do_inverse = %d\n", do_inverse);
 	printf("  .do_shift = %d\n", do_shift);
 	printf("  .scale_factor = %d\n", scale_factor);
@@ -117,7 +117,7 @@ int main(int argc, char **argv)
 	free(gold);
 	esp_free(buf);
 
-        if ((float)(errors / (float)(2.0 * (float)num_ffts * (float)num_samples)) > ERROR_COUNT_TH)
+        if ((float)(errors / (float)(2.0 * (float)num_firs * (float)num_samples)) > ERROR_COUNT_TH)
 		printf("  + TEST FAIL: exceeding error count threshold\n");
         else
 		printf("  + TEST PASS: not exceeding error count threshold\n");

@@ -1,7 +1,7 @@
 TEST : MEM : MEM_SIZE = 262144 : in_size = 128  out_size = 128  gold_size = 128
 TEST : MEM : in[0] @ 0x26bb9b0  :: in[127] @ 0x26bbbac
 IN_DATA:
-float FFT_INPUTS[128] = {
+float FIR_INPUTS[128] = {
     -0.550323128700256,
     0.688112735748291,
     0.322322487831116,
@@ -133,7 +133,7 @@ float FFT_INPUTS[128] = {
 };
 END_OF_IN_DATA
 OUT_DATA:
-float FFT_OUTPUTS[128] = {
+float FIR_OUTPUTS[128] = {
     -0.980090379714966,
     5.026745319366455,
     -3.915761232376099,
@@ -264,14 +264,14 @@ float FFT_OUTPUTS[128] = {
     6.845310688018799,
 };
 END_OF_OUT_DATA
-COMPUTE: in_len 128 : max_in_ffts 14 >> 6 = 256
+COMPUTE: in_len 128 : max_in_firs 14 >> 6 = 256
 COMPUTE INFO : in_rem 128 : in_len 128 :: out_rem 128 : out_len 128
 COMPUTE hit the compute-load handshake...
 STORE hit the store-compute handshake...
 LOAD DMA INFO : rem 128 : off = 0 , len 64
 LOAD hit the load-compute handshake...
-COMPUTE has 1 rem_ffts : proceeding to the next 1 FFT computations...
-COMPUTE: starting FFT 0 of 1 = 0 : offset = 0
+COMPUTE has 1 rem_firs : proceeding to the next 1 FIR computations...
+COMPUTE: starting FIR 0 of 1 = 0 : offset = 0
 COMPUTE hit the compute-store handshake...
 STORE DMA INFO : rem 128 : off = 0 , len = 64
 minV = 0.000061035156250

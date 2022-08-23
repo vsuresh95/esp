@@ -46,7 +46,7 @@ void system_t::config_proc()
         // Custom configuration
         /* <<--params-->> */
         config.logn_samples = logn_samples;
-        config.num_ffts = num_ffts;
+        config.num_firs = num_firs;
         config.do_inverse = do_inverse;
         config.do_shift = do_shift;
         config.scale_factor = scale_factor;
@@ -83,12 +83,12 @@ void system_t::config_proc()
         dump_memory(); // store the output in more suitable data structure if needed
         // check the results with the golden model
         int errs = validate();
-        double pct_err = ((double)errs / (double)(2 * num_ffts * num_samples));
+        double pct_err = ((double)errs / (double)(2 * num_firs * num_samples));
         if (pct_err > ERROR_COUNT_TH)
         {
-            ESP_REPORT_ERROR("DMA %u FX %u nFFT %u logn %u : Exceeding error count threshold : %d of %u = %g vs %g : validation failed!", DMA_WIDTH, FX_WIDTH, num_ffts, logn_samples, errs, (2 * num_ffts * num_samples), pct_err, ERROR_COUNT_TH);
+            ESP_REPORT_ERROR("DMA %u FX %u nFIR %u logn %u : Exceeding error count threshold : %d of %u = %g vs %g : validation failed!", DMA_WIDTH, FX_WIDTH, num_firs, logn_samples, errs, (2 * num_firs * num_samples), pct_err, ERROR_COUNT_TH);
         } else {
-            ESP_REPORT_INFO("DMA %u FX %u nFFT %u logn %u : Not exceeding error count threshold : %d of %u = %g vs %g: validation passed!", DMA_WIDTH, FX_WIDTH, num_ffts, logn_samples, errs, (2 * num_ffts * num_samples), pct_err, ERROR_COUNT_TH);
+            ESP_REPORT_INFO("DMA %u FX %u nFIR %u logn %u : Not exceeding error count threshold : %d of %u = %g vs %g: validation passed!", DMA_WIDTH, FX_WIDTH, num_firs, logn_samples, errs, (2 * num_firs * num_samples), pct_err, ERROR_COUNT_TH);
         }
     }
 
@@ -112,11 +112,11 @@ void system_t::load_memory()
 
     // Input data and golden output (aligned to DMA_WIDTH makes your life easier)
 #if (DMA_WORD_PER_BEAT == 0)
-    in_words_adj  = 2 * num_ffts * num_samples;
-    out_words_adj = 2 * num_ffts * num_samples;
+    in_words_adj  = 2 * num_firs * num_samples;
+    out_words_adj = 2 * num_firs * num_samples;
 #else
-    in_words_adj  = round_up(2 * num_ffts * num_samples, DMA_WORD_PER_BEAT);
-    out_words_adj = round_up(2 * num_ffts * num_samples, DMA_WORD_PER_BEAT);
+    in_words_adj  = round_up(2 * num_firs * num_samples, DMA_WORD_PER_BEAT);
+    out_words_adj = round_up(2 * num_firs * num_samples, DMA_WORD_PER_BEAT);
 #endif
 
     in_size  = in_words_adj;
@@ -132,7 +132,7 @@ void system_t::load_memory()
     init_random_distribution();
     in = new float[in_size];
     printf("TEST : MEM : in[%d] @ %p  :: in[%d] @ %p\n", 0, &in[0], (in_size-1), &in[in_size-1]);
-    for (int j = 0; j < 2 * num_ffts * num_samples; j++) {
+    for (int j = 0; j < 2 * num_firs * num_samples; j++) {
         in[j] = gen_random_float();
         //in[j] = ((float)j); ///10000.0;
     }
@@ -141,7 +141,7 @@ void system_t::load_memory()
     gold = new float[out_size];
     memcpy(gold, in, out_size * sizeof(float));
 
-    fir_comp(gold, num_ffts, num_samples, logn_samples, do_inverse, do_shift); // do_bitrev is always true
+    fir_comp(gold, num_firs, num_samples, logn_samples, do_inverse, do_shift); // do_bitrev is always true
 
     // Memory initialization:
 #if (DMA_WORD_PER_BEAT == 0)
@@ -197,19 +197,19 @@ int system_t::validate()
     uint32_t errors = 0;
     const float ERR_TH = 0.05;
 
-    for (int nf = 0; nf < num_ffts; nf++ ){
+    for (int nf = 0; nf < num_firs; nf++ ){
         for (int j = 0; j < 2 * num_samples; j++) {
             int idx = 2 * nf * num_samples + j;
             if ((fabs(gold[idx] - out[idx]) / fabs(gold[idx])) > ERR_TH) {
                 if (errors < 10) {
-                    ESP_REPORT_INFO(" ERROR %u : fft %u : idx %u : gold %g  out %g", errors, nf, idx, gold[idx], out[idx]);
+                    ESP_REPORT_INFO(" ERROR %u : fir %u : idx %u : gold %g  out %g", errors, nf, idx, gold[idx], out[idx]);
                 }
                 errors++;
             }
         }
     }
 
-    ESP_REPORT_INFO("DMA %u FX %u nFFT %u logn %u : Relative error > %f for %d output values out of %d\n", DMA_WIDTH, FX_WIDTH, num_ffts,logn_samples,  ERR_TH, errors, 2*num_ffts*num_samples);
+    ESP_REPORT_INFO("DMA %u FX %u nFIR %u logn %u : Relative error > %f for %d output values out of %d\n", DMA_WIDTH, FX_WIDTH, num_firs,logn_samples,  ERR_TH, errors, 2*num_firs*num_samples);
 
     delete [] in;
     delete [] out;

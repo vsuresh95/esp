@@ -48,7 +48,7 @@ void system_t::config_proc()
         // Custom configuration
         /* <<--params-->> */
         config.logn_samples = logn_samples;
-        config.num_ffts = num_ffts;
+        config.num_firs = num_firs;
         config.do_inverse = do_inverse;
         config.do_shift = do_shift;
         config.scale_factor = scale_factor;
@@ -85,12 +85,12 @@ void system_t::config_proc()
         dump_memory(); // store the output in more suitable data structure if needed
         // check the results with the golden model
         int errs = validate();
-        double pct_err = ((double)errs / (double)(2 * num_ffts * num_samples));
+        double pct_err = ((double)errs / (double)(2 * num_firs * num_samples));
         if (pct_err > ERROR_COUNT_TH)
         {
-            ESP_REPORT_ERROR("DMA %u FX %u nFFT %u logn %u : Exceeding error count threshold : %d of %u = %g vs %g : validation failed!", DMA_WIDTH, FX_WIDTH, num_ffts, logn_samples, errs, (2 * num_ffts * num_samples), pct_err, ERROR_COUNT_TH);
+            ESP_REPORT_ERROR("DMA %u FX %u nFIR %u logn %u : Exceeding error count threshold : %d of %u = %g vs %g : validation failed!", DMA_WIDTH, FX_WIDTH, num_firs, logn_samples, errs, (2 * num_firs * num_samples), pct_err, ERROR_COUNT_TH);
         } else {
-            ESP_REPORT_INFO("DMA %u FX %u nFFT %u logn %u : Not exceeding error count threshold : %d of %u = %g vs %g: validation passed!", DMA_WIDTH, FX_WIDTH, num_ffts, logn_samples, errs, (2 * num_ffts * num_samples), pct_err, ERROR_COUNT_TH);
+            ESP_REPORT_INFO("DMA %u FX %u nFIR %u logn %u : Not exceeding error count threshold : %d of %u = %g vs %g: validation passed!", DMA_WIDTH, FX_WIDTH, num_firs, logn_samples, errs, (2 * num_firs * num_samples), pct_err, ERROR_COUNT_TH);
         }
     }
 
@@ -114,11 +114,11 @@ void system_t::load_memory()
 
     // Input data and golden output (aligned to DMA_WIDTH makes your life easier)
 #if (DMA_WORD_PER_BEAT == 0)
-    in_words_adj  = 2 * num_ffts * num_samples;
-    out_words_adj = 2 * num_ffts * num_samples;
+    in_words_adj  = 2 * num_firs * num_samples;
+    out_words_adj = 2 * num_firs * num_samples;
 #else
-    in_words_adj  = round_up(2 * num_ffts * num_samples, DMA_WORD_PER_BEAT);
-    out_words_adj = round_up(2 * num_ffts * num_samples, DMA_WORD_PER_BEAT);
+    in_words_adj  = round_up(2 * num_firs * num_samples, DMA_WORD_PER_BEAT);
+    out_words_adj = round_up(2 * num_firs * num_samples, DMA_WORD_PER_BEAT);
 #endif
 
     in_size  = in_words_adj;
@@ -135,10 +135,10 @@ void system_t::load_memory()
     in = new float[in_size];
     printf("TEST : MEM : in[%d] @ %p  :: in[%d] @ %p\n", 0, &in[0], (in_size-1), &in[in_size-1]);
     printf("IN_DATA:\n");
-    printf("float FFT_INPUTS[%u] = {\n", 2 * num_ffts * num_samples);
-    for (int j = 0; j < 2 * num_ffts * num_samples; j++) {
+    printf("float FIR_INPUTS[%u] = {\n", 2 * num_firs * num_samples);
+    for (int j = 0; j < 2 * num_firs * num_samples; j++) {
         if (use_input_files) { 
-            in[j] = FFT_INPUTS[j];
+            in[j] = FIR_INPUTS[j];
         } else {
             in[j] = gen_random_float();
         }
@@ -151,11 +151,11 @@ void system_t::load_memory()
     gold = new float[out_size];
     memcpy(gold, in, out_size * sizeof(float));
 
-    fir_comp(gold, num_ffts, num_samples, logn_samples, do_inverse, do_shift); // do_bitrev is always true
+    fir_comp(gold, num_firs, num_samples, logn_samples, do_inverse, do_shift); // do_bitrev is always true
 
     printf("OUT_DATA:\n");
-    printf("float FFT_OUTPUTS[%u] = {\n", 2 * num_ffts * num_samples);
-    for (int j = 0; j < 2 * num_ffts * num_samples; j++) {
+    printf("float FIR_OUTPUTS[%u] = {\n", 2 * num_firs * num_samples);
+    for (int j = 0; j < 2 * num_firs * num_samples; j++) {
         printf("    %.15f,\n", gold[j]);
     }
     printf("};\nEND_OF_OUT_DATA\n");
@@ -217,7 +217,7 @@ int system_t::validate()
     const float ERR_TH = 0.05;
     const float minV = 1.0/(float)(1<<14);
     printf("minV = %.15f\n", minV);
-    for (int nf = 0; nf < num_ffts; nf++ ) {
+    for (int nf = 0; nf < num_firs; nf++ ) {
         for (int j = 0; j < 2 * num_samples; j++) {
             int idx = 2 * nf * num_samples + j;
             float eOvG = (fabs(gold[idx] - out[idx] ) / fabs(gold[idx]));
@@ -226,36 +226,36 @@ int system_t::validate()
             if ((eOvG > ERR_TH) && (eGvO > ERR_TH)) {
                 if (errors1 < 4) {
                     //ESP_REPORT_INFO(" ERROR : GOLD[%u] = %f vs %f = out[%u]\n", idx, gold[idx], out[idx], idx);
-                    ESP_REPORT_INFO(" ERROR %u : fft %u : idx %u : gold %.15f  out %.15f", errors1, nf, idx, gold[idx], out[idx]);
+                    ESP_REPORT_INFO(" ERROR %u : fir %u : idx %u : gold %.15f  out %.15f", errors1, nf, idx, gold[idx], out[idx]);
                 }
                 errors1++;
                 if (fabs(gold[j]) > minV) {
                     if (errors2 < 4) {
                         //ESP_REPORT_INFO(" ERROR : GOLD[%u] = %f vs %f = out[%u]\n", idx, gold[idx], out[idx], idx);
-                        ESP_REPORT_INFO(" ERROR %u : fft %u : idx %u : gold %.15f  out %.15f", errors2, nf, idx, gold[idx], out[idx]);
+                        ESP_REPORT_INFO(" ERROR %u : fir %u : idx %u : gold %.15f  out %.15f", errors2, nf, idx, gold[idx], out[idx]);
                     }
                     errors2++;
                 }
                 if (fabs(out[j]) > minV) {
                     if (errors3 < 4) {
                         //ESP_REPORT_INFO(" ERROR : GOLD[%u] = %f vs %f = out[%u]\n", idx, gold[idx], out[idx], idx);
-                        ESP_REPORT_INFO(" ERROR %u : fft %u : idx %u : gold %.15f  out %.15f", errors3, nf, idx, gold[idx], out[idx]);
+                        ESP_REPORT_INFO(" ERROR %u : fir %u : idx %u : gold %.15f  out %.15f", errors3, nf, idx, gold[idx], out[idx]);
                     }
                     errors3++;
                 }
             }
             /*
-            if ((fabs(FFT_OUTPUTS[idx] - out[idx]) / fabs(FFT_OUTPUTS[idx])) > ERR_TH) {
+            if ((fabs(FIR_OUTPUTS[idx] - out[idx]) / fabs(FIR_OUTPUTS[idx])) > ERR_TH) {
                 if (errors2 < 4) {
-                    //ESP_REPORT_INFO(" ERROR : FFT_OUTPUTS[%u] = %f vs %f = out[%u]\n", idx, FFT_OUTPUTS[idx], out[idx], idx);
-                    ESP_REPORT_INFO(" ERROR %u : fft %u : idx %u : FFT_OUTPUTS %.15f  out %.15f", errors2, nf, idx, FFT_OUTPUTS[idx], out[idx]);
+                    //ESP_REPORT_INFO(" ERROR : FIR_OUTPUTS[%u] = %f vs %f = out[%u]\n", idx, FIR_OUTPUTS[idx], out[idx], idx);
+                    ESP_REPORT_INFO(" ERROR %u : fir %u : idx %u : FIR_OUTPUTS %.15f  out %.15f", errors2, nf, idx, FIR_OUTPUTS[idx], out[idx]);
                 }
                 errors2++;
             }
-            if ((fabs(FFT_OUTPUTS[idx] - gold[idx]) / fabs(FFT_OUTPUTS[idx])) > ERR_TH) {
+            if ((fabs(FIR_OUTPUTS[idx] - gold[idx]) / fabs(FIR_OUTPUTS[idx])) > ERR_TH) {
                 if (errors3 < 4) {
-                    //ESP_REPORT_INFO(" ERROR : FFT_OUTPUTS[%u] = %f vs %f = gold[%u]\n", idx, FFT_OUTPUTS[idx], gold[idx], idx);
-                    ESP_REPORT_INFO(" ERROR %u : fft %u : idx %u : FFT_OUTPUTS %.15f  GOLD %.15f", errors3, nf, idx, FFT_OUTPUTS[idx], gold[idx]);
+                    //ESP_REPORT_INFO(" ERROR : FIR_OUTPUTS[%u] = %f vs %f = gold[%u]\n", idx, FIR_OUTPUTS[idx], gold[idx], idx);
+                    ESP_REPORT_INFO(" ERROR %u : fir %u : idx %u : FIR_OUTPUTS %.15f  GOLD %.15f", errors3, nf, idx, FIR_OUTPUTS[idx], gold[idx]);
                 }
                 errors3++;
             }
@@ -263,8 +263,8 @@ int system_t::validate()
         }
     }
 
-    ESP_REPORT_INFO("DMA %u FX %u nFFT %u logn %u : Rel-Err > %f for %d OvG %d Gmin %d Omin values out of %d\n", 
-                    DMA_WIDTH, FX_WIDTH, num_ffts,logn_samples,  ERR_TH, errors1, errors2, errors3, 2*num_ffts*num_samples);
+    ESP_REPORT_INFO("DMA %u FX %u nFIR %u logn %u : Rel-Err > %f for %d OvG %d Gmin %d Omin values out of %d\n", 
+                    DMA_WIDTH, FX_WIDTH, num_firs,logn_samples,  ERR_TH, errors1, errors2, errors3, 2*num_firs*num_samples);
 
     delete [] in;
     delete [] out;

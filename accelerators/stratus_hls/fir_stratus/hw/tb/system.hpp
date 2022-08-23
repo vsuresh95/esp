@@ -58,15 +58,15 @@ public:
         /* <<--params-default-->> */
         // use_input_files = 1
         //logn_samples = 6;
-        //num_ffts = 46;
+        //num_firs = 46;
 
         use_input_files = 0;
         logn_samples = 12;
-        num_ffts = 15;
+        num_firs = 15;
 
         //use_input_files = 1;
         //logn_samples = 6;
-        //num_ffts = 1;
+        //num_firs = 1;
         num_samples = (1 << logn_samples);
         do_inverse = 0;
         do_shift = 0;
@@ -91,7 +91,7 @@ public:
     /* <<--params-->> */
     int32_t logn_samples;
     int32_t num_samples;
-    int32_t num_ffts;
+    int32_t num_firs;
     int32_t do_inverse;
     int32_t do_shift;
     int32_t scale_factor;

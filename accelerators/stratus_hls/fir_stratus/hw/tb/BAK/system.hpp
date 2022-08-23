@@ -58,7 +58,7 @@ public:
         /* <<--params-default-->> */
         logn_samples = 12;
         num_samples = (1 << logn_samples);
-        num_ffts = 4;
+        num_firs = 4;
         do_inverse = 0;
         do_shift = 0;
         scale_factor = 1;
@@ -82,7 +82,7 @@ public:
     /* <<--params-->> */
     int32_t logn_samples;
     int32_t num_samples;
-    int32_t num_ffts;
+    int32_t num_firs;
     int32_t do_inverse;
     int32_t do_shift;
     int32_t scale_factor;

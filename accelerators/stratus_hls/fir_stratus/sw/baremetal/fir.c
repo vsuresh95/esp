@@ -38,7 +38,7 @@ static unsigned DMA_WORD_PER_BEAT(unsigned _st)
 /* <<--params-->> */
 const int32_t logn_samples = 10;
 const int32_t num_samples = (1 << logn_samples);
-const int32_t num_ffts = 1;
+const int32_t num_firs = 1;
 const int32_t do_inverse = 0;
 const int32_t do_shift = 0;
 const int32_t scale_factor = 1;
@@ -63,7 +63,7 @@ static unsigned mem_size;
 /* User defined registers */
 /* <<--regs-->> */
 #define FIR_LOGN_SAMPLES_REG 0x40
-#define FIR_NUM_FFTS_REG 0x44
+#define FIR_NUM_FIRS_REG 0x44
 #define FIR_DO_INVERSE_REG 0x48
 #define FIR_DO_SHIFT_REG 0x4c
 #define FIR_SCALE_FACTOR_REG 0x50
@@ -110,13 +110,13 @@ static void init_buf(token_t *in, float *gold)
 		in[j+SYNC_VAR_SIZE] = float2fx((native_t) gold[j], FX_IL);
 
 	// Compute golden output
-	fir_comp(gold, num_ffts, num_samples, logn_samples, 0 /* do_inverse */, do_shift);
+	fir_comp(gold, num_firs, num_samples, logn_samples, 0 /* do_inverse */, do_shift);
 
 	// for (j = 0; j < 2 * len; j++) {
 	// 	printf("  INT GOLD[%u] = 0x%08x\n", j, ((uint32_t*)gold)[j]);
     // }
 
-	fir_comp(gold, num_ffts, num_samples, logn_samples, 1 /* do_inverse */, do_shift);
+	fir_comp(gold, num_firs, num_samples, logn_samples, 1 /* do_inverse */, do_shift);
 }
 
 int main(int argc, char * argv[])
@@ -135,8 +135,8 @@ int main(int argc, char * argv[])
 	unsigned coherence;
         const float ERROR_COUNT_TH = 0.001;
 
-	len = num_ffts * (1 << logn_samples);
-	printf("logn %u nsmp %u nfft %u inv %u shft %u len %u\n", logn_samples, num_samples, num_ffts, do_inverse, do_shift, len);
+	len = num_firs * (1 << logn_samples);
+	printf("logn %u nsmp %u nfir %u inv %u shft %u len %u\n", logn_samples, num_samples, num_firs, do_inverse, do_shift, len);
 	if (DMA_WORD_PER_BEAT(sizeof(token_t)) == 0) {
 		in_words_adj = 2 * len;
 		out_words_adj = 2 * len;
@@ -216,7 +216,7 @@ int main(int argc, char * argv[])
 		// Pass accelerator-specific configuration parameters
 		/* <<--regs-config-->> */
 		iowrite32(dev, FIR_LOGN_SAMPLES_REG, logn_samples);
-		iowrite32(dev, FIR_NUM_FFTS_REG, num_ffts);
+		iowrite32(dev, FIR_NUM_FIRS_REG, num_firs);
 		iowrite32(dev, FIR_SCALE_FACTOR_REG, scale_factor);
 		iowrite32(dev, FIR_DO_SHIFT_REG, do_shift);
 		iowrite32(dev, FIR_DO_INVERSE_REG, n);

@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <sld>
   <accelerator name="fir" desc="Accelerator FIR" data_size="128" device_id="055" hls_tool="stratus_hls">
-    <param name="logn_samples" desc="Log-2 of the number of FFT samples" />
-    <param name="num_ffts" desc="The nubmer of FFTs to do in the current memory block" />
-    <param name="do_inverse" desc="0 = FFT, 1 = Inverse-FFT" />
+    <param name="logn_samples" desc="Log-2 of the number of FIR samples" />
+    <param name="num_firs" desc="The nubmer of FIRs to do in the current memory block" />
+    <param name="do_inverse" desc="0 = FIR, 1 = Inverse-FIR" />
     <param name="do_shift" desc="0 = no shift, 1 = do shift (move's sampels center)" />
     <param name="scale_factor" desc="(unused) scale_factor" />
   </accelerator>

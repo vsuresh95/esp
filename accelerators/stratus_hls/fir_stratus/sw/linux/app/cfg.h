@@ -20,11 +20,11 @@ typedef float native_t;
 
 /* <<--params-def-->> */
 #define LOGN_SAMPLES 6
-//#define NUM_FFTS     46
-#define NUM_FFTS     1
+//#define NUM_FIRS     46
+#define NUM_FIRS     1
 //#define LOGN_SAMPLES 12
-//#define NUM_FFTS     13
-/*#define NUM_SAMPLES (NUM_FFTS * (1 << LOGN_SAMPLES))*/
+//#define NUM_FIRS     13
+/*#define NUM_SAMPLES (NUM_FIRS * (1 << LOGN_SAMPLES))*/
 #define DO_INVERSE   0
 #define DO_SHIFT     1
 #define SCALE_FACTOR 0
@@ -32,7 +32,7 @@ typedef float native_t;
 /* <<--params-->> */
 const int32_t logn_samples = LOGN_SAMPLES;
 /*const int32_t num_samples = NUM_SAMPLES;*/
-const int32_t num_ffts = NUM_FFTS;
+const int32_t num_firs = NUM_FIRS;
 const int32_t do_inverse = DO_INVERSE;
 const int32_t do_shift = DO_SHIFT;
 const int32_t scale_factor = SCALE_FACTOR;
@@ -43,7 +43,7 @@ struct fir_stratus_access fir_cfg_000[] = {
 	{
 		/* <<--descriptor-->> */
 		.logn_samples = LOGN_SAMPLES,
-		.num_ffts = NUM_FFTS,
+		.num_firs = NUM_FIRS,
 		.do_inverse = DO_INVERSE,
 		.do_shift = DO_SHIFT,
 		.scale_factor = SCALE_FACTOR,

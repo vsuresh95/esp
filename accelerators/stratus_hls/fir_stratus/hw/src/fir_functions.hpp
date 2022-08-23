@@ -117,7 +117,7 @@ inline void fir::fir_do_shift(unsigned int offset, unsigned int num_samples, uns
 }
 
 
-// These values are the same whether FFT or iFFT (i.e. indep of do_inverse)
+// These values are the same whether FIR or iFIR (i.e. indep of do_inverse)
 inline FPDATA myCos(int m)
 {
 	switch(m) {

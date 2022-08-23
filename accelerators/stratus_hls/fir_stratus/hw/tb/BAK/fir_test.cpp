@@ -65,16 +65,16 @@ void fir_do_shift(float *A0, unsigned int offset, unsigned int num_samples, unsi
 }
 
 
-int fir_comp(float *data, unsigned nffts, unsigned int n, unsigned int logn, int do_inverse, int do_shift)
+int fir_comp(float *data, unsigned nfirs, unsigned int n, unsigned int logn, int do_inverse, int do_shift)
 {
-    for (int nf = 0; nf < nffts; nf++) {
+    for (int nf = 0; nf < nfirs; nf++) {
 	unsigned int transform_length;
 	unsigned int a, b, i, j, bit;
 	float theta, t_real, t_imag, w_real, w_imag, s, t, s2, z_real, z_imag;
 
-        unsigned int offset = nf * n;  // This is the offset for start of nf=th FFT
+        unsigned int offset = nf * n;  // This is the offset for start of nf=th FIR
         int sign;
-        //printf("TEST : Doing computation of FFT %u : data[%u] = %.15g\n", nf, 2*offset, data[2*offset]);
+        //printf("TEST : Doing computation of FIR %u : data[%u] = %.15g\n", nf, 2*offset, data[2*offset]);
         if (do_inverse) {
             sign = 1;
             if (do_shift) {
@@ -134,7 +134,7 @@ int fir_comp(float *data, unsigned nffts, unsigned int n, unsigned int logn, int
             fir_do_shift(data, offset, n, logn);
         }
 
-    } // for (nf = 0 .. num_ffts)
+    } // for (nf = 0 .. num_firs)
 
     return 0;
 }

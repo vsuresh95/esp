@@ -354,11 +354,11 @@ void fir::compute_kernel()
             wait();
         }
 
-        // Compute FFT
+        // Compute FIR
         {
             compute_state_req_dbg.write(3);
 
-            unsigned offset = 0;  // Offset into Mem for start of this FFT
+            unsigned offset = 0;  // Offset into Mem for start of this FIR
             int sin_sign = (do_inverse) ? -1 : 1; // This modifes the mySin
                                                   // values used below
             if (do_inverse && do_shift) {
@@ -369,7 +369,7 @@ void fir::compute_kernel()
             fir_bit_reverse(offset, num_samples, logn_samples);
 
             // Computing phase implementation
-            int m = 1;  // iterative FFT
+            int m = 1;  // iterative FIR
 
             FIR_SINGLE_L1:
                 for(unsigned s = 1; s <= logn_samples; s++) {

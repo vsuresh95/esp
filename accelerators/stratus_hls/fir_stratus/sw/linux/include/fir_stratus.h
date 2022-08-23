@@ -22,7 +22,7 @@ struct fir_stratus_access {
 	unsigned do_inverse;
 	unsigned logn_samples;
 	unsigned do_shift;
-	unsigned num_ffts;
+	unsigned num_firs;
 	unsigned src_offset;
 	unsigned dst_offset;
 };

@@ -12,7 +12,7 @@
 
 /* <<--regs-->> */
 #define FIR_LOGN_SAMPLES_REG 0x40
-#define FIR_NUM_FFTS_REG 0x44
+#define FIR_NUM_FIRS_REG 0x44
 #define FIR_DO_INVERSE_REG 0x48
 #define FIR_DO_SHIFT_REG 0x4c
 #define FIR_SCALE_FACTOR_REG 0x50
@@ -52,7 +52,7 @@ static void fir_prep_xfer(struct esp_device *esp, void *arg)
 	iowrite32be(a->do_inverse, esp->iomem + FIR_DO_INVERSE_REG);
 	iowrite32be(a->logn_samples, esp->iomem + FIR_LOGN_SAMPLES_REG);
 	iowrite32be(a->do_shift, esp->iomem + FIR_DO_SHIFT_REG);
-	iowrite32be(a->num_ffts, esp->iomem + FIR_NUM_FFTS_REG);
+	iowrite32be(a->num_firs, esp->iomem + FIR_NUM_FIRS_REG);
 	iowrite32be(a->src_offset, esp->iomem + SRC_OFFSET_REG);
 	iowrite32be(a->dst_offset, esp->iomem + DST_OFFSET_REG);
 
