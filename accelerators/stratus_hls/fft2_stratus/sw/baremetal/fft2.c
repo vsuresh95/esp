@@ -35,8 +35,11 @@ static unsigned DMA_WORD_PER_BEAT(unsigned _st)
 #define SLD_FFT2 0x057
 #define DEV_NAME "sld,fft2_stratus"
 
+#define SLD_FIR 0x050
+#define FIR_DEV_NAME "sld,fir_stratus"
+
 /* <<--params-->> */
-const int32_t logn_samples = 10;
+const int32_t logn_samples = 3;
 const int32_t num_samples = (1 << logn_samples);
 const int32_t num_ffts = 1;
 const int32_t do_inverse = 0;
@@ -52,6 +55,8 @@ static unsigned in_size;
 static unsigned out_size;
 static unsigned out_offset;
 static unsigned mem_size;
+static unsigned acc_offset;
+static unsigned acc_size;
 
 /* Size of the contiguous chunks for scatter/gather */
 #define CHUNK_SHIFT 20
@@ -68,9 +73,15 @@ static unsigned mem_size;
 #define FFT2_DO_SHIFT_REG 0x4c
 #define FFT2_SCALE_FACTOR_REG 0x50
 
+#define FIR_LOGN_SAMPLES_REG 0x40
+#define FIR_NUM_FIRS_REG 0x44
+#define FIR_DO_INVERSE_REG 0x48
+#define FIR_DO_SHIFT_REG 0x4c
+#define FIR_SCALE_FACTOR_REG 0x50
+
 #define SYNC_VAR_SIZE 2
 
-#define NUM_DEVICES 2
+#define NUM_DEVICES 3
 
 static int validate_buf(token_t *out, float *gold)
 {
@@ -90,7 +101,7 @@ static int validate_buf(token_t *out, float *gold)
 }
 
 
-static void init_buf(token_t *in, float *gold)
+static void init_buf(token_t *in, float *gold, token_t *in_filter, float *gold_filter)
 {
 	int j;
 	const float LO = -10.0;
@@ -105,12 +116,32 @@ static void init_buf(token_t *in, float *gold)
 		// printf("  IN[%u] = 0x%08x\n", j, ig);
 	}
 
+	for (j = 0; j < 2 * len; j++) {
+		float scaling_factor = (float) rand () / (float) RAND_MAX;
+		gold_filter[j] = LO + scaling_factor * (HI - LO);
+		uint32_t ig = ((uint32_t*)gold_filter)[j];
+		// printf("  IN[%u] = 0x%08x\n", j, ig);
+	}
+
 	// convert input to fixed point
 	for (j = 0; j < 2 * len; j++)
 		in[j+SYNC_VAR_SIZE] = float2fx((native_t) gold[j], FX_IL);
 
+	// convert input to fixed point
+	for (j = 0; j < 2 * len; j++)
+		in_filter[j] = float2fx((native_t) gold_filter[j], FX_IL);
+
 	// Compute golden output
 	fft2_comp(gold, num_ffts, num_samples, logn_samples, 0 /* do_inverse */, do_shift);
+
+    float gold_r, gold_i;
+
+	for (j = 0; j < 2 * len; j+=2) {
+        gold_r = gold[j] * gold_filter[j] - gold[j+1] * gold_filter[j+1];
+        gold_i = gold[j] * gold_filter[j+1] + gold[j+1] * gold_filter[j];
+        gold[j] = gold_r;
+        gold[j+1] = gold_i;
+    }
 
 	// for (j = 0; j < 2 * len; j++) {
 	// 	printf("  INT GOLD[%u] = 0x%08x\n", j, ((uint32_t*)gold)[j]);
@@ -126,6 +157,7 @@ int main(int argc, char * argv[])
 	int ndev;
 	struct esp_device *espdevs;
 	struct esp_device *dev;
+	struct esp_device *fir_dev;
 	unsigned done;
 	unsigned spin_ct;
 	unsigned **ptable = NULL;
@@ -151,13 +183,14 @@ int main(int argc, char * argv[])
 	out_offset  = 0;
 	mem_size = (out_offset * sizeof(token_t)) + out_size + (SYNC_VAR_SIZE * sizeof(token_t));
 
-    unsigned acc_offset = mem_size;
-    mem_size *= NUM_DEVICES+1;
+    acc_size = mem_size;
+    acc_offset = out_offset + out_len + SYNC_VAR_SIZE;
+    mem_size *= NUM_DEVICES+3;
 
 	printf("ilen %u isize %u o_off %u olen %u osize %u msize %u\n", in_len, out_len, in_size, out_size, out_offset, mem_size);
 
 	// Allocate memory
-	gold = aligned_malloc(out_len * sizeof(float));
+	gold = aligned_malloc(2 * out_len * sizeof(float));
 	mem = aligned_malloc(mem_size);
 	printf("  memory buffer base-address = %p\n", mem);
 
@@ -174,7 +207,7 @@ int main(int argc, char * argv[])
 	coherence = ACC_COH_FULL;
 	printf("  --------------------\n");
 	printf("  Generate input...\n");
-	init_buf(mem, gold);
+	init_buf(mem, gold, (mem + acc_offset + 4 * out_len), (gold + out_len));
 
 	printf("Scanning device tree... \n");
 
@@ -210,8 +243,8 @@ int main(int argc, char * argv[])
 		iowrite32(dev, PT_SHIFT_REG, CHUNK_SHIFT);
 
 		// Use the following if input and output data are not allocated at the default offsets
-		iowrite32(dev, SRC_OFFSET_REG, n * acc_offset);
-		iowrite32(dev, DST_OFFSET_REG, n * acc_offset);
+		iowrite32(dev, SRC_OFFSET_REG, 2 * n * acc_size);
+		iowrite32(dev, DST_OFFSET_REG, 2 * n * acc_size);
 
 		// Pass accelerator-specific configuration parameters
 		/* <<--regs-config-->> */
@@ -229,10 +262,56 @@ int main(int argc, char * argv[])
 		iowrite32(dev, CMD_REG, CMD_MASK_START);
     }
 
-    unsigned cpu_arr_offset = out_offset + out_len + SYNC_VAR_SIZE;
+	unsigned nfir = probe(&fir_dev, VENDOR_SLD, SLD_FIR, FIR_DEV_NAME);
+	if (nfir == 0) {
+		printf("%s not found\n", FIR_DEV_NAME);
+		return 0;
+	}
+
+	for (n = 0; n < nfir; n++) {
+
+		printf("**************** %s.%d ****************\n", FIR_DEV_NAME, n);
+
+		dev = fir_dev;
+
+		// Check DMA capabilities
+		if (ioread32(dev, PT_NCHUNK_MAX_REG) == 0) {
+			printf("  -> scatter-gather DMA is disabled. Abort.\n");
+			return 0;
+		}
+
+		if (ioread32(dev, PT_NCHUNK_MAX_REG) < NCHUNK(mem_size)) {
+			printf("  -> Not enough TLB entries available. Abort.\n");
+			return 0;
+		}
+
+		// Pass common configuration parameters
+		iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
+		iowrite32(dev, COHERENCE_REG, coherence);
+
+		iowrite32(dev, PT_ADDRESS_REG, (unsigned long long) ptable);
+		iowrite32(dev, PT_NCHUNK_REG, NCHUNK(mem_size));
+		iowrite32(dev, PT_SHIFT_REG, CHUNK_SHIFT);
+
+		// Use the following if input and output data are not allocated at the default offsets
+		iowrite32(dev, SRC_OFFSET_REG, acc_size);
+		iowrite32(dev, DST_OFFSET_REG, acc_size);
+
+		// Pass accelerator-specific configuration parameters
+		/* <<--regs-config-->> */
+		iowrite32(dev, FIR_LOGN_SAMPLES_REG, logn_samples);
+		iowrite32(dev, FIR_NUM_FIRS_REG, num_ffts);
+
+		// Flush (customize coherence model here)
+		esp_flush(coherence);
+
+		// Start accelerators
+		printf("  Start...\n");
+		iowrite32(dev, CMD_REG, CMD_MASK_START);
+    }
 
 	sm_sync[0] = 1;
-	while(sm_sync[2*cpu_arr_offset] != 1);
+	while(sm_sync[NUM_DEVICES*acc_offset] != 1);
 
 	for (n = 0; n < ndev; n++) {
 
@@ -253,10 +332,29 @@ int main(int argc, char * argv[])
         printf("  Done : spin_count = %u\n", spin_ct);
     }
 
+	for (n = 0; n < nfir; n++) {
+
+		printf("**************** %s.%d ****************\n", FIR_DEV_NAME, n);
+
+		dev = fir_dev;
+
+	    // Wait for completion
+	    done = 0;
+	    spin_ct = 0;
+	    while (!done) {
+	        done = ioread32(dev, STATUS_REG);
+	        done &= STATUS_MASK_DONE;
+	        spin_ct++;
+	    }
+	    iowrite32(dev, CMD_REG, 0x0);
+
+        printf("  Done : spin_count = %u\n", spin_ct);
+    }
+
 	printf("  validating...\n");
 
 	/* Validation */
-	errors = validate_buf(&mem[(2*cpu_arr_offset)], gold);
+	errors = validate_buf(&mem[NUM_DEVICES*acc_offset], gold);
 	if ((float)((float)errors / (2.0 * (float)len)) > ERROR_COUNT_TH)
 		printf("  ... FAIL : %u errors out of %u\n", errors, 2*len);
 	else
