@@ -10,6 +10,7 @@ static unsigned out_size;
 static unsigned out_offset;
 static unsigned size;
 static unsigned acc_offset;
+static unsigned acc_size;
 
 const float ERR_TH = 0.05;
 
@@ -55,7 +56,13 @@ static void init_buffer(token_t *in, float *gold)
 	}
 
 	// Compute golden output
-	fft2_comp(gold, num_ffts, (1<<logn_samples), logn_samples, do_inverse, do_shift);
+	fft2_comp(gold, num_ffts, (1<<logn_samples), logn_samples, 0 /* do_inverse */, do_shift);
+
+	for (j = 0; j < 2 * num_ffts * num_samples; j++) {
+		printf("  INT GOLD[%u] = %f\n", j, gold[j]);
+    }
+
+	fft2_comp(gold, num_ffts, (1<<logn_samples), logn_samples, 1 /* do_inverse */, do_shift);
 }
 
 
@@ -78,7 +85,8 @@ static void init_parameters()
 	out_offset = 0;
 	size = (out_offset * sizeof(token_t)) + out_size + (SYNC_VAR_SIZE * sizeof(token_t));
 
-    acc_offset = size;
+    acc_size = size;
+    acc_offset = out_offset + out_len + SYNC_VAR_SIZE;
     size *= NUM_DEVICES+1;
 }
 
@@ -100,8 +108,11 @@ int main(int argc, char **argv)
 	cfg_001[0].hw_buf = buf;
 	gold = malloc(out_len * sizeof(float));
 
-    fft2_cfg_001[0].src_offset = acc_offset;
-    fft2_cfg_001[0].dst_offset = acc_offset;
+	printf("   buf = %p\n", buf);
+	printf("   gold = %p\n", gold);
+
+    fft2_cfg_001[0].src_offset = acc_size;
+    fft2_cfg_001[0].dst_offset = acc_size;
 
     volatile token_t* sm_sync = (volatile token_t*) buf;
 
@@ -131,12 +142,11 @@ int main(int argc, char **argv)
 	sm_sync[0] = 1;
 
     // Wait for last accelerator
-    unsigned cpu_arr_offset = out_offset + out_len + SYNC_VAR_SIZE;
-	while(sm_sync[2*cpu_arr_offset] != 1);
+	while(sm_sync[2*acc_offset] != 1);
 
 	printf("\n  ** DONE **\n");
 
-	errors = validate_buffer(&buf[2*cpu_arr_offset], gold);
+	errors = validate_buffer(&buf[2*acc_offset], gold);
 
 	free(gold);
 	esp_free(buf);
