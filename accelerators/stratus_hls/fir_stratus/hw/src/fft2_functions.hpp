@@ -1,7 +1,7 @@
 // Copyright (c) 2011-2019 Columbia University, System Level Design Group
 // SPDX-License-Identifier: Apache-2.0
 
-//#include "fft2.hpp"
+//#include "fir.hpp"
 
 // complex number multiplication
 inline void compMul(const CompNum &x, const CompNum &y, CompNum &res)
@@ -25,14 +25,14 @@ inline void compSub(const CompNum &x, const CompNum &y, CompNum &res)
 }
 
 // bit reverse
-inline unsigned int fft2_rev(unsigned int v)
+inline unsigned int fir_rev(unsigned int v)
 {
     unsigned int r = v;
     int s = 31;
     int i;
 
     for (i = 0; i < 31; i++) {
-        HLS_UNROLL_N(8, "fft2-rev-unroll");
+        HLS_UNROLL_N(8, "fir-rev-unroll");
         v >>= 1;
         if (v != 0) {
             r <<= 1;
@@ -46,7 +46,7 @@ inline unsigned int fft2_rev(unsigned int v)
     return r;
 }
 
-inline void fft2::fft2_bit_reverse(unsigned int offset, unsigned int n, unsigned int bits)
+inline void fir::fir_bit_reverse(unsigned int offset, unsigned int n, unsigned int bits)
 {
 	unsigned int i, s, shift;
         s = 31;
@@ -57,7 +57,7 @@ inline void fft2::fft2_bit_reverse(unsigned int offset, unsigned int n, unsigned
             FPDATA_WORD t1_real, t1_imag;
             FPDATA_WORD t2_real, t2_imag;
 
-            r = fft2_rev(i);
+            r = fir_rev(i);
             r >>= shift;
 
             unsigned int iidx = 2*(offset + i);
@@ -87,7 +87,7 @@ inline void fft2::fft2_bit_reverse(unsigned int offset, unsigned int n, unsigned
 
 
 
-inline void fft2::fft2_do_shift(unsigned int offset, unsigned int num_samples, unsigned int logn_samples)
+inline void fir::fir_do_shift(unsigned int offset, unsigned int num_samples, unsigned int logn_samples)
 {
     int md = (num_samples/2);
     for(unsigned oi = 0; oi < md; oi++) {
@@ -212,7 +212,7 @@ inline FPDATA myInvSin(int m)
 	}
 }
 
-inline void fft2::compute_load_ready_handshake()
+inline void fir::compute_load_ready_handshake()
 {
     {
         HLS_DEFINE_PROTOCOL("compute-load-ready-handshake");
@@ -221,7 +221,7 @@ inline void fft2::compute_load_ready_handshake()
     }
 }
 
-inline void fft2::load_compute_ready_handshake()
+inline void fir::load_compute_ready_handshake()
 {
     {
         HLS_DEFINE_PROTOCOL("load-compute-ready-handshake");
@@ -230,7 +230,7 @@ inline void fft2::load_compute_ready_handshake()
     }
 }
 
-inline void fft2::compute_store_ready_handshake()
+inline void fir::compute_store_ready_handshake()
 {
     {
         HLS_DEFINE_PROTOCOL("compute-store-ready-handshake");
@@ -239,7 +239,7 @@ inline void fft2::compute_store_ready_handshake()
     }
 }
 
-inline void fft2::store_compute_ready_handshake()
+inline void fir::store_compute_ready_handshake()
 {
     {
         HLS_DEFINE_PROTOCOL("store-compute-ready-handshake");
@@ -248,7 +248,7 @@ inline void fft2::store_compute_ready_handshake()
     }
 }
 
-inline void fft2::compute_load_done_handshake()
+inline void fir::compute_load_done_handshake()
 {
     {
         HLS_DEFINE_PROTOCOL("compute-load-done-handshake");
@@ -257,7 +257,7 @@ inline void fft2::compute_load_done_handshake()
     }
 }
 
-inline void fft2::load_compute_done_handshake()
+inline void fir::load_compute_done_handshake()
 {
     {
         HLS_DEFINE_PROTOCOL("load-compute-done-handshake");
@@ -266,7 +266,7 @@ inline void fft2::load_compute_done_handshake()
     }
 }
 
-inline void fft2::compute_store_done_handshake()
+inline void fir::compute_store_done_handshake()
 {
     {
         HLS_DEFINE_PROTOCOL("compute-store-done-handshake");
@@ -275,7 +275,7 @@ inline void fft2::compute_store_done_handshake()
     }
 }
 
-inline void fft2::store_compute_done_handshake()
+inline void fir::store_compute_done_handshake()
 {
     {
         HLS_DEFINE_PROTOCOL("store-compute-done-handshake");

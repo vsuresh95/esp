@@ -2,9 +2,9 @@
 #include <stdio.h>
 #include <iostream>
 
-#include "fft2_test.hpp"
+#include "fir_test.hpp"
 
-unsigned int fft2_rev(unsigned int v)
+unsigned int fir_rev(unsigned int v)
 {
     unsigned int r = v;
     int s = sizeof(v) * CHAR_BIT - 1;
@@ -18,7 +18,7 @@ unsigned int fft2_rev(unsigned int v)
     return r;
 }
 
-void fft2_bit_reverse(float *w, unsigned int offset, unsigned int n, unsigned int bits)
+void fir_bit_reverse(float *w, unsigned int offset, unsigned int n, unsigned int bits)
 {
     unsigned int i, s, shift;
 
@@ -29,7 +29,7 @@ void fft2_bit_reverse(float *w, unsigned int offset, unsigned int n, unsigned in
         unsigned int r;
         float t_real, t_imag;
 
-        r = fft2_rev(i);
+        r = fir_rev(i);
         r >>= shift;
 
         if (i < r) {
@@ -45,7 +45,7 @@ void fft2_bit_reverse(float *w, unsigned int offset, unsigned int n, unsigned in
 }
 
 
-void fft2_do_shift(float *A0, unsigned int offset, unsigned int num_samples, unsigned int bits)
+void fir_do_shift(float *A0, unsigned int offset, unsigned int num_samples, unsigned int bits)
 {
     int md = (num_samples/2);
     /* shift: */
@@ -65,7 +65,7 @@ void fft2_do_shift(float *A0, unsigned int offset, unsigned int num_samples, uns
 }
 
 
-int fft2_comp(float *data, unsigned nffts, unsigned int n, unsigned int logn, int do_inverse, int do_shift)
+int fir_comp(float *data, unsigned nffts, unsigned int n, unsigned int logn, int do_inverse, int do_shift)
 {
     for (int nf = 0; nf < nffts; nf++) {
 	unsigned int transform_length;
@@ -79,7 +79,7 @@ int fft2_comp(float *data, unsigned nffts, unsigned int n, unsigned int logn, in
             sign = 1;
             if (do_shift) {
                 //printf("TEST: Calling Inverse-Do-Shift\n");
-                fft2_do_shift(data, offset, n, logn);
+                fir_do_shift(data, offset, n, logn);
             }
         } else {
             sign = -1;
@@ -88,7 +88,7 @@ int fft2_comp(float *data, unsigned nffts, unsigned int n, unsigned int logn, in
 	transform_length = 1;
 
         // Do the bit-reverse
-        fft2_bit_reverse(data, offset, n, logn);
+        fir_bit_reverse(data, offset, n, logn);
 
 	/* calculation */
 	for (bit = 0; bit < logn; bit++) {
@@ -131,7 +131,7 @@ int fft2_comp(float *data, unsigned nffts, unsigned int n, unsigned int logn, in
 
         if ((!do_inverse) && do_shift) {
             //printf("TEST: Calling Non-Inverse Do-Shift\n");
-            fft2_do_shift(data, offset, n, logn);
+            fir_do_shift(data, offset, n, logn);
         }
 
     } // for (nf = 0 .. num_ffts)

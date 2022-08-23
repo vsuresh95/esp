@@ -2,21 +2,21 @@
 #define __ESP_CFG_000_H__
 
 #include "libesp.h"
-#include "fft2_stratus.h"
+#include "fir_stratus.h"
 
-#if (FFT2_FX_WIDTH == 64)
+#if (FIR_FX_WIDTH == 64)
 typedef unsigned long long token_t;
 typedef double native_t;
 #define fx2float fixed64_to_double
 #define float2fx double_to_fixed64
 #define FX_IL 42
-#elif (FFT2_FX_WIDTH == 32)
+#elif (FIR_FX_WIDTH == 32)
 typedef int token_t;
 typedef float native_t;
 #define fx2float fixed32_to_float
 #define float2fx float_to_fixed32
 #define FX_IL 14
-#endif /* FFT2_FX_WIDTH */
+#endif /* FIR_FX_WIDTH */
 
 /* <<--params-def-->> */
 #define LOGN_SAMPLES 6
@@ -39,7 +39,7 @@ const int32_t scale_factor = SCALE_FACTOR;
 
 #define NACC 1
 
-struct fft2_stratus_access fft2_cfg_000[] = {
+struct fir_stratus_access fir_cfg_000[] = {
 	{
 		/* <<--descriptor-->> */
 		.logn_samples = LOGN_SAMPLES,
@@ -59,9 +59,9 @@ struct fft2_stratus_access fft2_cfg_000[] = {
 esp_thread_info_t cfg_000[] = {
 	{
 		.run = true,
-		.devname = "fft2_stratus.0",
-		.ioctl_req = FFT2_STRATUS_IOC_ACCESS,
-		.esp_desc = &(fft2_cfg_000[0].esp),
+		.devname = "fir_stratus.0",
+		.ioctl_req = FIR_STRATUS_IOC_ACCESS,
+		.esp_desc = &(fir_cfg_000[0].esp),
 	}
 };
 

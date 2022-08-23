@@ -1,16 +1,16 @@
 // Copyright (c) 2011-2019 Columbia University, System Level Design Group
 // SPDX-License-Identifier: Apache-2.0
 
-#ifndef __FFT2_HPP__
-#define __FFT2_HPP__
+#ifndef __FIR_HPP__
+#define __FIR_HPP__
 
 #include "fpdata.hpp"
-#include "fft2_conf_info.hpp"
-#include "fft2_debug_info.hpp"
+#include "fir_conf_info.hpp"
+#include "fir_debug_info.hpp"
 
 #include "esp_templates.hpp"
 
-#include "fft2_directives.hpp"
+#include "fir_directives.hpp"
 
 #define __round_mask(x, y) ((y)-1)
 #define round_up(x, y) ((((x)-1) | __round_mask(x, y))+1)
@@ -39,7 +39,7 @@
 #define STORE_FENCE 3
 #define ACC_DONE 4
 
-class fft2 : public esp_accelerator_3P<DMA_WIDTH>
+class fir : public esp_accelerator_3P<DMA_WIDTH>
 {
 public:
     // Handshake between store and load for auto-refills
@@ -58,8 +58,8 @@ public:
     handshake_t store_done;
 
     // Constructor
-    SC_HAS_PROCESS(fft2);
-    fft2(const sc_module_name& name)
+    SC_HAS_PROCESS(fir);
+    fir(const sc_module_name& name)
     : esp_accelerator_3P<DMA_WIDTH>(name)
         , cfg("config")
         , store_to_load("store-to-load")
@@ -128,12 +128,12 @@ public:
     // Store the output data
     void store_output();
 
-    // Configure fft2
+    // Configure fir
     esp_config_proc cfg;
 
     // Functions
-    void fft2_do_shift(unsigned int offset, unsigned int num_samples, unsigned int logn_samples);
-    void fft2_bit_reverse(unsigned int offset, unsigned int n, unsigned int bits);
+    void fir_do_shift(unsigned int offset, unsigned int num_samples, unsigned int logn_samples);
+    void fir_bit_reverse(unsigned int offset, unsigned int n, unsigned int bits);
 
     // Private local memories
     sc_dt::sc_int<DATA_WIDTH> A0[PLM_IN_WORD];
@@ -150,4 +150,4 @@ public:
 };
 
 
-#endif /* __FFT2_HPP__ */
+#endif /* __FIR_HPP__ */

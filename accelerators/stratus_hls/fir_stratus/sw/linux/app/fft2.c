@@ -1,5 +1,5 @@
 #include "cfg.h"
-#include "utils/fft2_utils.h"
+#include "utils/fir_utils.h"
 
 static unsigned in_words_adj;
 static unsigned out_words_adj;
@@ -56,7 +56,7 @@ static void init_buffer(token_t *in, float *gold)
 	}
 
 	// Compute golden output
-	fft2_comp(gold, num_ffts, (1<<logn_samples), logn_samples, do_inverse, do_shift);
+	fir_comp(gold, num_ffts, (1<<logn_samples), logn_samples, do_inverse, do_shift);
 }
 
 

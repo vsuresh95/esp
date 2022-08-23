@@ -1,5 +1,5 @@
-#ifndef _FFT2_STRATUS_H_
-#define _FFT2_STRATUS_H_
+#ifndef _FIR_STRATUS_H_
+#define _FIR_STRATUS_H_
 
 #ifdef __KERNEL__
 #include <linux/ioctl.h>
@@ -15,7 +15,7 @@
 #include <esp.h>
 #include <esp_accelerator.h>
 
-struct fft2_stratus_access {
+struct fir_stratus_access {
 	struct esp_access esp;
 	/* <<--regs-->> */
 	unsigned scale_factor;
@@ -27,6 +27,6 @@ struct fft2_stratus_access {
 	unsigned dst_offset;
 };
 
-#define FFT2_STRATUS_IOC_ACCESS	_IOW ('S', 0, struct fft2_stratus_access)
+#define FIR_STRATUS_IOC_ACCESS	_IOW ('S', 0, struct fir_stratus_access)
 
-#endif /* _FFT2_STRATUS_H_ */
+#endif /* _FIR_STRATUS_H_ */

@@ -4,11 +4,11 @@
 #ifndef __SYSTEM_HPP__
 #define __SYSTEM_HPP__
 
-#include "fft2_conf_info.hpp"
-#include "fft2_debug_info.hpp"
-#include "fft2.hpp"
-#include "fft2_directives.hpp"
-#include "fft2_test.hpp"
+#include "fir_conf_info.hpp"
+#include "fir_debug_info.hpp"
+#include "fir.hpp"
+#include "fir_directives.hpp"
+#include "fir_test.hpp"
 
 #include "esp_templates.hpp"
 
@@ -18,7 +18,7 @@ const size_t MEM_SIZE = MAX_BUFFERS_FULL * (2 * 262144) / (DMA_WIDTH/8);
 #include "core/systems/esp_system.hpp"
 
 #ifdef CADENCE
-#include "fft2_wrap.h"
+#include "fir_wrap.h"
 #endif
 
 class system_t : public esp_system<DMA_WIDTH, MEM_SIZE>
@@ -27,9 +27,9 @@ public:
 
     // ACC instance
 #ifdef CADENCE
-    fft2_wrapper *acc;
+    fir_wrapper *acc;
 #else
-    fft2 *acc;
+    fir *acc;
 #endif
 
     // Constructor
@@ -39,9 +39,9 @@ public:
     {
         // ACC
 #ifdef CADENCE
-        acc = new fft2_wrapper("fft2_wrapper");
+        acc = new fir_wrapper("fir_wrapper");
 #else
-        acc = new fft2("fft2_wrapper");
+        acc = new fir("fir_wrapper");
 #endif
         // Binding ACC
         acc->clk(clk);

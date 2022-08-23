@@ -1,7 +1,7 @@
 # TODO: read HLS configuration from device registers instead
-EXTRA_CFLAGS ?= -DFFT2_FX_WIDTH=32
-APPNAME := fft2
+EXTRA_CFLAGS ?= -DFIR_FX_WIDTH=32
+APPNAME := fir
 
 #$(info $$DRIVERS  is [${DRIVERS}])
-#$(info $$FFT2_FX_WIDTH  is [${FFT2_FX_WIDTH}])
+#$(info $$FIR_FX_WIDTH  is [${FIR_FX_WIDTH}])
 include $(DRIVERS)/common.mk

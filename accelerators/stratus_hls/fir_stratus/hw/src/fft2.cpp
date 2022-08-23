@@ -1,16 +1,16 @@
 // Copyright (c) 2011-2019 Columbia University, System Level Design Group
 // SPDX-License-Identifier: Apache-2.0
 
-#include "fft2.hpp"
-#include "fft2_directives.hpp"
+#include "fir.hpp"
+#include "fir_directives.hpp"
 
 // Functions
 
-#include "fft2_functions.hpp"
+#include "fir_functions.hpp"
 
 // Processes
 
-void fft2::load_input()
+void fir::load_input()
 {
     // Reset
     {
@@ -128,7 +128,7 @@ void fft2::load_input()
     }
 } // Function : load_input
 
-void fft2::store_output()
+void fir::store_output()
 {
     // Reset
     {
@@ -264,7 +264,7 @@ void fft2::store_output()
     }
 } // Function : store_output
 
-void fft2::compute_kernel()
+void fir::compute_kernel()
 {
     // Reset
     {
@@ -343,27 +343,27 @@ void fft2::compute_kernel()
             int sin_sign = (do_inverse) ? -1 : 1; // This modifes the mySin
                                                   // values used below
             if (do_inverse && do_shift) {
-                fft2_do_shift(offset, num_samples, logn_samples);
+                fir_do_shift(offset, num_samples, logn_samples);
             }
 
             // Do the bit-reverse
-            fft2_bit_reverse(offset, num_samples, logn_samples);
+            fir_bit_reverse(offset, num_samples, logn_samples);
 
             // Computing phase implementation
             int m = 1;  // iterative FFT
 
-            FFT2_SINGLE_L1:
+            FIR_SINGLE_L1:
                 for(unsigned s = 1; s <= logn_samples; s++) {
                     m = 1 << s;
                     CompNum wm(myCos(s), sin_sign*mySin(s));
 
-                FFT2_SINGLE_L2:
+                FIR_SINGLE_L2:
                     for(unsigned k = 0; k < num_samples; k +=m) {
 
                         CompNum w((FPDATA) 1, (FPDATA) 0);
                         int md2 = m / 2;
 
-                    FFT2_SINGLE_L3:
+                    FIR_SINGLE_L3:
                         for(int j = 0; j < md2; j++) {
 
                             int kj = offset + k + j;
@@ -401,7 +401,7 @@ void fft2::compute_kernel()
                 } // for (s = 1 .. logn_samples)
 
             if ((!do_inverse) && (do_shift)) {
-                fft2_do_shift(offset, num_samples, logn_samples);
+                fir_do_shift(offset, num_samples, logn_samples);
             }
         } // Compute
 

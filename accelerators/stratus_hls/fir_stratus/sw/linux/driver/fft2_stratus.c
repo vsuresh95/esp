@@ -6,131 +6,131 @@
 #include <esp_accelerator.h>
 #include <esp.h>
 
-#include "fft2_stratus.h"
+#include "fir_stratus.h"
 
-#define DRV_NAME	"fft2_stratus"
+#define DRV_NAME	"fir_stratus"
 
 /* <<--regs-->> */
-#define FFT2_LOGN_SAMPLES_REG 0x40
-#define FFT2_NUM_FFTS_REG 0x44
-#define FFT2_DO_INVERSE_REG 0x48
-#define FFT2_DO_SHIFT_REG 0x4c
-#define FFT2_SCALE_FACTOR_REG 0x50
+#define FIR_LOGN_SAMPLES_REG 0x40
+#define FIR_NUM_FFTS_REG 0x44
+#define FIR_DO_INVERSE_REG 0x48
+#define FIR_DO_SHIFT_REG 0x4c
+#define FIR_SCALE_FACTOR_REG 0x50
 
-struct fft2_stratus_device {
+struct fir_stratus_device {
 	struct esp_device esp;
 };
 
-static struct esp_driver fft2_driver;
+static struct esp_driver fir_driver;
 
-static struct of_device_id fft2_device_ids[] = {
+static struct of_device_id fir_device_ids[] = {
 	{
-		.name = "SLD_FFT2_STRATUS",
+		.name = "SLD_FIR_STRATUS",
 	},
 	{
 		.name = "eb_057",
 	},
 	{
-		.compatible = "sld,fft2_stratus",
+		.compatible = "sld,fir_stratus",
 	},
 	{ },
 };
 
-static int fft2_devs;
+static int fir_devs;
 
-static inline struct fft2_stratus_device *to_fft2(struct esp_device *esp)
+static inline struct fir_stratus_device *to_fir(struct esp_device *esp)
 {
-	return container_of(esp, struct fft2_stratus_device, esp);
+	return container_of(esp, struct fir_stratus_device, esp);
 }
 
-static void fft2_prep_xfer(struct esp_device *esp, void *arg)
+static void fir_prep_xfer(struct esp_device *esp, void *arg)
 {
-	struct fft2_stratus_access *a = arg;
+	struct fir_stratus_access *a = arg;
 
 	/* <<--regs-config-->> */
-	iowrite32be(a->scale_factor, esp->iomem + FFT2_SCALE_FACTOR_REG);
-	iowrite32be(a->do_inverse, esp->iomem + FFT2_DO_INVERSE_REG);
-	iowrite32be(a->logn_samples, esp->iomem + FFT2_LOGN_SAMPLES_REG);
-	iowrite32be(a->do_shift, esp->iomem + FFT2_DO_SHIFT_REG);
-	iowrite32be(a->num_ffts, esp->iomem + FFT2_NUM_FFTS_REG);
+	iowrite32be(a->scale_factor, esp->iomem + FIR_SCALE_FACTOR_REG);
+	iowrite32be(a->do_inverse, esp->iomem + FIR_DO_INVERSE_REG);
+	iowrite32be(a->logn_samples, esp->iomem + FIR_LOGN_SAMPLES_REG);
+	iowrite32be(a->do_shift, esp->iomem + FIR_DO_SHIFT_REG);
+	iowrite32be(a->num_ffts, esp->iomem + FIR_NUM_FFTS_REG);
 	iowrite32be(a->src_offset, esp->iomem + SRC_OFFSET_REG);
 	iowrite32be(a->dst_offset, esp->iomem + DST_OFFSET_REG);
 
 }
 
-static bool fft2_xfer_input_ok(struct esp_device *esp, void *arg)
+static bool fir_xfer_input_ok(struct esp_device *esp, void *arg)
 {
-	/* struct fft2_stratus_device *fft2 = to_fft2(esp); */
-	/* struct fft2_stratus_access *a = arg; */
+	/* struct fir_stratus_device *fir = to_fir(esp); */
+	/* struct fir_stratus_access *a = arg; */
 
 	return true;
 }
 
-static int fft2_probe(struct platform_device *pdev)
+static int fir_probe(struct platform_device *pdev)
 {
-	struct fft2_stratus_device *fft2;
+	struct fir_stratus_device *fir;
 	struct esp_device *esp;
 	int rc;
 
-	fft2 = kzalloc(sizeof(*fft2), GFP_KERNEL);
-	if (fft2 == NULL)
+	fir = kzalloc(sizeof(*fir), GFP_KERNEL);
+	if (fir == NULL)
 		return -ENOMEM;
-	esp = &fft2->esp;
+	esp = &fir->esp;
 	esp->module = THIS_MODULE;
-	esp->number = fft2_devs;
-	esp->driver = &fft2_driver;
+	esp->number = fir_devs;
+	esp->driver = &fir_driver;
 	rc = esp_device_register(esp, pdev);
 	if (rc)
 		goto err;
 
-	fft2_devs++;
+	fir_devs++;
 	return 0;
  err:
-	kfree(fft2);
+	kfree(fir);
 	return rc;
 }
 
-static int __exit fft2_remove(struct platform_device *pdev)
+static int __exit fir_remove(struct platform_device *pdev)
 {
 	struct esp_device *esp = platform_get_drvdata(pdev);
-	struct fft2_stratus_device *fft2 = to_fft2(esp);
+	struct fir_stratus_device *fir = to_fir(esp);
 
 	esp_device_unregister(esp);
-	kfree(fft2);
+	kfree(fir);
 	return 0;
 }
 
-static struct esp_driver fft2_driver = {
+static struct esp_driver fir_driver = {
 	.plat = {
-		.probe		= fft2_probe,
-		.remove		= fft2_remove,
+		.probe		= fir_probe,
+		.remove		= fir_remove,
 		.driver		= {
 			.name = DRV_NAME,
 			.owner = THIS_MODULE,
-			.of_match_table = fft2_device_ids,
+			.of_match_table = fir_device_ids,
 		},
 	},
-	.xfer_input_ok	= fft2_xfer_input_ok,
-	.prep_xfer	= fft2_prep_xfer,
-	.ioctl_cm	= FFT2_STRATUS_IOC_ACCESS,
-	.arg_size	= sizeof(struct fft2_stratus_access),
+	.xfer_input_ok	= fir_xfer_input_ok,
+	.prep_xfer	= fir_prep_xfer,
+	.ioctl_cm	= FIR_STRATUS_IOC_ACCESS,
+	.arg_size	= sizeof(struct fir_stratus_access),
 };
 
-static int __init fft2_init(void)
+static int __init fir_init(void)
 {
-	return esp_driver_register(&fft2_driver);
+	return esp_driver_register(&fir_driver);
 }
 
-static void __exit fft2_exit(void)
+static void __exit fir_exit(void)
 {
-	esp_driver_unregister(&fft2_driver);
+	esp_driver_unregister(&fir_driver);
 }
 
-module_init(fft2_init)
-module_exit(fft2_exit)
+module_init(fir_init)
+module_exit(fir_exit)
 
-MODULE_DEVICE_TABLE(of, fft2_device_ids);
+MODULE_DEVICE_TABLE(of, fir_device_ids);
 
 MODULE_AUTHOR("Emilio G. Cota <cota@braap.org>");
 MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("fft2_stratus driver");
+MODULE_DESCRIPTION("fir_stratus driver");

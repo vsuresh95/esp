@@ -8,21 +8,21 @@
 
 #include <esp_accelerator.h>
 #include <esp_probe.h>
-#include "utils/fft2_utils.h"
+#include "utils/fir_utils.h"
 
-#if (FFT2_FX_WIDTH == 64)
+#if (FIR_FX_WIDTH == 64)
 typedef long long token_t;
 typedef double native_t;
 #define fx2float fixed64_to_double
 #define float2fx double_to_fixed64
 #define FX_IL 42
-#else // (FFT2_FX_WIDTH == 32)
+#else // (FIR_FX_WIDTH == 32)
 typedef int token_t;
 typedef float native_t;
 #define fx2float fixed32_to_float
 #define float2fx float_to_fixed32
 #define FX_IL 14
-#endif /* FFT2_FX_WIDTH */
+#endif /* FIR_FX_WIDTH */
 
 const float ERR_TH = 0.05;
 
@@ -32,8 +32,8 @@ static unsigned DMA_WORD_PER_BEAT(unsigned _st)
 }
 
 
-#define SLD_FFT2 0x057
-#define DEV_NAME "sld,fft2_stratus"
+#define SLD_FIR 0x057
+#define DEV_NAME "sld,fir_stratus"
 
 /* <<--params-->> */
 const int32_t logn_samples = 10;
@@ -62,11 +62,11 @@ static unsigned mem_size;
 
 /* User defined registers */
 /* <<--regs-->> */
-#define FFT2_LOGN_SAMPLES_REG 0x40
-#define FFT2_NUM_FFTS_REG 0x44
-#define FFT2_DO_INVERSE_REG 0x48
-#define FFT2_DO_SHIFT_REG 0x4c
-#define FFT2_SCALE_FACTOR_REG 0x50
+#define FIR_LOGN_SAMPLES_REG 0x40
+#define FIR_NUM_FFTS_REG 0x44
+#define FIR_DO_INVERSE_REG 0x48
+#define FIR_DO_SHIFT_REG 0x4c
+#define FIR_SCALE_FACTOR_REG 0x50
 
 #define SYNC_VAR_SIZE 2
 
@@ -110,13 +110,13 @@ static void init_buf(token_t *in, float *gold)
 		in[j+SYNC_VAR_SIZE] = float2fx((native_t) gold[j], FX_IL);
 
 	// Compute golden output
-	fft2_comp(gold, num_ffts, num_samples, logn_samples, 0 /* do_inverse */, do_shift);
+	fir_comp(gold, num_ffts, num_samples, logn_samples, 0 /* do_inverse */, do_shift);
 
 	// for (j = 0; j < 2 * len; j++) {
 	// 	printf("  INT GOLD[%u] = 0x%08x\n", j, ((uint32_t*)gold)[j]);
     // }
 
-	fft2_comp(gold, num_ffts, num_samples, logn_samples, 1 /* do_inverse */, do_shift);
+	fir_comp(gold, num_ffts, num_samples, logn_samples, 1 /* do_inverse */, do_shift);
 }
 
 int main(int argc, char * argv[])
@@ -178,7 +178,7 @@ int main(int argc, char * argv[])
 
 	printf("Scanning device tree... \n");
 
-	ndev = probe(&espdevs, VENDOR_SLD, SLD_FFT2, DEV_NAME);
+	ndev = probe(&espdevs, VENDOR_SLD, SLD_FIR, DEV_NAME);
 	if (ndev == 0) {
 		printf("%s not found\n", DEV_NAME);
 		return 0;
@@ -215,11 +215,11 @@ int main(int argc, char * argv[])
 
 		// Pass accelerator-specific configuration parameters
 		/* <<--regs-config-->> */
-		iowrite32(dev, FFT2_LOGN_SAMPLES_REG, logn_samples);
-		iowrite32(dev, FFT2_NUM_FFTS_REG, num_ffts);
-		iowrite32(dev, FFT2_SCALE_FACTOR_REG, scale_factor);
-		iowrite32(dev, FFT2_DO_SHIFT_REG, do_shift);
-		iowrite32(dev, FFT2_DO_INVERSE_REG, n);
+		iowrite32(dev, FIR_LOGN_SAMPLES_REG, logn_samples);
+		iowrite32(dev, FIR_NUM_FFTS_REG, num_ffts);
+		iowrite32(dev, FIR_SCALE_FACTOR_REG, scale_factor);
+		iowrite32(dev, FIR_DO_SHIFT_REG, do_shift);
+		iowrite32(dev, FIR_DO_INVERSE_REG, n);
 
 		// Flush (customize coherence model here)
 		esp_flush(coherence);

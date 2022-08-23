@@ -1,8 +1,8 @@
 // Copyright (c) 2011-2019 Columbia University, System Level Design Group
 // SPDX-License-Identifier: Apache-2.0
 
-#ifndef __FFT2_CONF_INFO_HPP__
-#define __FFT2_CONF_INFO_HPP__
+#ifndef __FIR_CONF_INFO_HPP__
+#define __FIR_CONF_INFO_HPP__
 
 #include <systemc.h>
 
@@ -93,4 +93,4 @@ public:
     int32_t scale_factor;
 };
 
-#endif // __FFT2_CONF_INFO_HPP__
+#endif // __FIR_CONF_INFO_HPP__

@@ -1,32 +1,32 @@
 // Copyright (c) 2011-2019 Columbia University, System Level Design Group
 // SPDX-License-Identifier: Apache-2.0
 
-#ifndef __FFT2_DIRECTIVES_HPP__
-#define __FFT2_DIRECTIVES_HPP__
+#ifndef __FIR_DIRECTIVES_HPP__
+#define __FIR_DIRECTIVES_HPP__
 
 #if (DMA_WIDTH == 32)
 #if (FX_WIDTH == 64)
 #define DMA_BEAT_PER_WORD 2
 #define DMA_WORD_PER_BEAT 0
-#define PLM_IN_NAME "fft2_plm_block_in_fx64"
-#define PLM_OUT_NAME "fft2_plm_block_out_fx64"
+#define PLM_IN_NAME "fir_plm_block_in_fx64"
+#define PLM_OUT_NAME "fir_plm_block_out_fx64"
 #elif (FX_WIDTH == 32)
 #define DMA_BEAT_PER_WORD 1
 #define DMA_WORD_PER_BEAT 1
-#define PLM_IN_NAME "fft2_plm_block_in_fx32"
-#define PLM_OUT_NAME "fft2_plm_block_out_fx32"
+#define PLM_IN_NAME "fir_plm_block_in_fx32"
+#define PLM_OUT_NAME "fir_plm_block_out_fx32"
 #endif // FX_WIDTH
 #elif (DMA_WIDTH == 64)
 #if (FX_WIDTH == 64)
 #define DMA_BEAT_PER_WORD 1
 #define DMA_WORD_PER_BEAT 1
-#define PLM_IN_NAME "fft2_plm_block_in_fx64"
-#define PLM_OUT_NAME "fft2_plm_block_out_fx64"
+#define PLM_IN_NAME "fir_plm_block_in_fx64"
+#define PLM_OUT_NAME "fir_plm_block_out_fx64"
 #elif (FX_WIDTH == 32)
 #define DMA_BEAT_PER_WORD 1
 #define DMA_WORD_PER_BEAT 2
-#define PLM_IN_NAME "fft2_plm_block_in_fx32"
-#define PLM_OUT_NAME "fft2_plm_block_out_fx32"
+#define PLM_IN_NAME "fir_plm_block_in_fx32"
+#define PLM_OUT_NAME "fir_plm_block_out_fx32"
 #endif // FX_WIDTH
 #endif // DMA_WIDTH
 
@@ -70,4 +70,4 @@
 
 #endif /* STRATUS_HLS */
 
-#endif /* __FFT2_DIRECTIVES_HPP_ */
+#endif /* __FIR_DIRECTIVES_HPP_ */

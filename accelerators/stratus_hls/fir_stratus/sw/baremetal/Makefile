@@ -1,2 +1,2 @@
-APPNAME := fft2
+APPNAME := fir
 include $(DRIVERS)/common_bare.mk
