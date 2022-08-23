@@ -3,6 +3,7 @@
 
 #include "libesp.h"
 #include "fft2_stratus.h"
+#include "../../../../fir_stratus/sw/linux/include/fir_stratus.h"
 
 #if (FFT2_FX_WIDTH == 64)
 typedef unsigned long long token_t;
@@ -41,7 +42,7 @@ const int32_t scale_factor = SCALE_FACTOR;
 
 #define SYNC_VAR_SIZE 2
 
-#define NUM_DEVICES 2
+#define NUM_DEVICES 3
 
 struct fft2_stratus_access fft2_cfg_000[] = {
 	{
@@ -77,6 +78,23 @@ struct fft2_stratus_access fft2_cfg_001[] = {
 	}
 };
 
+struct fir_stratus_access fir_cfg_000[] = {
+	{
+		/* <<--descriptor-->> */
+		.logn_samples = LOGN_SAMPLES,
+		.num_firs = NUM_FFTS,
+		.do_inverse = 0,
+		.do_shift = DO_SHIFT,
+		.scale_factor = SCALE_FACTOR,
+		.src_offset = 0,
+		.dst_offset = 0,
+		.esp.coherence = ACC_COH_FULL,
+		.esp.p2p_store = 0,
+		.esp.p2p_nsrcs = 0,
+		.esp.p2p_srcs = {"", "", "", ""},
+	}
+};
+
 esp_thread_info_t cfg_000[] = {
 	{
 		.run = true,
@@ -92,6 +110,15 @@ esp_thread_info_t cfg_001[] = {
 		.devname = "fft2_stratus.1",
 		.ioctl_req = FFT2_STRATUS_IOC_ACCESS,
 		.esp_desc = &(fft2_cfg_001[0].esp),
+	}
+};
+
+esp_thread_info_t cfg_002[] = {
+	{
+		.run = true,
+		.devname = "fir_stratus.0",
+		.ioctl_req = FIR_STRATUS_IOC_ACCESS,
+		.esp_desc = &(fir_cfg_000[0].esp),
 	}
 };
 
