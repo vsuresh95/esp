@@ -36,7 +36,7 @@ static int validate_buffer(token_t *out, float *gold)
 
 
 /* User-defined code */
-static void init_buffer(token_t *in, float *gold)
+static void init_buffer(token_t *in, float *gold, token_t *in_filter, float *gold_filter)
 {
 	int j;
 	const float LO = -2.0;
@@ -50,13 +50,32 @@ static void init_buffer(token_t *in, float *gold)
 		gold[j] = LO + scaling_factor * (HI - LO);
 	}
 
+	for (j = 0; j < 2 * num_ffts * num_samples; j++) {
+		float scaling_factor = (float) rand () / (float) RAND_MAX;
+		gold_filter[j] = LO + scaling_factor * (HI - LO);
+	}
+
 	// convert input to fixed point
 	for (j = 0; j < 2 * num_ffts * num_samples; j++) {
 		in[j+SYNC_VAR_SIZE] = float2fx((native_t) gold[j], FX_IL);
 	}
 
+	// convert input to fixed point
+	for (j = 0; j < 2 * num_ffts * num_samples; j++) {
+		in_filter[j] = float2fx((native_t) gold_filter[j], FX_IL);
+	}
+
 	// Compute golden output
 	fft2_comp(gold, num_ffts, (1<<logn_samples), logn_samples, 0 /* do_inverse */, do_shift);
+
+    float gold_r, gold_i;
+
+	for (j = 0; j < 2 * num_ffts * num_samples; j+=2) {
+        gold_r = gold[j] * gold_filter[j] - gold[j+1] * gold_filter[j+1];
+        gold_i = gold[j] * gold_filter[j+1] + gold[j+1] * gold_filter[j];
+        gold[j] = gold_r;
+        gold[j+1] = gold_i;
+    }
 
 	for (j = 0; j < 2 * num_ffts * num_samples; j++) {
 		printf("  INT GOLD[%u] = %f\n", j, gold[j]);
@@ -106,13 +125,17 @@ int main(int argc, char **argv)
 	buf = (token_t *) esp_alloc(size);
 	cfg_000[0].hw_buf = buf;
 	cfg_001[0].hw_buf = buf;
-	gold = malloc(out_len * sizeof(float));
+	cfg_002[0].hw_buf = buf;
+	gold = malloc(2 * out_len * sizeof(float));
 
 	printf("   buf = %p\n", buf);
 	printf("   gold = %p\n", gold);
 
-    fft2_cfg_001[0].src_offset = acc_size;
-    fft2_cfg_001[0].dst_offset = acc_size;
+    fft2_cfg_001[0].src_offset = 2 * acc_size;
+    fft2_cfg_001[0].dst_offset = 2 * acc_size;
+
+    fir_cfg_000[0].src_offset = acc_size;
+    fir_cfg_000[0].dst_offset = acc_size;
 
     volatile token_t* sm_sync = (volatile token_t*) buf;
 
@@ -125,28 +148,31 @@ int main(int argc, char **argv)
 	printf("  .do_shift = %d\n", do_shift);
 	printf("  .scale_factor = %d\n", scale_factor);
 	printf("\n  ** START **\n");
-	init_buffer(buf, gold);
+	init_buffer(buf, gold, (buf + acc_offset + 4 * out_len), (gold + out_len));
 
 	sm_sync[0] = 0;
 	sm_sync[acc_offset] = 0;
 	sm_sync[2*acc_offset] = 0;
+	sm_sync[3*acc_offset] = 0;
 
     // Invoke accelerators but do not check for end
 	fft2_cfg_000[0].esp.start_stop = 1;
 	fft2_cfg_001[0].esp.start_stop = 1;
+	fir_cfg_000[0].esp.start_stop = 1;
 
 	esp_run(cfg_000, NACC);
 	esp_run(cfg_001, NACC);
+	esp_run(cfg_002, NACC);
 
     // Start first accelerator
 	sm_sync[0] = 1;
 
     // Wait for last accelerator
-	while(sm_sync[2*acc_offset] != 1);
+	while(sm_sync[NUM_DEVICES*acc_offset] != 1);
 
 	printf("\n  ** DONE **\n");
 
-	errors = validate_buffer(&buf[2*acc_offset], gold);
+	errors = validate_buffer(&buf[NUM_DEVICES*acc_offset], gold);
 
 	free(gold);
 	esp_free(buf);
