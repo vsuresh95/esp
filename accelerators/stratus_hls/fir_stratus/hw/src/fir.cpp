@@ -354,31 +354,114 @@ void fir::compute_kernel()
             wait();
         }
 
-        // Compute FIR
+        // Compute
         {
             compute_state_req_dbg.write(3);
 
-            for (unsigned k = 0; k < 2 * num_samples; k+=2) {
+            CompNum fpnk, fpk, f1k, f2k, tw, tdc;
+            CompNum tf, if0, ifn, of0, flt0, fltn, t0, tn;
+            CompNum fk, fnkc, fek, fok, tmp;
+            CompNum tmpbuf0, tmpbufn;
 
-                CompNum akj, akjm;
-                CompNum bkj, bkjm;
+            // Post-process first and last element
+            tdc.re = int2fp<FPDATA, WORD_SIZE>(A0[0]);
+            tdc.im = int2fp<FPDATA, WORD_SIZE>(A0[1]);
 
-                akj.re = int2fp<FPDATA, WORD_SIZE>(A0[k]);
-                akj.im = int2fp<FPDATA, WORD_SIZE>(A0[k + 1]);
-                akjm.re = int2fp<FPDATA, WORD_SIZE>(F0[k]);
-                akjm.im = int2fp<FPDATA, WORD_SIZE>(F0[k + 1]);
+            tdc.re /= 2; tdc.im /= 2;
 
-                CompNum t;
-                compMul(akj, akjm, t);
+            if0.re = tdc.re + tdc.im;
+            if0.im = 0; // not in original code
+            ifn.re = tdc.re - tdc.im;
+            ifn.im = 0;
+
+            // Reading filter values
+            flt0.re = int2fp<FPDATA, WORD_SIZE>(F0[0]);
+            flt0.im = int2fp<FPDATA, WORD_SIZE>(F0[1]);
+            fltn.re = int2fp<FPDATA, WORD_SIZE>(F0[(2 * num_samples)]);
+            fltn.im = int2fp<FPDATA, WORD_SIZE>(F0[(2 * num_samples) + 1]);
+
+            // FIR
+            compMul(if0, flt0, t0);
+            compMul(ifn, flt0, tn);
+
+            // Pre-process first and last element
+            of0.re = t0.re + tn.re;
+            of0.im = t0.re - tn.re;
+
+            of0.re /= 2; of0.im /= 2;
+
+            // Write back element 0 to memory
+            {
+                HLS_PROTO("write-back-elem-0");
+                HLS_BREAK_DEP(A0);
+                wait();
+                A0[0] = fp2int<FPDATA, WORD_SIZE>(of0.re);
+                A0[1] = fp2int<FPDATA, WORD_SIZE>(of0.im);
+            }
+
+            for (unsigned k = 2; k < num_samples; k+=2) {
+
+                // Read FFT output
+                fpk.re = int2fp<FPDATA, WORD_SIZE>(A0[k]);
+                fpk.im = int2fp<FPDATA, WORD_SIZE>(A0[k + 1]);
+                fpnk.re = int2fp<FPDATA, WORD_SIZE>(A0[(2 * num_samples) - k]);
+                fpnk.im = - (int2fp<FPDATA, WORD_SIZE>(A0[(2 * num_samples) - k + 1]));
+
+                // Read twiddle factors
+                tf.re = int2fp<FPDATA, WORD_SIZE>(T0[k/2 - 1]);
+                tf.im = int2fp<FPDATA, WORD_SIZE>(T0[k/2]);
+
+                fpk.re /= 2; fpk.im /= 2;
+                fpnk.re /= 2; fpnk.im /= 2;
+
+                compAdd(fpk, fpnk, f1k);
+                compSub(fpk, fpnk, f2k);
+                compMul(f2k, tf, tw);
+
+                // Computing freqdata's
+                compAdd(f1k, tw, if0);
+                if0.re /= 2; if0.im /= 2;
+
+                compSub(f1k, tw, ifn);
+                ifn.re /= 2; ifn.im /= 2;
+
+                // Reading filter values
+                flt0.re = int2fp<FPDATA, WORD_SIZE>(F0[k]);
+                flt0.im = int2fp<FPDATA, WORD_SIZE>(F0[k + 1]);
+                fltn.re = int2fp<FPDATA, WORD_SIZE>(F0[(2 * num_samples) - k]);
+                fltn.im = int2fp<FPDATA, WORD_SIZE>(F0[(2 * num_samples) - k + 1]);
+
+                // FIR
+                compMul(if0, flt0, t0);
+                compMul(ifn, fltn, tn);
+
+                fk = t0;
+                fnkc.re = tn.re;
+                fnkc.im = - (tn.im);
+
+                fk.re /= 2; fk.im /= 2;
+                fnkc.re /= 2; fnkc.im /= 2;
+
+                compAdd(fk, fnkc, fek);
+                compSub(fk, fnkc, tmp);
+                compMul(tmp, tf, fok);
+
+                compAdd(fek, fok, tmpbuf0);
+                compSub(fek, fok, tmpbufn);
+
+                tmpbufn.im *= -1;
 
                 {
-                    HLS_PROTO("compute_write_A0");
+                    HLS_PROTO("write-back-elem-k");
                     HLS_BREAK_DEP(A0);
                     wait();
-                    A0[k] = fp2int<FPDATA, WORD_SIZE>(t.re);
-                    A0[k + 1] = fp2int<FPDATA, WORD_SIZE>(t.im);
+                    A0[k] = fp2int<FPDATA, WORD_SIZE>(tmpbuf0.re);
+                    A0[k + 1] = fp2int<FPDATA, WORD_SIZE>(tmpbuf0.im);
+                    wait();
+                    A0[(2 * num_samples) - k] = fp2int<FPDATA, WORD_SIZE>(tmpbufn.re);
+                    A0[(2 * num_samples) - k + 1] = fp2int<FPDATA, WORD_SIZE>(tmpbufn.im);
                 } 
-            } // for (k = 0 .. num_samples)
+            } // for (k = 2 .. num_samples)
         } // Compute
 
         // Poll lock for consumer's ready
