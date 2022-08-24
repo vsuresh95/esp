@@ -77,10 +77,6 @@ static void init_buffer(token_t *in, float *gold, token_t *in_filter, float *gol
         gold[j+1] = gold_i;
     }
 
-	for (j = 0; j < 2 * num_ffts * num_samples; j++) {
-		printf("  INT GOLD[%u] = %f\n", j, gold[j]);
-    }
-
 	fft2_comp(gold, num_ffts, (1<<logn_samples), logn_samples, 1 /* do_inverse */, do_shift);
 }
 
