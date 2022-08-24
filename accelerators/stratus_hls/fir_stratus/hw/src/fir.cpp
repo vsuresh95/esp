@@ -358,7 +358,7 @@ void fir::compute_kernel()
         {
             compute_state_req_dbg.write(3);
 
-            for (unsigned k = 0; k < num_samples; k+=2) {
+            for (unsigned k = 0; k < 2 * num_samples; k+=2) {
 
                 CompNum akj, akjm;
                 CompNum bkj, bkjm;
