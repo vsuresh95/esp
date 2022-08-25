@@ -190,3 +190,75 @@ inline void fir::store_compute_done_handshake()
         store_done.req.req();
     }
 }
+
+inline void fir::compute_post_proc_ready_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("compute-post_proc-ready-handshake");
+
+        post_proc_ready.req.req();
+    }
+}
+
+inline void fir::post_proc_compute_ready_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("post_proc-compute-ready-handshake");
+
+        post_proc_ready.ack.ack();
+    }
+}
+
+inline void fir::compute_pre_proc_ready_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("compute-pre_proc-ready-handshake");
+
+        pre_proc_ready.req.req();
+    }
+}
+
+inline void fir::pre_proc_compute_ready_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("pre_proc-compute-ready-handshake");
+
+        pre_proc_ready.ack.ack();
+    }
+}
+
+inline void fir::compute_post_proc_done_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("compute-post_proc-done-handshake");
+
+        post_proc_done.ack.ack();
+    }
+}
+
+inline void fir::post_proc_compute_done_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("post_proc-compute-done-handshake");
+
+        post_proc_done.req.req();
+    }
+}
+
+inline void fir::compute_pre_proc_done_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("compute-pre_proc-done-handshake");
+
+        pre_proc_done.ack.ack();
+    }
+}
+
+inline void fir::pre_proc_compute_done_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("pre_proc-compute-done-handshake");
+
+        pre_proc_done.req.req();
+    }
+}
