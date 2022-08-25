@@ -421,8 +421,8 @@ void fir::compute_kernel()
                 A0[1] = fp2int<FPDATA, WORD_SIZE>(of0.im);
             }
 
-            for (unsigned k = 2; k < num_samples; k+=2) {
-
+            for (unsigned k = 2; k < num_samples; k+=2)
+            {
                 // Read FFT output
                 fpk.re = int2fp<FPDATA, WORD_SIZE>(A0[k]);
                 fpk.im = int2fp<FPDATA, WORD_SIZE>(A0[k + 1]);
