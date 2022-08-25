@@ -386,39 +386,41 @@ void fir::compute_kernel()
             CompNum tmpbuf0, tmpbufn;
 
             // Post-process first and last element
-            tdc.re = int2fp<FPDATA, WORD_SIZE>(A0[0]);
-            tdc.im = int2fp<FPDATA, WORD_SIZE>(A0[1]);
-
-            tdc.re /= 2; tdc.im /= 2;
-
-            if0.re = tdc.re + tdc.im;
-            if0.im = 0; // not in original code
-            ifn.re = tdc.re - tdc.im;
-            ifn.im = 0;
-
-            // Reading filter values
-            flt0.re = int2fp<FPDATA, WORD_SIZE>(F0[0]);
-            flt0.im = int2fp<FPDATA, WORD_SIZE>(F0[1]);
-            fltn.re = int2fp<FPDATA, WORD_SIZE>(F0[(2 * num_samples)]);
-            fltn.im = int2fp<FPDATA, WORD_SIZE>(F0[(2 * num_samples) + 1]);
-
-            // FIR
-            compMul(if0, flt0, t0);
-            compMul(ifn, flt0, tn);
-
-            // Pre-process first and last element
-            of0.re = t0.re + tn.re;
-            of0.im = t0.re - tn.re;
-
-            of0.re /= 2; of0.im /= 2;
-
-            // Write back element 0 to memory
             {
-                HLS_PROTO("write-back-elem-0");
-                HLS_BREAK_DEP(A0);
-                wait();
-                A0[0] = fp2int<FPDATA, WORD_SIZE>(of0.re);
-                A0[1] = fp2int<FPDATA, WORD_SIZE>(of0.im);
+                tdc.re = int2fp<FPDATA, WORD_SIZE>(A0[0]);
+                tdc.im = int2fp<FPDATA, WORD_SIZE>(A0[1]);
+
+                tdc.re /= 2; tdc.im /= 2;
+
+                if0.re = tdc.re + tdc.im;
+                if0.im = 0; // not in original code
+                ifn.re = tdc.re - tdc.im;
+                ifn.im = 0;
+
+                // Reading filter values
+                flt0.re = int2fp<FPDATA, WORD_SIZE>(F0[0]);
+                flt0.im = int2fp<FPDATA, WORD_SIZE>(F0[1]);
+                fltn.re = int2fp<FPDATA, WORD_SIZE>(F0[(2 * num_samples)]);
+                fltn.im = int2fp<FPDATA, WORD_SIZE>(F0[(2 * num_samples) + 1]);
+
+                // FIR
+                compMul(if0, flt0, t0);
+                compMul(ifn, flt0, tn);
+
+                // Pre-process first and last element
+                of0.re = t0.re + tn.re;
+                of0.im = t0.re - tn.re;
+
+                of0.re /= 2; of0.im /= 2;
+
+                // Write back element 0 to memory
+                {
+                    HLS_PROTO("write-back-elem-0");
+                    HLS_BREAK_DEP(A0);
+                    wait();
+                    A0[0] = fp2int<FPDATA, WORD_SIZE>(of0.re);
+                    A0[1] = fp2int<FPDATA, WORD_SIZE>(of0.im);
+                }
             }
 
             for (unsigned k = 2; k < num_samples; k+=2)
