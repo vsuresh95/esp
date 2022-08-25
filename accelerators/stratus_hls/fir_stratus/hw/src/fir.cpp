@@ -591,3 +591,99 @@ void fir::compute_kernel()
         }
     } // while (true)
 } // Function : compute_kernel
+
+void fir::fft_post_proc()
+{
+    // Reset
+    {
+        HLS_PROTO("fft_post_proc-reset");
+
+        post_proc_done.req.reset_req();
+        post_proc_ready.ack.reset_ack();
+
+        wait();
+    }
+
+    // Config
+    /* <<--params-->> */
+    int32_t logn_samples;
+    int32_t num_samples;
+    {
+        HLS_PROTO("fft_post_proc-config");
+
+        cfg.wait_for_config(); // config process
+        conf_info_t config = this->conf_info.read();
+
+        // User-defined config code
+        /* <<--local-params-->> */
+        logn_samples = config.logn_samples;
+        num_samples = 1 << logn_samples;
+    }
+
+    while(true)
+    {
+        {
+            HLS_PROTO("wait-for-post-proc-ready");
+
+            wait();
+
+            this->post_proc_compute_ready_handshake();
+        }
+
+        {
+            HLS_PROTO("send-for-post-proc-done");
+
+            wait();
+
+            this->post_proc_compute_done_handshake();
+        }
+    } // while (true)
+} // Function : fft_post_proc
+
+void fir::ifft_pre_proc()
+{
+    // Reset
+    {
+        HLS_PROTO("ifft_pre_proc-reset");
+
+        pre_proc_done.req.reset_req();
+        pre_proc_ready.ack.reset_ack();
+
+        wait();
+    }
+
+    // Config
+    /* <<--params-->> */
+    int32_t logn_samples;
+    int32_t num_samples;
+    {
+        HLS_PROTO("ifft_pre_proc-config");
+
+        cfg.wait_for_config(); // config process
+        conf_info_t config = this->conf_info.read();
+
+        // User-defined config code
+        /* <<--local-params-->> */
+        logn_samples = config.logn_samples;
+        num_samples = 1 << logn_samples;
+    }
+
+    while(true)
+    {
+        {
+            HLS_PROTO("wait-for-post-proc-ready");
+
+            wait();
+
+            this->pre_proc_compute_ready_handshake();
+        }
+
+        {
+            HLS_PROTO("send-for-post-proc-done");
+
+            wait();
+
+            this->pre_proc_compute_done_handshake();
+        }
+    } // while (true)
+} // Function : ifft_pre_proc
