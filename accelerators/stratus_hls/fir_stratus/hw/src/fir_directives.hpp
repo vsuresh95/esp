@@ -9,24 +9,28 @@
 #define DMA_BEAT_PER_WORD 2
 #define DMA_WORD_PER_BEAT 0
 #define PLM_IN_NAME "fir_plm_block_in_fx64"
-#define PLM_OUT_NAME "fir_plm_block_out_fx64"
+#define PLM_FLT_NAME "fir_plm_block_flt_fx64"
+#define PLM_TW_NAME "fir_plm_block_tw_fx64"
 #elif (FX_WIDTH == 32)
 #define DMA_BEAT_PER_WORD 1
 #define DMA_WORD_PER_BEAT 1
 #define PLM_IN_NAME "fir_plm_block_in_fx32"
-#define PLM_OUT_NAME "fir_plm_block_out_fx32"
+#define PLM_FLT_NAME "fir_plm_block_flt_fx32"
+#define PLM_TW_NAME "fir_plm_block_tw_fx32"
 #endif // FX_WIDTH
 #elif (DMA_WIDTH == 64)
 #if (FX_WIDTH == 64)
 #define DMA_BEAT_PER_WORD 1
 #define DMA_WORD_PER_BEAT 1
 #define PLM_IN_NAME "fir_plm_block_in_fx64"
-#define PLM_OUT_NAME "fir_plm_block_out_fx64"
+#define PLM_FLT_NAME "fir_plm_block_flt_fx64"
+#define PLM_TW_NAME "fir_plm_block_tw_fx64"
 #elif (FX_WIDTH == 32)
 #define DMA_BEAT_PER_WORD 1
 #define DMA_WORD_PER_BEAT 2
 #define PLM_IN_NAME "fir_plm_block_in_fx32"
-#define PLM_OUT_NAME "fir_plm_block_out_fx32"
+#define PLM_FLT_NAME "fir_plm_block_flt_fx32"
+#define PLM_TW_NAME "fir_plm_block_tw_fx32"
 #endif // FX_WIDTH
 #endif // DMA_WIDTH
 

@@ -81,7 +81,8 @@ public:
         // Map arrays to memories
         /* <<--plm-bind-->> */
         HLS_MAP_plm(A0, PLM_IN_NAME);
-        HLS_MAP_plm(F0, PLM_OUT_NAME);
+        HLS_MAP_plm(F0, PLM_FLT_NAME);
+        HLS_MAP_plm(F0, PLM_TW_NAME);
         
         load_ready.bind_with(*this);
         store_ready.bind_with(*this);
@@ -135,6 +136,7 @@ public:
     // Private local memories
     sc_dt::sc_int<DATA_WIDTH> A0[PLM_IN_WORD];
     sc_dt::sc_int<DATA_WIDTH> F0[PLM_IN_WORD];
+    sc_dt::sc_int<DATA_WIDTH> T0[PLM_IN_WORD];
 
     // Handshakes
     inline void compute_load_ready_handshake();

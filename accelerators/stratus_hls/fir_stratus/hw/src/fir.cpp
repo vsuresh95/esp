@@ -140,6 +140,28 @@ void fir::load_input()
                     }
                 }
             }
+            // Load twiddle factors 
+            {
+                dma_info_t dma_info(5 * 2 * num_samples / DMA_WORD_PER_BEAT, num_samples / DMA_WORD_PER_BEAT, DMA_SIZE);
+                sc_dt::sc_bv<DMA_WIDTH> dataBv;
+
+                wait();
+
+                this->dma_read_ctrl.put(dma_info);
+
+                for (int i = 0; i < 2 * num_samples; i += DMA_WORD_PER_BEAT)
+                {
+                    HLS_BREAK_DEP(T0);
+
+                    dataBv = this->dma_read_chnl.get();
+                    wait();
+                    for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
+                    {
+                        HLS_UNROLL_SIMPLE;
+                        T0[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
+                    }
+                }
+            }
             break;
             default:
             break;
