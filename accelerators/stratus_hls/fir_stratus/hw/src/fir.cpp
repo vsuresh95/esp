@@ -149,7 +149,7 @@ void fir::load_input()
 
                 this->dma_read_ctrl.put(dma_info);
 
-                for (int i = 0; i < 2 * num_samples; i += DMA_WORD_PER_BEAT)
+                for (int i = 0; i < num_samples; i += DMA_WORD_PER_BEAT)
                 {
                     HLS_BREAK_DEP(T0);
 
