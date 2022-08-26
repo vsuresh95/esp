@@ -589,6 +589,7 @@ void fir::fft_post_proc()
                 wait();
                 A0[0] = fp2int<FPDATA, WORD_SIZE>(f0.re);
                 A0[1] = fp2int<FPDATA, WORD_SIZE>(f0.im);
+                wait();
                 A0[(2 * num_samples)] = fp2int<FPDATA, WORD_SIZE>(fn.re);
                 A0[(2 * num_samples) + 1] = fp2int<FPDATA, WORD_SIZE>(fn.im);
             }
