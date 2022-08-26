@@ -84,6 +84,13 @@ public:
         , post_proc_done("post_proc_done")
         , pre_proc_done("pre_proc_done")
     {
+
+        SC_CTHREAD(fft_post_proc, this->clk.pos());
+        this->reset_signal_is(this->rst, false);
+
+        SC_CTHREAD(ifft_pre_proc, this->clk.pos());
+        this->reset_signal_is(this->rst, false);
+
         // Signal binding
         cfg.bind_with(*this);
 
@@ -98,7 +105,7 @@ public:
         /* <<--plm-bind-->> */
         HLS_MAP_plm(A0, PLM_IN_NAME);
         HLS_MAP_plm(F0, PLM_FLT_NAME);
-        HLS_MAP_plm(F0, PLM_TW_NAME);
+        HLS_MAP_plm(T0, PLM_TW_NAME);
         
         load_ready.bind_with(*this);
         store_ready.bind_with(*this);
