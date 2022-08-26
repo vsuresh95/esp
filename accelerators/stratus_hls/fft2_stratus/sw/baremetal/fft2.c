@@ -31,6 +31,30 @@ static unsigned DMA_WORD_PER_BEAT(unsigned _st)
         return (sizeof(void *) / _st);
 }
 
+typedef struct {
+    float r;
+    float i;
+} cpx_num;
+
+#   define S_MUL(a,b) ( (a)*(b) )
+#define C_MUL(m,a,b) \
+    do{ (m).r = (a).r*(b).r - (a).i*(b).i;\
+        (m).i = (a).r*(b).i + (a).i*(b).r; }while(0)
+#   define C_FIXDIV(c,div) /* NOOP */
+#   define C_MULBYSCALAR( c, s ) \
+    do{ (c).r *= (s);\
+        (c).i *= (s); }while(0)
+
+#define  C_ADD( res, a,b)\
+    do { \
+        (res).r=(a).r+(b).r;  (res).i=(a).i+(b).i; \
+    }while(0)
+#define  C_SUB( res, a,b)\
+    do { \
+        (res).r=(a).r-(b).r;  (res).i=(a).i-(b).i; \
+    }while(0)
+
+#  define HALF_OF(x) ((x)*.5)
 
 #define SLD_FFT2 0x057
 #define DEV_NAME "sld,fft2_stratus"
@@ -91,7 +115,7 @@ static int validate_buf(token_t *out, float *gold)
 	for (j = 0; j < 2 * len; j++) {
 		native_t val = fx2float(out[j+SYNC_VAR_SIZE], FX_IL);
 		uint32_t ival = *((uint32_t*)&val);
-		// printf("  GOLD[%u] = 0x%08x  :  OUT[%u] = 0x%08x\n", j, ((uint32_t*)gold)[j], j, ival);
+		printf("  GOLD[%u] = 0x%08x  :  OUT[%u] = 0x%08x\n", j, ((uint32_t*)gold)[j], j, ival);
 		if ((fabs(gold[j] - val) / fabs(gold[j])) > ERR_TH)
 			errors++;
 	}
@@ -101,7 +125,7 @@ static int validate_buf(token_t *out, float *gold)
 }
 
 
-static void init_buf(token_t *in, float *gold, token_t *in_filter, float *gold_filter)
+static void init_buf(token_t *in, float *gold, token_t *in_filter, float *gold_filter, token_t *in_twiddle, float *gold_twiddle, float *gold_freqdata)
 {
 	int j;
 	const float LO = -10.0;
@@ -123,6 +147,13 @@ static void init_buf(token_t *in, float *gold, token_t *in_filter, float *gold_f
 		// printf("  IN[%u] = 0x%08x\n", j, ig);
 	}
 
+	for (j = 0; j < 2 * len; j++) {
+		float scaling_factor = (float) rand () / (float) RAND_MAX;
+		gold_twiddle[j] = LO + scaling_factor * (HI - LO);
+		uint32_t ig = ((uint32_t*)gold_twiddle)[j];
+		// printf("  IN[%u] = 0x%08x\n", j, ig);
+	}
+
 	// convert input to fixed point
 	for (j = 0; j < 2 * len; j++)
 		in[j+SYNC_VAR_SIZE] = float2fx((native_t) gold[j], FX_IL);
@@ -131,21 +162,87 @@ static void init_buf(token_t *in, float *gold, token_t *in_filter, float *gold_f
 	for (j = 0; j < 2 * len; j++)
 		in_filter[j] = float2fx((native_t) gold_filter[j], FX_IL);
 
+	// convert input to fixed point
+	for (j = 0; j < 2 * len; j++)
+		in_twiddle[j] = float2fx((native_t) gold_twiddle[j], FX_IL);
+
 	// Compute golden output
 	fft2_comp(gold, num_ffts, num_samples, logn_samples, 0 /* do_inverse */, do_shift);
 
-    float gold_r, gold_i;
+    cpx_num fpnk, fpk, f1k, f2k, tw, tdc;
+    cpx_num fk, fnkc, fek, fok, tmp;
+    cpx_num cptemp;
+    cpx_num *tmpbuf = (cpx_num *) gold;
+    cpx_num *freqdata = (cpx_num *) gold_freqdata;
+    cpx_num *super_twiddles = (cpx_num *) gold_twiddle;
+    cpx_num *filter = (cpx_num *) gold_filter;
 
-	for (j = 0; j < 2 * len; j+=2) {
-        gold_r = gold[j] * gold_filter[j] - gold[j+1] * gold_filter[j+1];
-        gold_i = gold[j] * gold_filter[j+1] + gold[j+1] * gold_filter[j];
-        gold[j] = gold_r;
-        gold[j+1] = gold_i;
+	for (j = 0; j < 2 * len; j++) {
+		printf("  1 GOLD[%u] = 0x%08x\n", j, ((uint32_t*)gold)[j]);
     }
 
-	// for (j = 0; j < 2 * len; j++) {
-	// 	printf("  INT GOLD[%u] = 0x%08x\n", j, ((uint32_t*)gold)[j]);
-    // }
+    // Post-processing
+    tdc.r = tmpbuf[0].r;
+    tdc.i = tmpbuf[0].i;
+    C_FIXDIV(tdc,2);
+    freqdata[0].r = tdc.r + tdc.i;
+    freqdata[len+1].r = tdc.r - tdc.i;
+    freqdata[len+1].i = freqdata[0].i = 0;
+
+    for ( j=1;j <= len+1/2 ; ++j ) {
+        fpk    = tmpbuf[j]; 
+        fpnk.r =   tmpbuf[len+1-j].r;
+        fpnk.i = - tmpbuf[len+1-j].i;
+        C_FIXDIV(fpk,2);
+        C_FIXDIV(fpnk,2);
+
+        C_ADD( f1k, fpk , fpnk );
+        C_SUB( f2k, fpk , fpnk );
+        C_MUL( tw , f2k , super_twiddles[j-1]);
+
+        freqdata[j].r = HALF_OF(f1k.r + tw.r);
+        freqdata[j].i = HALF_OF(f1k.i + tw.i);
+        freqdata[len+1-j].r = HALF_OF(f1k.r - tw.r);
+        freqdata[len+1-j].i = HALF_OF(tw.i - f1k.i);
+    }
+
+	for (j = 0; j < 2 * (len+1); j++) {
+		printf("  2 GOLD[%u] = 0x%08x\n", j, ((uint32_t*)gold_freqdata)[j]);
+    }
+
+    // FIR
+	for (j = 0; j < len + 1; j++) {
+        C_MUL( cptemp, freqdata[j], filter[j]);
+        freqdata[j] = cptemp;
+    }
+
+	for (j = 0; j < 2 * (len+1); j++) {
+		printf("  3 GOLD[%u] = 0x%08x\n", j, ((uint32_t*)gold_freqdata)[j]);
+    }
+
+    // Pre-processing
+    tmpbuf[0].r = freqdata[0].r + freqdata[len+1].r;
+    tmpbuf[0].i = freqdata[0].r - freqdata[len+1].r;
+    C_FIXDIV(tmpbuf[0],2);
+
+    for (j = 1; j <= len+1 / 2; ++j) {
+        fk = freqdata[j];
+        fnkc.r = freqdata[len+1 - j].r;
+        fnkc.i = -freqdata[len+1 - j].i;
+        C_FIXDIV( fk , 2 );
+        C_FIXDIV( fnkc , 2 );
+
+        C_ADD (fek, fk, fnkc);
+        C_SUB (tmp, fk, fnkc);
+        C_MUL (fok, tmp, super_twiddles[j-1]);
+        C_ADD (tmpbuf[j],     fek, fok);
+        C_SUB (tmpbuf[len+1 - j], fek, fok);
+        tmpbuf[len+1 - j].i *= -1;
+    }
+
+	for (j = 0; j < 2 * len; j++) {
+		printf("  4 GOLD[%u] = 0x%08x\n", j, ((uint32_t*)gold)[j]);
+    }
 
 	fft2_comp(gold, num_ffts, num_samples, logn_samples, 1 /* do_inverse */, do_shift);
 }
@@ -190,7 +287,7 @@ int main(int argc, char * argv[])
 	printf("ilen %u isize %u o_off %u olen %u osize %u msize %u\n", in_len, out_len, in_size, out_size, out_offset, mem_size);
 
 	// Allocate memory
-	gold = aligned_malloc(2 * out_len * sizeof(float));
+	gold = aligned_malloc(((4 * out_len) + 2) * sizeof(float));
 	mem = aligned_malloc(mem_size);
 	printf("  memory buffer base-address = %p\n", mem);
 
@@ -207,7 +304,7 @@ int main(int argc, char * argv[])
 	coherence = ACC_COH_FULL;
 	printf("  --------------------\n");
 	printf("  Generate input...\n");
-	init_buf(mem, gold, (mem + acc_offset + 4 * out_len), (gold + out_len));
+	init_buf(mem, gold, (mem + acc_offset + 4 * out_len), (gold + out_len), (mem + acc_offset + 5 * out_len), (gold + 2 * out_len), (gold + 3 * out_len));
 
 	printf("Scanning device tree... \n");
 
