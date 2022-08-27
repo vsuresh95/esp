@@ -324,6 +324,12 @@ void fir::compute_kernel()
         store_ready.req.reset_req();
         store_done.ack.reset_ack();
 
+        post_proc_done.ack.reset_ack();
+        post_proc_ready.req.reset_req();
+
+        pre_proc_done.ack.reset_ack();
+        pre_proc_ready.req.reset_req();
+
         load_state_req = 0;
         store_state_req = 0;
 
@@ -386,12 +392,12 @@ void fir::compute_kernel()
             wait();
             this->compute_post_proc_done_handshake();
             wait();
+
+            compute_state_req_dbg.write(4);
         }
 
         // Compute
         {
-            compute_state_req_dbg.write(4);
-
             for (unsigned k = 0; k < 2 * (num_samples + 1); k+=2) {
 
                 CompNum akj, akjm;
