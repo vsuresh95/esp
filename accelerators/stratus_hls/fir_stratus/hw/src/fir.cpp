@@ -630,7 +630,7 @@ void fir::fft_post_proc()
                 A0[k + 1] = fp2int<FPDATA, WORD_SIZE>(f0.im);
                 wait();
                 A0[(2 * num_samples) - k] = fp2int<FPDATA, WORD_SIZE>(fn.re);
-                A0[(2 * num_samples) - k + 1] = fp2int<FPDATA, WORD_SIZE>(fn.im);
+                A0[(2 * num_samples) - k + 1] = - (fp2int<FPDATA, WORD_SIZE>(fn.im));
             }
         } // for (k = 2 .. num_samples)
 
@@ -692,6 +692,8 @@ void fir::ifft_pre_proc()
             t0.re = f0.re + fn.re;
             t0.im = f0.re - fn.re;
 
+            t0.re /= 2; t0.im /= 2;
+
             // Write back first and last element to memory
             {
                 HLS_PROTO("write-back-pre-proc-0");
@@ -725,8 +727,6 @@ void fir::ifft_pre_proc()
             compAdd(fek, fok, tmpbuf0);
             compSub(fek, fok, tmpbufn);
 
-            tmpbufn.im *= -1;
-
             {
                 HLS_PROTO("write-back-pre-proc-k");
                 HLS_BREAK_DEP(A0);
@@ -735,7 +735,7 @@ void fir::ifft_pre_proc()
                 A0[k + 1] = fp2int<FPDATA, WORD_SIZE>(tmpbuf0.im);
                 wait();
                 A0[(2 * num_samples) - k] = fp2int<FPDATA, WORD_SIZE>(tmpbufn.re);
-                A0[(2 * num_samples) - k + 1] = fp2int<FPDATA, WORD_SIZE>(tmpbufn.im);
+                A0[(2 * num_samples) - k + 1] = - (fp2int<FPDATA, WORD_SIZE>(tmpbufn.im));
             }
         } // for (k = 2 .. num_samples)
 
