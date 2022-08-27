@@ -677,7 +677,7 @@ void fir::ifft_pre_proc()
         CompNum tf, f0, fn, t0;
 
         {
-            HLS_PROTO("wait-for-post-proc-ready");
+            HLS_PROTO("wait-for-pre-proc-ready");
             wait();
             this->pre_proc_compute_ready_handshake();
         }
@@ -740,7 +740,7 @@ void fir::ifft_pre_proc()
         } // for (k = 2 .. num_samples)
 
         {
-            HLS_PROTO("send-for-post-proc-done");
+            HLS_PROTO("send-for-pre-proc-done");
             wait();
             this->pre_proc_compute_done_handshake();
         }
