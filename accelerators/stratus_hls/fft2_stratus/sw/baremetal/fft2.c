@@ -186,13 +186,13 @@ static void init_buf(token_t *in, float *gold, token_t *in_filter, float *gold_f
     tdc.i = tmpbuf[0].i;
     C_FIXDIV(tdc,2);
     freqdata[0].r = tdc.r + tdc.i;
-    freqdata[len+1].r = tdc.r - tdc.i;
-    freqdata[len+1].i = freqdata[0].i = 0;
+    freqdata[len].r = tdc.r - tdc.i;
+    freqdata[len].i = freqdata[0].i = 0;
 
-    for ( j=1;j <= len+1/2 ; ++j ) {
+    for ( j=1;j <= len/2 ; ++j ) {
         fpk    = tmpbuf[j]; 
-        fpnk.r =   tmpbuf[len+1-j].r;
-        fpnk.i = - tmpbuf[len+1-j].i;
+        fpnk.r =   tmpbuf[len-j].r;
+        fpnk.i = - tmpbuf[len-j].i;
         C_FIXDIV(fpk,2);
         C_FIXDIV(fpnk,2);
 
@@ -202,8 +202,8 @@ static void init_buf(token_t *in, float *gold, token_t *in_filter, float *gold_f
 
         freqdata[j].r = HALF_OF(f1k.r + tw.r);
         freqdata[j].i = HALF_OF(f1k.i + tw.i);
-        freqdata[len+1-j].r = HALF_OF(f1k.r - tw.r);
-        freqdata[len+1-j].i = HALF_OF(tw.i - f1k.i);
+        freqdata[len-j].r = HALF_OF(f1k.r - tw.r);
+        freqdata[len-j].i = HALF_OF(tw.i - f1k.i);
     }
 
 	for (j = 0; j < 2 * (len+1); j++) {
@@ -221,14 +221,14 @@ static void init_buf(token_t *in, float *gold, token_t *in_filter, float *gold_f
     }
 
     // Pre-processing
-    tmpbuf[0].r = freqdata[0].r + freqdata[len+1].r;
-    tmpbuf[0].i = freqdata[0].r - freqdata[len+1].r;
+    tmpbuf[0].r = freqdata[0].r + freqdata[len].r;
+    tmpbuf[0].i = freqdata[0].r - freqdata[len].r;
     C_FIXDIV(tmpbuf[0],2);
 
-    for (j = 1; j <= len+1 / 2; ++j) {
+    for (j = 1; j <= len/2; ++j) {
         fk = freqdata[j];
-        fnkc.r = freqdata[len+1 - j].r;
-        fnkc.i = -freqdata[len+1 - j].i;
+        fnkc.r = freqdata[len-j].r;
+        fnkc.i = -freqdata[len-j].i;
         C_FIXDIV( fk , 2 );
         C_FIXDIV( fnkc , 2 );
 
@@ -236,8 +236,8 @@ static void init_buf(token_t *in, float *gold, token_t *in_filter, float *gold_f
         C_SUB (tmp, fk, fnkc);
         C_MUL (fok, tmp, super_twiddles[j-1]);
         C_ADD (tmpbuf[j],     fek, fok);
-        C_SUB (tmpbuf[len+1 - j], fek, fok);
-        tmpbuf[len+1 - j].i *= -1;
+        C_SUB (tmpbuf[len-j], fek, fok);
+        tmpbuf[len-j].i *= -1;
     }
 
 	for (j = 0; j < 2 * len; j++) {

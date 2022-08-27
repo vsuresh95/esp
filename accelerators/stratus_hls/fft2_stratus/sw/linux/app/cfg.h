@@ -20,7 +20,7 @@ typedef float native_t;
 #endif /* FFT2_FX_WIDTH */
 
 /* <<--params-def-->> */
-#define LOGN_SAMPLES 10
+#define LOGN_SAMPLES 3
 //#define NUM_FFTS     46
 #define NUM_FFTS     1
 //#define LOGN_SAMPLES 12
@@ -43,6 +43,31 @@ const int32_t scale_factor = SCALE_FACTOR;
 #define SYNC_VAR_SIZE 2
 
 #define NUM_DEVICES 3
+
+typedef struct {
+    float r;
+    float i;
+} cpx_num;
+
+#   define S_MUL(a,b) ( (a)*(b) )
+#define C_MUL(m,a,b) \
+    do{ (m).r = (a).r*(b).r - (a).i*(b).i;\
+        (m).i = (a).r*(b).i + (a).i*(b).r; }while(0)
+#   define C_FIXDIV(c,div) /* NOOP */
+#   define C_MULBYSCALAR( c, s ) \
+    do{ (c).r *= (s);\
+        (c).i *= (s); }while(0)
+
+#define  C_ADD( res, a,b)\
+    do { \
+        (res).r=(a).r+(b).r;  (res).i=(a).i+(b).i; \
+    }while(0)
+#define  C_SUB( res, a,b)\
+    do { \
+        (res).r=(a).r-(b).r;  (res).i=(a).i-(b).i; \
+    }while(0)
+
+#  define HALF_OF(x) ((x)*.5)
 
 struct fft2_stratus_access fft2_cfg_000[] = {
 	{
