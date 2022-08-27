@@ -40,7 +40,9 @@ typedef struct {
 #define C_MUL(m,a,b) \
     do{ (m).r = (a).r*(b).r - (a).i*(b).i;\
         (m).i = (a).r*(b).i + (a).i*(b).r; }while(0)
-#   define C_FIXDIV(c,div) /* NOOP */
+#   define C_FIXDIV(c,div) \
+    do{ (c).r /= (div);\
+        (c).i /= (div); }while(0)
 #   define C_MULBYSCALAR( c, s ) \
     do{ (c).r *= (s);\
         (c).i *= (s); }while(0)
@@ -63,7 +65,7 @@ typedef struct {
 #define FIR_DEV_NAME "sld,fir_stratus"
 
 /* <<--params-->> */
-const int32_t logn_samples = 3;
+const int32_t logn_samples = 2;
 const int32_t num_samples = (1 << logn_samples);
 const int32_t num_ffts = 1;
 const int32_t do_inverse = 0;
@@ -140,7 +142,7 @@ static void init_buf(token_t *in, float *gold, token_t *in_filter, float *gold_f
 		// printf("  IN[%u] = 0x%08x\n", j, ig);
 	}
 
-	for (j = 0; j < 2 * len; j++) {
+	for (j = 0; j < 2 * (len+1); j++) {
 		float scaling_factor = (float) rand () / (float) RAND_MAX;
 		gold_filter[j] = LO + scaling_factor * (HI - LO);
 		uint32_t ig = ((uint32_t*)gold_filter)[j];
@@ -159,7 +161,7 @@ static void init_buf(token_t *in, float *gold, token_t *in_filter, float *gold_f
 		in[j+SYNC_VAR_SIZE] = float2fx((native_t) gold[j], FX_IL);
 
 	// convert input to fixed point
-	for (j = 0; j < 2 * len; j++)
+	for (j = 0; j < 2 * (len+1); j++)
 		in_filter[j] = float2fx((native_t) gold_filter[j], FX_IL);
 
 	// convert input to fixed point
@@ -282,12 +284,12 @@ int main(int argc, char * argv[])
 
     acc_size = mem_size;
     acc_offset = out_offset + out_len + SYNC_VAR_SIZE;
-    mem_size *= NUM_DEVICES+3;
+    mem_size *= NUM_DEVICES+5;
 
 	printf("ilen %u isize %u o_off %u olen %u osize %u msize %u\n", in_len, out_len, in_size, out_size, out_offset, mem_size);
 
 	// Allocate memory
-	gold = aligned_malloc(((4 * out_len) + 2) * sizeof(float));
+	gold = aligned_malloc((6 * out_len) * sizeof(float));
 	mem = aligned_malloc(mem_size);
 	printf("  memory buffer base-address = %p\n", mem);
 
@@ -304,7 +306,10 @@ int main(int argc, char * argv[])
 	coherence = ACC_COH_FULL;
 	printf("  --------------------\n");
 	printf("  Generate input...\n");
-	init_buf(mem, gold, (mem + acc_offset + 4 * out_len), (gold + out_len), (mem + acc_offset + 5 * out_len), (gold + 2 * out_len), (gold + 3 * out_len));
+	init_buf(mem, gold,
+            (mem + acc_offset + 4 * out_len) /* in_filter */, (gold + out_len) /* gold_filter */,
+            (mem + acc_offset + 6 * out_len) /* in_twiddle */, (gold + 3 * out_len) /* gold_twiddle */,
+            (gold + 4 * out_len) /* gold_freqdata */);
 
 	printf("Scanning device tree... \n");
 

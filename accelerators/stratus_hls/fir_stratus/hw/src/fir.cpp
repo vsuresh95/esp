@@ -120,14 +120,14 @@ void fir::load_input()
             }
             // Load filters
             {
-                dma_info_t dma_info(4 * 2 * num_samples / DMA_WORD_PER_BEAT, 2 * num_samples / DMA_WORD_PER_BEAT, DMA_SIZE);
+                dma_info_t dma_info(4 * 2 * num_samples / DMA_WORD_PER_BEAT, 2 * (num_samples + 1)/ DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
 
                 wait();
 
                 this->dma_read_ctrl.put(dma_info);
 
-                for (int i = 0; i < 2 * num_samples; i += DMA_WORD_PER_BEAT)
+                for (int i = 0; i < 2 * (num_samples + 1); i += DMA_WORD_PER_BEAT)
                 {
                     HLS_BREAK_DEP(F0);
 
@@ -142,7 +142,7 @@ void fir::load_input()
             }
             // Load twiddle factors 
             {
-                dma_info_t dma_info(5 * 2 * num_samples / DMA_WORD_PER_BEAT, num_samples / DMA_WORD_PER_BEAT, DMA_SIZE);
+                dma_info_t dma_info(6 * 2 * num_samples / DMA_WORD_PER_BEAT, num_samples / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
 
                 wait();
@@ -392,7 +392,7 @@ void fir::compute_kernel()
         {
             compute_state_req_dbg.write(4);
 
-            for (unsigned k = 0; k < 2 * num_samples; k+=2) {
+            for (unsigned k = 0; k < 2 * (num_samples + 1); k+=2) {
 
                 CompNum akj, akjm;
                 CompNum bkj, bkjm;
