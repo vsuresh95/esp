@@ -57,18 +57,6 @@ public:
     // Store -> Compute
     handshake_t store_done;
 
-    // Compute -> Post_proc
-    handshake_t post_proc_ready;
-
-    // Compute -> Pre_proc
-    handshake_t pre_proc_ready;
-
-    // Post_proc -> Compute
-    handshake_t post_proc_done;
-
-    // Pre_proc -> Compute
-    handshake_t pre_proc_done;
-
     // Constructor
     SC_HAS_PROCESS(fir);
     fir(const sc_module_name& name)
@@ -79,17 +67,7 @@ public:
         , store_ready("store_ready")
         , load_done("load_done")
         , store_done("store_done")
-        , post_proc_ready("post_proc_ready")
-        , pre_proc_ready("pre_proc_ready")
-        , post_proc_done("post_proc_done")
-        , pre_proc_done("pre_proc_done")
     {
-
-        SC_CTHREAD(fft_post_proc, this->clk.pos());
-        this->reset_signal_is(this->rst, false);
-
-        SC_CTHREAD(ifft_pre_proc, this->clk.pos());
-        this->reset_signal_is(this->rst, false);
 
         // Signal binding
         cfg.bind_with(*this);
@@ -111,11 +89,6 @@ public:
         store_ready.bind_with(*this);
         load_done.bind_with(*this);
         store_done.bind_with(*this);
-        
-        post_proc_ready.bind_with(*this);
-        pre_proc_ready.bind_with(*this);
-        post_proc_done.bind_with(*this);
-        pre_proc_done.bind_with(*this);
     }
 
     sc_signal< sc_int<32> > load_state_req_dbg;
@@ -155,12 +128,6 @@ public:
     // Computation
     void compute_kernel();
 
-    // FFT Post-processing
-    void fft_post_proc();
-
-    // IFFT Pre-processing
-    void ifft_pre_proc();
-
     // Store the output data
     void store_output();
 
@@ -181,15 +148,6 @@ public:
     inline void load_compute_done_handshake();
     inline void compute_store_done_handshake();
     inline void store_compute_done_handshake();
-
-    inline void compute_post_proc_ready_handshake();
-    inline void post_proc_compute_ready_handshake();
-    inline void compute_pre_proc_ready_handshake();
-    inline void pre_proc_compute_ready_handshake();
-    inline void compute_post_proc_done_handshake();
-    inline void post_proc_compute_done_handshake();
-    inline void compute_pre_proc_done_handshake();
-    inline void pre_proc_compute_done_handshake();
 };
 
 

@@ -324,12 +324,6 @@ void fir::compute_kernel()
         store_ready.req.reset_req();
         store_done.ack.reset_ack();
 
-        post_proc_done.ack.reset_ack();
-        post_proc_ready.req.reset_req();
-
-        pre_proc_done.ack.reset_ack();
-        pre_proc_ready.req.reset_req();
-
         load_state_req = 0;
         store_state_req = 0;
 
@@ -380,58 +374,121 @@ void fir::compute_kernel()
             wait();
             this->compute_load_done_handshake();
             wait();
-        }
-
-        // Post-process FFT output
-        {
-            HLS_PROTO("post-process-fft");
 
             compute_state_req_dbg.write(3);
-
-            this->compute_post_proc_ready_handshake();
-            wait();
-            this->compute_post_proc_done_handshake();
-            wait();
-
-            compute_state_req_dbg.write(4);
         }
 
         // Compute
         {
-            for (unsigned k = 0; k < 2 * (num_samples + 1); k+=2) {
+            CompNum fpnk, fpk, f1k, f2k, tw, tdc;
+            CompNum tf, if0, ifn, of0, flt0, fltn, t0, tn;
+            CompNum fk, fnkc, fek, fok, tmp;
+            CompNum tmpbuf0, tmpbufn;
 
-                CompNum akj, akjm;
-                CompNum bkj, bkjm;
+            // First and last element
+            {
+                // Post-process first and last element
+                tdc.re = int2fp<FPDATA, WORD_SIZE>(A0[0]);
+                tdc.im = int2fp<FPDATA, WORD_SIZE>(A0[1]);
 
-                akj.re = int2fp<FPDATA, WORD_SIZE>(A0[k]);
-                akj.im = int2fp<FPDATA, WORD_SIZE>(A0[k + 1]);
-                akjm.re = int2fp<FPDATA, WORD_SIZE>(F0[k]);
-                akjm.im = int2fp<FPDATA, WORD_SIZE>(F0[k + 1]);
+                tdc.re /= 2; tdc.im /= 2;
 
-                CompNum t;
-                compMul(akj, akjm, t);
+                if0.re = tdc.re + tdc.im;
+                if0.im = 0;
+                ifn.re = tdc.re - tdc.im;
+                ifn.im = 0;
 
+                // Reading filter values
+                flt0.re = int2fp<FPDATA, WORD_SIZE>(F0[0]);
+                flt0.im = int2fp<FPDATA, WORD_SIZE>(F0[1]);
+                fltn.re = int2fp<FPDATA, WORD_SIZE>(F0[(2 * num_samples)]);
+                fltn.im = int2fp<FPDATA, WORD_SIZE>(F0[(2 * num_samples) + 1]);
+
+                // FIR
+                compMul(if0, flt0, t0);
+                compMul(ifn, flt0, tn);
+
+                // Pre-process first and last element
+                of0.re = t0.re + tn.re;
+                of0.im = t0.re - tn.re;
+
+                of0.re /= 2; of0.im /= 2;
+
+                // Write back element 0 to memory
                 {
-                    HLS_PROTO("compute_write_A0");
+                    HLS_PROTO("write-back-elem-0");
                     HLS_BREAK_DEP(A0);
                     wait();
-                    A0[k] = fp2int<FPDATA, WORD_SIZE>(t.re);
-                    A0[k + 1] = fp2int<FPDATA, WORD_SIZE>(t.im);
+                    A0[0] = fp2int<FPDATA, WORD_SIZE>(of0.re);
+                    A0[1] = fp2int<FPDATA, WORD_SIZE>(of0.im);
+                }
+            }
+
+            // Remaining elements
+            for (unsigned k = 2; k < num_samples; k+=2)
+            {
+                // Read FFT output
+                fpk.re = int2fp<FPDATA, WORD_SIZE>(A0[k]);
+                fpk.im = int2fp<FPDATA, WORD_SIZE>(A0[k + 1]);
+                fpnk.re = int2fp<FPDATA, WORD_SIZE>(A0[(2 * num_samples) - k]);
+                fpnk.im = - (int2fp<FPDATA, WORD_SIZE>(A0[(2 * num_samples) - k + 1]));
+
+                // Read twiddle factors
+                tf.re = int2fp<FPDATA, WORD_SIZE>(T0[k/2 - 1]);
+                tf.im = int2fp<FPDATA, WORD_SIZE>(T0[k/2]);
+
+                fpk.re /= 2; fpk.im /= 2;
+                fpnk.re /= 2; fpnk.im /= 2;
+
+                compAdd(fpk, fpnk, f1k);
+                compSub(fpk, fpnk, f2k);
+                compMul(f2k, tf, tw);
+
+                // Computing freqdata's
+                compAdd(f1k, tw, if0);
+                if0.re /= 2; if0.im /= 2;
+
+                compSub(f1k, tw, ifn);
+                ifn.re /= 2; ifn.im /= 2;
+
+                ifn.im *= -1;
+
+                // Reading filter values
+                flt0.re = int2fp<FPDATA, WORD_SIZE>(F0[k]);
+                flt0.im = int2fp<FPDATA, WORD_SIZE>(F0[k + 1]);
+                fltn.re = int2fp<FPDATA, WORD_SIZE>(F0[(2 * num_samples) - k]);
+                fltn.im = int2fp<FPDATA, WORD_SIZE>(F0[(2 * num_samples) - k + 1]);
+
+                // FIR
+                compMul(if0, flt0, t0);
+                compMul(ifn, fltn, tn);
+
+                fk = t0;
+                fnkc.re = tn.re;
+                fnkc.im = - (tn.im);
+
+                fk.re /= 2; fk.im /= 2;
+                fnkc.re /= 2; fnkc.im /= 2;
+
+                compAdd(fk, fnkc, fek);
+                compSub(fk, fnkc, tmp);
+                compMul(tmp, tf, fok);
+
+                compAdd(fek, fok, tmpbuf0);
+                compSub(fek, fok, tmpbufn);
+
+                {
+                    HLS_PROTO("write-back-elem-k");
+                    HLS_BREAK_DEP(A0);
+                    wait();
+                    A0[k] = fp2int<FPDATA, WORD_SIZE>(tmpbuf0.re);
+                    A0[k + 1] = fp2int<FPDATA, WORD_SIZE>(tmpbuf0.im);
+                    wait();
+                    A0[(2 * num_samples) - k] = fp2int<FPDATA, WORD_SIZE>(tmpbufn.re);
+                    A0[(2 * num_samples) - k + 1] = - (fp2int<FPDATA, WORD_SIZE>(tmpbufn.im));
                 }
             } // for (k = 0 .. num_samples)
         } // Compute
-
-        // Pre-process IFFT output
-        {
-            HLS_PROTO("pre-process-ifft");
-
-            compute_state_req_dbg.write(5);
-
-            this->compute_pre_proc_ready_handshake();
-            wait();
-            this->compute_pre_proc_done_handshake();
-            wait();
-        }
 
         // Poll lock for consumer's ready
         {
@@ -439,7 +496,7 @@ void fir::compute_kernel()
 
             load_state_req = POLL_NEXT_REQ;
 
-            compute_state_req_dbg.write(6);
+            compute_state_req_dbg.write(4);
 
             this->compute_load_ready_handshake();
             wait();
@@ -455,8 +512,32 @@ void fir::compute_kernel()
 
             this->compute_store_ready_handshake();
 
+            compute_state_req_dbg.write(5);
+
+            wait();
+            this->compute_store_done_handshake();
+            wait();
+
+            // Wait for all writes to be done and then issue fence
+            store_state_req = STORE_FENCE;
+
+            compute_state_req_dbg.write(6);
+
+            this->compute_store_ready_handshake();
+            wait();
+            this->compute_store_done_handshake();
+            wait();
+        }
+
+        // update consumer for data ready
+        {
+            HLS_PROTO("update-next-lock");
+
+            store_state_req = UPDATE_NEXT_REQ;
+
             compute_state_req_dbg.write(7);
 
+            this->compute_store_ready_handshake();
             wait();
             this->compute_store_done_handshake();
             wait();
@@ -472,11 +553,11 @@ void fir::compute_kernel()
             wait();
         }
 
-        // update consumer for data ready
+        // update producer for ready to accept
         {
-            HLS_PROTO("update-next-lock");
+            HLS_PROTO("update-prev-lock");
 
-            store_state_req = UPDATE_NEXT_REQ;
+            store_state_req = UPDATE_PREV_REQ;
 
             compute_state_req_dbg.write(9);
 
@@ -496,37 +577,13 @@ void fir::compute_kernel()
             wait();
         }
 
-        // update producer for ready to accept
-        {
-            HLS_PROTO("update-prev-lock");
-
-            store_state_req = UPDATE_PREV_REQ;
-
-            compute_state_req_dbg.write(11);
-
-            this->compute_store_ready_handshake();
-            wait();
-            this->compute_store_done_handshake();
-            wait();
-
-            // Wait for all writes to be done and then issue fence
-            store_state_req = STORE_FENCE;
-
-            compute_state_req_dbg.write(12);
-
-            this->compute_store_ready_handshake();
-            wait();
-            this->compute_store_done_handshake();
-            wait();
-        }
-
         // End operation
         {
             HLS_PROTO("end-acc");
 
             store_state_req = ACC_DONE;
 
-            compute_state_req_dbg.write(13);
+            compute_state_req_dbg.write(11);
 
             this->compute_store_ready_handshake();
             wait();
@@ -536,219 +593,3 @@ void fir::compute_kernel()
         }
     } // while (true)
 } // Function : compute_kernel
-
-void fir::fft_post_proc()
-{
-    // Reset
-    {
-        HLS_PROTO("fft_post_proc-reset");
-
-        post_proc_done.req.reset_req();
-        post_proc_ready.ack.reset_ack();
-
-        wait();
-    }
-
-    // Config
-    /* <<--params-->> */
-    int32_t logn_samples;
-    int32_t num_samples;
-    {
-        HLS_PROTO("fft_post_proc-config");
-
-        cfg.wait_for_config(); // config process
-        conf_info_t config = this->conf_info.read();
-
-        // User-defined config code
-        /* <<--local-params-->> */
-        logn_samples = config.logn_samples;
-        num_samples = 1 << logn_samples;
-    }
-
-    while(true)
-    {
-        CompNum fpnk, fpk, f1k, f2k, tw, tdc;
-        CompNum tf, f0, fn;
-
-        {
-            HLS_PROTO("wait-for-post-proc-ready");
-            wait();
-            this->post_proc_compute_ready_handshake();
-        }
-
-        // First and last element
-        {
-            tdc.re = int2fp<FPDATA, WORD_SIZE>(A0[0]);
-            tdc.im = int2fp<FPDATA, WORD_SIZE>(A0[1]);
-
-            tdc.re /= 2; tdc.im /= 2;
-
-            f0.re = tdc.re + tdc.im;
-            f0.im = 0; // not in original code
-            fn.re = tdc.re - tdc.im;
-            fn.im = 0;
-
-            // Write back first and last element to memory
-            {
-                HLS_PROTO("write-back-post-proc-0");
-                HLS_BREAK_DEP(A0);
-                wait();
-                A0[0] = fp2int<FPDATA, WORD_SIZE>(f0.re);
-                A0[1] = fp2int<FPDATA, WORD_SIZE>(f0.im);
-                wait();
-                A0[(2 * num_samples)] = fp2int<FPDATA, WORD_SIZE>(fn.re);
-                A0[(2 * num_samples) + 1] = fp2int<FPDATA, WORD_SIZE>(fn.im);
-            }
-        }
-
-        // Remaining elements
-        for (unsigned k = 2; k < num_samples; k+=2)
-        {
-            // Read FFT output
-            fpk.re = int2fp<FPDATA, WORD_SIZE>(A0[k]);
-            fpk.im = int2fp<FPDATA, WORD_SIZE>(A0[k + 1]);
-            fpnk.re = int2fp<FPDATA, WORD_SIZE>(A0[(2 * num_samples) - k]);
-            fpnk.im = - (int2fp<FPDATA, WORD_SIZE>(A0[(2 * num_samples) - k + 1]));
-
-            // Read twiddle factors
-            tf.re = int2fp<FPDATA, WORD_SIZE>(T0[k/2 - 1]);
-            tf.im = int2fp<FPDATA, WORD_SIZE>(T0[k/2]);
-
-            fpk.re /= 2; fpk.im /= 2;
-            fpnk.re /= 2; fpnk.im /= 2;
-
-            compAdd(fpk, fpnk, f1k);
-            compSub(fpk, fpnk, f2k);
-            compMul(f2k, tf, tw);
-
-            // Computing freqdata's
-            compAdd(f1k, tw, f0);
-            f0.re /= 2; f0.im /= 2;
-
-            compSub(f1k, tw, fn);
-            fn.re /= 2; fn.im /= 2;
-
-            {
-                HLS_PROTO("write-back-post-proc-k");
-                HLS_BREAK_DEP(A0);
-                wait();
-                A0[k] = fp2int<FPDATA, WORD_SIZE>(f0.re);
-                A0[k + 1] = fp2int<FPDATA, WORD_SIZE>(f0.im);
-                wait();
-                A0[(2 * num_samples) - k] = fp2int<FPDATA, WORD_SIZE>(fn.re);
-                A0[(2 * num_samples) - k + 1] = - (fp2int<FPDATA, WORD_SIZE>(fn.im));
-            }
-        } // for (k = 2 .. num_samples)
-
-        {
-            HLS_PROTO("send-for-post-proc-done");
-            wait();
-            this->post_proc_compute_done_handshake();
-        }
-    } // while (true)
-} // Function : fft_post_proc
-
-void fir::ifft_pre_proc()
-{
-    // Reset
-    {
-        HLS_PROTO("ifft_pre_proc-reset");
-
-        pre_proc_done.req.reset_req();
-        pre_proc_ready.ack.reset_ack();
-
-        wait();
-    }
-
-    // Config
-    /* <<--params-->> */
-    int32_t logn_samples;
-    int32_t num_samples;
-    {
-        HLS_PROTO("ifft_pre_proc-config");
-
-        cfg.wait_for_config(); // config process
-        conf_info_t config = this->conf_info.read();
-
-        // User-defined config code
-        /* <<--local-params-->> */
-        logn_samples = config.logn_samples;
-        num_samples = 1 << logn_samples;
-    }
-
-    while(true)
-    {
-        CompNum fk, fnkc, fek, fok, tmp;
-        CompNum tmpbuf0, tmpbufn;
-        CompNum tf, f0, fn, t0;
-
-        {
-            HLS_PROTO("wait-for-pre-proc-ready");
-            wait();
-            this->pre_proc_compute_ready_handshake();
-        }
-
-        // First and last element
-        {
-            f0.re = int2fp<FPDATA, WORD_SIZE>(A0[0]);
-            f0.im = int2fp<FPDATA, WORD_SIZE>(A0[1]);
-            fn.re = int2fp<FPDATA, WORD_SIZE>(A0[(2 * num_samples)]);
-            fn.im = int2fp<FPDATA, WORD_SIZE>(A0[(2 * num_samples) + 1]);
-
-            t0.re = f0.re + fn.re;
-            t0.im = f0.re - fn.re;
-
-            t0.re /= 2; t0.im /= 2;
-
-            // Write back first and last element to memory
-            {
-                HLS_PROTO("write-back-pre-proc-0");
-                HLS_BREAK_DEP(A0);
-                wait();
-                A0[0] = fp2int<FPDATA, WORD_SIZE>(t0.re);
-                A0[1] = fp2int<FPDATA, WORD_SIZE>(t0.im);
-            }
-        }
-
-        // Remaining elements
-        for (unsigned k = 2; k < num_samples; k+=2)
-        {
-            // Read FIR output
-            fk.re = int2fp<FPDATA, WORD_SIZE>(A0[k]);
-            fk.im = int2fp<FPDATA, WORD_SIZE>(A0[k + 1]);
-            fnkc.re = int2fp<FPDATA, WORD_SIZE>(A0[(2 * num_samples) - k]);
-            fnkc.im = - (int2fp<FPDATA, WORD_SIZE>(A0[(2 * num_samples) - k + 1]));
-
-            // Read twiddle factors
-            tf.re = int2fp<FPDATA, WORD_SIZE>(T0[k/2 - 1]);
-            tf.im = int2fp<FPDATA, WORD_SIZE>(T0[k/2]);
-
-            fk.re /= 2; fk.im /= 2;
-            fnkc.re /= 2; fnkc.im /= 2;
-
-            compAdd(fk, fnkc, fek);
-            compSub(fk, fnkc, tmp);
-            compMul(tmp, tf, fok);
-
-            compAdd(fek, fok, tmpbuf0);
-            compSub(fek, fok, tmpbufn);
-
-            {
-                HLS_PROTO("write-back-pre-proc-k");
-                HLS_BREAK_DEP(A0);
-                wait();
-                A0[k] = fp2int<FPDATA, WORD_SIZE>(tmpbuf0.re);
-                A0[k + 1] = fp2int<FPDATA, WORD_SIZE>(tmpbuf0.im);
-                wait();
-                A0[(2 * num_samples) - k] = fp2int<FPDATA, WORD_SIZE>(tmpbufn.re);
-                A0[(2 * num_samples) - k + 1] = - (fp2int<FPDATA, WORD_SIZE>(tmpbufn.im));
-            }
-        } // for (k = 2 .. num_samples)
-
-        {
-            HLS_PROTO("send-for-pre-proc-done");
-            wait();
-            this->pre_proc_compute_done_handshake();
-        }
-    } // while (true)
-} // Function : ifft_pre_proc
