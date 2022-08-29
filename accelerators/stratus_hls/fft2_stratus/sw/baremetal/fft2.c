@@ -65,7 +65,7 @@ typedef struct {
 #define FIR_DEV_NAME "sld,fir_stratus"
 
 /* <<--params-->> */
-const int32_t logn_samples = 2;
+const int32_t logn_samples = 6;
 const int32_t num_samples = (1 << logn_samples);
 const int32_t num_ffts = 1;
 const int32_t do_inverse = 0;
@@ -117,9 +117,10 @@ static int validate_buf(token_t *out, float *gold)
 	for (j = 0; j < 2 * len; j++) {
 		native_t val = fx2float(out[j+SYNC_VAR_SIZE], FX_IL);
 		uint32_t ival = *((uint32_t*)&val);
-		printf("  GOLD[%u] = 0x%08x  :  OUT[%u] = 0x%08x\n", j, ((uint32_t*)gold)[j], j, ival);
-		if ((fabs(gold[j] - val) / fabs(gold[j])) > ERR_TH)
+		if ((fabs(gold[j] - val) / fabs(gold[j])) > ERR_TH) {
+		    printf("%u G %08x O %08x\n", j, ((uint32_t*)gold)[j], ival);
 			errors++;
+        }
 	}
 
 	//printf("  %u errors\n", errors);
@@ -179,9 +180,9 @@ static void init_buf(token_t *in, float *gold, token_t *in_filter, float *gold_f
     cpx_num *super_twiddles = (cpx_num *) gold_twiddle;
     cpx_num *filter = (cpx_num *) gold_filter;
 
-	for (j = 0; j < 2 * len; j++) {
-		printf("  1 GOLD[%u] = 0x%08x\n", j, ((uint32_t*)gold)[j]);
-    }
+	// for (j = 0; j < 2 * len; j++) {
+	// 	printf("  1 GOLD[%u] = 0x%08x\n", j, ((uint32_t*)gold)[j]);
+    // }
 
     // Post-processing
     tdc.r = tmpbuf[0].r;
@@ -208,9 +209,9 @@ static void init_buf(token_t *in, float *gold, token_t *in_filter, float *gold_f
         freqdata[len-j].i = HALF_OF(tw.i - f1k.i);
     }
 
-	for (j = 0; j < 2 * (len+1); j++) {
-		printf("  2 GOLD[%u] = 0x%08x\n", j, ((uint32_t*)gold_freqdata)[j]);
-    }
+	// for (j = 0; j < 2 * (len+1); j++) {
+	// 	printf("  2 GOLD[%u] = 0x%08x\n", j, ((uint32_t*)gold_freqdata)[j]);
+    // }
 
     // FIR
 	for (j = 0; j < len + 1; j++) {
@@ -218,9 +219,9 @@ static void init_buf(token_t *in, float *gold, token_t *in_filter, float *gold_f
         freqdata[j] = cptemp;
     }
 
-	for (j = 0; j < 2 * (len+1); j++) {
-		printf("  3 GOLD[%u] = 0x%08x\n", j, ((uint32_t*)gold_freqdata)[j]);
-    }
+	// for (j = 0; j < 2 * (len+1); j++) {
+	// 	printf("  3 GOLD[%u] = 0x%08x\n", j, ((uint32_t*)gold_freqdata)[j]);
+    // }
 
     // Pre-processing
     tmpbuf[0].r = freqdata[0].r + freqdata[len].r;
@@ -242,9 +243,9 @@ static void init_buf(token_t *in, float *gold, token_t *in_filter, float *gold_f
         tmpbuf[len-j].i *= -1;
     }
 
-	for (j = 0; j < 2 * len; j++) {
-		printf("  4 GOLD[%u] = 0x%08x\n", j, ((uint32_t*)gold)[j]);
-    }
+	// for (j = 0; j < 2 * len; j++) {
+	// 	printf("  4 GOLD[%u] = 0x%08x\n", j, ((uint32_t*)gold)[j]);
+    // }
 
 	fft2_comp(gold, num_ffts, num_samples, logn_samples, 1 /* do_inverse */, do_shift);
 }

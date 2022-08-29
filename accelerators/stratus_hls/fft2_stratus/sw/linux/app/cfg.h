@@ -20,7 +20,7 @@ typedef float native_t;
 #endif /* FFT2_FX_WIDTH */
 
 /* <<--params-def-->> */
-#define LOGN_SAMPLES 3
+#define LOGN_SAMPLES 2
 //#define NUM_FFTS     46
 #define NUM_FFTS     1
 //#define LOGN_SAMPLES 12
@@ -53,7 +53,9 @@ typedef struct {
 #define C_MUL(m,a,b) \
     do{ (m).r = (a).r*(b).r - (a).i*(b).i;\
         (m).i = (a).r*(b).i + (a).i*(b).r; }while(0)
-#   define C_FIXDIV(c,div) /* NOOP */
+#   define C_FIXDIV(c,div) \
+    do{ (c).r /= (div);\
+        (c).i /= (div); }while(0)
 #   define C_MULBYSCALAR( c, s ) \
     do{ (c).r *= (s);\
         (c).i *= (s); }while(0)
