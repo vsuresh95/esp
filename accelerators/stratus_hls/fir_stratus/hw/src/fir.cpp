@@ -406,7 +406,7 @@ void fir::compute_kernel()
 
                 // FIR
                 compMul(if0, flt0, t0);
-                compMul(ifn, flt0, tn);
+                compMul(ifn, fltn, tn);
 
                 // Pre-process first and last element
                 of0.re = t0.re + tn.re;
@@ -425,7 +425,7 @@ void fir::compute_kernel()
             }
 
             // Remaining elements
-            for (unsigned k = 2; k < num_samples; k+=2)
+            for (unsigned k = 2; k <= num_samples; k+=2)
             {
                 // Read FFT output
                 fpk.re = int2fp<FPDATA, WORD_SIZE>(A0[k]);
@@ -434,8 +434,8 @@ void fir::compute_kernel()
                 fpnk.im = - (int2fp<FPDATA, WORD_SIZE>(A0[(2 * num_samples) - k + 1]));
 
                 // Read twiddle factors
-                tf.re = int2fp<FPDATA, WORD_SIZE>(T0[k/2 - 1]);
-                tf.im = int2fp<FPDATA, WORD_SIZE>(T0[k/2]);
+                tf.re = int2fp<FPDATA, WORD_SIZE>(T0[k - 2]);
+                tf.im = int2fp<FPDATA, WORD_SIZE>(T0[k - 1]);
 
                 fpk.re /= 2; fpk.im /= 2;
                 fpnk.re /= 2; fpnk.im /= 2;
@@ -450,7 +450,6 @@ void fir::compute_kernel()
 
                 compSub(f1k, tw, ifn);
                 ifn.re /= 2; ifn.im /= 2;
-
                 ifn.im *= -1;
 
                 // Reading filter values
