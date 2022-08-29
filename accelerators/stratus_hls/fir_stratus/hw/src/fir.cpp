@@ -469,6 +469,8 @@ void fir::compute_kernel()
                 fk.re /= 2; fk.im /= 2;
                 fnkc.re /= 2; fnkc.im /= 2;
 
+                tf.re *= -1; tf.im *= -1;
+
                 compAdd(fk, fnkc, fek);
                 compSub(fk, fnkc, tmp);
                 compMul(tmp, tf, fok);
