@@ -12,6 +12,8 @@
 
 #include "esp_templates.hpp"
 
+#define SYNC_VAR_SIZE 2
+
 #define MAX_BUFFERS_FULL 4
 const size_t MEM_SIZE = MAX_BUFFERS_FULL * (2 * 262144) / (DMA_WIDTH/8);
 
@@ -53,6 +55,7 @@ public:
         acc->conf_info(conf_info);
         acc->conf_done(conf_done);
         acc->acc_done(acc_done);
+        acc->acc_fence(acc_fence);
         acc->debug(debug);
 
         /* <<--params-default-->> */
@@ -61,8 +64,8 @@ public:
         //num_firs = 46;
 
         use_input_files = 0;
-        logn_samples = 12;
-        num_firs = 15;
+        logn_samples = 10;
+        num_firs = 1;
 
         //use_input_files = 1;
         //logn_samples = 6;
@@ -104,6 +107,7 @@ public:
     float *out;
     float *gold;
 
+    uint32_t total_size;
     uint32_t use_input_files;
     // Other Functions
 };
