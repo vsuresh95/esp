@@ -31,38 +31,41 @@ static unsigned DMA_WORD_PER_BEAT(unsigned _st)
         return (sizeof(void *) / _st);
 }
 
-token_t _pow(token_t a, token_t b) {
-    token_t c = 1;
-    for (int i=0; i<b; i++)
-        c *= a;
-    return c;
+
+token_t _sin(token_t x)
+{
+	int i = 1;
+	token_t cur = x;
+	token_t acc = 1;
+	token_t fact= 1;
+	token_t pow = x;
+	while (fabs(acc) > .00000001 &&   i < 100){
+		fact *= ((2*i)*(2*i+1));
+		pow *= -1 * x*x;
+		acc =  pow / fact;
+		cur += acc;
+		i++;
+	}
+	return cur;
+
 }
 
-token_t _fact(token_t x) {
-    token_t ret = 1;
-    for (int i=1; i<=x; i++)
-        ret *= i;
-    return ret;
-}
+token_t _cos(token_t x)
+{
+	int i = 1;
+	token_t cur = 1;
+	token_t acc = 1;
+	token_t fact= 1;
+	token_t pow = x;
+	while (fabs(acc) > .00000001 &&   i < 100){
+		fact *= ((2*i)*(2*i+1));
+		pow *= -1 * x*x;
+		acc =  pow / fact;
+		cur += acc;
+		i++;
+	}
+	return cur;
 
-token_t _sin(token_t x) {
-    token_t y = x;
-    token_t s = -1;
-    for (int i=3; i<=100; i+=2) {
-        y+=s*(_pow(x,i)/_fact(i));
-        s *= -1;
-    }
-    return y;
-}
-
-token_t _cos(token_t x) {
-    token_t y = 1;
-    token_t s = -1;
-    for (int i=2; i<=100; i+=2) {
-        y+=s*(_pow(x,i)/_fact(i));
-        s *= -1;
-    }
-    return y;
 }
 
 token_t _tan(token_t x) {
