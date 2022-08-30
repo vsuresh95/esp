@@ -57,9 +57,11 @@ static void init_buffer(token_t *in, float *gold, token_t *in_filter, float *gol
 		printf("  1 gold_filter[%u] = %f\n", j, gold_filter[j]);
 	}
 
-	for (j = 0; j < 2 * len; j++) {
-		float scaling_factor = (float) rand () / (float) RAND_MAX;
-		gold_twiddle[j] = LO + scaling_factor * (HI - LO);
+
+	for (j = 0; j < 2 * len; j+=2) {
+        token_t phase = -3.14159 * ((token_t) ((j+1) / len) + .5);
+        gold_twiddle[j] = cos(phase);
+        gold_twiddle[j + 1] = sin(phase);
 		printf("  1 gold_twiddle[%u] = %f\n", j, gold_twiddle[j]);
 	}
 
@@ -84,6 +86,7 @@ static void init_buffer(token_t *in, float *gold, token_t *in_filter, float *gol
     cpx_num fpnk, fpk, f1k, f2k, tw, tdc;
     cpx_num fk, fnkc, fek, fok, tmp;
     cpx_num cptemp;
+    cpx_num inv_twd;
     cpx_num *tmpbuf = (cpx_num *) gold;
     cpx_num *freqdata = (cpx_num *) gold_freqdata;
     cpx_num *super_twiddles = (cpx_num *) gold_twiddle;
@@ -143,10 +146,12 @@ static void init_buffer(token_t *in, float *gold, token_t *in_filter, float *gol
         fnkc.i = -freqdata[len-j].i;
         C_FIXDIV( fk , 2 );
         C_FIXDIV( fnkc , 2 );
+        inv_twd = super_twiddles[j-1];
+        C_MULBYSCALAR(inv_twd,-1);
 
         C_ADD (fek, fk, fnkc);
         C_SUB (tmp, fk, fnkc);
-        C_MUL (fok, tmp, super_twiddles[j-1]);
+        C_MUL (fok, tmp, inv_twd);
         C_ADD (tmpbuf[j],     fek, fok);
         C_SUB (tmpbuf[len-j], fek, fok);
         tmpbuf[len-j].i *= -1;
