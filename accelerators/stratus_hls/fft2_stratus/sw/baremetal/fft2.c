@@ -31,6 +31,44 @@ static unsigned DMA_WORD_PER_BEAT(unsigned _st)
         return (sizeof(void *) / _st);
 }
 
+token_t _pow(token_t a, token_t b) {
+    token_t c = 1;
+    for (int i=0; i<b; i++)
+        c *= a;
+    return c;
+}
+
+token_t _fact(token_t x) {
+    token_t ret = 1;
+    for (int i=1; i<=x; i++)
+        ret *= i;
+    return ret;
+}
+
+token_t _sin(token_t x) {
+    token_t y = x;
+    token_t s = -1;
+    for (int i=3; i<=100; i+=2) {
+        y+=s*(_pow(x,i)/_fact(i));
+        s *= -1;
+    }
+    return y;
+}
+
+token_t _cos(token_t x) {
+    token_t y = 1;
+    token_t s = -1;
+    for (int i=2; i<=100; i+=2) {
+        y+=s*(_pow(x,i)/_fact(i));
+        s *= -1;
+    }
+    return y;
+}
+
+token_t _tan(token_t x) {
+     return (_sin(x)/_cos(x));
+}
+
 typedef struct {
     float r;
     float i;
@@ -117,8 +155,8 @@ static int validate_buf(token_t *out, float *gold)
 	for (j = 0; j < 2 * len; j++) {
 		native_t val = fx2float(out[j+SYNC_VAR_SIZE], FX_IL);
 		uint32_t ival = *((uint32_t*)&val);
+		printf("%u G %08x O %08x\n", j, ((uint32_t*)gold)[j], ival);
 		if ((fabs(gold[j] - val) / fabs(gold[j])) > ERR_TH) {
-		    printf("%u G %08x O %08x\n", j, ((uint32_t*)gold)[j], ival);
 			errors++;
         }
 	}
@@ -150,9 +188,10 @@ static void init_buf(token_t *in, float *gold, token_t *in_filter, float *gold_f
 		// printf("  IN[%u] = 0x%08x\n", j, ig);
 	}
 
-	for (j = 0; j < 2 * len; j++) {
-		float scaling_factor = (float) rand () / (float) RAND_MAX;
-		gold_twiddle[j] = LO + scaling_factor * (HI - LO);
+	for (j = 0; j < 2 * len; j+=2) {
+        token_t phase = -3.14159 * ((token_t) ((j+1) / len) + .5);
+        gold_twiddle[j] = _cos(phase);
+        gold_twiddle[j + 1] = _sin(phase);
 		uint32_t ig = ((uint32_t*)gold_twiddle)[j];
 		// printf("  IN[%u] = 0x%08x\n", j, ig);
 	}
@@ -175,6 +214,7 @@ static void init_buf(token_t *in, float *gold, token_t *in_filter, float *gold_f
     cpx_num fpnk, fpk, f1k, f2k, tw, tdc;
     cpx_num fk, fnkc, fek, fok, tmp;
     cpx_num cptemp;
+    cpx_num inv_twd;
     cpx_num *tmpbuf = (cpx_num *) gold;
     cpx_num *freqdata = (cpx_num *) gold_freqdata;
     cpx_num *super_twiddles = (cpx_num *) gold_twiddle;
@@ -234,10 +274,12 @@ static void init_buf(token_t *in, float *gold, token_t *in_filter, float *gold_f
         fnkc.i = -freqdata[len-j].i;
         C_FIXDIV( fk , 2 );
         C_FIXDIV( fnkc , 2 );
+        inv_twd = super_twiddles[j-1];
+        C_MULBYSCALAR(inv_twd,-1);
 
         C_ADD (fek, fk, fnkc);
         C_SUB (tmp, fk, fnkc);
-        C_MUL (fok, tmp, super_twiddles[j-1]);
+        C_MUL (fok, tmp, inv_twd);
         C_ADD (tmpbuf[j],     fek, fok);
         C_SUB (tmpbuf[len-j], fek, fok);
         tmpbuf[len-j].i *= -1;
