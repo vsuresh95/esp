@@ -462,7 +462,12 @@ void fir::compute_kernel()
                 compMul(if0, flt0, t0);
                 compMul(ifn, fltn, tn);
 
-                fk = t0;
+                if (k == num_samples/2) {
+                    fk = tn;
+                } else {
+                    fk = t0;
+                }
+
                 fnkc.re = tn.re;
                 fnkc.im = - (tn.im);
 
