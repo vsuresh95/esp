@@ -31,23 +31,23 @@ static unsigned DMA_WORD_PER_BEAT(unsigned _st)
         return (sizeof(void *) / _st);
 }
 
-token_t _pow(token_t a, token_t b) {
-    token_t c = 1;
+native_t _pow(native_t a, native_t b) {
+    native_t c = 1;
     for (int i=0; i<b; i++)
         c *= a;
     return c;
 }
 
-token_t _fact(token_t x) {
-    token_t ret = 1;
+native_t _fact(native_t x) {
+    native_t ret = 1;
     for (int i=1; i<=x; i++)
         ret *= i;
     return ret;
 }
 
-token_t _sin(token_t x) {
-    token_t y = x;
-    token_t s = -1;
+native_t _sin(native_t x) {
+    native_t y = x;
+    native_t s = -1;
     for (int i=3; i<=100; i+=2) {
         y+=s*(_pow(x,i)/_fact(i));
         s *= -1;
@@ -55,9 +55,9 @@ token_t _sin(token_t x) {
     return y;
 }
 
-token_t _cos(token_t x) {
-    token_t y = 1;
-    token_t s = -1;
+native_t _cos(native_t x) {
+    native_t y = 1;
+    native_t s = -1;
     for (int i=2; i<=100; i+=2) {
         y+=s*(_pow(x,i)/_fact(i));
         s *= -1;
@@ -65,7 +65,7 @@ token_t _cos(token_t x) {
     return y;
 }
 
-token_t _tan(token_t x) {
+native_t _tan(native_t x) {
      return (_sin(x)/_cos(x));
 }
 
@@ -189,7 +189,7 @@ static void init_buf(token_t *in, float *gold, token_t *in_filter, float *gold_f
 	}
 
 	for (j = 0; j < 2 * len; j+=2) {
-        token_t phase = -3.14159 * ((token_t) ((j+1) / len) + .5);
+        native_t phase = -3.14159265358979323846264338327 * ((native_t) ((j+1) / len) + .5);
         gold_twiddle[j] = _cos(phase);
         gold_twiddle[j + 1] = _sin(phase);
 		uint32_t ig = ((uint32_t*)gold_twiddle)[j];
