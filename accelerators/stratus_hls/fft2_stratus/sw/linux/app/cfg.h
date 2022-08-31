@@ -20,7 +20,7 @@ typedef float native_t;
 #endif /* FFT2_FX_WIDTH */
 
 /* <<--params-def-->> */
-#define LOGN_SAMPLES 2
+#define LOGN_SAMPLES 6
 //#define NUM_FFTS     46
 #define NUM_FFTS     1
 //#define LOGN_SAMPLES 12

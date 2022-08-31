@@ -57,10 +57,12 @@ static void init_buffer(token_t *in, float *gold, token_t *in_filter, float *gol
 		printf("  1 gold_filter[%u] = %f\n", j, gold_filter[j]);
 	}
 
-	for (j = 0; j < 2 * len; j++) {
-		float scaling_factor = (float) rand () / (float) RAND_MAX;
-		gold_twiddle[j] = LO + scaling_factor * (HI - LO);
+	for (j = 0; j < 2 * len; j+=2) {
+        float phase = -3.14159265358979323846264338327 * ((float) (j+1) / len + .5);
+        gold_twiddle[j] = cos(phase);
+        gold_twiddle[j + 1] = sin(phase);
 		printf("  1 gold_twiddle[%u] = %f\n", j, gold_twiddle[j]);
+		printf("  1 gold_twiddle[%u] = %f\n", j+1, gold_twiddle[j+1]);
 	}
 
 	// convert input to fixed point
@@ -157,6 +159,10 @@ static void init_buffer(token_t *in, float *gold, token_t *in_filter, float *gol
     }
 
 	fft2_comp(gold, num_ffts, (1<<logn_samples), logn_samples, 1 /* do_inverse */, do_shift);
+
+	for (j = 0; j < 2 * len; j++) {
+		printf("  5 GOLD[%u] = %f\n", j, gold[j]);
+    }
 }
 
 
