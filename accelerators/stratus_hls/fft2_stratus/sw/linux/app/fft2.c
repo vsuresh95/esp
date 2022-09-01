@@ -39,8 +39,8 @@ static int validate_buffer(token_t *out, float *gold)
 static void init_buffer(token_t *in, float *gold, token_t *in_filter, float *gold_filter, token_t *in_twiddle, float *gold_twiddle, float *gold_freqdata)
 {
 	int j;
-	const float LO = -10.0;
-	const float HI = 10.0;
+	const float LO = -1.0;
+	const float HI = 1.0;
 	const unsigned num_samples = (1 << logn_samples);
     const unsigned len = num_ffts * num_samples;
 
@@ -239,8 +239,8 @@ int main(int argc, char **argv)
 	printf("  .scale_factor = %d\n", scale_factor);
 	printf("\n  ** START **\n");
 	init_buffer(buf, gold, 
-            (buf + acc_offset + 4 * out_len) /* in_filter */, (gold + out_len) /* gold_filter */,
-            (buf + acc_offset + 6 * out_len) /* in_twiddle */, (gold + 3 * out_len) /* gold_twiddle */,
+            (buf + 5 * acc_offset) /* in_filter */, (gold + out_len) /* gold_filter */,
+            (buf + 7 * acc_offset) /* in_twiddle */, (gold + 3 * out_len) /* gold_twiddle */,
             (gold + 4 * out_len) /* gold_freqdata */);
 
 	sm_sync[0] = 0;
@@ -257,11 +257,25 @@ int main(int argc, char **argv)
 	esp_run(cfg_001, NACC);
 	esp_run(cfg_002, NACC);
 
+	sm_sync[2] = 0;
+	sm_sync[acc_offset+2] = 0;
+	sm_sync[2*acc_offset+2] = 0;
+
     // Start first accelerator
 	sm_sync[0] = 1;
-
     // Wait for last accelerator
 	while(sm_sync[NUM_DEVICES*acc_offset] != 1);
+	sm_sync[NUM_DEVICES*acc_offset] = 0;
+
+	sm_sync[2] = 1;
+	sm_sync[acc_offset+2] = 1;
+	sm_sync[2*acc_offset+2] = 1;
+
+    // Start first accelerator
+	sm_sync[0] = 1;
+    // Wait for last accelerator
+	while(sm_sync[NUM_DEVICES*acc_offset] != 1);
+	sm_sync[NUM_DEVICES*acc_offset] = 0;
 
 	printf("\n  ** DONE **\n");
 

@@ -58,7 +58,7 @@ void fir::load_input()
         {
             case POLL_PREV_REQ:
             {
-                dma_info_t dma_info(0, 1, DMA_SIZE);
+                dma_info_t dma_info(0, SYNC_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 int32_t new_task = 0;
 
@@ -72,6 +72,9 @@ void fir::load_input()
                     dataBv = this->dma_read_chnl.get();
                     wait();
                     new_task = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
+                    dataBv = this->dma_read_chnl.get();
+                    wait();
+                    last_task = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
                 }
             }
             break;
@@ -120,7 +123,7 @@ void fir::load_input()
             }
             // Load filters
             {
-                dma_info_t dma_info(4 * 2 * num_samples / DMA_WORD_PER_BEAT, 2 * (num_samples + 1)/ DMA_WORD_PER_BEAT, DMA_SIZE);
+                dma_info_t dma_info(4 * (2 * num_samples + SYNC_VAR_SIZE) / DMA_WORD_PER_BEAT, 2 * (num_samples + 1)/ DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
 
                 wait();
@@ -142,7 +145,7 @@ void fir::load_input()
             }
             // Load twiddle factors 
             {
-                dma_info_t dma_info(6 * 2 * num_samples / DMA_WORD_PER_BEAT, num_samples / DMA_WORD_PER_BEAT, DMA_SIZE);
+                dma_info_t dma_info(6 * (2 * num_samples + SYNC_VAR_SIZE) / DMA_WORD_PER_BEAT, num_samples / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
 
                 wait();
@@ -587,15 +590,18 @@ void fir::compute_kernel()
         {
             HLS_PROTO("end-acc");
 
-            store_state_req = ACC_DONE;
+            if (last_task == 1)
+            {
+                store_state_req = ACC_DONE;
 
-            compute_state_req_dbg.write(11);
+                compute_state_req_dbg.write(11);
 
-            this->compute_store_ready_handshake();
-            wait();
-            this->compute_store_done_handshake();
-            wait();
-            this->process_done();
+                this->compute_store_ready_handshake();
+                wait();
+                this->compute_store_done_handshake();
+                wait();
+                this->process_done();
+            }
         }
     } // while (true)
 } // Function : compute_kernel

@@ -16,7 +16,7 @@ typedef int token_t;
 typedef float native_t;
 #define fx2float fixed32_to_float
 #define float2fx float_to_fixed32
-#define FX_IL 14
+#define FX_IL 4
 #endif /* FFT2_FX_WIDTH */
 
 /* <<--params-def-->> */
@@ -40,7 +40,7 @@ const int32_t scale_factor = SCALE_FACTOR;
 
 #define NACC 1
 
-#define SYNC_VAR_SIZE 2
+#define SYNC_VAR_SIZE 4
 
 #define NUM_DEVICES 3
 

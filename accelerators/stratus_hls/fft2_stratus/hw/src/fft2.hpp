@@ -28,7 +28,7 @@
 #define PLM_IN_WORD  (MAX_NUM_SAMPLES << 1)
 #define PLM_OUT_WORD (MAX_NUM_SAMPLES << 1)
 
-#define SYNC_VAR_SIZE 2
+#define SYNC_VAR_SIZE 4
 
 #define POLL_PREV_REQ 0
 #define POLL_NEXT_REQ 1
@@ -94,6 +94,8 @@ public:
 
     sc_int<32> load_state_req;
     sc_int<32> store_state_req;
+
+    sc_int<32> last_task;
 
     // Processes
 

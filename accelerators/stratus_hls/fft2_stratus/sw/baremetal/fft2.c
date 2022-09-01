@@ -21,7 +21,7 @@ typedef int token_t;
 typedef float native_t;
 #define fx2float fixed32_to_float
 #define float2fx float_to_fixed32
-#define FX_IL 14
+#define FX_IL 4
 #endif /* FFT2_FX_WIDTH */
 
 const float ERR_TH = 0.05;
@@ -103,7 +103,7 @@ typedef struct {
 #define FIR_DEV_NAME "sld,fir_stratus"
 
 /* <<--params-->> */
-const int32_t logn_samples = 6;
+const int32_t logn_samples = 2;
 const int32_t num_samples = (1 << logn_samples);
 const int32_t num_ffts = 1;
 const int32_t do_inverse = 0;
@@ -143,7 +143,7 @@ static unsigned acc_size;
 #define FIR_DO_SHIFT_REG 0x4c
 #define FIR_SCALE_FACTOR_REG 0x50
 
-#define SYNC_VAR_SIZE 2
+#define SYNC_VAR_SIZE 4
 
 #define NUM_DEVICES 3
 
@@ -169,8 +169,8 @@ static int validate_buf(token_t *out, float *gold)
 static void init_buf(token_t *in, float *gold, token_t *in_filter, float *gold_filter, token_t *in_twiddle, float *gold_twiddle, float *gold_freqdata)
 {
 	int j;
-	const float LO = -10.0;
-	const float HI = 10.0;
+	const float LO = -1.0;
+	const float HI = 1.0;
 
 	/* srand((unsigned int) time(NULL)); */
 
@@ -350,8 +350,8 @@ int main(int argc, char * argv[])
 	printf("  --------------------\n");
 	printf("  Generate input...\n");
 	init_buf(mem, gold,
-            (mem + acc_offset + 4 * out_len) /* in_filter */, (gold + out_len) /* gold_filter */,
-            (mem + acc_offset + 6 * out_len) /* in_twiddle */, (gold + 3 * out_len) /* gold_twiddle */,
+            (mem + 5 * acc_offset) /* in_filter */, (gold + out_len) /* gold_filter */,
+            (mem + 7 * acc_offset) /* in_twiddle */, (gold + 3 * out_len) /* gold_twiddle */,
             (gold + 4 * out_len) /* gold_freqdata */);
 
 	printf("Scanning device tree... \n");
@@ -455,8 +455,26 @@ int main(int argc, char * argv[])
 		iowrite32(dev, CMD_REG, CMD_MASK_START);
     }
 
+	sm_sync[0] = 0;
+	sm_sync[acc_offset] = 0;
+	sm_sync[2*acc_offset] = 0;
+	sm_sync[3*acc_offset] = 0;
+
+	sm_sync[2] = 0;
+	sm_sync[acc_offset+2] = 0;
+	sm_sync[2*acc_offset+2] = 0;
+
 	sm_sync[0] = 1;
 	while(sm_sync[NUM_DEVICES*acc_offset] != 1);
+	sm_sync[NUM_DEVICES*acc_offset] = 0;
+
+	sm_sync[2] = 1;
+	sm_sync[acc_offset+2] = 1;
+	sm_sync[2*acc_offset+2] = 1;
+
+	sm_sync[0] = 1;
+	while(sm_sync[NUM_DEVICES*acc_offset] != 1);
+	sm_sync[NUM_DEVICES*acc_offset] = 0;
 
 	for (n = 0; n < ndev; n++) {
 
