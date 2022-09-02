@@ -166,4 +166,5 @@ void init_params()
     mem_size *= NUM_DEVICES+5;
 
     sync_size = SYNC_VAR_SIZE * sizeof(token_t);
+	// printf("ilen %u isize %u o_off %u olen %u osize %u msize %u\n", in_len, out_len, in_size, out_size, out_offset, mem_size);
 }
