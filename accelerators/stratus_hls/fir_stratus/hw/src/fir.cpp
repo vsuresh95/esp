@@ -394,8 +394,6 @@ void fir::compute_kernel()
                 tdc.re = int2fp<FPDATA, WORD_SIZE>(A0[0]);
                 tdc.im = int2fp<FPDATA, WORD_SIZE>(A0[1]);
 
-                tdc.re /= 2; tdc.im /= 2;
-
                 if0.re = tdc.re + tdc.im;
                 if0.im = 0;
                 ifn.re = tdc.re - tdc.im;
@@ -414,8 +412,6 @@ void fir::compute_kernel()
                 // Pre-process first and last element
                 of0.re = t0.re + tn.re;
                 of0.im = t0.re - tn.re;
-
-                of0.re /= 2; of0.im /= 2;
 
                 // Write back element 0 to memory
                 {
@@ -439,9 +435,6 @@ void fir::compute_kernel()
                 // Read twiddle factors
                 tf.re = int2fp<FPDATA, WORD_SIZE>(T0[k - 2]);
                 tf.im = int2fp<FPDATA, WORD_SIZE>(T0[k - 1]);
-
-                fpk.re /= 2; fpk.im /= 2;
-                fpnk.re /= 2; fpnk.im /= 2;
 
                 compAdd(fpk, fpnk, f1k);
                 compSub(fpk, fpnk, f2k);
@@ -473,9 +466,6 @@ void fir::compute_kernel()
 
                 fnkc.re = tn.re;
                 fnkc.im = - (tn.im);
-
-                fk.re /= 2; fk.im /= 2;
-                fnkc.re /= 2; fnkc.im /= 2;
 
                 tf.re *= -1; tf.im *= -1;
 
