@@ -146,7 +146,7 @@ static unsigned DMA_WORD_PER_BEAT(unsigned _st)
 void init_params()
 {
 	len = num_ffts * (1 << logn_samples);
-	printf("logn %u nsmp %u nfft %u inv %u shft %u len %u\n", logn_samples, num_samples, num_ffts, do_inverse, do_shift, len);
+	// printf("logn %u nsmp %u nfft %u inv %u shft %u len %u\n", logn_samples, num_samples, num_ffts, do_inverse, do_shift, len);
 	if (DMA_WORD_PER_BEAT(sizeof(token_t)) == 0) {
 		in_words_adj = 2 * len;
 		out_words_adj = 2 * len;

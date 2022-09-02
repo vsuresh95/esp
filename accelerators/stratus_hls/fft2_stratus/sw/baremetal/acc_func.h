@@ -17,8 +17,6 @@ const float ERROR_COUNT_TH = 0.001;
 ///////////////////////////////////////////////////////////////
 int start_acc()
 {
-	printf("Scanning device tree... \n");
-
 	ndev = probe(&espdevs, VENDOR_SLD, SLD_FFT2, DEV_NAME);
 	if (ndev == 0) {
 		printf("%s not found\n", DEV_NAME);
@@ -66,7 +64,6 @@ int start_acc()
 		esp_flush(coherence);
 
 		// Start accelerators
-		printf("  Start...\n");
 		iowrite32(dev, CMD_REG, CMD_MASK_START);
     }
 
@@ -114,7 +111,6 @@ int start_acc()
 		esp_flush(coherence);
 
 		// Start accelerators
-		printf("  Start...\n");
 		iowrite32(dev, CMD_REG, CMD_MASK_START);
     }
 }
@@ -125,8 +121,6 @@ void terminate_acc()
     unsigned spin_ct;
 
 	for (n = 0; n < ndev; n++) {
-
-		printf("**************** %s.%d ****************\n", DEV_NAME, n);
 
 		dev = &espdevs[n];
 
@@ -139,13 +133,9 @@ void terminate_acc()
 	        spin_ct++;
 	    }
 	    iowrite32(dev, CMD_REG, 0x0);
-
-        printf("  Done : spin_count = %u\n", spin_ct);
     }
 
 	for (n = 0; n < nfir; n++) {
-
-		printf("**************** %s.%d ****************\n", FIR_DEV_NAME, n);
 
 		dev = fir_dev;
 
@@ -158,7 +148,5 @@ void terminate_acc()
 	        spin_ct++;
 	    }
 	    iowrite32(dev, CMD_REG, 0x0);
-
-        printf("  Done : spin_count = %u\n", spin_ct);
     }
 }
