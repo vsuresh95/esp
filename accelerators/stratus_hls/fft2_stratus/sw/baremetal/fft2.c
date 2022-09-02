@@ -10,14 +10,31 @@
 #include <esp_probe.h>
 #include "utils/fft2_utils.h"
 
+#define COH_MODE 0
+#define ESP
+
 #include "cfg.h"
 #include "sw_func.h"
+#include "coh_func.h"
 #include "acc_func.h"
+
+static void write_mem (void* dst, int64_t value_64)
+{
+	asm volatile (
+		"mv t0, %0;"
+		"mv t1, %1;"
+		".word " QU(WRITE_CODE)
+		:
+		: "r" (dst), "r" (value_64)
+		: "t0", "t1", "memory"
+	);
+}
 
 static int validate_buf(token_t *out, float *gold)
 {
 	int j;
 	unsigned errors = 0;
+	spandex_token_t out_data;
 
 	for (j = 0; j < 2 * len; j++) {
 		native_t val = fx2float(out[j+SYNC_VAR_SIZE], FX_IL);
@@ -35,18 +52,36 @@ static int validate_buf(token_t *out, float *gold)
 static void init_buf(token_t *in, float *gold, token_t *in_filter, float *gold_filter, token_t *in_twiddle, float *gold_twiddle)
 {
 	int j;
+	int local_len = len;
+	spandex_token_t in_data;
+	void* dst;
 
-	// convert input to fixed point
-	for (j = 0; j < 2 * len; j++)
-		in[j+SYNC_VAR_SIZE] = float2fx((native_t) gold[j], FX_IL);
+	// convert input to fixed point -- here all the inputs gold values are refetched
+	for (j = 0, dst = (void*)(in); j < 2 * local_len; j+=2, dst+=8)
+	{
+		in_data.value_32_1 = float2fx((native_t) gold[j], FX_IL);
+		in_data.value_32_2 = float2fx((native_t) gold[j+1], FX_IL);
 
-	// convert input to fixed point
-	for (j = 0; j < 2 * (len+1); j++)
-		in_filter[j] = float2fx((native_t) gold_filter[j], FX_IL);
+		write_mem(dst, in_data.value_64);
+	}
 
-	// convert input to fixed point
-	for (j = 0; j < 2 * len; j++)
-		in_twiddle[j] = float2fx((native_t) gold_twiddle[j], FX_IL);
+	// convert filter to fixed point
+	for (j = 0, dst = (void*)(in_filter); j < 2 * (local_len+1); j+=2, dst+=8)
+	{
+		in_data.value_32_1 = float2fx((native_t) gold_filter[j], FX_IL);
+		in_data.value_32_2 = float2fx((native_t) gold_filter[j+1], FX_IL);
+
+		write_mem(dst, in_data.value_64);
+	}
+
+	// convert twiddle to fixed point
+	for (j = 0, dst = (void*)(in_twiddle); j < local_len; j+=2, dst+=8)
+	{
+		in_data.value_32_1 = float2fx((native_t) gold_twiddle[j], FX_IL);
+		in_data.value_32_2 = float2fx((native_t) gold_twiddle[j+1], FX_IL);
+
+		write_mem(dst, in_data.value_64);
+	}
 }
 
 int main(int argc, char * argv[])
