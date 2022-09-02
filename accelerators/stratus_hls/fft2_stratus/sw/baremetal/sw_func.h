@@ -1,4 +1,4 @@
-void golden_data_init(float *gold, float *gold_filter, float *gold_twiddle)
+void golden_data_init(float *gold, float *gold_ref, float *gold_filter, float *gold_twiddle)
 {
 	int j;
 	const float LO = -1.0;
@@ -7,6 +7,7 @@ void golden_data_init(float *gold, float *gold_filter, float *gold_twiddle)
 	for (j = 0; j < 2 * len; j++) {
 		float scaling_factor = (float) rand () / (float) RAND_MAX;
 		gold[j] = LO + scaling_factor * (HI - LO);
+		gold_ref[j] = LO + scaling_factor * (HI - LO);
 		// uint32_t ig = ((uint32_t*)gold)[j];
 		// printf("  IN[%u] = 0x%08x\n", j, ig);
 	}

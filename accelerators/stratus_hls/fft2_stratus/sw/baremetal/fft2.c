@@ -152,7 +152,7 @@ int main(int argc, char * argv[])
 	///////////////////////////////////////////////////////////////
 	// Allocate memory pointers
 	///////////////////////////////////////////////////////////////
-	gold = aligned_malloc((6 * out_len) * sizeof(float));
+	gold = aligned_malloc((7 * out_len) * sizeof(float));
 	mem = aligned_malloc(mem_size);
 	printf("  memory buffer base-address = %p\n", mem);
 
@@ -167,25 +167,27 @@ int main(int argc, char * argv[])
 	printf("  nchunk = %lu\n", NCHUNK(mem_size));
 
 	///////////////////////////////////////////////////////////////
-	// Initialize golden buffers, transfer to accelerator memory
-	// and compute golden output
+	// Initialize golden buffers and compute golden output
 	///////////////////////////////////////////////////////////////
 	printf("  --------------------\n");
 	printf("  Generate input...\n");
 
-	golden_data_init(gold, (gold + out_len) /* gold_filter */, (gold + 3 * out_len) /* gold_twiddle */);
-
-	printf("  Init buffers...\n");
-
-	start_counter();
-	init_buf(mem, gold, (mem + 5 * acc_offset) /* in_filter */, (gold + out_len) /* gold_filter */,
-			(mem + 7 * acc_offset) /* in_twiddle */, (gold + 3 * out_len) /* gold_twiddle */);
-	t_cpu_write = end_counter();
+	golden_data_init(gold, (gold + out_len) /* gold_ref*/, (gold + 2 * out_len) /* gold_filter */, (gold + 4 * out_len) /* gold_twiddle */);
 
 	printf("  SW implementation...\n");
+
+	chain_sw_impl((gold + out_len) /* gold_ref*/, (gold + 2 * out_len) /* gold_filter */, (gold + 4 * out_len) /* gold_twiddle */, (gold + 6 * out_len) /* gold_freqdata */);
+
+	///////////////////////////////////////////////////////////////
+	// Transfer to accelerator memory
+	///////////////////////////////////////////////////////////////
+	printf("  Init buffers...\n");
 	printf("  --------------------\n");
 
-	chain_sw_impl (gold, (gold + out_len) /* gold_filter */, (gold + 3 * out_len) /* gold_twiddle */, (gold + 4 * out_len) /* gold_freqdata */);
+	start_counter();
+	init_buf(mem, gold, (mem + 5 * acc_offset) /* in_filter */, (gold + 2 * out_len) /* gold_filter */,
+			(mem + 7 * acc_offset) /* in_twiddle */, (gold + 4 * out_len) /* gold_twiddle */);
+	t_cpu_write = end_counter();
 
 	///////////////////////////////////////////////////////////////
 	// Start all accelerators
@@ -226,16 +228,17 @@ int main(int argc, char * argv[])
 	// Read back output
 	///////////////////////////////////////////////////////////////
 	start_counter();
-	validate_buf(&mem[NUM_DEVICES*acc_offset], gold);
+	validate_buf(&mem[NUM_DEVICES*acc_offset], (gold + out_len));
 	t_cpu_read = end_counter();
 
 	aligned_free(ptable);
 	aligned_free(mem);
 	aligned_free(gold);
 
-	printf("CPU write = %lu\n", t_cpu_write/ITERATIONS);
-	printf("ACC = %lu\n", t_acc/ITERATIONS);
-	printf("CPU read = %lu\n", t_cpu_read/ITERATIONS);
+	printf("  CPU write = %lu\n", t_cpu_write/ITERATIONS);
+	printf("  ACC = %lu\n", t_acc/ITERATIONS);
+	printf("  CPU read = %lu\n", t_cpu_read/ITERATIONS);
+	printf("\n");
 
     // while(1);
 
