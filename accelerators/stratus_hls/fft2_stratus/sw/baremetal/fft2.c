@@ -12,7 +12,7 @@
 
 #define COH_MODE 0
 #define ESP
-#define ITERATIONS 1
+#define ITERATIONS 1000
 #define LOG_LEN 10
 
 #include "cfg.h"
@@ -143,6 +143,9 @@ static void init_buf(token_t *in, float *gold, token_t *in_filter, float *gold_f
 int main(int argc, char * argv[])
 {
 	int i;
+	t_cpu_write = 0;
+	t_acc = 0;
+	t_cpu_read = 0;
 
 	///////////////////////////////////////////////////////////////
 	// Init data size parameters
@@ -166,75 +169,61 @@ int main(int argc, char * argv[])
 	printf("  ptable = %p\n", ptable);
 	printf("  nchunk = %lu\n", NCHUNK(mem_size));
 
-	///////////////////////////////////////////////////////////////
+	//////////////////////////////////////////////////////
 	// Initialize golden buffers and compute golden output
-	///////////////////////////////////////////////////////////////
-	printf("  --------------------\n");
-	printf("  Generate input...\n");
-
+	//////////////////////////////////////////////////////
 	golden_data_init(gold, (gold + out_len) /* gold_ref*/, (gold + 2 * out_len) /* gold_filter */, (gold + 4 * out_len) /* gold_twiddle */);
-
-	printf("  SW implementation...\n");
 
 	chain_sw_impl((gold + out_len) /* gold_ref*/, (gold + 2 * out_len) /* gold_filter */, (gold + 4 * out_len) /* gold_twiddle */, (gold + 6 * out_len) /* gold_freqdata */);
 
 	///////////////////////////////////////////////////////////////
-	// Transfer to accelerator memory
-	///////////////////////////////////////////////////////////////
-	printf("  Init buffers...\n");
-	printf("  --------------------\n");
-
-	start_counter();
-	init_buf(mem, gold, (mem + 5 * acc_offset) /* in_filter */, (gold + 2 * out_len) /* gold_filter */,
-			(mem + 7 * acc_offset) /* in_twiddle */, (gold + 4 * out_len) /* gold_twiddle */);
-	t_cpu_write = end_counter();
-
-	///////////////////////////////////////////////////////////////
 	// Start all accelerators
 	///////////////////////////////////////////////////////////////
-	start_acc();
-
-	start_counter();
 	sm_sync[0] = 0;
 	sm_sync[acc_offset] = 0;
 	sm_sync[2*acc_offset] = 0;
 	sm_sync[3*acc_offset] = 0;
 
-	sm_sync[2] = 0;
-	sm_sync[acc_offset+2] = 0;
-	sm_sync[2*acc_offset+2] = 0;
+	start_acc();
 
-	sm_sync[0] = 1;
-	while(sm_sync[NUM_DEVICES*acc_offset] != 1);
-	sm_sync[NUM_DEVICES*acc_offset] = 0;
+	///////////////////////////////////////////////////////////////
+	// Transfer to accelerator memory
+	///////////////////////////////////////////////////////////////
+	for (i = 0; i < ITERATIONS; i++)
+	{
+		start_counter();
+		init_buf(mem, gold, (mem + 5 * acc_offset) /* in_filter */, (gold + 2 * out_len) /* gold_filter */,
+				(mem + 7 * acc_offset) /* in_twiddle */, (gold + 4 * out_len) /* gold_twiddle */);
+		t_cpu_write += end_counter();
 
-	sm_sync[2] = 1;
-	sm_sync[acc_offset+2] = 1;
-	sm_sync[2*acc_offset+2] = 1;
+		start_counter();
+		sm_sync[2] = (i+1)/ITERATIONS;
+		sm_sync[acc_offset+2] = (i+1)/ITERATIONS;
+		sm_sync[2*acc_offset+2] = (i+1)/ITERATIONS;
 
-	sm_sync[0] = 1;
-	while(sm_sync[NUM_DEVICES*acc_offset] != 1);
-	sm_sync[NUM_DEVICES*acc_offset] = 0;
-	t_acc = end_counter();
+		sm_sync[0] = 1;
+		while(sm_sync[NUM_DEVICES*acc_offset] != 1);
+		sm_sync[NUM_DEVICES*acc_offset] = 0;
+		t_acc += end_counter();
+
+		///////////////////////////////////////////////////////////////
+		// Read back output
+		///////////////////////////////////////////////////////////////
+		start_counter();
+		validate_buf(&mem[NUM_DEVICES*acc_offset], (gold + out_len));
+		t_cpu_read += end_counter();
+	}
 
 	///////////////////////////////////////////////////////////////
 	// Terminate all accelerators
 	///////////////////////////////////////////////////////////////
 	terminate_acc();
 
-	printf("  Validating...\n");
-
-	///////////////////////////////////////////////////////////////
-	// Read back output
-	///////////////////////////////////////////////////////////////
-	start_counter();
-	validate_buf(&mem[NUM_DEVICES*acc_offset], (gold + out_len));
-	t_cpu_read = end_counter();
-
 	aligned_free(ptable);
 	aligned_free(mem);
 	aligned_free(gold);
 
+	printf("  Mode: %s\n", print_coh);
 	printf("  CPU write = %lu\n", t_cpu_write/ITERATIONS);
 	printf("  ACC = %lu\n", t_acc/ITERATIONS);
 	printf("  CPU read = %lu\n", t_cpu_read/ITERATIONS);
