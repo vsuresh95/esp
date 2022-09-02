@@ -7,23 +7,25 @@ void golden_data_init(float *gold, float *gold_filter, float *gold_twiddle)
 	for (j = 0; j < 2 * len; j++) {
 		float scaling_factor = (float) rand () / (float) RAND_MAX;
 		gold[j] = LO + scaling_factor * (HI - LO);
-		uint32_t ig = ((uint32_t*)gold)[j];
+		// uint32_t ig = ((uint32_t*)gold)[j];
 		// printf("  IN[%u] = 0x%08x\n", j, ig);
 	}
 
 	for (j = 0; j < 2 * (len+1); j++) {
 		float scaling_factor = (float) rand () / (float) RAND_MAX;
 		gold_filter[j] = LO + scaling_factor * (HI - LO);
-		uint32_t ig = ((uint32_t*)gold_filter)[j];
-		// printf("  IN[%u] = 0x%08x\n", j, ig);
+		// uint32_t ig = ((uint32_t*)gold_filter)[j];
+		// printf("  FLT[%u] = 0x%08x\n", j, ig);
 	}
 
 	for (j = 0; j < 2 * len; j+=2) {
         native_t phase = -3.14159265358979323846264338327 * ((native_t) ((j+1) / len) + .5);
         gold_twiddle[j] = _cos(phase);
         gold_twiddle[j + 1] = _sin(phase);
-		uint32_t ig = ((uint32_t*)gold_twiddle)[j];
-		// printf("  IN[%u] = 0x%08x\n", j, ig);
+		// uint32_t ig = ((uint32_t*)gold_twiddle)[j];
+		// printf("  TWD[%u] = 0x%08x\n", j, ig);
+		// ig = ((uint32_t*)gold_twiddle)[j+1];
+		// printf("  TWD[%u] = 0x%08x\n", j+1, ig);
 	} 
 }
 

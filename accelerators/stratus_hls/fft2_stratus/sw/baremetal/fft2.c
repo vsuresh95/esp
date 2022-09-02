@@ -12,13 +12,46 @@
 
 #define COH_MODE 0
 #define ESP
+#define ITERATIONS 1
+#define LOG_LEN 10
 
 #include "cfg.h"
 #include "sw_func.h"
 #include "coh_func.h"
 #include "acc_func.h"
 
-static void write_mem (void* dst, int64_t value_64)
+static uint64_t t_start = 0;
+static uint64_t t_end = 0;
+
+uint64_t t_cpu_write;
+uint64_t t_acc;
+uint64_t t_cpu_read;
+
+static inline void start_counter() {
+	asm volatile (
+		"li t0, 0;"
+		"csrr t0, mcycle;"
+		"mv %0, t0"
+		: "=r" (t_start)
+		:
+		: "t0"
+	);
+}
+
+static inline uint64_t end_counter() {
+	asm volatile (
+		"li t0, 0;"
+		"csrr t0, mcycle;"
+		"mv %0, t0"
+		: "=r" (t_end)
+		:
+		: "t0"
+	);
+
+	return (t_end - t_start);
+}
+
+static inline void write_mem (void* dst, int64_t value_64)
 {
 	asm volatile (
 		"mv t0, %0;"
@@ -30,23 +63,43 @@ static void write_mem (void* dst, int64_t value_64)
 	);
 }
 
-static int validate_buf(token_t *out, float *gold)
+static inline int64_t read_mem (void* dst)
+{
+	int64_t value_64;
+
+	asm volatile (
+		"mv t0, %1;"
+		".word " QU(READ_CODE) ";"
+		"mv %0, t1"
+		: "=r" (value_64)
+		: "r" (dst)
+		: "t0", "t1", "memory"
+	);
+
+	return value_64;
+}
+
+static void validate_buf(token_t *out, float *gold)
 {
 	int j;
 	unsigned errors = 0;
+	int local_len = len;
 	spandex_token_t out_data;
+	void* dst;
+	volatile native_t val;
+	uint32_t ival;
 
-	for (j = 0; j < 2 * len; j++) {
-		native_t val = fx2float(out[j+SYNC_VAR_SIZE], FX_IL);
-		uint32_t ival = *((uint32_t*)&val);
-		printf("%u G %08x O %08x\n", j, ((uint32_t*)gold)[j], ival);
-		if ((fabs(gold[j] - val) / fabs(gold[j])) > ERR_TH) {
-			errors++;
-        }
+	for (j = 0, dst = (void*)(out+SYNC_VAR_SIZE); j < 2 * local_len; j+=2, dst+=8) {
+		out_data.value_64 = read_mem(dst);
+
+		val = fx2float(out_data.value_32_1, FX_IL);
+		// ival = *((uint32_t*)&val);
+		// printf("%u G %08x O %08x\n", j, ((uint32_t*)gold)[j], ival);
+
+		val = fx2float(out_data.value_32_2, FX_IL);
+		// ival = *((uint32_t*)&val);
+		// printf("%u G %08x O %08x\n", j, ((uint32_t*)gold)[j+1], ival);
 	}
-
-	//printf("  %u errors\n", errors);
-	return errors;
 }
 
 static void init_buf(token_t *in, float *gold, token_t *in_filter, float *gold_filter, token_t *in_twiddle, float *gold_twiddle)
@@ -56,13 +109,14 @@ static void init_buf(token_t *in, float *gold, token_t *in_filter, float *gold_f
 	spandex_token_t in_data;
 	void* dst;
 
-	// convert input to fixed point -- here all the inputs gold values are refetched
-	for (j = 0, dst = (void*)(in); j < 2 * local_len; j+=2, dst+=8)
+	// convert input to fixed point -- TODO here all the inputs gold values are refetched
+	for (j = 0, dst = (void*)(in+SYNC_VAR_SIZE); j < 2 * local_len; j+=2, dst+=8)
 	{
 		in_data.value_32_1 = float2fx((native_t) gold[j], FX_IL);
 		in_data.value_32_2 = float2fx((native_t) gold[j+1], FX_IL);
 
 		write_mem(dst, in_data.value_64);
+		// printf("IN %u %llx\n", j, ((uint32_t*) in_data.value_64));
 	}
 
 	// convert filter to fixed point
@@ -72,6 +126,7 @@ static void init_buf(token_t *in, float *gold, token_t *in_filter, float *gold_f
 		in_data.value_32_2 = float2fx((native_t) gold_filter[j+1], FX_IL);
 
 		write_mem(dst, in_data.value_64);
+		// printf("FLT %u %llx\n", j, ((uint32_t*) in_data.value_64));
 	}
 
 	// convert twiddle to fixed point
@@ -81,6 +136,7 @@ static void init_buf(token_t *in, float *gold, token_t *in_filter, float *gold_f
 		in_data.value_32_2 = float2fx((native_t) gold_twiddle[j+1], FX_IL);
 
 		write_mem(dst, in_data.value_64);
+		// printf("TWD %u %llx\n", j, ((uint32_t*) in_data.value_64));
 	}
 }
 
@@ -123,8 +179,10 @@ int main(int argc, char * argv[])
 
 	printf("  Init buffers...\n");
 
+	start_counter();
 	init_buf(mem, gold, (mem + 5 * acc_offset) /* in_filter */, (gold + out_len) /* gold_filter */,
 			(mem + 7 * acc_offset) /* in_twiddle */, (gold + 3 * out_len) /* gold_twiddle */);
+	t_cpu_write = end_counter();
 
 	printf("  SW implementation...\n");
 	printf("  --------------------\n");
@@ -136,6 +194,7 @@ int main(int argc, char * argv[])
 	///////////////////////////////////////////////////////////////
 	start_acc();
 
+	start_counter();
 	sm_sync[0] = 0;
 	sm_sync[acc_offset] = 0;
 	sm_sync[2*acc_offset] = 0;
@@ -156,6 +215,7 @@ int main(int argc, char * argv[])
 	sm_sync[0] = 1;
 	while(sm_sync[NUM_DEVICES*acc_offset] != 1);
 	sm_sync[NUM_DEVICES*acc_offset] = 0;
+	t_acc = end_counter();
 
 	///////////////////////////////////////////////////////////////
 	// Terminate all accelerators
@@ -164,16 +224,20 @@ int main(int argc, char * argv[])
 
 	printf("  validating...\n");
 
-	/* Validation */
-	unsigned errors = validate_buf(&mem[NUM_DEVICES*acc_offset], gold);
-	if ((float)((float)errors / (2.0 * (float)len)) > ERROR_COUNT_TH)
-		printf("  ... FAIL : %u errors out of %u\n", errors, 2*len);
-	else
-		printf("  ... PASS : %u errors out of %u\n", errors, 2*len);
+	///////////////////////////////////////////////////////////////
+	// Read back output
+	///////////////////////////////////////////////////////////////
+	start_counter();
+	validate_buf(&mem[NUM_DEVICES*acc_offset], gold);
+	t_cpu_read = end_counter();
 
 	aligned_free(ptable);
 	aligned_free(mem);
 	aligned_free(gold);
+
+	printf("CPU write = %lu\n", t_cpu_write/ITERATIONS);
+	printf("ACC = %lu\n", t_acc/ITERATIONS);
+	printf("CPU read = %lu\n", t_cpu_read/ITERATIONS);
 
     // while(1);
 

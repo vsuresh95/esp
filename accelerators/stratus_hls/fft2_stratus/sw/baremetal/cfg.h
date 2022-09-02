@@ -118,24 +118,25 @@ typedef struct {
 #define NUM_DEVICES 3
 
 /* <<--params-->> */
-const int32_t logn_samples = 2;
+const int32_t logn_samples = LOG_LEN;
 const int32_t num_samples = (1 << logn_samples);
 const int32_t num_ffts = 1;
 const int32_t do_inverse = 0;
 const int32_t do_shift = 0;
 const int32_t scale_factor = 1;
-int32_t len;
+unsigned len;
 
-static unsigned in_words_adj;
-static unsigned out_words_adj;
-static unsigned in_len;
-static unsigned out_len;
-static unsigned in_size;
-static unsigned out_size;
-static unsigned out_offset;
-static unsigned mem_size;
-static unsigned acc_offset;
-static unsigned acc_size;
+unsigned in_words_adj;
+unsigned out_words_adj;
+unsigned in_len;
+unsigned out_len;
+unsigned in_size;
+unsigned out_size;
+unsigned out_offset;
+unsigned mem_size;
+unsigned acc_offset;
+unsigned acc_size;
+unsigned sync_size;
 
 static unsigned DMA_WORD_PER_BEAT(unsigned _st)
 {
@@ -163,4 +164,6 @@ void init_params()
     acc_size = mem_size;
     acc_offset = out_offset + out_len + SYNC_VAR_SIZE;
     mem_size *= NUM_DEVICES+5;
+
+    sync_size = SYNC_VAR_SIZE * sizeof(token_t);
 }
