@@ -21,8 +21,8 @@ void golden_data_init(float *gold, float *gold_ref, float *gold_filter, float *g
 
 	for (j = 0; j < 2 * len; j+=2) {
         native_t phase = -3.14159265358979323846264338327 * ((native_t) ((j+1) / len) + .5);
-        gold_twiddle[j] = _cos(phase);
-        gold_twiddle[j + 1] = _sin(phase);
+        gold_twiddle[j] = -6.42796e-08; // _cos(phase);
+        gold_twiddle[j + 1] = -1; // _sin(phase);
 		// uint32_t ig = ((uint32_t*)gold_twiddle)[j];
 		// printf("  TWD[%u] = 0x%08x\n", j, ig);
 		// ig = ((uint32_t*)gold_twiddle)[j+1];
