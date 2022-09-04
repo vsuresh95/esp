@@ -40,6 +40,8 @@ int start_acc()
 			return 0;
 		}
 
+		iowrite32(dev, SPANDEX_REG, spandex_config.spandex_reg);
+
 		// Pass common configuration parameters
 		iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
 		iowrite32(dev, COHERENCE_REG, coherence);
@@ -89,6 +91,8 @@ int start_acc()
 			printf("  -> Not enough TLB entries available. Abort.\n");
 			return 0;
 		}
+
+		iowrite32(dev, SPANDEX_REG, spandex_config.spandex_reg);
 
 		// Pass common configuration parameters
 		iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));

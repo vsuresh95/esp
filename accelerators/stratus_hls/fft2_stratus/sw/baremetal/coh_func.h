@@ -38,6 +38,7 @@ typedef union
 // ESP COHERENCE PROTOCOLS
 #define READ_CODE 0x0002B30B
 #define WRITE_CODE 0x0062B02B
+spandex_config_t spandex_config;
 
 #if (COH_MODE == 3)
 unsigned coherence = ACC_COH_NONE;
