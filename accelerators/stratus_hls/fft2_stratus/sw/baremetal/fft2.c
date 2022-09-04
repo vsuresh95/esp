@@ -89,7 +89,9 @@ static void validate_buf(token_t *out, float *gold)
 	volatile native_t val;
 	uint32_t ival;
 
-	for (j = 0, dst = (void*)(out+SYNC_VAR_SIZE); j < 2 * local_len; j+=2, dst+=8) {
+	dst = (void*)(out+SYNC_VAR_SIZE);
+
+	for (j = 0; j < 2 * local_len; j+=2, dst+=8) {
 		out_data.value_64 = read_mem(dst);
 
 		val = fx2float(out_data.value_32_1, FX_IL);
@@ -109,8 +111,10 @@ static void init_buf(token_t *in, float *gold, token_t *in_filter, float *gold_f
 	spandex_token_t in_data;
 	void* dst;
 
+	dst = (void*)(in+SYNC_VAR_SIZE);
+
 	// convert input to fixed point -- TODO here all the inputs gold values are refetched
-	for (j = 0, dst = (void*)(in+SYNC_VAR_SIZE); j < 2 * local_len; j+=2, dst+=8)
+	for (j = 0; j < 2 * local_len; j+=2, dst+=8)
 	{
 		in_data.value_32_1 = float2fx((native_t) gold[j], FX_IL);
 		in_data.value_32_2 = float2fx((native_t) gold[j+1], FX_IL);
@@ -119,8 +123,10 @@ static void init_buf(token_t *in, float *gold, token_t *in_filter, float *gold_f
 		// printf("IN %u %llx\n", j, ((uint32_t*) in_data.value_64));
 	}
 
+	dst = (void*)(in_filter);
+
 	// convert filter to fixed point
-	for (j = 0, dst = (void*)(in_filter); j < 2 * (local_len+1); j+=2, dst+=8)
+	for (j = 0; j < 2 * (local_len+1); j+=2, dst+=8)
 	{
 		in_data.value_32_1 = float2fx((native_t) gold_filter[j], FX_IL);
 		in_data.value_32_2 = float2fx((native_t) gold_filter[j+1], FX_IL);
@@ -129,8 +135,10 @@ static void init_buf(token_t *in, float *gold, token_t *in_filter, float *gold_f
 		// printf("FLT %u %llx\n", j, ((uint32_t*) in_data.value_64));
 	}
 
+	dst = (void*)(in_twiddle);
+
 	// convert twiddle to fixed point
-	for (j = 0, dst = (void*)(in_twiddle); j < local_len; j+=2, dst+=8)
+	for (j = 0; j < local_len; j+=2, dst+=8)
 	{
 		in_data.value_32_1 = float2fx((native_t) gold_twiddle[j], FX_IL);
 		in_data.value_32_2 = float2fx((native_t) gold_twiddle[j+1], FX_IL);
