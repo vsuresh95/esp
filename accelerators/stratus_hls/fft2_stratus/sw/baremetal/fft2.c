@@ -184,6 +184,8 @@ int main(int argc, char * argv[])
 	sm_sync[2*acc_offset] = 0;
 	sm_sync[3*acc_offset] = 0;
 
+	printf("  Mode: %s\n", print_coh);
+
 	start_acc();
 
 	///////////////////////////////////////////////////////////////
@@ -223,7 +225,6 @@ int main(int argc, char * argv[])
 	aligned_free(mem);
 	aligned_free(gold);
 
-	printf("  Mode: %s\n", print_coh);
 	printf("  CPU write = %lu\n", t_cpu_write/ITERATIONS);
 	printf("  ACC = %lu\n", t_acc/ITERATIONS);
 	printf("  CPU read = %lu\n", t_cpu_read/ITERATIONS);
