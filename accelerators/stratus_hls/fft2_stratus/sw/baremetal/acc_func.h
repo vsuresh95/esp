@@ -40,6 +40,10 @@ int start_acc()
 			return 0;
 		}
 
+		#if (COH_MODE == 3 && !defined(ESP))
+		spandex_config.w_cid = (n+3)%4;
+		#endif
+
 		iowrite32(dev, SPANDEX_REG, spandex_config.spandex_reg);
 
 		// Pass common configuration parameters
@@ -91,6 +95,10 @@ int start_acc()
 			printf("  -> Not enough TLB entries available. Abort.\n");
 			return 0;
 		}
+
+		#if (COH_MODE == 3 && !defined(ESP))
+		spandex_config.w_cid = 2;
+		#endif
 
 		iowrite32(dev, SPANDEX_REG, spandex_config.spandex_reg);
 
