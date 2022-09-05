@@ -408,19 +408,19 @@ void fft2::compute_kernel()
             }
         } // Compute
 
-        // Poll lock for consumer's ready
-        {
-            HLS_PROTO("poll-for-cons-ready");
+        // // Poll lock for consumer's ready
+        // {
+        //     HLS_PROTO("poll-for-cons-ready");
 
-            load_state_req = POLL_NEXT_REQ;
+        //     load_state_req = POLL_NEXT_REQ;
 
-            compute_state_req_dbg.write(4);
+        //     compute_state_req_dbg.write(4);
 
-            this->compute_load_ready_handshake();
-            wait();
-            this->compute_load_done_handshake();
-            wait();
-        }
+        //     this->compute_load_ready_handshake();
+        //     wait();
+        //     this->compute_load_done_handshake();
+        //     wait();
+        // }
 
         // Store output data
         {
@@ -471,29 +471,29 @@ void fft2::compute_kernel()
             wait();
         }
 
-        // update producer for ready to accept
-        {
-            HLS_PROTO("update-prev-lock");
+        // // update producer for ready to accept
+        // {
+        //     HLS_PROTO("update-prev-lock");
 
-            store_state_req = UPDATE_PREV_REQ;
+        //     store_state_req = UPDATE_PREV_REQ;
 
-            compute_state_req_dbg.write(9);
+        //     compute_state_req_dbg.write(9);
 
-            this->compute_store_ready_handshake();
-            wait();
-            this->compute_store_done_handshake();
-            wait();
+        //     this->compute_store_ready_handshake();
+        //     wait();
+        //     this->compute_store_done_handshake();
+        //     wait();
 
-            // Wait for all writes to be done and then issue fence
-            store_state_req = STORE_FENCE;
+        //     // Wait for all writes to be done and then issue fence
+        //     store_state_req = STORE_FENCE;
 
-            compute_state_req_dbg.write(10);
+        //     compute_state_req_dbg.write(10);
 
-            this->compute_store_ready_handshake();
-            wait();
-            this->compute_store_done_handshake();
-            wait();
-        }
+        //     this->compute_store_ready_handshake();
+        //     wait();
+        //     this->compute_store_done_handshake();
+        //     wait();
+        // }
 
         // End operation
         {

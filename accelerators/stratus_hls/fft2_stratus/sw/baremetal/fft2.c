@@ -213,7 +213,7 @@ int main(int argc, char * argv[])
 
 		sm_sync[0] = 1;
 		while(sm_sync[NUM_DEVICES*acc_offset] != 1);
-		sm_sync[NUM_DEVICES*acc_offset] = 0;
+		// sm_sync[NUM_DEVICES*acc_offset] = 0;
 		t_acc += end_counter();
 
 		///////////////////////////////////////////////////////////////
