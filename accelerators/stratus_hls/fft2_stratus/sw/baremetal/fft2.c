@@ -86,7 +86,7 @@ static void validate_buf(token_t *out, float *gold)
 	int local_len = len;
 	spandex_token_t out_data;
 	void* dst;
-	volatile native_t val;
+	native_t val;
 	uint32_t ival;
 
 	dst = (void*)(out+SYNC_VAR_SIZE);
@@ -95,10 +95,12 @@ static void validate_buf(token_t *out, float *gold)
 		out_data.value_64 = read_mem(dst);
 
 		val = fx2float(out_data.value_32_1, FX_IL);
+		if (val == 12412.12412) j = 0;
 		// ival = *((uint32_t*)&val);
 		// printf("%u G %08x O %08x\n", j, ((uint32_t*)gold)[j], ival);
 
 		val = fx2float(out_data.value_32_2, FX_IL);
+		if (val == 22412.12412) j = 0;
 		// ival = *((uint32_t*)&val);
 		// printf("%u G %08x O %08x\n", j, ((uint32_t*)gold)[j+1], ival);
 	}
@@ -194,6 +196,10 @@ int main(int argc, char * argv[])
 
 	printf("  Mode: %s\n", print_coh);
 
+	sm_sync[2] = 0;
+	sm_sync[acc_offset+2] = 0;
+	sm_sync[2*acc_offset+2] = 0;
+
 	start_acc();
 
 	///////////////////////////////////////////////////////////////
@@ -207,13 +213,16 @@ int main(int argc, char * argv[])
 		t_cpu_write += end_counter();
 
 		start_counter();
-		sm_sync[2] = (i+1)/ITERATIONS;
-		sm_sync[acc_offset+2] = (i+1)/ITERATIONS;
-		sm_sync[2*acc_offset+2] = (i+1)/ITERATIONS;
+
+		if (i == ITERATIONS - 1) {
+			sm_sync[2] = 1;
+			sm_sync[acc_offset+2] = 1;
+			sm_sync[2*acc_offset+2] = 1;
+		}
 
 		sm_sync[0] = 1;
 		while(sm_sync[NUM_DEVICES*acc_offset] != 1);
-		// sm_sync[NUM_DEVICES*acc_offset] = 0;
+		sm_sync[NUM_DEVICES*acc_offset] = 0;
 		t_acc += end_counter();
 
 		///////////////////////////////////////////////////////////////
