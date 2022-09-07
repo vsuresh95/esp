@@ -97,20 +97,21 @@ static void validate_buf(token_t *out, float *gold)
 		val = fx2float(out_data.value_32_1, FX_IL);
 		if (val == 12412.12412) j = 0;
 		// ival = *((uint32_t*)&val);
-		// printf("%u G %08x O %08x\n", j, ((uint32_t*)gold)[j], ival);
+		// printf("%u G %08x O %08x\n", j, ((uint32_t*) gold)[j], ival);
 
 		val = fx2float(out_data.value_32_2, FX_IL);
 		if (val == 22412.12412) j = 0;
 		// ival = *((uint32_t*)&val);
-		// printf("%u G %08x O %08x\n", j, ((uint32_t*)gold)[j+1], ival);
+		// printf("%u G %08x O %08x\n", j, ((uint32_t*) gold)[j+1], ival);
 	}
 }
 
-static void init_buf(token_t *in, float *gold, token_t *in_filter, float *gold_filter, token_t *in_twiddle, float *gold_twiddle)
+static void init_buf(token_t *in, float *gold, token_t *in_filter, int64_t *gold_filter)
 {
 	int j;
 	int local_len = len;
 	spandex_token_t in_data;
+	int64_t value_64;
 	void* dst;
 
 	dst = (void*)(in+SYNC_VAR_SIZE);
@@ -122,19 +123,32 @@ static void init_buf(token_t *in, float *gold, token_t *in_filter, float *gold_f
 		in_data.value_32_2 = float2fx((native_t) gold[j+1], FX_IL);
 
 		write_mem(dst, in_data.value_64);
-		// printf("IN %u %llx\n", j, ((uint32_t*) in_data.value_64));
+		// printf("IN %u %llx\n", j, (in_data.value_64));
 	}
 
 	dst = (void*)(in_filter);
 
 	// convert filter to fixed point
-	for (j = 0; j < 2 * (local_len+1); j+=2, dst+=8)
+	for (j = 0; j < (local_len+1); j++, dst+=8)
 	{
-		in_data.value_32_1 = float2fx((native_t) gold_filter[j], FX_IL);
-		in_data.value_32_2 = float2fx((native_t) gold_filter[j+1], FX_IL);
+		value_64 = gold_filter[j];
 
-		write_mem(dst, in_data.value_64);
-		// printf("FLT %u %llx\n", j, ((uint32_t*) in_data.value_64));
+		write_mem(dst, value_64);
+		// printf("FLT %u %llx\n", j, value_64);
+	}
+}
+
+static void flt_twd_fxp_conv(token_t *gold_filter_fxp, float *gold_filter, token_t *in_twiddle, float *gold_twiddle)
+{
+	int j;
+	int local_len = len;
+	spandex_token_t in_data;
+	void* dst;
+
+	// convert filter to fixed point
+	for (j = 0; j < 2 * (local_len+1); j++)
+	{
+		gold_filter_fxp[j] = float2fx((native_t) gold_filter[j], FX_IL);
 	}
 
 	dst = (void*)(in_twiddle);
@@ -146,7 +160,7 @@ static void init_buf(token_t *in, float *gold, token_t *in_filter, float *gold_f
 		in_data.value_32_2 = float2fx((native_t) gold_twiddle[j+1], FX_IL);
 
 		write_mem(dst, in_data.value_64);
-		// printf("TWD %u %llx\n", j, ((uint32_t*) in_data.value_64));
+		// printf("TWD %u %llx\n", j, in_data.value_64);
 	}
 }
 
@@ -165,7 +179,8 @@ int main(int argc, char * argv[])
 	///////////////////////////////////////////////////////////////
 	// Allocate memory pointers
 	///////////////////////////////////////////////////////////////
-	gold = aligned_malloc((7 * out_len) * sizeof(float));
+	gold = aligned_malloc((8 * out_len) * sizeof(float));
+	fxp_filters = aligned_malloc((out_len + 2) * sizeof(float));
 	mem = aligned_malloc(mem_size);
 	printf("  memory buffer base-address = %p\n", mem);
 
@@ -203,13 +218,17 @@ int main(int argc, char * argv[])
 	start_acc();
 
 	///////////////////////////////////////////////////////////////
+	// Do repetitive things initially
+	///////////////////////////////////////////////////////////////
+	flt_twd_fxp_conv(fxp_filters /* gold_filter_fxp */, (gold + 2 * out_len) /* gold_filter */, (mem + 7 * acc_offset) /* in_twiddle */, (gold + 4 * out_len) /* gold_twiddle */);
+
+	///////////////////////////////////////////////////////////////
 	// Transfer to accelerator memory
 	///////////////////////////////////////////////////////////////
 	for (i = 0; i < ITERATIONS; i++)
 	{
 		start_counter();
-		init_buf(mem, gold, (mem + 5 * acc_offset) /* in_filter */, (gold + 2 * out_len) /* gold_filter */,
-				(mem + 7 * acc_offset) /* in_twiddle */, (gold + 4 * out_len) /* gold_twiddle */);
+		init_buf(mem, gold, (mem + 5 * acc_offset) /* in_filter */, (int64_t*) fxp_filters /* gold_filter */);
 		t_cpu_write += end_counter();
 
 		start_counter();

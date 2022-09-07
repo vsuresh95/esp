@@ -10,6 +10,7 @@ struct esp_device *fir_dev;
 unsigned **ptable = NULL;
 token_t *mem;
 float *gold;
+token_t *fxp_filters;
 const float ERROR_COUNT_TH = 0.001;
 
 ///////////////////////////////////////////////////////////////
