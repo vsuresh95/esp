@@ -86,5 +86,5 @@ set ESP_UTILS_PATH "$ESP_ROOT/accelerators/stratus_hls/common/utils"
 #
 # Compiling Options
 #
-set INCLUDES "-I$ESP_HDRS_PATH -I$ESP_UTILS_PATH -I../src -I./memlib"
+set INCLUDES "-I$ESP_HDRS_PATH -I$ESP_UTILS_PATH -I../src -I./memlib -I$ESP_ROOT/rtl/caches/spandex-caches/utils -I$ESP_ROOT/rtl/caches/spandex-caches/common/caches"
 

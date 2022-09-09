@@ -196,30 +196,38 @@ end;
   signal dma_snd_ready        : std_ulogic;
 
   -- Accelerator signals
-  signal acc_rst                    : std_ulogic;
-  signal conf_done                  : std_ulogic;
-  signal dma_read_ctrl_valid        : std_ulogic;
-  signal dma_read_ctrl_ready        : std_ulogic;
-  signal dma_read_ctrl_data_index   : std_logic_vector(31 downto 0);
-  signal dma_read_ctrl_data_length  : std_logic_vector(31 downto 0);
-  signal dma_read_ctrl_data_size    : std_logic_vector(2 downto 0);
-  signal dma_write_ctrl_valid       : std_ulogic;
-  signal dma_write_ctrl_ready       : std_ulogic;
-  signal dma_write_ctrl_data_index  : std_logic_vector(31 downto 0);
-  signal dma_write_ctrl_data_length : std_logic_vector(31 downto 0);
-  signal dma_write_ctrl_data_size   : std_logic_vector(2 downto 0);
-  signal dma_read_chnl_valid        : std_ulogic;
-  signal dma_read_chnl_ready        : std_ulogic;
-  signal dma_read_chnl_data         : std_logic_vector(ARCH_BITS - 1 downto 0);
-  signal dma_write_chnl_valid       : std_ulogic;
-  signal dma_write_chnl_ready       : std_ulogic;
-  signal dma_write_chnl_data        : std_logic_vector(ARCH_BITS - 1 downto 0);
-  signal acc_done                   : std_ulogic;
-  signal flush                      : std_ulogic;
-  signal acc_flush_done             : std_ulogic;
-  signal acc_fence_valid            : std_ulogic;
-  signal acc_fence_ready            : std_ulogic;
-  signal acc_fence_data             : std_logic_vector(1 downto 0);
+  signal acc_rst                                  : std_ulogic;
+  signal conf_done                                : std_ulogic;
+  signal dma_read_ctrl_valid                      : std_ulogic;
+  signal dma_read_ctrl_ready                      : std_ulogic;
+  signal dma_read_ctrl_data_index                 : std_logic_vector(31 downto 0);
+  signal dma_read_ctrl_data_length                : std_logic_vector(31 downto 0);
+  signal dma_read_ctrl_data_size                  : std_logic_vector(2 downto 0);
+  signal dma_read_ctrl_data_opts_dcs_en           : std_ulogic;
+  signal dma_read_ctrl_data_opts_use_owner_pred   : std_ulogic;
+  signal dma_read_ctrl_data_opts_dcs              : std_logic_vector(1 downto 0);
+  signal dma_read_ctrl_data_opts_pred_cid         : std_logic_vector(3 downto 0);
+  signal dma_write_ctrl_valid                     : std_ulogic;
+  signal dma_write_ctrl_ready                     : std_ulogic;
+  signal dma_write_ctrl_data_index                : std_logic_vector(31 downto 0);
+  signal dma_write_ctrl_data_length               : std_logic_vector(31 downto 0);
+  signal dma_write_ctrl_data_size                 : std_logic_vector(2 downto 0);
+  signal dma_write_ctrl_data_opts_dcs_en          : std_ulogic;
+  signal dma_write_ctrl_data_opts_use_owner_pred  : std_ulogic;
+  signal dma_write_ctrl_data_opts_dcs             : std_logic_vector(1 downto 0);
+  signal dma_write_ctrl_data_opts_pred_cid        : std_logic_vector(3 downto 0);
+  signal dma_read_chnl_valid                      : std_ulogic;
+  signal dma_read_chnl_ready                      : std_ulogic;
+  signal dma_read_chnl_data                       : std_logic_vector(ARCH_BITS - 1 downto 0);
+  signal dma_write_chnl_valid                     : std_ulogic;
+  signal dma_write_chnl_ready                     : std_ulogic;
+  signal dma_write_chnl_data                      : std_logic_vector(ARCH_BITS - 1 downto 0);
+  signal acc_done                                 : std_ulogic;
+  signal flush                                    : std_ulogic;
+  signal acc_flush_done                           : std_ulogic;
+  signal acc_fence_valid                          : std_ulogic;
+  signal acc_fence_ready                          : std_ulogic;
+  signal acc_fence_data                           : std_logic_vector(1 downto 0);
   -- Register control, interrupt and monitor signals
   signal pllclk_int        : std_ulogic;
   signal mon_dvfs_feedthru : monitor_dvfs_type;
@@ -256,11 +264,19 @@ end;
   attribute keep of dma_read_ctrl_data_index : signal is "true";
   attribute keep of dma_read_ctrl_data_length : signal is "true";
   attribute keep of dma_read_ctrl_data_size : signal is "true";
+  attribute keep of dma_read_ctrl_data_opts_dcs_en : signal is "true";
+  attribute keep of dma_read_ctrl_data_opts_use_owner_pred : signal is "true";
+  attribute keep of dma_read_ctrl_data_opts_dcs : signal is "true";
+  attribute keep of dma_read_ctrl_data_opts_pred_cid : signal is "true";
   attribute keep of dma_write_ctrl_valid : signal is "true";
   attribute keep of dma_write_ctrl_ready : signal is "true";
   attribute keep of dma_write_ctrl_data_index : signal is "true";
   attribute keep of dma_write_ctrl_data_length : signal is "true";
   attribute keep of dma_write_ctrl_data_size : signal is "true";
+  attribute keep of dma_write_ctrl_data_opts_dcs_en : signal is "true";
+  attribute keep of dma_write_ctrl_data_opts_use_owner_pred : signal is "true";
+  attribute keep of dma_write_ctrl_data_opts_dcs : signal is "true";
+  attribute keep of dma_write_ctrl_data_opts_pred_cid : signal is "true";
   attribute keep of dma_read_chnl_valid : signal is "true";
   attribute keep of dma_read_chnl_ready : signal is "true";
   attribute keep of dma_read_chnl_data : signal is "true";
@@ -313,7 +329,14 @@ begin
         acc_fence_ready            => acc_fence_ready,
         acc_fence_data             => acc_fence_data ,
         acc_fence_valid            => acc_fence_valid,
-        spandex_conf               => bank(SPANDEX_REG),
+        spandex_conf(15 downto 12) => dma_write_ctrl_data_opts_pred_cid,
+        spandex_conf(11 downto 10) => dma_write_ctrl_data_opts_dcs,
+        spandex_conf(9)            => dma_write_ctrl_data_opts_use_owner_pred,
+        spandex_conf(8)            => dma_write_ctrl_data_opts_dcs_en,
+        spandex_conf(7 downto 4)   => dma_read_ctrl_data_opts_pred_cid,
+        spandex_conf(3 downto 2)   => dma_read_ctrl_data_opts_dcs,
+        spandex_conf(1)            => dma_read_ctrl_data_opts_use_owner_pred,
+        spandex_conf(0)            => dma_read_ctrl_data_opts_dcs_en,
         acc_flush_done             => acc_flush_done,
         coherence_req_wrreq        => coherence_req_wrreq,
         coherence_req_data_in      => coherence_req_data_in,
