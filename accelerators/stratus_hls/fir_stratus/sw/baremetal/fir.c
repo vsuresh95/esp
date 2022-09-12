@@ -8,156 +8,179 @@
 
 #include <esp_accelerator.h>
 #include <esp_probe.h>
-#include "utils/fir_utils.h"
+#include "utils/fft2_utils.h"
 
-#if (FIR_FX_WIDTH == 64)
-typedef long long token_t;
-typedef double native_t;
-#define fx2float fixed64_to_double
-#define float2fx double_to_fixed64
-#define FX_IL 42
-#else // (FIR_FX_WIDTH == 32)
-typedef int token_t;
-typedef float native_t;
-#define fx2float fixed32_to_float
-#define float2fx float_to_fixed32
-#define FX_IL 14
-#endif /* FIR_FX_WIDTH */
+#define COH_MODE 0
+// #define ESP
+#define ITERATIONS 1000
+#define LOG_LEN 10
 
-const float ERR_TH = 0.05;
+#include "cfg.h"
+#include "sw_func.h"
+#include "coh_func.h"
+#include "acc_func.h"
 
-static unsigned DMA_WORD_PER_BEAT(unsigned _st)
-{
-        return (sizeof(void *) / _st);
+static uint64_t t_start = 0;
+static uint64_t t_end = 0;
+
+uint64_t t_cpu_write;
+uint64_t t_acc;
+uint64_t t_cpu_read;
+
+static inline void start_counter() {
+	asm volatile (
+		"li t0, 0;"
+		"csrr t0, mcycle;"
+		"mv %0, t0"
+		: "=r" (t_start)
+		:
+		: "t0"
+	);
 }
 
+static inline uint64_t end_counter() {
+	asm volatile (
+		"li t0, 0;"
+		"csrr t0, mcycle;"
+		"mv %0, t0"
+		: "=r" (t_end)
+		:
+		: "t0"
+	);
 
-#define SLD_FIR 0x057
-#define DEV_NAME "sld,fir_stratus"
+	return (t_end - t_start);
+}
 
-/* <<--params-->> */
-const int32_t logn_samples = 10;
-const int32_t num_samples = (1 << logn_samples);
-const int32_t num_firs = 1;
-const int32_t do_inverse = 0;
-const int32_t do_shift = 0;
-const int32_t scale_factor = 1;
-int32_t len;
+static inline void write_mem (void* dst, int64_t value_64)
+{
+	asm volatile (
+		"mv t0, %0;"
+		"mv t1, %1;"
+		".word " QU(WRITE_CODE)
+		:
+		: "r" (dst), "r" (value_64)
+		: "t0", "t1", "memory"
+	);
+}
 
-static unsigned in_words_adj;
-static unsigned out_words_adj;
-static unsigned in_len;
-static unsigned out_len;
-static unsigned in_size;
-static unsigned out_size;
-static unsigned out_offset;
-static unsigned mem_size;
+static inline int64_t read_mem (void* dst)
+{
+	int64_t value_64;
 
-/* Size of the contiguous chunks for scatter/gather */
-#define CHUNK_SHIFT 20
-#define CHUNK_SIZE BIT(CHUNK_SHIFT)
-#define NCHUNK(_sz) ((_sz % CHUNK_SIZE == 0) ?		\
-			(_sz / CHUNK_SIZE) :		\
-			(_sz / CHUNK_SIZE) + 1)
+	asm volatile (
+		"mv t0, %1;"
+		".word " QU(READ_CODE) ";"
+		"mv %0, t1"
+		: "=r" (value_64)
+		: "r" (dst)
+		: "t0", "t1", "memory"
+	);
 
-/* User defined registers */
-/* <<--regs-->> */
-#define FIR_LOGN_SAMPLES_REG 0x40
-#define FIR_NUM_FIRS_REG 0x44
-#define FIR_DO_INVERSE_REG 0x48
-#define FIR_DO_SHIFT_REG 0x4c
-#define FIR_SCALE_FACTOR_REG 0x50
+	return value_64;
+}
 
-#define SYNC_VAR_SIZE 2
-
-#define NUM_DEVICES 2
-
-static int validate_buf(token_t *out, float *gold)
+static void validate_buf(token_t *out, float *gold)
 {
 	int j;
 	unsigned errors = 0;
+	int local_len = len;
+	spandex_token_t out_data;
+	void* dst;
+	native_t val;
+	uint32_t ival;
 
-	for (j = 0; j < 2 * len; j++) {
-		native_t val = fx2float(out[j+SYNC_VAR_SIZE], FX_IL);
-		uint32_t ival = *((uint32_t*)&val);
-		// printf("  GOLD[%u] = 0x%08x  :  OUT[%u] = 0x%08x\n", j, ((uint32_t*)gold)[j], j, ival);
-		if ((fabs(gold[j] - val) / fabs(gold[j])) > ERR_TH)
-			errors++;
+	dst = (void*)(out+SYNC_VAR_SIZE);
+
+	for (j = 0; j < 2 * local_len; j+=2, dst+=8) {
+		out_data.value_64 = read_mem(dst);
+
+		val = fx2float(out_data.value_32_1, FX_IL);
+		if (val == 12412.12412) j = 0;
+		// ival = *((uint32_t*)&val);
+		// printf("%u G %08x O %08x\n", j, ((uint32_t*) gold)[j], ival);
+
+		val = fx2float(out_data.value_32_2, FX_IL);
+		if (val == 22412.12412) j = 0;
+		// ival = *((uint32_t*)&val);
+		// printf("%u G %08x O %08x\n", j, ((uint32_t*) gold)[j+1], ival);
 	}
-
-	//printf("  %u errors\n", errors);
-	return errors;
 }
 
-
-static void init_buf(token_t *in, float *gold)
+static void init_buf(token_t *in, float *gold, token_t *in_filter, int64_t *gold_filter)
 {
 	int j;
-	const float LO = -10.0;
-	const float HI = 10.0;
+	int local_len = len;
+	spandex_token_t in_data;
+	int64_t value_64;
+	void* dst;
 
-	/* srand((unsigned int) time(NULL)); */
+	dst = (void*)(in+SYNC_VAR_SIZE);
 
-	for (j = 0; j < 2 * len; j++) {
-		float scaling_factor = (float) rand () / (float) RAND_MAX;
-		gold[j] = LO + scaling_factor * (HI - LO);
-		uint32_t ig = ((uint32_t*)gold)[j];
-		// printf("  IN[%u] = 0x%08x\n", j, ig);
+	// convert input to fixed point -- TODO here all the inputs gold values are refetched
+	for (j = 0; j < 2 * local_len; j+=2, dst+=8)
+	{
+		in_data.value_32_1 = float2fx((native_t) gold[j], FX_IL);
+		in_data.value_32_2 = float2fx((native_t) gold[j+1], FX_IL);
+
+		write_mem(dst, in_data.value_64);
+		// printf("IN %u %llx\n", j, (in_data.value_64));
 	}
 
-	// convert input to fixed point
-	for (j = 0; j < 2 * len; j++)
-		in[j+SYNC_VAR_SIZE] = float2fx((native_t) gold[j], FX_IL);
+	dst = (void*)(in_filter);
 
-	// Compute golden output
-	fir_comp(gold, num_firs, num_samples, logn_samples, 0 /* do_inverse */, do_shift);
+	// convert filter to fixed point
+	for (j = 0; j < (local_len+1); j++, dst+=8)
+	{
+		value_64 = gold_filter[j];
 
-	// for (j = 0; j < 2 * len; j++) {
-	// 	printf("  INT GOLD[%u] = 0x%08x\n", j, ((uint32_t*)gold)[j]);
-    // }
+		write_mem(dst, value_64);
+		// printf("FLT %u %llx\n", j, value_64);
+	}
+}
 
-	fir_comp(gold, num_firs, num_samples, logn_samples, 1 /* do_inverse */, do_shift);
+static void flt_twd_fxp_conv(token_t *gold_filter_fxp, float *gold_filter, token_t *in_twiddle, float *gold_twiddle)
+{
+	int j;
+	int local_len = len;
+	spandex_token_t in_data;
+	void* dst;
+
+	// convert filter to fixed point
+	for (j = 0; j < 2 * (local_len+1); j++)
+	{
+		gold_filter_fxp[j] = float2fx((native_t) gold_filter[j], FX_IL);
+	}
+
+	dst = (void*)(in_twiddle);
+
+	// convert twiddle to fixed point
+	for (j = 0; j < local_len; j+=2, dst+=8)
+	{
+		in_data.value_32_1 = float2fx((native_t) gold_twiddle[j], FX_IL);
+		in_data.value_32_2 = float2fx((native_t) gold_twiddle[j+1], FX_IL);
+
+		write_mem(dst, in_data.value_64);
+		// printf("TWD %u %llx\n", j, in_data.value_64);
+	}
 }
 
 int main(int argc, char * argv[])
 {
 	int i;
-	int n;
-	int ndev;
-	struct esp_device *espdevs;
-	struct esp_device *dev;
-	unsigned done;
-	unsigned spin_ct;
-	unsigned **ptable = NULL;
-	token_t *mem;
-	float *gold;
-	unsigned errors = 0;
-	unsigned coherence;
-        const float ERROR_COUNT_TH = 0.001;
+	t_cpu_write = 0;
+	t_acc = 0;
+	t_cpu_read = 0;
 
-	len = num_firs * (1 << logn_samples);
-	printf("logn %u nsmp %u nfir %u inv %u shft %u len %u\n", logn_samples, num_samples, num_firs, do_inverse, do_shift, len);
-	if (DMA_WORD_PER_BEAT(sizeof(token_t)) == 0) {
-		in_words_adj = 2 * len;
-		out_words_adj = 2 * len;
-	} else {
-		in_words_adj = round_up(2 * len, DMA_WORD_PER_BEAT(sizeof(token_t)));
-		out_words_adj = round_up(2 * len, DMA_WORD_PER_BEAT(sizeof(token_t)));
-	}
-	in_len = in_words_adj;
-	out_len = out_words_adj;
-	in_size = in_len * sizeof(token_t);
-	out_size = out_len * sizeof(token_t);
-	out_offset  = 0;
-	mem_size = (out_offset * sizeof(token_t)) + out_size + (SYNC_VAR_SIZE * sizeof(token_t));
+	///////////////////////////////////////////////////////////////
+	// Init data size parameters
+	///////////////////////////////////////////////////////////////
+	init_params();
 
-    unsigned acc_offset = mem_size;
-    mem_size *= NUM_DEVICES+1;
-
-	printf("ilen %u isize %u o_off %u olen %u osize %u msize %u\n", in_len, out_len, in_size, out_size, out_offset, mem_size);
-
-	// Allocate memory
-	gold = aligned_malloc(out_len * sizeof(float));
+	///////////////////////////////////////////////////////////////
+	// Allocate memory pointers
+	///////////////////////////////////////////////////////////////
+	gold = aligned_malloc((8 * out_len) * sizeof(float));
+	fxp_filters = aligned_malloc((out_len + 2) * sizeof(float));
 	mem = aligned_malloc(mem_size);
 	printf("  memory buffer base-address = %p\n", mem);
 
@@ -171,100 +194,55 @@ int main(int argc, char * argv[])
 	printf("  ptable = %p\n", ptable);
 	printf("  nchunk = %lu\n", NCHUNK(mem_size));
 
-	coherence = ACC_COH_FULL;
-	printf("  --------------------\n");
-	printf("  Generate input...\n");
-	init_buf(mem, gold);
+	//////////////////////////////////////////////////////
+	// Initialize golden buffers and compute golden output
+	//////////////////////////////////////////////////////
+	golden_data_init(gold, (gold + out_len) /* gold_ref*/, (gold + 2 * out_len) /* gold_filter */, (gold + 4 * out_len) /* gold_twiddle */);
 
-	printf("Scanning device tree... \n");
+	chain_sw_impl((gold + out_len) /* gold_ref*/, (gold + 2 * out_len) /* gold_filter */, (gold + 4 * out_len) /* gold_twiddle */, (gold + 6 * out_len) /* gold_freqdata */);
 
-	ndev = probe(&espdevs, VENDOR_SLD, SLD_FIR, DEV_NAME);
-	if (ndev == 0) {
-		printf("%s not found\n", DEV_NAME);
-		return 0;
+	printf("  Mode: %s\n", print_coh);
+
+	///////////////////////////////////////////////////////////////
+	// Do repetitive things initially
+	///////////////////////////////////////////////////////////////
+	flt_twd_fxp_conv(fxp_filters /* gold_filter_fxp */, (gold + 2 * out_len) /* gold_filter */, (mem + 7 * acc_offset) /* in_twiddle */, (gold + 4 * out_len) /* gold_twiddle */);
+
+	///////////////////////////////////////////////////////////////
+	// Transfer to accelerator memory
+	///////////////////////////////////////////////////////////////
+	for (i = 0; i < ITERATIONS; i++)
+	{
+		start_counter();
+		init_buf(mem, gold, (mem + 5 * acc_offset) /* in_filter */, (int64_t*) fxp_filters /* gold_filter */);
+		t_cpu_write += end_counter();
+
+		start_counter();
+
+		///////////////////////////////////////////////////////////////
+		// Invoke all accelerators
+		///////////////////////////////////////////////////////////////
+		start_acc();
+		terminate_acc();
+
+		t_acc += end_counter();
+
+		///////////////////////////////////////////////////////////////
+		// Read back output
+		///////////////////////////////////////////////////////////////
+		start_counter();
+		validate_buf(&mem[NUM_DEVICES*acc_offset], (gold + out_len));
+		t_cpu_read += end_counter();
 	}
-
-	for (n = 0; n < ndev; n++) {
-
-		printf("**************** %s.%d ****************\n", DEV_NAME, n);
-
-		dev = &espdevs[n];
-
-		// Check DMA capabilities
-		if (ioread32(dev, PT_NCHUNK_MAX_REG) == 0) {
-			printf("  -> scatter-gather DMA is disabled. Abort.\n");
-			return 0;
-		}
-
-		if (ioread32(dev, PT_NCHUNK_MAX_REG) < NCHUNK(mem_size)) {
-			printf("  -> Not enough TLB entries available. Abort.\n");
-			return 0;
-		}
-
-		// Pass common configuration parameters
-		iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
-		iowrite32(dev, COHERENCE_REG, coherence);
-
-		iowrite32(dev, PT_ADDRESS_REG, (unsigned long long) ptable);
-		iowrite32(dev, PT_NCHUNK_REG, NCHUNK(mem_size));
-		iowrite32(dev, PT_SHIFT_REG, CHUNK_SHIFT);
-
-		// Use the following if input and output data are not allocated at the default offsets
-		iowrite32(dev, SRC_OFFSET_REG, n * acc_offset);
-		iowrite32(dev, DST_OFFSET_REG, n * acc_offset);
-
-		// Pass accelerator-specific configuration parameters
-		/* <<--regs-config-->> */
-		iowrite32(dev, FIR_LOGN_SAMPLES_REG, logn_samples);
-		iowrite32(dev, FIR_NUM_FIRS_REG, num_firs);
-		iowrite32(dev, FIR_SCALE_FACTOR_REG, scale_factor);
-		iowrite32(dev, FIR_DO_SHIFT_REG, do_shift);
-		iowrite32(dev, FIR_DO_INVERSE_REG, n);
-
-		// Flush (customize coherence model here)
-		esp_flush(coherence);
-
-		// Start accelerators
-		printf("  Start...\n");
-		iowrite32(dev, CMD_REG, CMD_MASK_START);
-    }
-
-    unsigned cpu_arr_offset = out_offset + out_len + SYNC_VAR_SIZE;
-
-	sm_sync[0] = 1;
-	while(sm_sync[2*cpu_arr_offset] != 1);
-
-	for (n = 0; n < ndev; n++) {
-
-		printf("**************** %s.%d ****************\n", DEV_NAME, n);
-
-		dev = &espdevs[n];
-
-	    // Wait for completion
-	    done = 0;
-	    spin_ct = 0;
-	    while (!done) {
-	        done = ioread32(dev, STATUS_REG);
-	        done &= STATUS_MASK_DONE;
-	        spin_ct++;
-	    }
-	    iowrite32(dev, CMD_REG, 0x0);
-
-        printf("  Done : spin_count = %u\n", spin_ct);
-    }
-
-	printf("  validating...\n");
-
-	/* Validation */
-	errors = validate_buf(&mem[(2*cpu_arr_offset)], gold);
-	if ((float)((float)errors / (2.0 * (float)len)) > ERROR_COUNT_TH)
-		printf("  ... FAIL : %u errors out of %u\n", errors, 2*len);
-	else
-		printf("  ... PASS : %u errors out of %u\n", errors, 2*len);
 
 	aligned_free(ptable);
 	aligned_free(mem);
 	aligned_free(gold);
+
+	printf("  CPU write = %lu\n", t_cpu_write/ITERATIONS);
+	printf("  ACC = %lu\n", t_acc/ITERATIONS);
+	printf("  CPU read = %lu\n", t_cpu_read/ITERATIONS);
+	printf("\n");
 
     // while(1);
 
