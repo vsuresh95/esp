@@ -201,21 +201,7 @@ int main(int argc, char * argv[])
 
 	chain_sw_impl((gold + out_len) /* gold_ref*/, (gold + 2 * out_len) /* gold_filter */, (gold + 4 * out_len) /* gold_twiddle */, (gold + 6 * out_len) /* gold_freqdata */);
 
-	///////////////////////////////////////////////////////////////
-	// Start all accelerators
-	///////////////////////////////////////////////////////////////
-	sm_sync[0] = 0;
-	sm_sync[acc_offset] = 0;
-	sm_sync[2*acc_offset] = 0;
-	sm_sync[3*acc_offset] = 0;
-
 	printf("  Mode: %s\n", print_coh);
-
-	sm_sync[2] = 0;
-	sm_sync[acc_offset+2] = 0;
-	sm_sync[2*acc_offset+2] = 0;
-
-	start_acc();
 
 	///////////////////////////////////////////////////////////////
 	// Do repetitive things initially
@@ -233,15 +219,12 @@ int main(int argc, char * argv[])
 
 		start_counter();
 
-		if (i == ITERATIONS - 1) {
-			sm_sync[2] = 1;
-			sm_sync[acc_offset+2] = 1;
-			sm_sync[2*acc_offset+2] = 1;
-		}
+		///////////////////////////////////////////////////////////////
+		// Invoke all accelerators
+		///////////////////////////////////////////////////////////////
+		start_acc();
+		terminate_acc();
 
-		sm_sync[0] = 1;
-		while(sm_sync[NUM_DEVICES*acc_offset] != 1);
-		sm_sync[NUM_DEVICES*acc_offset] = 0;
 		t_acc += end_counter();
 
 		///////////////////////////////////////////////////////////////
@@ -251,11 +234,6 @@ int main(int argc, char * argv[])
 		validate_buf(&mem[NUM_DEVICES*acc_offset], (gold + out_len));
 		t_cpu_read += end_counter();
 	}
-
-	///////////////////////////////////////////////////////////////
-	// Terminate all accelerators
-	///////////////////////////////////////////////////////////////
-	terminate_acc();
 
 	aligned_free(ptable);
 	aligned_free(mem);

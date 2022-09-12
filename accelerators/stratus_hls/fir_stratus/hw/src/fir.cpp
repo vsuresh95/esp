@@ -349,21 +349,21 @@ void fir::compute_kernel()
         num_samples = 1 << logn_samples;
     }
 
-    while(true)
-    {
-        // Poll lock for new task
-        {
-            HLS_PROTO("poll-for-new-task");
+    // while(true)
+    // {
+        // // Poll lock for new task
+        // {
+        //     HLS_PROTO("poll-for-new-task");
 
-            load_state_req = POLL_PREV_REQ;
+        //     load_state_req = POLL_PREV_REQ;
 
-            compute_state_req_dbg.write(1);
+        //     compute_state_req_dbg.write(1);
 
-            this->compute_load_ready_handshake();
-            wait();
-            this->compute_load_done_handshake();
-            wait();
-        }
+        //     this->compute_load_ready_handshake();
+        //     wait();
+        //     this->compute_load_done_handshake();
+        //     wait();
+        // }
 
         // Load input data
         {
@@ -528,60 +528,60 @@ void fir::compute_kernel()
             wait();
         }
 
-        // update consumer for data ready
-        {
-            HLS_PROTO("update-next-lock");
+        // // update consumer for data ready
+        // {
+        //     HLS_PROTO("update-next-lock");
 
-            store_state_req = UPDATE_NEXT_REQ;
+        //     store_state_req = UPDATE_NEXT_REQ;
 
-            compute_state_req_dbg.write(7);
+        //     compute_state_req_dbg.write(7);
 
-            this->compute_store_ready_handshake();
-            wait();
-            this->compute_store_done_handshake();
-            wait();
+        //     this->compute_store_ready_handshake();
+        //     wait();
+        //     this->compute_store_done_handshake();
+        //     wait();
 
-            // Wait for all writes to be done and then issue fence
-            store_state_req = STORE_FENCE;
+        //     // Wait for all writes to be done and then issue fence
+        //     store_state_req = STORE_FENCE;
 
-            compute_state_req_dbg.write(8);
+        //     compute_state_req_dbg.write(8);
 
-            this->compute_store_ready_handshake();
-            wait();
-            this->compute_store_done_handshake();
-            wait();
-        }
+        //     this->compute_store_ready_handshake();
+        //     wait();
+        //     this->compute_store_done_handshake();
+        //     wait();
+        // }
 
-        // update producer for ready to accept
-        {
-            HLS_PROTO("update-prev-lock");
+        // // update producer for ready to accept
+        // {
+        //     HLS_PROTO("update-prev-lock");
 
-            store_state_req = UPDATE_PREV_REQ;
+        //     store_state_req = UPDATE_PREV_REQ;
 
-            compute_state_req_dbg.write(9);
+        //     compute_state_req_dbg.write(9);
 
-            this->compute_store_ready_handshake();
-            wait();
-            this->compute_store_done_handshake();
-            wait();
+        //     this->compute_store_ready_handshake();
+        //     wait();
+        //     this->compute_store_done_handshake();
+        //     wait();
 
-            // Wait for all writes to be done and then issue fence
-            store_state_req = STORE_FENCE;
+        //     // Wait for all writes to be done and then issue fence
+        //     store_state_req = STORE_FENCE;
 
-            compute_state_req_dbg.write(10);
+        //     compute_state_req_dbg.write(10);
 
-            this->compute_store_ready_handshake();
-            wait();
-            this->compute_store_done_handshake();
-            wait();
-        }
+        //     this->compute_store_ready_handshake();
+        //     wait();
+        //     this->compute_store_done_handshake();
+        //     wait();
+        // }
 
         // End operation
         {
             HLS_PROTO("end-acc");
 
-            if (last_task == 1)
-            {
+            // if (last_task == 1)
+            // {
                 store_state_req = ACC_DONE;
 
                 compute_state_req_dbg.write(11);
@@ -591,7 +591,7 @@ void fir::compute_kernel()
                 this->compute_store_done_handshake();
                 wait();
                 this->process_done();
-            }
+            // }
         }
-    } // while (true)
+    // } // while (true)
 } // Function : compute_kernel
