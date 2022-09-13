@@ -222,6 +222,8 @@ int main(int argc, char * argv[])
 		///////////////////////////////////////////////////////////////
 		start_counter();
 
+		probe_acc();
+
 		start_fft(fft_dev, 0);
 		terminate_fft(fft_dev);
 
