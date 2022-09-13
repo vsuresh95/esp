@@ -217,13 +217,19 @@ int main(int argc, char * argv[])
 		init_buf(mem, gold, (mem + 5 * acc_offset) /* in_filter */, (int64_t*) fxp_filters /* gold_filter */);
 		t_cpu_write += end_counter();
 
-		start_counter();
-
 		///////////////////////////////////////////////////////////////
 		// Invoke all accelerators
 		///////////////////////////////////////////////////////////////
-		start_acc();
-		terminate_acc();
+		start_counter();
+
+		start_fft(fft_dev, 0);
+		terminate_fft(fft_dev);
+
+		start_fir();
+		terminate_fir();
+
+		start_fft(ifft_dev, 1);
+		terminate_fft(ifft_dev);
 
 		t_acc += end_counter();
 
