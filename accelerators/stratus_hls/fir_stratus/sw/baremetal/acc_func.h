@@ -26,14 +26,6 @@ int probe_acc()
 
 	fft_dev = &espdevs[0];
 	ifft_dev = &espdevs[1];
-
-	ndev = probe(&espdevs, VENDOR_SLD, SLD_FIR, FIR_DEV_NAME);
-	if (ndev == 0) {
-		printf("%s not found\n", FIR_DEV_NAME);
-		return 0;
-	}
-
-	fir_dev = &espdevs[0];
 }
 
 int start_fft(struct esp_device *dev, int inverse)

@@ -25,6 +25,7 @@ static uint64_t t_end = 0;
 
 uint64_t t_cpu_write;
 uint64_t t_acc;
+uint64_t t_fir;
 uint64_t t_cpu_read;
 
 static inline void start_counter() {
@@ -106,7 +107,7 @@ static void validate_buf(token_t *out, float *gold)
 	}
 }
 
-static void init_buf(token_t *in, float *gold, token_t *in_filter, int64_t *gold_filter)
+static void init_buf(token_t *in, float *gold)
 {
 	int j;
 	int local_len = len;
@@ -125,42 +126,39 @@ static void init_buf(token_t *in, float *gold, token_t *in_filter, int64_t *gold
 		write_mem(dst, in_data.value_64);
 		// printf("IN %u %llx\n", j, (in_data.value_64));
 	}
-
-	dst = (void*)(in_filter);
-
-	// convert filter to fixed point
-	for (j = 0; j < (local_len+1); j++, dst+=8)
-	{
-		value_64 = gold_filter[j];
-
-		write_mem(dst, value_64);
-		// printf("FLT %u %llx\n", j, value_64);
-	}
 }
 
-static void flt_twd_fxp_conv(token_t *gold_filter_fxp, float *gold_filter, token_t *in_twiddle, float *gold_twiddle)
+static void fir_input_conv(token_t *in, float *out)
 {
 	int j;
 	int local_len = len;
 	spandex_token_t in_data;
 	void* dst;
 
-	// convert filter to fixed point
-	for (j = 0; j < 2 * (local_len+1); j++)
-	{
-		gold_filter_fxp[j] = float2fx((native_t) gold_filter[j], FX_IL);
+	dst = (void*)(in+SYNC_VAR_SIZE);
+
+	for (j = 0; j < 2 * local_len; j+=2, dst+=8) {
+		in_data.value_64 = read_mem(dst);
+
+		out[j] = (float) fx2float(in_data.value_32_1, FX_IL);
+		out[j+1] = (float) fx2float(in_data.value_32_2, FX_IL);
 	}
+}
 
-	dst = (void*)(in_twiddle);
+static void fir_output_conv(float *in, token_t *out)
+{
+	int j;
+	int local_len = len;
+	spandex_token_t in_data;
+	void* dst;
 
-	// convert twiddle to fixed point
-	for (j = 0; j < local_len; j+=2, dst+=8)
-	{
-		in_data.value_32_1 = float2fx((native_t) gold_twiddle[j], FX_IL);
-		in_data.value_32_2 = float2fx((native_t) gold_twiddle[j+1], FX_IL);
+	dst = (void*)(out+SYNC_VAR_SIZE);
+
+	for (j = 0; j < 2 * local_len; j+=2, dst+=8) {
+		in_data.value_32_1 = float2fx((native_t) in[j], FX_IL);
+		in_data.value_32_2 = float2fx((native_t) in[j+1], FX_IL);
 
 		write_mem(dst, in_data.value_64);
-		// printf("TWD %u %llx\n", j, in_data.value_64);
 	}
 }
 
@@ -169,6 +167,7 @@ int main(int argc, char * argv[])
 	int i;
 	t_cpu_write = 0;
 	t_acc = 0;
+	t_fir = 0;
 	t_cpu_read = 0;
 
 	///////////////////////////////////////////////////////////////
@@ -204,27 +203,47 @@ int main(int argc, char * argv[])
 	printf("  Mode: %s\n", print_coh);
 
 	///////////////////////////////////////////////////////////////
-	// Do repetitive things initially
-	///////////////////////////////////////////////////////////////
-	flt_twd_fxp_conv(fxp_filters /* gold_filter_fxp */, (gold + 2 * out_len) /* gold_filter */, (mem + 7 * acc_offset) /* in_twiddle */, (gold + 4 * out_len) /* gold_twiddle */);
-
-	///////////////////////////////////////////////////////////////
 	// Transfer to accelerator memory
 	///////////////////////////////////////////////////////////////
 	for (i = 0; i < ITERATIONS; i++)
 	{
 		start_counter();
-		init_buf(mem, gold, (mem + 5 * acc_offset) /* in_filter */, (int64_t*) fxp_filters /* gold_filter */);
+		init_buf(mem, gold);
 		t_cpu_write += end_counter();
 
 		start_counter();
 
-		///////////////////////////////////////////////////////////////
-		// Invoke all accelerators
-		///////////////////////////////////////////////////////////////
-		start_acc();
-		terminate_acc();
+		probe_acc();
 
+		///////////////////////////////////////////////////////////////
+		// HW FFT
+		///////////////////////////////////////////////////////////////
+		start_fft(fft_dev, 0);
+		terminate_fft(fft_dev);
+
+		t_acc += end_counter();
+
+		///////////////////////////////////////////////////////////////
+		// SW FIR
+		///////////////////////////////////////////////////////////////
+		start_counter();
+
+		// Convert FFT output to floating point
+		fir_input_conv((mem + acc_offset) /* in */, (gold + out_len) /* out */);
+
+    	fir_sw_impl((gold + out_len) /* gold_ref*/, (gold + 2 * out_len) /* gold_filter */, (gold + 4 * out_len) /* gold_twiddle */, (gold + 6 * out_len) /* gold_freqdata */);
+			
+		// Convert FIR output to fixed point
+		fir_output_conv((gold + out_len) /* out */, (mem + 2 * acc_offset) /* in */);
+
+		t_fir += end_counter();
+
+		///////////////////////////////////////////////////////////////
+		// HW IFFT
+		///////////////////////////////////////////////////////////////
+		start_counter();
+		start_fft(ifft_dev, 1);
+		terminate_fft(ifft_dev);
 		t_acc += end_counter();
 
 		///////////////////////////////////////////////////////////////
@@ -241,6 +260,7 @@ int main(int argc, char * argv[])
 
 	printf("  CPU write = %lu\n", t_cpu_write/ITERATIONS);
 	printf("  ACC = %lu\n", t_acc/ITERATIONS);
+	printf("  FIR = %lu\n", t_fir/ITERATIONS);
 	printf("  CPU read = %lu\n", t_cpu_read/ITERATIONS);
 	printf("\n");
 

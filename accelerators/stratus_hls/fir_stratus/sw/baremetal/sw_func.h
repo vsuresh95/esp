@@ -30,12 +30,14 @@ void golden_data_init(float *gold, float *gold_ref, float *gold_filter, float *g
 	} 
 }
 
-void chain_sw_impl(float *gold, float *gold_filter, float *gold_twiddle, float *gold_freqdata)
+void fft_sw_impl(float *gold)
+{
+	fft2_comp(gold, num_ffts, num_samples, logn_samples, 0 /* do_inverse */, do_shift);
+}
+
+void fir_sw_impl(float *gold, float *gold_filter, float *gold_twiddle, float *gold_freqdata)
 {
 	int j;
-
-	// Compute golden output
-	fft2_comp(gold, num_ffts, num_samples, logn_samples, 0 /* do_inverse */, do_shift);
 
     cpx_num fpnk, fpk, f1k, f2k, tw, tdc;
     cpx_num fk, fnkc, fek, fok, tmp;
@@ -114,6 +116,16 @@ void chain_sw_impl(float *gold, float *gold_filter, float *gold_twiddle, float *
 	// for (j = 0; j < 2 * len; j++) {
 	// 	printf("  4 GOLD[%u] = 0x%08x\n", j, ((uint32_t*)gold)[j]);
     // }
+}
 
+void ifft_sw_impl(float *gold)
+{
 	fft2_comp(gold, num_ffts, num_samples, logn_samples, 1 /* do_inverse */, do_shift);
+}
+
+void chain_sw_impl(float *gold, float *gold_filter, float *gold_twiddle, float *gold_freqdata)
+{
+    fft_sw_impl(gold);
+    fir_sw_impl(gold, gold_filter, gold_twiddle, gold_freqdata);
+    ifft_sw_impl(gold);
 }
