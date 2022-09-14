@@ -52,7 +52,7 @@ void sensor_dma::load_input()
         uint32_t length = round_up(rd_size, DMA_WORD_PER_BEAT);
 
         // Configure DMA transaction
-        dma_info_t dma_info(src_offset / DMA_WORD_PER_BEAT, length / DMA_WORD_PER_BEAT, DMA_SIZE);
+        dma_info_t dma_info(src_offset / DMA_WORD_PER_BEAT, length / DMA_WORD_PER_BEAT, DMA_SIZE, spandex_read_opts);
 
         this->dma_read_ctrl.put(dma_info);
 
@@ -123,7 +123,7 @@ void sensor_dma::store_output()
         uint32_t length = round_up(wr_size, DMA_WORD_PER_BEAT);
 
         // Configure DMA transaction
-        dma_info_t dma_info(dst_offset / DMA_WORD_PER_BEAT, length / DMA_WORD_PER_BEAT, DMA_SIZE);
+        dma_info_t dma_info(dst_offset / DMA_WORD_PER_BEAT, length / DMA_WORD_PER_BEAT, DMA_SIZE, spandex_write_opts);
 
         this->dma_write_ctrl.put(dma_info);
 

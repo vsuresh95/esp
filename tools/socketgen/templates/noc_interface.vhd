@@ -329,6 +329,7 @@ begin
         acc_fence_ready            => acc_fence_ready,
         acc_fence_data             => acc_fence_data ,
         acc_fence_valid            => acc_fence_valid,
+        spandex_conf(31 downto 16) => (others => '0'),
         spandex_conf(15 downto 12) => dma_write_ctrl_data_opts_pred_cid,
         spandex_conf(11 downto 10) => dma_write_ctrl_data_opts_dcs,
         spandex_conf(9)            => dma_write_ctrl_data_opts_use_owner_pred,

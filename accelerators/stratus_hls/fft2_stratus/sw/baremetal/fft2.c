@@ -36,7 +36,7 @@ static unsigned DMA_WORD_PER_BEAT(unsigned _st)
 #define DEV_NAME "sld,fft2_stratus"
 
 /* <<--params-->> */
-const int32_t logn_samples = 3;
+const int32_t logn_samples = 6;
 const int32_t num_samples = (1 << logn_samples);
 const int32_t num_ffts = 1;
 const int32_t do_inverse = 0;
@@ -188,7 +188,7 @@ int main(int argc, char * argv[])
 #else
 		{
 			/* TODO: Restore full test once ESP caches are integrated */
-			coherence = ACC_COH_NONE;
+			coherence = ACC_COH_FULL;
 #endif
 			printf("  --------------------\n");
 			printf("  Generate input...\n");

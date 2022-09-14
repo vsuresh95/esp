@@ -18,6 +18,8 @@
 #define DMA_SIZE SIZE_DWORD
 #define PLM_IN_WORD 12 * 1024
 
+#define COH_MODE 3
+
 class sensor_dma : public esp_accelerator_3P<DMA_WIDTH>
 {
 public:
@@ -33,6 +35,49 @@ public:
         // Map arrays to memories
         /* <<--plm-bind-->> */
         HLS_MAP_plm(plm, PLM_OUT_NAME);
+
+        // Initialize the coherence structures
+        #if (COH_MODE == 3) // Owner prediction
+            spandex_read_opts.dcs_en = true;
+            spandex_read_opts.use_owner_pred = false;
+            spandex_read_opts.dcs = 2;
+            spandex_read_opts.pred_cid = 0;
+
+            spandex_write_opts.dcs_en = true;
+            spandex_write_opts.use_owner_pred = true;
+            spandex_write_opts.dcs = 1;
+            spandex_write_opts.pred_cid = 0;
+        #elif (COH_MODE == 2) // Write-through fowarding
+            spandex_read_opts.dcs_en = true;
+            spandex_read_opts.use_owner_pred = false;
+            spandex_read_opts.dcs = 2;
+            spandex_read_opts.pred_cid = 0;
+
+            spandex_write_opts.dcs_en = true;
+            spandex_write_opts.use_owner_pred = false;
+            spandex_write_opts.dcs = 1;
+            spandex_write_opts.pred_cid = 0;
+        #elif (COH_MODE == 1) // Baseline spandex (ReqV)
+            spandex_read_opts.dcs_en = true;
+            spandex_read_opts.use_owner_pred = false;
+            spandex_read_opts.dcs = 1;
+            spandex_read_opts.pred_cid = 0;
+
+            spandex_write_opts.dcs_en = false;
+            spandex_write_opts.use_owner_pred = false;
+            spandex_write_opts.dcs = 0;
+            spandex_write_opts.pred_cid = 0;
+        #else   // Baseline spandex (MESI)
+            spandex_read_opts.dcs_en = false;
+            spandex_read_opts.use_owner_pred = false;
+            spandex_read_opts.dcs = 0;
+            spandex_read_opts.pred_cid = 0;
+
+            spandex_write_opts.dcs_en = false;
+            spandex_write_opts.use_owner_pred = false;
+            spandex_write_opts.dcs = 0;
+            spandex_write_opts.pred_cid = 0;
+        #endif
     }
 
     // Processes
@@ -53,6 +98,10 @@ public:
 
     // Private local memories
     sc_dt::sc_int<DATA_WIDTH> plm[PLM_IN_WORD];
+
+private:
+    dma_spandex_options spandex_read_opts;
+    dma_spandex_options spandex_write_opts;
 
 };
 
