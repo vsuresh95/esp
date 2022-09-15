@@ -99,7 +99,7 @@ uint64_t intvl_network_llc[3];
 
 #define ITERATIONS 1000
 // #define ESP
-#define COH_MODE 0
+#define COH_MODE 3
 /* 3 - Owner Prediction, 2 - Write-through forwarding, 1 - Baseline Spandex (ReqV), 0 - Baseline Spandex (MESI) */
 /* 3 - Non-Coherent DMA, 2 - LLC Coherent DMA, 1 - Coherent DMA, 0 - Fully Coherent MESI */
 
@@ -185,14 +185,6 @@ int main(int argc, char * argv[])
 	/* ********************************************************** */
 	printf("Owner Prediction\n");
 
-	spandex_config.spandex_reg = 0;
-	spandex_config.r_en = 1;
-	spandex_config.r_type = 2;
-	spandex_config.w_en = 1;
-	spandex_config.w_op = 1;
-	spandex_config.w_type = 1;
-	iowrite32(dev, SPANDEX_REG, spandex_config.spandex_reg);
-
 	intvl_write = 0;
 	intvl_acc_write = 0;
 	intvl_read = 0;
@@ -231,12 +223,6 @@ int main(int argc, char * argv[])
   		void* dst = (void*)(mem);
 		int64_t value_64 = 123;
 
-		// for (j = 0; j < 3; j++) {
-		// 	start_network_cpu[j] = get_network_counter(1,1,j);
-		// 	start_network_acc[j] = get_network_counter(1,0,j);
-		// 	start_network_llc[j] = get_network_counter(0,0,j);
-		// }
-
       	start_write = get_counter();
 
     	for (j = 0; j < mem_words; j+=2)
@@ -256,17 +242,6 @@ int main(int argc, char * argv[])
       	stop_write = get_counter();
 		intvl_write += stop_write - start_write;
 
-		// for (j = 0; j < 3; j++) {
-		// 	stop_network_cpu[j] = get_network_counter(1,1,j);
-		// 	stop_network_llc[j] = get_network_counter(0,0,j);
-		// 	stop_network_acc[j] = get_network_counter(1,0,j);
-		// 	intvl_network_cpu[j] += stop_network_cpu[j] - start_network_cpu[j];
-		// 	intvl_network_llc[j] += stop_network_llc[j] - start_network_llc[j];
-		// 	intvl_network_acc[j] += stop_network_acc[j] - start_network_acc[j];
-		// }
-
-		// if(i == 2) printf("CPU write %d = %lu\n", i, stop_write - start_write);
-
 		// Start accelerators
 		iowrite32(dev, CMD_REG, CMD_MASK_START);
 
@@ -281,8 +256,6 @@ int main(int argc, char * argv[])
 
       	stop_acc_read = get_counter();
 		intvl_acc_read += stop_acc_read - start_acc_read;
-
-		// if(i == 2) printf("ACC read %d = %lu\n", i, stop_acc_read - start_acc_read);
 
 		iowrite32(dev, CMD_REG, 0x0);
 
@@ -306,8 +279,6 @@ int main(int argc, char * argv[])
       	stop_acc_write = get_counter();
 		intvl_acc_write += stop_acc_write - start_acc_write;
 
-		// if(i == 2) printf("ACC write %d = %lu\n", i, stop_acc_write - start_acc_write);
-
 		iowrite32(dev, CMD_REG, 0x0);
 
   		dst = (void*)(gold);
@@ -330,8 +301,6 @@ int main(int argc, char * argv[])
 
       	stop_read = get_counter();
 		intvl_read += stop_read - start_read;
-
-		// if(i == 2) printf("CPU read %d = %lu\n", i, stop_read - start_read);
 	}
 
 	printf("CPU write = %lu\n", intvl_write/ITERATIONS);
@@ -340,31 +309,11 @@ int main(int argc, char * argv[])
 	printf("CPU read = %lu\n", intvl_read/ITERATIONS);
 	printf("Total time = %lu\n", (intvl_write + intvl_acc_read + intvl_acc_write + intvl_read)/ITERATIONS);
 
-	// printf("REQ Plane:\n");
-	// printf("CPU = %lu\n", intvl_network_cpu[0]);
-	// printf("LLC = %lu\n", intvl_network_llc[0]);
-	// printf("ACC = %lu\n", intvl_network_acc[0]);
-	// printf("FWD Plane:\n");
-	// printf("CPU = %lu\n", intvl_network_cpu[1]);
-	// printf("LLC = %lu\n", intvl_network_llc[1]);
-	// printf("ACC = %lu\n", intvl_network_acc[1]);
-	// printf("RSP Plane:\n");
-	// printf("CPU = %lu\n", intvl_network_cpu[2]);
-	// printf("LLC = %lu\n", intvl_network_llc[2]);
-	// printf("ACC = %lu\n", intvl_network_acc[2]);
-
 #elif (COH_MODE == 2)
 	/* ********************************************************** */
 	/* Write-through forwarding */
 	/* ********************************************************** */
 	printf("Write-through forwarding\n");
-
-	spandex_config.spandex_reg = 0;
-	spandex_config.r_en = 1;
-	spandex_config.r_type = 2;
-	spandex_config.w_en = 1;
-	spandex_config.w_type = 1;
-	iowrite32(dev, SPANDEX_REG, spandex_config.spandex_reg);
 
 	intvl_write = 0;
 	intvl_acc_write = 0;
@@ -417,8 +366,6 @@ int main(int argc, char * argv[])
       	stop_write = get_counter();
 		intvl_write += stop_write - start_write;
 
-		// if(i == 2) printf("CPU write %d = %lu\n", i, stop_write - start_write);
-
 		// Start accelerators
 		iowrite32(dev, CMD_REG, CMD_MASK_START);
 
@@ -433,8 +380,6 @@ int main(int argc, char * argv[])
 
       	stop_acc_read = get_counter();
 		intvl_acc_read += stop_acc_read - start_acc_read;
-
-		// if(i == 2) printf("ACC read %d = %lu\n", i, stop_acc_read - start_acc_read);
 
 		iowrite32(dev, CMD_REG, 0x0);
 
@@ -458,8 +403,6 @@ int main(int argc, char * argv[])
       	stop_acc_write = get_counter();
 		intvl_acc_write += stop_acc_write - start_acc_write;
 
-		// if(i == 2) printf("ACC write %d = %lu\n", i, stop_acc_write - start_acc_write);
-
 		iowrite32(dev, CMD_REG, 0x0);
 
   		dst = (void*)(gold);
@@ -482,8 +425,6 @@ int main(int argc, char * argv[])
 
       	stop_read = get_counter();
 		intvl_read += stop_read - start_read;
-
-		// if(i == 2) printf("CPU read %d = %lu\n", i, stop_read - start_read);
 	}
 
 	printf("CPU write = %lu\n", intvl_write/ITERATIONS);
@@ -497,11 +438,6 @@ int main(int argc, char * argv[])
 	/* Baseline Spandex (ReqV) */
 	/* ********************************************************** */
 	printf("Baseline Spandex (ReqV)\n");
-
-	spandex_config.spandex_reg = 0;
-	spandex_config.r_en = 1;
-	spandex_config.r_type = 1;
-	iowrite32(dev, SPANDEX_REG, spandex_config.spandex_reg);
 
 	intvl_write = 0;
 	intvl_acc_write = 0;
@@ -554,8 +490,6 @@ int main(int argc, char * argv[])
       	stop_write = get_counter();
 		intvl_write += stop_write - start_write;
 
-		// if(i == 2) printf("CPU write %d = %lu\n", i, stop_write - start_write);
-
 		// Start accelerators
 		iowrite32(dev, CMD_REG, CMD_MASK_START);
 
@@ -570,8 +504,6 @@ int main(int argc, char * argv[])
 
       	stop_acc_read = get_counter();
 		intvl_acc_read += stop_acc_read - start_acc_read;
-
-		// if(i == 2) printf("ACC read %d = %lu\n", i, stop_acc_read - start_acc_read);
 
 		iowrite32(dev, CMD_REG, 0x0);
 
@@ -597,8 +529,6 @@ int main(int argc, char * argv[])
       	stop_acc_write = get_counter();
 		intvl_acc_write += stop_acc_write - start_acc_write;
 
-		// if(i == 2) printf("ACC write %d = %lu\n", i, stop_acc_write - start_acc_write);
-
 		iowrite32(dev, CMD_REG, 0x0);
 
   		dst = (void*)(gold);
@@ -621,8 +551,6 @@ int main(int argc, char * argv[])
 
       	stop_read = get_counter();
 		intvl_read += stop_read - start_read;
-
-		// if(i == 2) printf("CPU read %d = %lu\n", i, stop_read - start_read);
 	}
 
 	printf("CPU write = %lu\n", intvl_write/ITERATIONS);
@@ -636,9 +564,6 @@ int main(int argc, char * argv[])
 	/* Baseline Spandex (MESI) */
 	/* ********************************************************** */
 	printf("Baseline Spandex (MESI)\n");
-
-	spandex_config.spandex_reg = 0;
-	iowrite32(dev, SPANDEX_REG, spandex_config.spandex_reg);
 
 	intvl_write = 0;
 	intvl_acc_write = 0;
@@ -691,8 +616,6 @@ int main(int argc, char * argv[])
       	stop_write = get_counter();
 		intvl_write += stop_write - start_write;
 
-		// if(i == 2) printf("CPU write %d = %lu\n", i, stop_write - start_write);
-
 		// Start accelerators
 		iowrite32(dev, CMD_REG, CMD_MASK_START);
 
@@ -707,8 +630,6 @@ int main(int argc, char * argv[])
 
       	stop_acc_read = get_counter();
 		intvl_acc_read += stop_acc_read - start_acc_read;
-
-		// if(i == 2) printf("ACC read %d = %lu\n", i, stop_acc_read - start_acc_read);
 
 		iowrite32(dev, CMD_REG, 0x0);
 
@@ -732,8 +653,6 @@ int main(int argc, char * argv[])
       	stop_acc_write = get_counter();
 		intvl_acc_write += stop_acc_write - start_acc_write;
 
-		// if(i == 2) printf("ACC write %d = %lu\n", i, stop_acc_write - start_acc_write);
-
 		iowrite32(dev, CMD_REG, 0x0);
 
   		dst = (void*)(gold);
@@ -746,6 +665,7 @@ int main(int argc, char * argv[])
 				"mv t0, %1;"
 				".word 0x0002B30B;"
 				"mv %0, t1"
+		// if(i == 2) printf("CPU read %d = %lu\n", i, stop_read - start_read);
 				: "=r" (value_64)
 				: "r" (dst)
 				: "t0", "t1", "memory"
@@ -756,8 +676,6 @@ int main(int argc, char * argv[])
 
       	stop_read = get_counter();
 		intvl_read += stop_read - start_read;
-
-		// if(i == 2) printf("CPU read %d = %lu\n", i, stop_read - start_read);
 	}
 
 	printf("CPU write = %lu\n", intvl_write/ITERATIONS);
@@ -826,8 +744,6 @@ int main(int argc, char * argv[])
       	stop_write = get_counter();
 		intvl_write += stop_write - start_write;
 
-		// if(i == 2) printf("CPU write %d = %lu\n", i, stop_write - start_write);
-
 		// Start accelerators
 		iowrite32(dev, CMD_REG, CMD_MASK_START);
 
@@ -842,8 +758,6 @@ int main(int argc, char * argv[])
 
       	stop_acc_read = get_counter();
 		intvl_acc_read += stop_acc_read - start_acc_read;
-
-		// if(i == 2) printf("ACC read %d = %lu\n", i, stop_acc_read - start_acc_read);
 
 		iowrite32(dev, CMD_REG, 0x0);
 
@@ -867,8 +781,6 @@ int main(int argc, char * argv[])
       	stop_acc_write = get_counter();
 		intvl_acc_write += stop_acc_write - start_acc_write;
 
-		// if(i == 2) printf("ACC write %d = %lu\n", i, stop_acc_write - start_acc_write);
-
 		iowrite32(dev, CMD_REG, 0x0);
 
   		dst = (void*)(gold);
@@ -891,8 +803,6 @@ int main(int argc, char * argv[])
 
       	stop_read = get_counter();
 		intvl_read += stop_read - start_read;
-
-		// if(i == 2) printf("CPU read %d = %lu\n", i, stop_read - start_read);
 	}
 
 	printf("CPU write = %lu\n", intvl_write/ITERATIONS);
@@ -959,8 +869,6 @@ int main(int argc, char * argv[])
       	stop_write = get_counter();
 		intvl_write += stop_write - start_write;
 
-		// if(i == 2) printf("CPU write %d = %lu\n", i, stop_write - start_write);
-
 		// Start accelerators
 		iowrite32(dev, CMD_REG, CMD_MASK_START);
 
@@ -975,8 +883,6 @@ int main(int argc, char * argv[])
 
       	stop_acc_read = get_counter();
 		intvl_acc_read += stop_acc_read - start_acc_read;
-
-		// if(i == 2) printf("ACC read %d = %lu\n", i, stop_acc_read - start_acc_read);
 
 		iowrite32(dev, CMD_REG, 0x0);
 
@@ -1000,8 +906,6 @@ int main(int argc, char * argv[])
       	stop_acc_write = get_counter();
 		intvl_acc_write += stop_acc_write - start_acc_write;
 
-		// if(i == 2) printf("ACC write %d = %lu\n", i, stop_acc_write - start_acc_write);
-
 		iowrite32(dev, CMD_REG, 0x0);
 
   		dst = (void*)(gold);
@@ -1024,8 +928,6 @@ int main(int argc, char * argv[])
 
       	stop_read = get_counter();
 		intvl_read += stop_read - start_read;
-
-		// if(i == 2) printf("CPU read %d = %lu\n", i, stop_read - start_read);
 	}
 
 	printf("CPU write = %lu\n", intvl_write/ITERATIONS);
@@ -1090,8 +992,6 @@ int main(int argc, char * argv[])
       	stop_write = get_counter();
 		intvl_write += stop_write - start_write;
 
-		// if(i == 2) printf("CPU write %d = %lu\n", i, stop_write - start_write);
-
 		// Start accelerators
 		iowrite32(dev, CMD_REG, CMD_MASK_START);
 
@@ -1106,8 +1006,6 @@ int main(int argc, char * argv[])
 
       	stop_acc_read = get_counter();
 		intvl_acc_read += stop_acc_read - start_acc_read;
-
-		// if(i == 2) printf("ACC read %d = %lu\n", i, stop_acc_read - start_acc_read);
 
 		iowrite32(dev, CMD_REG, 0x0);
 
@@ -1131,8 +1029,6 @@ int main(int argc, char * argv[])
       	stop_acc_write = get_counter();
 		intvl_acc_write += stop_acc_write - start_acc_write;
 
-		// if(i == 2) printf("ACC write %d = %lu\n", i, stop_acc_write - start_acc_write);
-
 		iowrite32(dev, CMD_REG, 0x0);
 
   		dst = (void*)(gold);
@@ -1155,8 +1051,6 @@ int main(int argc, char * argv[])
 
       	stop_read = get_counter();
 		intvl_read += stop_read - start_read;
-
-		// if(i == 2) printf("CPU read %d = %lu\n", i, stop_read - start_read);
 	}
 
 	printf("CPU write = %lu\n", intvl_write/ITERATIONS);
@@ -1221,8 +1115,6 @@ int main(int argc, char * argv[])
       	stop_write = get_counter();
 		intvl_write += stop_write - start_write;
 
-		// if(i == 2) printf("CPU write %d = %lu\n", i, stop_write - start_write);
-
 		// Start accelerators
 		iowrite32(dev, CMD_REG, CMD_MASK_START);
 
@@ -1237,8 +1129,6 @@ int main(int argc, char * argv[])
 
       	stop_acc_read = get_counter();
 		intvl_acc_read += stop_acc_read - start_acc_read;
-
-		// if(i == 2) printf("ACC read %d = %lu\n", i, stop_acc_read - start_acc_read);
 
 		iowrite32(dev, CMD_REG, 0x0);
 
@@ -1262,8 +1152,6 @@ int main(int argc, char * argv[])
       	stop_acc_write = get_counter();
 		intvl_acc_write += stop_acc_write - start_acc_write;
 
-		// if(i == 2) printf("ACC write %d = %lu\n", i, stop_acc_write - start_acc_write);
-
 		iowrite32(dev, CMD_REG, 0x0);
 
   		dst = (void*)(gold);
@@ -1286,8 +1174,6 @@ int main(int argc, char * argv[])
 
       	stop_read = get_counter();
 		intvl_read += stop_read - start_read;
-
-		// if(i == 2) printf("CPU read %d = %lu\n", i, stop_read - start_read);
 	}
 
 	printf("CPU write = %lu\n", intvl_write/ITERATIONS);

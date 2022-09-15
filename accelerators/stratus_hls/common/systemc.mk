@@ -20,6 +20,8 @@ INCDIR += -I../tb
 INCDIR += -I$(SYSTEMC)/include
 INCDIR += -I$(STRATUS_PATH)/share/stratus/include
 INCDIR += -I$(ESP_ROOT)/accelerators/stratus_hls/common/inc
+INCDIR += -I$(ESP_ROOT)/rtl/caches/spandex-caches/utils
+INCDIR += -I$(ESP_ROOT)/rtl/caches/spandex-caches/common/caches
 
 CXXFLAGS ?=
 CXXFLAGS += -O3
