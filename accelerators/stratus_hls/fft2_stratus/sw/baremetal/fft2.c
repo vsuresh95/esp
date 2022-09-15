@@ -23,8 +23,9 @@
 static uint64_t t_start = 0;
 static uint64_t t_end = 0;
 
+uint64_t t_wait_cons;
 uint64_t t_cpu_write;
-uint64_t t_acc;
+uint64_t t_wait_prod;
 uint64_t t_cpu_read;
 
 static inline void start_counter() {
@@ -167,8 +168,9 @@ static void flt_twd_fxp_conv(token_t *gold_filter_fxp, float *gold_filter, token
 int main(int argc, char * argv[])
 {
 	int i;
+	t_wait_cons = 0;
 	t_cpu_write = 0;
-	t_acc = 0;
+	t_wait_prod = 0;
 	t_cpu_read = 0;
 
 	///////////////////////////////////////////////////////////////
@@ -204,16 +206,21 @@ int main(int argc, char * argv[])
 	///////////////////////////////////////////////////////////////
 	// Start all accelerators
 	///////////////////////////////////////////////////////////////
-	sm_sync[0] = 0;
-	sm_sync[acc_offset] = 0;
-	sm_sync[2*acc_offset] = 0;
-	sm_sync[3*acc_offset] = 0;
+	sm_sync[0*acc_offset + VALID_FLAG_OFFSET] = 0;
+	sm_sync[1*acc_offset + VALID_FLAG_OFFSET] = 0;
+	sm_sync[2*acc_offset + VALID_FLAG_OFFSET] = 0;
+	sm_sync[3*acc_offset + VALID_FLAG_OFFSET] = 0;
+
+	sm_sync[0*acc_offset + READY_FLAG_OFFSET] = 1;
+	sm_sync[1*acc_offset + READY_FLAG_OFFSET] = 1;
+	sm_sync[2*acc_offset + READY_FLAG_OFFSET] = 1;
+	sm_sync[3*acc_offset + READY_FLAG_OFFSET] = 1;
 
 	printf("  Mode: %s\n", print_coh);
 
-	sm_sync[2] = 0;
-	sm_sync[acc_offset+2] = 0;
-	sm_sync[2*acc_offset+2] = 0;
+	sm_sync[0*acc_offset + END_FLAG_OFFSET] = 0;
+	sm_sync[1*acc_offset + END_FLAG_OFFSET] = 0;
+	sm_sync[2*acc_offset + END_FLAG_OFFSET] = 0;
 
 	start_acc();
 
@@ -223,31 +230,80 @@ int main(int argc, char * argv[])
 	flt_twd_fxp_conv(fxp_filters /* gold_filter_fxp */, (gold + 2 * out_len) /* gold_filter */, (mem + 7 * acc_offset) /* in_twiddle */, (gold + 4 * out_len) /* gold_twiddle */);
 
 	///////////////////////////////////////////////////////////////
-	// Transfer to accelerator memory
+	// Write first N_DEVICES inputs
 	///////////////////////////////////////////////////////////////
-	for (i = 0; i < ITERATIONS; i++)
+	for (i = 0; i < NUM_DEVICES; i++)
 	{
+		start_counter();
+		// Wait for accelerator 1 (consumer) to be ready
+		while(sm_sync[READY_FLAG_OFFSET] != 1);
+		// Reset the same flag (consumer)
+		sm_sync[READY_FLAG_OFFSET] = 0;
+		t_wait_cons += end_counter();
+
+		// Write input data for accelerator 1 (and filters - TODO: move this separate for pipelining)
 		start_counter();
 		init_buf(mem, gold, (mem + 5 * acc_offset) /* in_filter */, (int64_t*) fxp_filters /* gold_filter */);
 		t_cpu_write += end_counter();
 
-		start_counter();
+		// Start accelerator 1 (consumer)
+		sm_sync[VALID_FLAG_OFFSET] = 1;
+	}
 
+	///////////////////////////////////////////////////////////////
+	// Start the loop
+	///////////////////////////////////////////////////////////////
+	for (i = NUM_DEVICES; i < ITERATIONS; i++)
+	{
+		start_counter();
+		// Wait for last accelerator (producer) to send output
+		while(sm_sync[NUM_DEVICES*acc_offset + VALID_FLAG_OFFSET] != 1);
+		// Reset the same flag (producer)
+		sm_sync[NUM_DEVICES*acc_offset + VALID_FLAG_OFFSET] = 0;
+		t_wait_prod += end_counter();
+
+		start_counter();
+		// Read back output
+		validate_buf(&mem[NUM_DEVICES*acc_offset], (gold + out_len));
+		t_cpu_read += end_counter();
+
+		start_counter();
+		// Wait for accelerator 1 (consumer) to be ready
+		while(sm_sync[READY_FLAG_OFFSET] != 1);
+		// Reset the same flag (consumer)
+		sm_sync[READY_FLAG_OFFSET] = 0;
+		t_wait_cons += end_counter();
+
+		start_counter();
+		// Write input data for accelerator 1 (and filters - TODO: move this separate for pipelining)
+		init_buf(mem, gold, (mem + 5 * acc_offset) /* in_filter */, (int64_t*) fxp_filters /* gold_filter */);
+		t_cpu_write += end_counter();
+
+		// Write end-of-accelerator only in the last iteration
 		if (i == ITERATIONS - 1) {
-			sm_sync[2] = 1;
-			sm_sync[acc_offset+2] = 1;
-			sm_sync[2*acc_offset+2] = 1;
+			sm_sync[0*acc_offset + END_FLAG_OFFSET] = 1;
+			sm_sync[1*acc_offset + END_FLAG_OFFSET] = 1;
+			sm_sync[2*acc_offset + END_FLAG_OFFSET] = 1;
 		}
 
-		sm_sync[0] = 1;
-		while(sm_sync[NUM_DEVICES*acc_offset] != 1);
-		sm_sync[NUM_DEVICES*acc_offset] = 0;
-		t_acc += end_counter();
+		// Start accelerator 1 (consumer)
+		sm_sync[VALID_FLAG_OFFSET] = 1;
+	}
 
-		///////////////////////////////////////////////////////////////
-		// Read back output
-		///////////////////////////////////////////////////////////////
+	///////////////////////////////////////////////////////////////
+	// Read last N_DEVICES outputs
+	///////////////////////////////////////////////////////////////
+	for (i = 0; i < NUM_DEVICES; i++)
+	{
 		start_counter();
+		// Wait for last accelerator (producer) to send output
+		while(sm_sync[NUM_DEVICES*acc_offset + VALID_FLAG_OFFSET] != 1);
+		// Reset the same flag (producer)
+		sm_sync[NUM_DEVICES*acc_offset + VALID_FLAG_OFFSET] = 0;
+		t_wait_prod += end_counter();
+
+		start_counter();
+		// Read back output
 		validate_buf(&mem[NUM_DEVICES*acc_offset], (gold + out_len));
 		t_cpu_read += end_counter();
 	}
@@ -261,8 +317,9 @@ int main(int argc, char * argv[])
 	aligned_free(mem);
 	aligned_free(gold);
 
+	printf("  Wait CONS = %lu\n", t_wait_cons/ITERATIONS);
 	printf("  CPU write = %lu\n", t_cpu_write/ITERATIONS);
-	printf("  ACC = %lu\n", t_acc/ITERATIONS);
+	printf("  Wait PROD = %lu\n", t_wait_prod/ITERATIONS);
 	printf("  CPU read = %lu\n", t_cpu_read/ITERATIONS);
 	printf("\n");
 
