@@ -56,45 +56,45 @@ void fft2::load_input()
 
         switch (load_state_req)
         {
-            case POLL_PREV_REQ:
+            case POLL_PROD_VALID_REQ:
             {
-                dma_info_t dma_info(0, SYNC_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                dma_info_t dma_info(VALID_FLAG_OFFSET, READY_FLAG_OFFSET / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
-                int32_t new_task = 0;
+                int32_t valid_task = 0;
 
                 wait();
 
                 // Wait for producer to send new data
-                while (new_task != 1)
+                while (valid_task != 1)
                 {
                     HLS_UNROLL_LOOP(OFF);
                     this->dma_read_ctrl.put(dma_info);
                     dataBv = this->dma_read_chnl.get();
                     wait();
-                    new_task = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
+                    valid_task = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
                     dataBv = this->dma_read_chnl.get();
                     wait();
                     last_task = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
                 }
             }
             break;
-            case POLL_NEXT_REQ:
+            case POLL_CONS_READY_REQ:
             {
-                int32_t end_sync_offset = SYNC_VAR_SIZE + 2 * num_samples;
-                dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, 1, DMA_SIZE);
+                int32_t end_sync_offset = SYNC_VAR_SIZE + 2 * num_samples + READY_FLAG_OFFSET;
+                dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
-                int32_t new_task = 1;
+                int32_t ready_for_task = 0;
 
                 wait();
 
                 // Wait for consumer to accept new data
-                while (new_task == 1)
+                while (ready_for_task != 1)
                 {
                     HLS_UNROLL_LOOP(OFF);
                     this->dma_read_ctrl.put(dma_info);
                     dataBv = this->dma_read_chnl.get();
                     wait();
-                    new_task = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
+                    ready_for_task = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
                 }
             }
             break;
@@ -178,9 +178,25 @@ void fft2::store_output()
 
         switch (store_state_req)
         {
-            case UPDATE_PREV_REQ:
+            case UPDATE_PROD_READY_REQ:
             {
-                dma_info_t dma_info(0, 1, DMA_SIZE);
+                dma_info_t dma_info(READY_FLAG_OFFSET, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                sc_dt::sc_bv<DMA_WIDTH> dataBv;
+                dataBv.range(DMA_WIDTH - 1, 0) = 1;
+
+                this->dma_write_ctrl.put(dma_info);
+                wait();
+                this->dma_write_chnl.put(dataBv);
+                wait();
+
+                // Wait till the write is accepted at the cache (and previous fences)
+                while (!(this->dma_write_chnl.ready)) wait();
+                wait();
+            }
+            break;
+            case UPDATE_PROD_VALID_REQ:
+            {
+                dma_info_t dma_info(VALID_FLAG_OFFSET, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 dataBv.range(DMA_WIDTH - 1, 0) = 0;
 
@@ -194,12 +210,29 @@ void fft2::store_output()
                 wait();
             }
             break;
-            case UPDATE_NEXT_REQ:
+            case UPDATE_CONS_VALID_REQ:
             {
-                int32_t end_sync_offset = SYNC_VAR_SIZE + 2 * num_samples;
-                dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, 1, DMA_SIZE);
+                int32_t end_sync_offset = SYNC_VAR_SIZE + 2 * num_samples + VALID_FLAG_OFFSET;
+                dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 dataBv.range(DMA_WIDTH - 1, 0) = 1;
+
+                this->dma_write_ctrl.put(dma_info);
+                wait();
+                this->dma_write_chnl.put(dataBv);
+                wait();
+
+                // Wait till the write is accepted at the cache (and previous fences)
+                while (!(this->dma_write_chnl.ready)) wait();
+                wait();
+            }
+            break;
+            case UPDATE_CONS_READY_REQ:
+            {
+                int32_t end_sync_offset = SYNC_VAR_SIZE + 2 * num_samples + READY_FLAG_OFFSET;
+                dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                sc_dt::sc_bv<DMA_WIDTH> dataBv;
+                dataBv.range(DMA_WIDTH - 1, 0) = 0;
 
                 this->dma_write_ctrl.put(dma_info);
                 wait();
@@ -310,11 +343,11 @@ void fft2::compute_kernel()
 
     while(true)
     {
-        // Poll lock for new task
+        // Poll producer's valid for new task
         {
-            HLS_PROTO("poll-for-new-task");
+            HLS_PROTO("poll-for-prod-valid");
 
-            load_state_req = POLL_PREV_REQ;
+            load_state_req = POLL_PROD_VALID_REQ;
 
             compute_state_req_dbg.write(1);
 
@@ -324,13 +357,37 @@ void fft2::compute_kernel()
             wait();
         }
 
+        // Reset producer's valid
+        {
+            HLS_PROTO("update-prod-valid");
+
+            store_state_req = UPDATE_PROD_VALID_REQ;
+
+            compute_state_req_dbg.write(2);
+
+            this->compute_store_ready_handshake();
+            wait();
+            this->compute_store_done_handshake();
+            wait();
+
+            // Wait for all writes to be done and then issue fence
+            store_state_req = STORE_FENCE;
+
+            compute_state_req_dbg.write(3);
+
+            this->compute_store_ready_handshake();
+            wait();
+            this->compute_store_done_handshake();
+            wait();
+        }
+
         // Load input data
         {
             HLS_PROTO("load-input-data");
 
             load_state_req = LOAD_DATA_REQ;
 
-            compute_state_req_dbg.write(2);
+            compute_state_req_dbg.write(4);
 
             this->compute_load_ready_handshake();
             wait();
@@ -338,10 +395,34 @@ void fft2::compute_kernel()
             wait();
         }
 
+        // update producer's ready to accept new data
+        {
+            HLS_PROTO("update-prod-ready");
+
+            store_state_req = UPDATE_PROD_READY_REQ;
+
+            compute_state_req_dbg.write(5);
+
+            this->compute_store_ready_handshake();
+            wait();
+            this->compute_store_done_handshake();
+            wait();
+
+            // Wait for all writes to be done and then issue fence
+            store_state_req = STORE_FENCE;
+
+            compute_state_req_dbg.write(6);
+
+            this->compute_store_ready_handshake();
+            wait();
+            this->compute_store_done_handshake();
+            wait();
+
+            compute_state_req_dbg.write(7);
+        }
+
         // Compute FFT
         {
-            compute_state_req_dbg.write(3);
-
             unsigned offset = 0;  // Offset into Mem for start of this FFT
             int sin_sign = (do_inverse) ? -1 : 1; // This modifes the mySin
                                                   // values used below
@@ -408,74 +489,25 @@ void fft2::compute_kernel()
             }
         } // Compute
 
-        // // Poll lock for consumer's ready
-        // {
-        //     HLS_PROTO("poll-for-cons-ready");
-
-        //     load_state_req = POLL_NEXT_REQ;
-
-        //     compute_state_req_dbg.write(4);
-
-        //     this->compute_load_ready_handshake();
-        //     wait();
-        //     this->compute_load_done_handshake();
-        //     wait();
-        // }
-
-        // Store output data
+        // Poll consumer's ready to know if we can send new data
         {
-            HLS_PROTO("store-output-data");
+            HLS_PROTO("poll-for-cons-ready");
 
-            store_state_req = STORE_DATA_REQ;
-
-            this->compute_store_ready_handshake();
-
-            compute_state_req_dbg.write(5);
-
-            wait();
-            this->compute_store_done_handshake();
-            wait();
-
-            // Wait for all writes to be done and then issue fence
-            store_state_req = STORE_FENCE;
-
-            compute_state_req_dbg.write(6);
-
-            this->compute_store_ready_handshake();
-            wait();
-            this->compute_store_done_handshake();
-            wait();
-        }
-
-        // update consumer for data ready
-        {
-            HLS_PROTO("update-next-lock");
-
-            store_state_req = UPDATE_NEXT_REQ;
-
-            compute_state_req_dbg.write(7);
-
-            this->compute_store_ready_handshake();
-            wait();
-            this->compute_store_done_handshake();
-            wait();
-
-            // Wait for all writes to be done and then issue fence
-            store_state_req = STORE_FENCE;
+            load_state_req = POLL_CONS_READY_REQ;
 
             compute_state_req_dbg.write(8);
 
-            this->compute_store_ready_handshake();
+            this->compute_load_ready_handshake();
             wait();
-            this->compute_store_done_handshake();
+            this->compute_load_done_handshake();
             wait();
         }
 
-        // update producer for ready to accept
+        // Reset consumer's ready
         {
-            HLS_PROTO("update-prev-lock");
+            HLS_PROTO("update-cons-ready");
 
-            store_state_req = UPDATE_PREV_REQ;
+            store_state_req = UPDATE_CONS_READY_REQ;
 
             compute_state_req_dbg.write(9);
 
@@ -495,6 +527,55 @@ void fft2::compute_kernel()
             wait();
         }
 
+        // Store output data
+        {
+            HLS_PROTO("store-output-data");
+
+            store_state_req = STORE_DATA_REQ;
+
+            this->compute_store_ready_handshake();
+
+            compute_state_req_dbg.write(11);
+
+            wait();
+            this->compute_store_done_handshake();
+            wait();
+
+            // Wait for all writes to be done and then issue fence
+            store_state_req = STORE_FENCE;
+
+            compute_state_req_dbg.write(12);
+
+            this->compute_store_ready_handshake();
+            wait();
+            this->compute_store_done_handshake();
+            wait();
+        }
+
+        // update consumer's ready for new data available
+        {
+            HLS_PROTO("update-cons-valid");
+
+            store_state_req = UPDATE_CONS_VALID_REQ;
+
+            compute_state_req_dbg.write(13);
+
+            this->compute_store_ready_handshake();
+            wait();
+            this->compute_store_done_handshake();
+            wait();
+
+            // Wait for all writes to be done and then issue fence
+            store_state_req = STORE_FENCE;
+
+            compute_state_req_dbg.write(14);
+
+            this->compute_store_ready_handshake();
+            wait();
+            this->compute_store_done_handshake();
+            wait();
+        }
+
         // End operation
         {
             HLS_PROTO("end-acc");
@@ -503,7 +584,7 @@ void fft2::compute_kernel()
             {
                 store_state_req = ACC_DONE;
 
-                compute_state_req_dbg.write(11);
+                compute_state_req_dbg.write(15);
 
                 this->compute_store_ready_handshake();
                 wait();

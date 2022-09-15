@@ -28,16 +28,21 @@
 #define PLM_IN_WORD  (MAX_NUM_SAMPLES << 1)
 #define PLM_OUT_WORD (MAX_NUM_SAMPLES << 1)
 
-#define SYNC_VAR_SIZE 4
+#define SYNC_VAR_SIZE 6
+#define UPDATE_VAR_SIZE 2
+#define VALID_FLAG_OFFSET 0
+#define READY_FLAG_OFFSET 4
 
-#define POLL_PREV_REQ 0
-#define POLL_NEXT_REQ 1
+#define POLL_PROD_VALID_REQ 0
+#define POLL_CONS_READY_REQ 1
 #define LOAD_DATA_REQ 2
-#define UPDATE_PREV_REQ 0
-#define UPDATE_NEXT_REQ 1
-#define STORE_DATA_REQ 2
-#define STORE_FENCE 3
-#define ACC_DONE 4
+#define UPDATE_PROD_VALID_REQ 0
+#define UPDATE_PROD_READY_REQ 1
+#define UPDATE_CONS_VALID_REQ 2
+#define UPDATE_CONS_READY_REQ 3
+#define STORE_DATA_REQ 4
+#define STORE_FENCE 5
+#define ACC_DONE 6
 
 class fft2 : public esp_accelerator_3P<DMA_WIDTH>
 {
