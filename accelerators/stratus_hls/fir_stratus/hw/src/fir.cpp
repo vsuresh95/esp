@@ -58,7 +58,7 @@ void fir::load_input()
         {
             case POLL_PROD_VALID_REQ:
             {
-                dma_info_t dma_info(VALID_FLAG_OFFSET, READY_FLAG_OFFSET / DMA_WORD_PER_BEAT, DMA_SIZE);
+                dma_info_t dma_info(VALID_FLAG_OFFSET / DMA_WORD_PER_BEAT, READY_FLAG_OFFSET / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 int32_t valid_task = 0;
 
@@ -225,7 +225,7 @@ void fir::store_output()
         {
             case UPDATE_PROD_READY_REQ:
             {
-                dma_info_t dma_info(READY_FLAG_OFFSET, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                dma_info_t dma_info(READY_FLAG_OFFSET / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 dataBv.range(DMA_WIDTH - 1, 0) = 1;
 
@@ -241,7 +241,7 @@ void fir::store_output()
             break;
             case UPDATE_PROD_VALID_REQ:
             {
-                dma_info_t dma_info(VALID_FLAG_OFFSET, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                dma_info_t dma_info(VALID_FLAG_OFFSET / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 dataBv.range(DMA_WIDTH - 1, 0) = 0;
 

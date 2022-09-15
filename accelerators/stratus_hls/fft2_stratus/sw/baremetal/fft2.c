@@ -265,6 +265,7 @@ int main(int argc, char * argv[])
 		start_counter();
 		// Read back output
 		validate_buf(&mem[NUM_DEVICES*acc_offset], (gold + out_len));
+		sm_sync[NUM_DEVICES*acc_offset + READY_FLAG_OFFSET] = 1;
 		t_cpu_read += end_counter();
 
 		start_counter();
@@ -305,6 +306,7 @@ int main(int argc, char * argv[])
 		start_counter();
 		// Read back output
 		validate_buf(&mem[NUM_DEVICES*acc_offset], (gold + out_len));
+		sm_sync[NUM_DEVICES*acc_offset + READY_FLAG_OFFSET] = 1;
 		t_cpu_read += end_counter();
 	}
 
