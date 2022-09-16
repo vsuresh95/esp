@@ -107,7 +107,7 @@ static void validate_buf(token_t *out, float *gold)
 	}
 }
 
-static void init_buf(token_t *in, float *gold, token_t *in_filter, int64_t *gold_filter)
+static void init_buf_data(token_t *in, float *gold)
 {
 	int j;
 	int local_len = len;
@@ -126,6 +126,15 @@ static void init_buf(token_t *in, float *gold, token_t *in_filter, int64_t *gold
 		write_mem(dst, in_data.value_64);
 		// printf("IN %u %llx\n", j, (in_data.value_64));
 	}
+}
+
+static void init_buf_filters(token_t *in_filter, int64_t *gold_filter)
+{
+	int j;
+	int local_len = len;
+	spandex_token_t in_data;
+	int64_t value_64;
+	void* dst;
 
 	dst = (void*)(in_filter);
 
@@ -216,6 +225,9 @@ int main(int argc, char * argv[])
 	sm_sync[2*acc_offset + READY_FLAG_OFFSET] = 1;
 	sm_sync[3*acc_offset + READY_FLAG_OFFSET] = 1;
 
+	sm_sync[1*acc_offset + FLT_VALID_FLAG_OFFSET] = 0;
+	sm_sync[1*acc_offset + FLT_READY_FLAG_OFFSET] = 1;
+
 	printf("  Mode: %s\n", print_coh);
 
 	sm_sync[0*acc_offset + END_FLAG_OFFSET] = 0;
@@ -223,6 +235,13 @@ int main(int argc, char * argv[])
 	sm_sync[2*acc_offset + END_FLAG_OFFSET] = 0;
 
 	start_acc();
+
+	unsigned local_cons_rdy_flag_offset = 0*acc_offset + READY_FLAG_OFFSET;
+	unsigned local_cons_vld_flag_offset = 0*acc_offset + VALID_FLAG_OFFSET;
+	unsigned local_flt_rdy_flag_offset = 1*acc_offset + FLT_READY_FLAG_OFFSET;
+	unsigned local_flt_vld_flag_offset = 1*acc_offset + FLT_VALID_FLAG_OFFSET;
+	unsigned local_prod_rdy_flag_offset = 3*acc_offset + READY_FLAG_OFFSET;
+	unsigned local_prod_vld_flag_offset = 3*acc_offset + VALID_FLAG_OFFSET;
 
 	///////////////////////////////////////////////////////////////
 	// Do repetitive things initially
@@ -236,18 +255,31 @@ int main(int argc, char * argv[])
 	{
 		start_counter();
 		// Wait for accelerator 1 (consumer) to be ready
-		while(sm_sync[READY_FLAG_OFFSET] != 1);
+		while(sm_sync[local_cons_rdy_flag_offset] != 1);
 		// Reset the same flag (consumer)
-		sm_sync[READY_FLAG_OFFSET] = 0;
+		sm_sync[local_cons_rdy_flag_offset] = 0;
 		t_wait_cons += end_counter();
 
-		// Write input data for accelerator 1 (and filters - TODO: move this separate for pipelining)
 		start_counter();
-		init_buf(mem, gold, (mem + 5 * acc_offset) /* in_filter */, (int64_t*) fxp_filters /* gold_filter */);
+		// Write input data for accelerator 1 (and filters - TODO: move this separate for pipelining)
+		init_buf_data(mem, gold);
+		// Start accelerator 1 (consumer)
+		sm_sync[local_cons_vld_flag_offset] = 1;
 		t_cpu_write += end_counter();
 
-		// Start accelerator 1 (consumer)
-		sm_sync[VALID_FLAG_OFFSET] = 1;
+		start_counter();
+		// Wait for accelerator 2 (consumer) to be ready
+		while(sm_sync[local_flt_rdy_flag_offset] != 1);
+		// Reset the same flag (consumer)
+		sm_sync[local_flt_rdy_flag_offset] = 0;
+		t_wait_cons += end_counter();
+
+		start_counter();
+		// Write input filters for accelerator 2
+		init_buf_filters((mem + 5 * acc_offset) /* in_filter */, (int64_t*) fxp_filters /* gold_filter */);
+		// Update accelerator 2 (consumer)
+		sm_sync[local_flt_vld_flag_offset] = 1;
+		t_cpu_write += end_counter();
 	}
 
 	///////////////////////////////////////////////////////////////
@@ -257,38 +289,43 @@ int main(int argc, char * argv[])
 	{
 		start_counter();
 		// Wait for last accelerator (producer) to send output
-		while(sm_sync[NUM_DEVICES*acc_offset + VALID_FLAG_OFFSET] != 1);
+		while(sm_sync[local_prod_vld_flag_offset] != 1);
 		// Reset the same flag (producer)
-		sm_sync[NUM_DEVICES*acc_offset + VALID_FLAG_OFFSET] = 0;
+		sm_sync[local_prod_vld_flag_offset] = 0;
 		t_wait_prod += end_counter();
 
 		start_counter();
 		// Read back output
 		validate_buf(&mem[NUM_DEVICES*acc_offset], (gold + out_len));
-		sm_sync[NUM_DEVICES*acc_offset + READY_FLAG_OFFSET] = 1;
+		sm_sync[local_prod_rdy_flag_offset] = 1;
 		t_cpu_read += end_counter();
 
 		start_counter();
 		// Wait for accelerator 1 (consumer) to be ready
-		while(sm_sync[READY_FLAG_OFFSET] != 1);
+		while(sm_sync[local_cons_rdy_flag_offset] != 1);
 		// Reset the same flag (consumer)
-		sm_sync[READY_FLAG_OFFSET] = 0;
+		sm_sync[local_cons_rdy_flag_offset] = 0;
 		t_wait_cons += end_counter();
 
-		start_counter();
 		// Write input data for accelerator 1 (and filters - TODO: move this separate for pipelining)
-		init_buf(mem, gold, (mem + 5 * acc_offset) /* in_filter */, (int64_t*) fxp_filters /* gold_filter */);
+		start_counter();
+		init_buf_data(mem, gold);
+		// Start accelerator 1 (consumer)
+		sm_sync[local_cons_vld_flag_offset] = 1;
 		t_cpu_write += end_counter();
 
-		// Write end-of-accelerator only in the last iteration
-		if (i == ITERATIONS - 1) {
-			sm_sync[0*acc_offset + END_FLAG_OFFSET] = 1;
-			sm_sync[1*acc_offset + END_FLAG_OFFSET] = 1;
-			sm_sync[2*acc_offset + END_FLAG_OFFSET] = 1;
-		}
+		start_counter();
+		// Wait for accelerator 1 (consumer) to be ready
+		while(sm_sync[local_flt_rdy_flag_offset] != 1);
+		// Reset the same flag (consumer)
+		sm_sync[local_flt_rdy_flag_offset] = 0;
+		t_wait_cons += end_counter();
 
-		// Start accelerator 1 (consumer)
-		sm_sync[VALID_FLAG_OFFSET] = 1;
+		// Write input filters for accelerator 2
+		init_buf_filters((mem + 5 * acc_offset) /* in_filter */, (int64_t*) fxp_filters /* gold_filter */);
+		// Update accelerator 2 (consumer)
+		sm_sync[local_flt_vld_flag_offset] = 1;
+		t_cpu_write += end_counter();
 	}
 
 	///////////////////////////////////////////////////////////////
@@ -298,17 +335,26 @@ int main(int argc, char * argv[])
 	{
 		start_counter();
 		// Wait for last accelerator (producer) to send output
-		while(sm_sync[NUM_DEVICES*acc_offset + VALID_FLAG_OFFSET] != 1);
+		while(sm_sync[local_prod_vld_flag_offset] != 1);
 		// Reset the same flag (producer)
-		sm_sync[NUM_DEVICES*acc_offset + VALID_FLAG_OFFSET] = 0;
+		sm_sync[local_prod_vld_flag_offset] = 0;
 		t_wait_prod += end_counter();
 
 		start_counter();
 		// Read back output
 		validate_buf(&mem[NUM_DEVICES*acc_offset], (gold + out_len));
-		sm_sync[NUM_DEVICES*acc_offset + READY_FLAG_OFFSET] = 1;
+		sm_sync[local_prod_rdy_flag_offset] = 1;
 		t_cpu_read += end_counter();
 	}
+
+	// Write end-of-accelerator only in the last iteration
+	sm_sync[0*acc_offset + END_FLAG_OFFSET] = 1;
+	sm_sync[1*acc_offset + END_FLAG_OFFSET] = 1;
+	sm_sync[2*acc_offset + END_FLAG_OFFSET] = 1;
+
+	sm_sync[local_cons_vld_flag_offset] = 1;
+	sm_sync[local_flt_vld_flag_offset] = 1;
+	while(sm_sync[local_prod_vld_flag_offset] != 1);
 
 	///////////////////////////////////////////////////////////////
 	// Terminate all accelerators

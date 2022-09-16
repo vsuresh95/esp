@@ -78,6 +78,25 @@ void fir::load_input()
                 }
             }
             break;
+            case POLL_FLT_PROD_VALID_REQ:
+            {
+                dma_info_t dma_info(FLT_VALID_FLAG_OFFSET / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                sc_dt::sc_bv<DMA_WIDTH> dataBv;
+                int32_t valid_task = 0;
+
+                wait();
+
+                // Wait for producer to send new data
+                while (valid_task != 1)
+                {
+                    HLS_UNROLL_LOOP(OFF);
+                    this->dma_read_ctrl.put(dma_info);
+                    dataBv = this->dma_read_chnl.get();
+                    wait();
+                    valid_task = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
+                }
+            }
+            break;
             case POLL_CONS_READY_REQ:
             {
                 int32_t end_sync_offset = SYNC_VAR_SIZE + 2 * num_samples + READY_FLAG_OFFSET;
@@ -239,9 +258,41 @@ void fir::store_output()
                 wait();
             }
             break;
+            case UPDATE_FLT_PROD_READY_REQ:
+            {
+                dma_info_t dma_info(FLT_READY_FLAG_OFFSET / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                sc_dt::sc_bv<DMA_WIDTH> dataBv;
+                dataBv.range(DMA_WIDTH - 1, 0) = 1;
+
+                this->dma_write_ctrl.put(dma_info);
+                wait();
+                this->dma_write_chnl.put(dataBv);
+                wait();
+
+                // Wait till the write is accepted at the cache (and previous fences)
+                while (!(this->dma_write_chnl.ready)) wait();
+                wait();
+            }
+            break;
             case UPDATE_PROD_VALID_REQ:
             {
                 dma_info_t dma_info(VALID_FLAG_OFFSET / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                sc_dt::sc_bv<DMA_WIDTH> dataBv;
+                dataBv.range(DMA_WIDTH - 1, 0) = 0;
+
+                this->dma_write_ctrl.put(dma_info);
+                wait();
+                this->dma_write_chnl.put(dataBv);
+                wait();
+
+                // Wait till the write is accepted at the cache (and previous fences)
+                while (!(this->dma_write_chnl.ready)) wait();
+                wait();
+            }
+            break;
+            case UPDATE_FLT_PROD_VALID_REQ:
+            {
+                dma_info_t dma_info(FLT_VALID_FLAG_OFFSET / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 dataBv.range(DMA_WIDTH - 1, 0) = 0;
 
@@ -422,11 +473,11 @@ void fir::compute_kernel()
             wait();
         }
 
-        // Load input data
+        // Poll filter producer's valid for new filters
         {
-            HLS_PROTO("load-input-data");
+            HLS_PROTO("poll-flt-prod-valid");
 
-            load_state_req = LOAD_DATA_REQ;
+            load_state_req = POLL_FLT_PROD_VALID_REQ;
 
             compute_state_req_dbg.write(4);
 
@@ -436,11 +487,11 @@ void fir::compute_kernel()
             wait();
         }
 
-        // update producer's ready to accept new data
+        // Reset filter producer's valid
         {
-            HLS_PROTO("update-prod-ready");
+            HLS_PROTO("update-flt-prod-valid");
 
-            store_state_req = UPDATE_PROD_READY_REQ;
+            store_state_req = UPDATE_FLT_PROD_VALID_REQ;
 
             compute_state_req_dbg.write(5);
 
@@ -458,8 +509,70 @@ void fir::compute_kernel()
             wait();
             this->compute_store_done_handshake();
             wait();
+        }
+
+        // Load input data
+        {
+            HLS_PROTO("load-input-data");
+
+            load_state_req = LOAD_DATA_REQ;
 
             compute_state_req_dbg.write(7);
+
+            this->compute_load_ready_handshake();
+            wait();
+            this->compute_load_done_handshake();
+            wait();
+        }
+
+        // update producer's ready to accept new data
+        {
+            HLS_PROTO("update-prod-ready");
+
+            store_state_req = UPDATE_PROD_READY_REQ;
+
+            compute_state_req_dbg.write(8);
+
+            this->compute_store_ready_handshake();
+            wait();
+            this->compute_store_done_handshake();
+            wait();
+
+            // Wait for all writes to be done and then issue fence
+            store_state_req = STORE_FENCE;
+
+            compute_state_req_dbg.write(9);
+
+            this->compute_store_ready_handshake();
+            wait();
+            this->compute_store_done_handshake();
+            wait();
+        }
+
+        // update filter producer's ready to accept new filters
+        {
+            HLS_PROTO("update-flt-prod-ready");
+
+            store_state_req = UPDATE_FLT_PROD_READY_REQ;
+
+            compute_state_req_dbg.write(10);
+
+            this->compute_store_ready_handshake();
+            wait();
+            this->compute_store_done_handshake();
+            wait();
+
+            // Wait for all writes to be done and then issue fence
+            store_state_req = STORE_FENCE;
+
+            compute_state_req_dbg.write(11);
+
+            this->compute_store_ready_handshake();
+            wait();
+            this->compute_store_done_handshake();
+            wait();
+
+            compute_state_req_dbg.write(12);
         }
 
         // Compute
@@ -576,7 +689,7 @@ void fir::compute_kernel()
 
             load_state_req = POLL_CONS_READY_REQ;
 
-            compute_state_req_dbg.write(8);
+            compute_state_req_dbg.write(13);
 
             this->compute_load_ready_handshake();
             wait();
@@ -590,7 +703,7 @@ void fir::compute_kernel()
 
             store_state_req = UPDATE_CONS_READY_REQ;
 
-            compute_state_req_dbg.write(9);
+            compute_state_req_dbg.write(14);
 
             this->compute_store_ready_handshake();
             wait();
@@ -600,7 +713,7 @@ void fir::compute_kernel()
             // Wait for all writes to be done and then issue fence
             store_state_req = STORE_FENCE;
 
-            compute_state_req_dbg.write(10);
+            compute_state_req_dbg.write(15);
 
             this->compute_store_ready_handshake();
             wait();
@@ -616,7 +729,7 @@ void fir::compute_kernel()
 
             this->compute_store_ready_handshake();
 
-            compute_state_req_dbg.write(11);
+            compute_state_req_dbg.write(16);
 
             wait();
             this->compute_store_done_handshake();
@@ -625,7 +738,7 @@ void fir::compute_kernel()
             // Wait for all writes to be done and then issue fence
             store_state_req = STORE_FENCE;
 
-            compute_state_req_dbg.write(12);
+            compute_state_req_dbg.write(17);
 
             this->compute_store_ready_handshake();
             wait();
@@ -639,7 +752,7 @@ void fir::compute_kernel()
 
             store_state_req = UPDATE_CONS_VALID_REQ;
 
-            compute_state_req_dbg.write(13);
+            compute_state_req_dbg.write(18);
 
             this->compute_store_ready_handshake();
             wait();
@@ -649,7 +762,7 @@ void fir::compute_kernel()
             // Wait for all writes to be done and then issue fence
             store_state_req = STORE_FENCE;
 
-            compute_state_req_dbg.write(14);
+            compute_state_req_dbg.write(19);
 
             this->compute_store_ready_handshake();
             wait();
@@ -665,7 +778,7 @@ void fir::compute_kernel()
             {
                 store_state_req = ACC_DONE;
 
-                compute_state_req_dbg.write(15);
+                compute_state_req_dbg.write(20);
 
                 this->compute_store_ready_handshake();
                 wait();

@@ -114,11 +114,13 @@ typedef struct {
 #  define HALF_OF(x) ((x)*.5)
 
 // Size and parameter defines
-#define SYNC_VAR_SIZE 6
+#define SYNC_VAR_SIZE 10
 #define UPDATE_VAR_SIZE 2
 #define VALID_FLAG_OFFSET 0
 #define END_FLAG_OFFSET 2
 #define READY_FLAG_OFFSET 4
+#define FLT_VALID_FLAG_OFFSET 6
+#define FLT_READY_FLAG_OFFSET 8
 #define NUM_DEVICES 3
 
 /* <<--params-->> */
