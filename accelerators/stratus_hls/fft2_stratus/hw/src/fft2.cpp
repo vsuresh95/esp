@@ -58,7 +58,7 @@ void fft2::load_input()
         {
             case POLL_PREV_REQ:
             {
-                dma_info_t dma_info(0, SYNC_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                dma_info_t dma_info(0, SYNC_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE, spandex_rd_opts);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 int32_t new_task = 0;
 
@@ -78,10 +78,35 @@ void fft2::load_input()
                 }
             }
             break;
+            case CFG_REQ:
+            {
+                dma_info_t dma_info(SYNC_VAR_SIZE / DMA_WORD_PER_BEAT, 
+                                    SPANDEX_CONFIG_VAR_SIZE / DMA_WORD_PER_BEAT, 
+                                    DMA_SIZE,
+                                    spandex_rd_opts);
+                sc_dt::sc_bv<DMA_WIDTH> dataBv;
+
+                wait();
+
+                this->dma_read_ctrl.put(dma_info);
+
+                dataBv = this->dma_read_chnl.get();
+                wait();
+                int64_t opts = dataBv.range(DMA_WIDTH - 1, 0).to_int64();
+                spandex_rd_opts.dcs_en          = (opts >>  0) & 0x01;
+                spandex_rd_opts.use_owner_pred  = (opts >>  1) & 0x01;
+                spandex_rd_opts.dcs             = (opts >>  2) & 0x03;
+                spandex_rd_opts.pred_cid        = (opts >>  4) & 0x0F;
+                spandex_wr_opts.dcs_en          = (opts >>  8) & 0x01;
+                spandex_wr_opts.use_owner_pred  = (opts >>  9) & 0x01;
+                spandex_wr_opts.dcs             = (opts >> 10) & 0x03;
+                spandex_wr_opts.pred_cid        = (opts >> 12) & 0x0F;
+            }
+            break;
             case POLL_NEXT_REQ:
             {
-                int32_t end_sync_offset = SYNC_VAR_SIZE + 2 * num_samples;
-                dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, 1, DMA_SIZE);
+                int32_t end_sync_offset = SYNC_VAR_SIZE + SPANDEX_CONFIG_VAR_SIZE + 2 * num_samples;
+                dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, 1, DMA_SIZE, spandex_rd_opts);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 int32_t new_task = 1;
 
@@ -100,7 +125,10 @@ void fft2::load_input()
             break;
             case LOAD_DATA_REQ:
             {
-                dma_info_t dma_info(SYNC_VAR_SIZE / DMA_WORD_PER_BEAT, 2 * num_samples / DMA_WORD_PER_BEAT, DMA_SIZE);
+                dma_info_t dma_info((SYNC_VAR_SIZE + SPANDEX_CONFIG_VAR_SIZE) / DMA_WORD_PER_BEAT, 
+                                    2 * num_samples / DMA_WORD_PER_BEAT, 
+                                    DMA_SIZE,
+                                    spandex_rd_opts);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
 
                 wait();
@@ -180,7 +208,7 @@ void fft2::store_output()
         {
             case UPDATE_PREV_REQ:
             {
-                dma_info_t dma_info(0, 1, DMA_SIZE);
+                dma_info_t dma_info(0, 1, DMA_SIZE, spandex_wr_opts);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 dataBv.range(DMA_WIDTH - 1, 0) = 0;
 
@@ -196,8 +224,8 @@ void fft2::store_output()
             break;
             case UPDATE_NEXT_REQ:
             {
-                int32_t end_sync_offset = SYNC_VAR_SIZE + 2 * num_samples;
-                dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, 1, DMA_SIZE);
+                int32_t end_sync_offset = SYNC_VAR_SIZE + SPANDEX_CONFIG_VAR_SIZE + 2 * num_samples;
+                dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, 1, DMA_SIZE, spandex_wr_opts);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 dataBv.range(DMA_WIDTH - 1, 0) = 1;
 
@@ -213,8 +241,11 @@ void fft2::store_output()
             break;
             case STORE_DATA_REQ:
             {
-                int32_t end_sync_offset = (2 * SYNC_VAR_SIZE) + (2 * num_samples);
-                dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, 2 * num_samples / DMA_WORD_PER_BEAT, DMA_SIZE);
+                int32_t end_sync_offset = (2 * (SYNC_VAR_SIZE + SPANDEX_CONFIG_VAR_SIZE)) + (2 * num_samples);
+                dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, 
+                                    2 * num_samples / DMA_WORD_PER_BEAT, 
+                                    DMA_SIZE,
+                                    spandex_wr_opts);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
 
                 wait();

@@ -115,6 +115,7 @@ typedef struct {
 
 // Size and parameter defines
 #define SYNC_VAR_SIZE 4
+#define SPANDEX_CONFIG_VAR_SIZE 4
 #define NUM_DEVICES 3
 
 /* <<--params-->> */
@@ -159,10 +160,10 @@ void init_params()
 	in_size = in_len * sizeof(token_t);
 	out_size = out_len * sizeof(token_t);
 	out_offset  = 0;
-	mem_size = (out_offset * sizeof(token_t)) + out_size + (SYNC_VAR_SIZE * sizeof(token_t));
+	mem_size = (out_offset * sizeof(token_t)) + out_size + ((SYNC_VAR_SIZE + SPANDEX_CONFIG_VAR_SIZE) * sizeof(token_t));
 
     acc_size = mem_size;
-    acc_offset = out_offset + out_len + SYNC_VAR_SIZE;
+    acc_offset = out_offset + out_len + SYNC_VAR_SIZE + SPANDEX_CONFIG_VAR_SIZE;
     mem_size *= NUM_DEVICES+5;
 
     sync_size = SYNC_VAR_SIZE * sizeof(token_t);

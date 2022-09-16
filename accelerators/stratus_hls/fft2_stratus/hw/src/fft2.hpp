@@ -29,6 +29,7 @@
 #define PLM_OUT_WORD (MAX_NUM_SAMPLES << 1)
 
 #define SYNC_VAR_SIZE 4
+#define SPANDEX_CONFIG_VAR_SIZE 4
 
 #define POLL_PREV_REQ 0
 #define POLL_NEXT_REQ 1
@@ -38,6 +39,7 @@
 #define STORE_DATA_REQ 2
 #define STORE_FENCE 3
 #define ACC_DONE 4
+#define CFG_REQ 5
 
 class fft2 : public esp_accelerator_3P<DMA_WIDTH>
 {
@@ -67,6 +69,8 @@ public:
         , store_ready("store_ready")
         , load_done("load_done")
         , store_done("store_done")
+        , spandex_rd_opts()
+        , spandex_wr_opts()
     {
         // Signal binding
         cfg.bind_with(*this);
@@ -149,6 +153,10 @@ public:
     inline void load_compute_done_handshake();
     inline void compute_store_done_handshake();
     inline void store_compute_done_handshake();
+
+    // Spandex coherence information
+    dma_spandex_options spandex_rd_opts;
+    dma_spandex_options spandex_wr_opts; 
 };
 
 

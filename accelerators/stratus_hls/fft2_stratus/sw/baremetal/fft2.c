@@ -12,8 +12,8 @@
 
 #define COH_MODE 0
 #define ESP
-#define ITERATIONS 1000
-#define LOG_LEN 10
+#define ITERATIONS 3
+#define LOG_LEN 3
 
 #include "cfg.h"
 #include "sw_func.h"
@@ -89,7 +89,7 @@ static void validate_buf(token_t *out, float *gold)
 	native_t val;
 	uint32_t ival;
 
-	dst = (void*)(out+SYNC_VAR_SIZE);
+	dst = (void*)(out+SYNC_VAR_SIZE+SPANDEX_CONFIG_VAR_SIZE);
 
 	for (j = 0; j < 2 * local_len; j+=2, dst+=8) {
 		out_data.value_64 = read_mem(dst);
@@ -114,7 +114,7 @@ static void init_buf(token_t *in, float *gold, token_t *in_filter, int64_t *gold
 	int64_t value_64;
 	void* dst;
 
-	dst = (void*)(in+SYNC_VAR_SIZE);
+	dst = (void*)(in+SYNC_VAR_SIZE+SPANDEX_CONFIG_VAR_SIZE);
 
 	// convert input to fixed point -- TODO here all the inputs gold values are refetched
 	for (j = 0; j < 2 * local_len; j+=2, dst+=8)
@@ -199,7 +199,7 @@ int main(int argc, char * argv[])
 	//////////////////////////////////////////////////////
 	golden_data_init(gold, (gold + out_len) /* gold_ref*/, (gold + 2 * out_len) /* gold_filter */, (gold + 4 * out_len) /* gold_twiddle */);
 
-	chain_sw_impl((gold + out_len) /* gold_ref*/, (gold + 2 * out_len) /* gold_filter */, (gold + 4 * out_len) /* gold_twiddle */, (gold + 6 * out_len) /* gold_freqdata */);
+	// chain_sw_impl((gold + out_len) /* gold_ref*/, (gold + 2 * out_len) /* gold_filter */, (gold + 4 * out_len) /* gold_twiddle */, (gold + 6 * out_len) /* gold_freqdata */);
 
 	///////////////////////////////////////////////////////////////
 	// Start all accelerators
