@@ -10,8 +10,8 @@
 #include <esp_probe.h>
 #include "utils/fft2_utils.h"
 
-#define COH_MODE 0
-#define ESP
+#define COH_MODE 3
+// #define ESP
 #define ITERATIONS 3
 #define LOG_LEN 3
 
@@ -214,6 +214,13 @@ int main(int argc, char * argv[])
 	sm_sync[2] = 0;
 	sm_sync[acc_offset+2] = 0;
 	sm_sync[2*acc_offset+2] = 0;
+
+	spandex_config.w_cid = 3;
+	sm_sync[SYNC_VAR_SIZE] = spandex_config.spandex_reg;
+	spandex_config.w_cid = 2;
+	sm_sync[acc_offset+SYNC_VAR_SIZE] = spandex_config.spandex_reg;
+	spandex_config.w_cid = 0;
+	sm_sync[2*acc_offset+SYNC_VAR_SIZE] = spandex_config.spandex_reg;
 
 	start_acc();
 

@@ -58,7 +58,7 @@ void fft2::load_input()
         {
             case POLL_PREV_REQ:
             {
-                dma_info_t dma_info(0, SYNC_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE, spandex_rd_opts);
+                dma_info_t dma_info(0, SYNC_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 int32_t new_task = 0;
 
@@ -82,8 +82,7 @@ void fft2::load_input()
             {
                 dma_info_t dma_info(SYNC_VAR_SIZE / DMA_WORD_PER_BEAT, 
                                     SPANDEX_CONFIG_VAR_SIZE / DMA_WORD_PER_BEAT, 
-                                    DMA_SIZE,
-                                    spandex_rd_opts);
+                                    DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
 
                 wait();
@@ -106,7 +105,7 @@ void fft2::load_input()
             case POLL_NEXT_REQ:
             {
                 int32_t end_sync_offset = SYNC_VAR_SIZE + SPANDEX_CONFIG_VAR_SIZE + 2 * num_samples;
-                dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, 1, DMA_SIZE, spandex_rd_opts);
+                dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, 1, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 int32_t new_task = 1;
 
@@ -208,7 +207,7 @@ void fft2::store_output()
         {
             case UPDATE_PREV_REQ:
             {
-                dma_info_t dma_info(0, 1, DMA_SIZE, spandex_wr_opts);
+                dma_info_t dma_info(0, 1, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 dataBv.range(DMA_WIDTH - 1, 0) = 0;
 
@@ -225,7 +224,7 @@ void fft2::store_output()
             case UPDATE_NEXT_REQ:
             {
                 int32_t end_sync_offset = SYNC_VAR_SIZE + SPANDEX_CONFIG_VAR_SIZE + 2 * num_samples;
-                dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, 1, DMA_SIZE, spandex_wr_opts);
+                dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, 1, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 dataBv.range(DMA_WIDTH - 1, 0) = 1;
 
@@ -355,11 +354,11 @@ void fft2::compute_kernel()
             wait();
         }
 
-        // Load input data
+        // Load config request
         {
-            HLS_PROTO("load-input-data");
+            HLS_PROTO("cfg-req");
 
-            load_state_req = LOAD_DATA_REQ;
+            load_state_req = CFG_REQ;
 
             compute_state_req_dbg.write(2);
 
@@ -369,10 +368,24 @@ void fft2::compute_kernel()
             wait();
         }
 
-        // Compute FFT
+        // Load input data
         {
+            HLS_PROTO("load-input-data");
+
+            load_state_req = LOAD_DATA_REQ;
+
             compute_state_req_dbg.write(3);
 
+            this->compute_load_ready_handshake();
+            wait();
+            this->compute_load_done_handshake();
+            wait();
+
+            compute_state_req_dbg.write(4);
+        }
+
+        // Compute FFT
+        {
             unsigned offset = 0;  // Offset into Mem for start of this FFT
             int sin_sign = (do_inverse) ? -1 : 1; // This modifes the mySin
                                                   // values used below
