@@ -1,18 +1,61 @@
-#include "cfg.h"
+// #include "cfg.h"
+#ifndef __riscv
+#include <stdlib.h>
+#endif
+
+#include <esp_accelerator.h>
+#include <stdint.h>
 #include "utils/fft2_utils.h"
 
-static unsigned in_words_adj;
-static unsigned out_words_adj;
-static unsigned in_len;
-static unsigned out_len;
-static unsigned in_size;
-static unsigned out_size;
-static unsigned out_offset;
-static unsigned size;
-static unsigned acc_offset;
-static unsigned acc_size;
+#define COH_MODE 0
+// #define ESP
+#define ITERATIONS 1000
 
-const float ERR_TH = 0.05;
+#include "coh_func.h"
+#include "sw_func.h"
+
+// static uint64_t t_start = 0;
+// static uint64_t t_end = 0;
+
+uint64_t t_cpu_write;
+uint64_t t_fft;
+uint64_t t_fir;
+uint64_t t_ifft;
+uint64_t t_cpu_read;
+uint64_t t_sw;
+
+//sw counters
+static uint64_t t_fft_sw_start = 0;
+static uint64_t t_ifft_sw_start = 0;
+static uint64_t t_fir_sw_start = 0;
+
+static inline void write_mem (void* dst, int64_t value_64)
+{
+	asm volatile (
+		"mv t0, %0;"
+		"mv t1, %1;"
+		".word " QU(WRITE_CODE)
+		:
+		: "r" (dst), "r" (value_64)
+		: "t0", "t1", "memory"
+	);
+}
+
+static inline int64_t read_mem (void* dst)
+{
+	int64_t value_64;
+
+	asm volatile (
+		"mv t0, %1;"
+		".word " QU(READ_CODE) ";"
+		"mv %0, t1"
+		: "=r" (value_64)
+		: "r" (dst)
+		: "t0", "t1", "memory"
+	);
+
+	return value_64;
+}
 
 /* User-defined code */
 static int validate_buffer(token_t *out, float *gold)
@@ -21,213 +64,212 @@ static int validate_buffer(token_t *out, float *gold)
 	unsigned errors = 0;
 	const unsigned num_samples = 1<<logn_samples;
 
-	for (j = 0; j < 2 * num_ffts * num_samples; j++) {
-		native_t val = fx2float(out[j+SYNC_VAR_SIZE], FX_IL);
+	// for (j = 0; j < 2 * num_ffts * num_samples; j++) {
+	// 	native_t val = fx2float(out[j+SYNC_VAR_SIZE], FX_IL);
 
-		if ((fabs(gold[j] - val) / fabs(gold[j])) > ERR_TH) {
-			printf(" GOLD[%u] = %f vs %f = out[%u]\n", j, gold[j], val, j);
-			errors++;
-		}
+	// 	if ((fabs(gold[j] - val) / fabs(gold[j])) > ERR_TH) {
+	// 		// printf(" GOLD[%u] = %f vs %f = out[%u]\n", j, gold[j], val, j);
+	// 		errors++;
+	// 	}
+	// }
+	// printf("  + Relative error > %.02f for %d values out of %d\n", ERR_TH, errors, 2 * num_ffts * num_samples);
+
+	/* Add the following 3 lines */
+	/* For performance profiling */
+	spandex_token_t out_data;
+	void* dst;
+	native_t val;
+
+	// YJ: comment out the following line
+	dst = (void*)(out+SYNC_VAR_SIZE);
+
+	/* Change the conditions for the for-loop */
+	/* For performance profiling */
+	for (j = 0; j < 2 * num_ffts * num_samples; j += 2, dst += 8) {
+		/* Add the following 5 lines */
+		/* For performance profiling */
+		out_data.value_64 = read_mem(dst);
+		val = fx2float(out_data.value_32_1, FX_IL);
+		// if ((fabs(gold[j] - val) / fabs(gold[j])) > ERR_TH) {
+		// 	// printf(" GOLD[%u] = %f vs %f = out[%u]\n", j, gold[j], val, j);
+		// 	errors++;
+		// }
+		if (val == 12412.12412) j = 0;
+		val = fx2float(out_data.value_32_2, FX_IL);
+		// if ((fabs(gold[j + 1] - val) / fabs(gold[j + 1])) > ERR_TH) {
+		// 	// printf(" GOLD[%u] = %f vs %f = out[%u]\n", j + 1, gold[j + 1], val, j + 1);
+		// 	errors++;
+		// }
+		if (val == 22412.12412) j = 0;
 	}
-	printf("  + Relative error > %.02f for %d values out of %d\n", ERR_TH, errors, 2 * num_ffts * num_samples);
 
 	return errors;
 }
 
 
 /* User-defined code */
-static void init_buffer(token_t *in, float *gold, token_t *in_filter, float *gold_filter, token_t *in_twiddle, float *gold_twiddle, float *gold_freqdata)
+static void init_buffer(token_t *in, float *gold, token_t *in_filter, int64_t *gold_filter)
 {
 	int j;
-	const float LO = -1.0;
-	const float HI = 1.0;
-	const unsigned num_samples = (1 << logn_samples);
-    const unsigned len = num_ffts * num_samples;
 
-	srand((unsigned int) time(NULL));
+	// srand((unsigned int) time(NULL));
 
-	for (j = 0; j < 2 * len; j++) {
-		float scaling_factor = (float) rand () / (float) RAND_MAX;
-		gold[j] = LO + scaling_factor * (HI - LO);
-	}
+	// convert input to fixed point
+	// for (j = 0; j < 2 * len; j++) {
+	// 	in[j+SYNC_VAR_SIZE] = float2fx((native_t) gold[j], FX_IL);
+	// }
 
-	for (j = 0; j < 2 * (len+1); j++) {
-		float scaling_factor = (float) rand () / (float) RAND_MAX;
-		gold_filter[j] = LO + scaling_factor * (HI - LO);
-		printf("  1 gold_filter[%u] = %f\n", j, gold_filter[j]);
-	}
+	// // convert input to fixed point
+	// for (j = 0; j < 2 * (len+1); j++) {
+	// 	in_filter[j] = float2fx((native_t) gold_filter[j], FX_IL);
+	// }
 
-	for (j = 0; j < 2 * len; j+=2) {
-        float phase = -3.14159265358979323846264338327 * ((float) (j+1) / len + .5);
-        gold_twiddle[j] = cos(phase);
-        gold_twiddle[j + 1] = sin(phase);
-		printf("  1 gold_twiddle[%u] = %f\n", j, gold_twiddle[j]);
-		printf("  1 gold_twiddle[%u] = %f\n", j+1, gold_twiddle[j+1]);
+	/* Add the following 3 lines */
+	/* For performance profiling */
+	spandex_token_t in_data;
+	int64_t value_64;
+	void* dst;
+
+	// convert input to fixed point
+	/* Add the following 1 line */
+	/* For performance profiling */
+	// YJ: comment out the following line
+	dst = (void*)(in+SYNC_VAR_SIZE);
+	/* Change the conditions for the for-loop */
+	/* For performance profiling */
+	for (j = 0; j < 2 * len; j += 2, dst += 8) {
+	// for (j = 0; j < 2 * len; j += 2) {
+		// in[j+SYNC_VAR_SIZE] = float2fx((native_t) gold[j], FX_IL);
+
+		/* Add the following 3 lines */
+		/* For performance profiling */
+		in_data.value_32_1 = float2fx((native_t) gold[j], FX_IL);
+		in_data.value_32_2 = float2fx((native_t) gold[j+1], FX_IL);
+		write_mem(dst, in_data.value_64);
 	}
 
 	// convert input to fixed point
-	for (j = 0; j < 2 * len; j++) {
-		in[j+SYNC_VAR_SIZE] = float2fx((native_t) gold[j], FX_IL);
+	/* Add the following 1 line */
+	/* For performance profiling */
+	// YJ: comment out the following line
+	dst = (void*)(in_filter);
+	/* Change the conditions for the for-loop */
+	/* For performance profiling */
+	for (j = 0; j < 2 * (len+1); ++j, dst += 8) {
+	// for (j = 0; j < 2 * (len+1); ++j) {
+		// in_filter[j] = float2fx((native_t) gold_filter[j], FX_IL);
+
+		/* Add the following 2 lines */
+		/* For performance profiling */
+		value_64 = gold_filter[j];
+		write_mem(dst, value_64);
 	}
-
-	// convert input to fixed point
-	for (j = 0; j < 2 * (len+1); j++) {
-		in_filter[j] = float2fx((native_t) gold_filter[j], FX_IL);
-	}
-
-	// convert input to fixed point
-	for (j = 0; j < 2 * len; j++) {
-		in_twiddle[j] = float2fx((native_t) gold_twiddle[j], FX_IL);
-	}
-
-	// Compute golden output
-	fft2_comp(gold, num_ffts, (1<<logn_samples), logn_samples, 0 /* do_inverse */, do_shift);
-
-    cpx_num fpnk, fpk, f1k, f2k, tw, tdc;
-    cpx_num fk, fnkc, fek, fok, tmp;
-    cpx_num cptemp;
-    cpx_num *tmpbuf = (cpx_num *) gold;
-    cpx_num *freqdata = (cpx_num *) gold_freqdata;
-    cpx_num *super_twiddles = (cpx_num *) gold_twiddle;
-    cpx_num *filter = (cpx_num *) gold_filter;
-
-	for (j = 0; j < 2 * len; j++) {
-		printf("  1 GOLD[%u] = %f\n", j, gold[j]);
-    }
-
-    // Post-processing
-    tdc.r = tmpbuf[0].r;
-    tdc.i = tmpbuf[0].i;
-    C_FIXDIV(tdc,2);
-    freqdata[0].r = tdc.r + tdc.i;
-    freqdata[len].r = tdc.r - tdc.i;
-    freqdata[len].i = freqdata[0].i = 0;
-
-    for ( j=1;j <= len/2 ; ++j ) {
-        fpk    = tmpbuf[j];
-        fpnk.r =   tmpbuf[len-j].r;
-        fpnk.i = - tmpbuf[len-j].i;
-        C_FIXDIV(fpk,2);
-        C_FIXDIV(fpnk,2);
-
-        C_ADD( f1k, fpk , fpnk );
-        C_SUB( f2k, fpk , fpnk );
-        C_MUL( tw , f2k , super_twiddles[j-1]);
-
-        freqdata[j].r = HALF_OF(f1k.r + tw.r);
-        freqdata[j].i = HALF_OF(f1k.i + tw.i);
-        freqdata[len-j].r = HALF_OF(f1k.r - tw.r);
-        freqdata[len-j].i = HALF_OF(tw.i - f1k.i);
-    }
-
-	for (j = 0; j < 2 * (len+1); j++) {
-		printf("  2 GOLD[%u] = %f\n", j, gold_freqdata[j]);
-    }
-
-    // FIR
-	for (j = 0; j < len+1; j++) {
-        C_MUL( cptemp, freqdata[j], filter[j]);
-        freqdata[j] = cptemp;
-    }
-
-	for (j = 0; j < 2 * (len+1); j++) {
-		printf("  3 GOLD[%u] = %f\n", j, gold_freqdata[j]);
-    }
-
-    // Pre-processing
-    tmpbuf[0].r = freqdata[0].r + freqdata[len].r;
-    tmpbuf[0].i = freqdata[0].r - freqdata[len].r;
-    C_FIXDIV(tmpbuf[0],2);
-
-    for (j = 1; j <= len/2; ++j) {
-        fk = freqdata[j];
-        fnkc.r = freqdata[len-j].r;
-        fnkc.i = -freqdata[len-j].i;
-        C_FIXDIV( fk , 2 );
-        C_FIXDIV( fnkc , 2 );
-
-        C_ADD (fek, fk, fnkc);
-        C_SUB (tmp, fk, fnkc);
-        C_MUL (fok, tmp, super_twiddles[j-1]);
-        C_ADD (tmpbuf[j],     fek, fok);
-        C_SUB (tmpbuf[len-j], fek, fok);
-        tmpbuf[len-j].i *= -1;
-    }
-
-	for (j = 0; j < 2 * len; j++) {
-		printf("  4 GOLD[%u] = %f\n", j, gold[j]);
-    }
-
-	fft2_comp(gold, num_ffts, (1<<logn_samples), logn_samples, 1 /* do_inverse */, do_shift);
-
-	for (j = 0; j < 2 * len; j++) {
-		printf("  5 GOLD[%u] = %f\n", j, gold[j]);
-    }
 }
-
 
 /* User-defined code */
-static void init_parameters()
+void init_params()
 {
-	const unsigned num_samples = (1 << logn_samples);
-
+	len = num_ffts * (1 << logn_samples);
+	// printf("logn %u nsmp %u nfft %u inv %u shft %u len %u\n", logn_samples, num_samples, num_ffts, do_inverse, do_shift, len);
 	if (DMA_WORD_PER_BEAT(sizeof(token_t)) == 0) {
-		in_words_adj = 2 * num_ffts * num_samples;
-		out_words_adj = 2 * num_ffts * num_samples;
+		in_words_adj = 2 * len;
+		out_words_adj = 2 * len;
 	} else {
-		in_words_adj = round_up(2 * num_ffts * num_samples, DMA_WORD_PER_BEAT(sizeof(token_t)));
-		out_words_adj = round_up(2 * num_ffts * num_samples, DMA_WORD_PER_BEAT(sizeof(token_t)));
+		in_words_adj = round_up(2 * len, DMA_WORD_PER_BEAT(sizeof(token_t)));
+		out_words_adj = round_up(2 * len, DMA_WORD_PER_BEAT(sizeof(token_t)));
 	}
 	in_len = in_words_adj;
-	out_len =  out_words_adj;
+	out_len = out_words_adj;
 	in_size = in_len * sizeof(token_t);
 	out_size = out_len * sizeof(token_t);
-	out_offset = 0;
-	size = (out_offset * sizeof(token_t)) + out_size + (SYNC_VAR_SIZE * sizeof(token_t));
+	out_offset  = 0;
+	mem_size = (out_offset * sizeof(token_t)) + out_size + (SYNC_VAR_SIZE * sizeof(token_t));
 
-    acc_size = size;
+    acc_size = mem_size;
     acc_offset = out_offset + out_len + SYNC_VAR_SIZE;
-    size *= NUM_DEVICES+5;
+    mem_size *= NUM_DEVICES+5;
+
+    sync_size = SYNC_VAR_SIZE * sizeof(token_t);
+	// printf("ilen %u isize %u o_off %u olen %u osize %u msize %u\n", in_len, out_len, in_size, out_size, out_offset, mem_size);
 }
 
+static void flt_twd_fxp_conv(token_t *gold_filter_fxp, float *gold_filter, token_t *in_twiddle, float *gold_twiddle)
+{
+	int j;
+	int local_len = len;
+	spandex_token_t in_data;
+	void* dst;
+
+	// convert filter to fixed point
+	for (j = 0; j < 2 * (local_len+1); j++)
+	{
+		gold_filter_fxp[j] = float2fx((native_t) gold_filter[j], FX_IL);
+	}
+
+	dst = (void*)(in_twiddle);
+
+	// convert twiddle to fixed point
+	for (j = 0; j < local_len; j+=2, dst+=8)
+	{
+		in_data.value_32_1 = float2fx((native_t) gold_twiddle[j], FX_IL);
+		in_data.value_32_2 = float2fx((native_t) gold_twiddle[j+1], FX_IL);
+
+		write_mem(dst, in_data.value_64);
+		// printf("TWD %u %llx\n", j, in_data.value_64);
+	}
+}
 
 int main(int argc, char **argv)
 {
 	int errors;
     int j;
 
+	t_cpu_write = 0;
+	t_fft = 0;
+	t_fir = 0;
+	t_ifft = 0;
+	t_cpu_read = 0;
+	t_sw = 0;
+
 	float *gold;
 	token_t *buf;
+	token_t *fxp_filters;
 
-    const float ERROR_COUNT_TH = 0.001;
+    // const float ERROR_COUNT_TH = 0.001;
 	const unsigned num_samples = (1 << logn_samples);
 
-	init_parameters();
+	init_params();
 
-	buf = (token_t *) esp_alloc(size);
+	buf = (token_t *) esp_alloc(mem_size);
 	cfg_000[0].hw_buf = buf;
 	cfg_001[0].hw_buf = buf;
 	cfg_002[0].hw_buf = buf;
-	gold = malloc((6 * out_len) * sizeof(float));
+	gold = esp_alloc((8 * out_len) * sizeof(float));
+	fxp_filters = esp_alloc((out_len + 2) * sizeof(token_t));
 
 	for (j = 0; j < acc_offset + (7 * out_len); j++) {
         buf[j] = 0;
     }
 
-	for (j = 0; j < (6 * out_len); j++) {
+	for (j = 0; j < (8 * out_len); j++) {
         gold[j] = 0;
     }
 
 	printf("   buf = %p\n", buf);
 	printf("   gold = %p\n", gold);
+	printf("   fxp_filters = %p\n", fxp_filters);
 
-    fft2_cfg_001[0].src_offset = 2 * acc_size;
-    fft2_cfg_001[0].dst_offset = 2 * acc_size;
-
+    fft2_cfg_000[0].esp.coherence = coherence;
+    
+	fir_cfg_000[0].esp.coherence = coherence;
     fir_cfg_000[0].src_offset = acc_size;
     fir_cfg_000[0].dst_offset = acc_size;
 
-    volatile token_t* sm_sync = (volatile token_t*) buf;
+    fft2_cfg_001[0].esp.coherence = coherence;
+	fft2_cfg_001[0].src_offset = 2 * acc_size;
+    fft2_cfg_001[0].dst_offset = 2 * acc_size;
+
+    // volatile token_t* sm_sync = (volatile token_t*) buf;
 
 	printf("\n====== %s ======\n\n", cfg_000[0].devname);
 	/* <<--print-params-->> */
@@ -238,80 +280,112 @@ int main(int argc, char **argv)
 	printf("  .do_shift = %d\n", do_shift);
 	printf("  .scale_factor = %d\n", scale_factor);
 	printf("\n  ** START **\n");
-	init_buffer(buf, gold, 
-            (buf + 5 * acc_offset) /* in_filter */, (gold + out_len) /* gold_filter */,
-            (buf + 7 * acc_offset) /* in_twiddle */, (gold + 3 * out_len) /* gold_twiddle */,
-            (gold + 4 * out_len) /* gold_freqdata */);
 
-	sm_sync[0] = 0;
-	sm_sync[acc_offset] = 0;
-	sm_sync[2*acc_offset] = 0;
-	sm_sync[3*acc_offset] = 0;
+	//////////////////////////////////////////////////////
+	// Initialize golden buffers and compute golden output
+	//////////////////////////////////////////////////////
+	golden_data_init(gold, (gold + out_len) /* gold_ref*/, (gold + 2 * out_len) /* gold_filter */, (gold + 4 * out_len) /* gold_twiddle */);
+	
+	for (j = 0; j < ITERATIONS; ++j) {
+		// Compute FFT output
+		start_counter();
+		fft2_comp((gold + out_len), num_ffts, num_samples, logn_samples, 0 /* do_inverse */, do_shift);
+		t_fft_sw_start += end_counter();
 
-    // Invoke accelerators but do not check for end
-	fft2_cfg_000[0].esp.start_stop = 1;
-	fft2_cfg_001[0].esp.start_stop = 1;
-	fir_cfg_000[0].esp.start_stop = 1;
+		start_counter();
+		// Compute FIR output
+		fir_sw_impl((gold + out_len) /* gold_ref*/, (gold + 2 * out_len) /* gold_filter */, (gold + 4 * out_len) /* gold_twiddle */, (gold + 6 * out_len) /* gold_freqdata */);
+		t_fir_sw_start += end_counter();
 
-	esp_run(cfg_000, NACC);
-	esp_run(cfg_001, NACC);
-	esp_run(cfg_002, NACC);
+		start_counter();
+		// Compute IFFT output
+		fft2_comp((gold + out_len), num_ffts, num_samples, logn_samples, 1 /* do_inverse */, do_shift);
+		t_ifft_sw_start += end_counter();
+	}
 
-	sm_sync[2] = 0;
-	sm_sync[acc_offset+2] = 0;
-	sm_sync[2*acc_offset+2] = 0;
+	printf("  Mode: %s\n", print_coh);
 
-    // Start first accelerator
-	sm_sync[0] = 1;
-    // Wait for last accelerator
-	while(sm_sync[NUM_DEVICES*acc_offset] != 1);
-	sm_sync[NUM_DEVICES*acc_offset] = 0;
+	///////////////////////////////////////////////////////////////
+	// Do repetitive things initially
+	///////////////////////////////////////////////////////////////
+	flt_twd_fxp_conv(fxp_filters /* gold_filter_fxp */, (gold + 2 * out_len) /* gold_filter */, (buf + 7 * acc_offset) /* in_twiddle */, (gold + 4 * out_len) /* gold_twiddle */);
 
-	sm_sync[2] = 1;
-	sm_sync[acc_offset+2] = 1;
-	sm_sync[2*acc_offset+2] = 1;
+	///////////////////////////////////////////////////////////////
+	// Transfer to accelerator memory
+	///////////////////////////////////////////////////////////////
+	for (j = 0; j < ITERATIONS; ++j) {
+		printf("Iteration: %d\n", j);
+		// printf("Before CPU write\n");
+		start_counter();
+		init_buffer(buf, gold, (buf + 5 * acc_offset) /* in_filter */, (int64_t*) fxp_filters /* gold_filter */);
+		t_cpu_write += end_counter();
+		// printf("After CPU write\n");
 
-    // Start first accelerator
-	sm_sync[0] = 1;
-    // Wait for last accelerator
-	while(sm_sync[NUM_DEVICES*acc_offset] != 1);
-	sm_sync[NUM_DEVICES*acc_offset] = 0;
+		// printf("Before FFT\n");
+		start_counter();
+		esp_run(cfg_000, NACC);
+		t_fft += end_counter();
+		// printf("After FFT\n");
 
-	printf("\n  ** DONE **\n");
+		// printf("Before FIR\n");
+		start_counter();
+		esp_run(cfg_001, NACC);
+		t_fir += end_counter();
+		// printf("After FIR\n");
 
-	errors = validate_buffer(&buf[NUM_DEVICES*acc_offset], gold);
+		// printf("Before IFFT\n");
+		start_counter();
+		esp_run(cfg_002, NACC);
+		t_ifft += end_counter();
+		// printf("After IFFT\n");
 
-	for (j = 0; j < acc_offset; j++) {
-		printf("  1 BUF[%u] = %f\n", j, fx2float(buf[j], FX_IL));
-    }
+		printf("\n  ** DONE **\n");
 
-	for (j = 0; j < acc_offset; j++) {
-		printf("  2 BUF[%u] = %f\n", j, fx2float(buf[acc_offset+j], FX_IL));
-    }
+		// printf("Before CPU read\n");
+		start_counter();
+		errors = validate_buffer(&buf[NUM_DEVICES*acc_offset], gold);
+		t_cpu_read += end_counter();
+		// printf("After CPU read\n");
+	}
+	// for (j = 0; j < acc_offset; j++) {
+	// 	printf("  1 BUF[%u] = %f\n", j, fx2float(buf[j], FX_IL));
+    // }
 
-	for (j = 0; j < acc_offset; j++) {
-		printf("  3 BUF[%u] = %f\n", j, fx2float(buf[(2*acc_offset)+j], FX_IL));
-    }
+	// for (j = 0; j < acc_offset; j++) {
+	// 	printf("  2 BUF[%u] = %f\n", j, fx2float(buf[acc_offset+j], FX_IL));
+    // }
 
-	for (j = 0; j < acc_offset; j++) {
-		printf("  4 BUF[%u] = %f\n", j, fx2float(buf[(3*acc_offset)+j], FX_IL));
-    }
+	// for (j = 0; j < acc_offset; j++) {
+	// 	printf("  3 BUF[%u] = %f\n", j, fx2float(buf[(2*acc_offset)+j], FX_IL));
+    // }
 
-	for (j = 0; j < out_len+2; j++) {
-		printf("  FLT BUF[%u] = %f\n", j, fx2float(buf[(acc_offset + 4 * out_len)+j], FX_IL));
-    }
+	// for (j = 0; j < acc_offset; j++) {
+	// 	printf("  4 BUF[%u] = %f\n", j, fx2float(buf[(3*acc_offset)+j], FX_IL));
+    // }
 
-	for (j = 0; j < out_len; j++) {
-		printf("  TWD BUF[%u] = %f\n", j, fx2float(buf[(acc_offset + 6 * out_len)+j], FX_IL));
-    }
+	// for (j = 0; j < out_len+2; j++) {
+	// 	printf("  FLT BUF[%u] = %f\n", j, fx2float(buf[(acc_offset + 4 * out_len)+j], FX_IL));
+    // }
 
-	free(gold);
+	// for (j = 0; j < out_len; j++) {
+	// 	printf("  TWD BUF[%u] = %f\n", j, fx2float(buf[(acc_offset + 6 * out_len)+j], FX_IL));
+    // }
+
+	esp_free(gold);
 	esp_free(buf);
+	esp_free(fxp_filters);
 
-    if ((float)(errors / (float)(2.0 * (float)num_ffts * (float)num_samples)) > ERROR_COUNT_TH)
-	    printf("  + TEST FAIL: exceeding error count threshold\n");
-    else
-	    printf("  + TEST PASS: not exceeding error count threshold\n");
+	printf("  SW Time = %lu\n", t_sw / ITERATIONS);
+	printf("  CPU write = %lu\n", t_cpu_write/ITERATIONS);
+	printf("  FFT = %lu\n", t_fft/ITERATIONS);
+	printf("  FIR = %lu\n", t_fir/ITERATIONS);
+	printf("  IFFT = %lu\n", t_ifft/ITERATIONS);
+	printf("  CPU read = %lu\n", t_cpu_read/ITERATIONS);
+
+    // if ((float)(errors / (float)(2.0 * (float)num_ffts * (float)num_samples)) > ERROR_COUNT_TH)
+	//     printf("  + TEST FAIL: exceeding error count threshold\n");
+    // else
+	//     printf("  + TEST PASS: not exceeding error count threshold\n");
 
 	printf("\n====== %s ======\n\n", cfg_000[0].devname);
 

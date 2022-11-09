@@ -19,8 +19,10 @@ typedef float native_t;
 #define FX_IL 4
 #endif /* FFT2_FX_WIDTH */
 
+const float ERR_TH = 0.05;
+
 /* <<--params-def-->> */
-#define LOGN_SAMPLES 6
+#define LOGN_SAMPLES 10
 //#define NUM_FFTS     46
 #define NUM_FFTS     1
 //#define LOGN_SAMPLES 12
@@ -32,17 +34,71 @@ typedef float native_t;
 
 /* <<--params-->> */
 const int32_t logn_samples = LOGN_SAMPLES;
-/*const int32_t num_samples = NUM_SAMPLES;*/
-const int32_t num_ffts = NUM_FFTS;
-const int32_t do_inverse = DO_INVERSE;
-const int32_t do_shift = DO_SHIFT;
-const int32_t scale_factor = SCALE_FACTOR;
+const int32_t num_samples = (1 << logn_samples);
+const int32_t num_ffts = 1;
+const int32_t do_inverse = 0;
+const int32_t do_shift = 0;
+const int32_t scale_factor = 1;
+unsigned len;
+
+unsigned in_words_adj;
+unsigned out_words_adj;
+unsigned in_len;
+unsigned out_len;
+unsigned in_size;
+unsigned out_size;
+unsigned out_offset;
+unsigned mem_size;
+unsigned acc_offset;
+unsigned acc_size;
+unsigned sync_size;
 
 #define NACC 1
 
 #define SYNC_VAR_SIZE 4
 
 #define NUM_DEVICES 3
+
+///////////////////////////////////////////////////////////////
+// Bare metal math APIs for SW implementation
+///////////////////////////////////////////////////////////////
+native_t _pow(native_t a, native_t b) {
+    native_t c = 1;
+    for (int i=0; i<b; i++)
+        c *= a;
+    return c;
+}
+
+native_t _fact(native_t x) {
+    native_t ret = 1;
+    for (int i=1; i<=x; i++)
+        ret *= i;
+    return ret;
+}
+
+native_t _sin(native_t x) {
+    native_t y = x;
+    native_t s = -1;
+    for (int i=3; i<=100; i+=2) {
+        y+=s*(_pow(x,i)/_fact(i));
+        s *= -1;
+    }
+    return y;
+}
+
+native_t _cos(native_t x) {
+    native_t y = 1;
+    native_t s = -1;
+    for (int i=2; i<=100; i+=2) {
+        y+=s*(_pow(x,i)/_fact(i));
+        s *= -1;
+    }
+    return y;
+}
+
+native_t _tan(native_t x) {
+     return (_sin(x)/_cos(x));
+}
 
 typedef struct {
     float r;

@@ -25,6 +25,7 @@ struct fft2_stratus_access {
 	unsigned num_ffts;
 	unsigned src_offset;
 	unsigned dst_offset;
+	unsigned spandex_conf;
 };
 
 #define FFT2_STRATUS_IOC_ACCESS	_IOW ('S', 0, struct fft2_stratus_access)
