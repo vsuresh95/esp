@@ -56,48 +56,6 @@ void fft2::load_input()
 
         switch (load_state_req)
         {
-            case POLL_PREV_REQ:
-            {
-                dma_info_t dma_info(0, SYNC_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
-                sc_dt::sc_bv<DMA_WIDTH> dataBv;
-                int32_t new_task = 0;
-
-                wait();
-
-                // Wait for producer to send new data
-                while (new_task != 1)
-                {
-                    HLS_UNROLL_LOOP(OFF);
-                    this->dma_read_ctrl.put(dma_info);
-                    dataBv = this->dma_read_chnl.get();
-                    wait();
-                    new_task = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
-                    dataBv = this->dma_read_chnl.get();
-                    wait();
-                    last_task = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
-                }
-            }
-            break;
-            case POLL_NEXT_REQ:
-            {
-                int32_t end_sync_offset = SYNC_VAR_SIZE + 2 * num_samples;
-                dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, 1, DMA_SIZE);
-                sc_dt::sc_bv<DMA_WIDTH> dataBv;
-                int32_t new_task = 1;
-
-                wait();
-
-                // Wait for consumer to accept new data
-                while (new_task == 1)
-                {
-                    HLS_UNROLL_LOOP(OFF);
-                    this->dma_read_ctrl.put(dma_info);
-                    dataBv = this->dma_read_chnl.get();
-                    wait();
-                    new_task = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
-                }
-            }
-            break;
             case LOAD_DATA_REQ:
             {
                 dma_info_t dma_info(SYNC_VAR_SIZE / DMA_WORD_PER_BEAT, 2 * num_samples / DMA_WORD_PER_BEAT, DMA_SIZE);
@@ -178,39 +136,6 @@ void fft2::store_output()
 
         switch (store_state_req)
         {
-            case UPDATE_PREV_REQ:
-            {
-                dma_info_t dma_info(0, 1, DMA_SIZE);
-                sc_dt::sc_bv<DMA_WIDTH> dataBv;
-                dataBv.range(DMA_WIDTH - 1, 0) = 0;
-
-                this->dma_write_ctrl.put(dma_info);
-                wait();
-                this->dma_write_chnl.put(dataBv);
-                wait();
-
-                // Wait till the write is accepted at the cache (and previous fences)
-                while (!(this->dma_write_chnl.ready)) wait();
-                wait();
-            }
-            break;
-            case UPDATE_NEXT_REQ:
-            {
-                int32_t end_sync_offset = SYNC_VAR_SIZE + 2 * num_samples;
-                dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, 1, DMA_SIZE);
-                sc_dt::sc_bv<DMA_WIDTH> dataBv;
-                dataBv.range(DMA_WIDTH - 1, 0) = 1;
-
-                this->dma_write_ctrl.put(dma_info);
-                wait();
-                this->dma_write_chnl.put(dataBv);
-                wait();
-
-                // Wait till the write is accepted at the cache (and previous fences)
-                while (!(this->dma_write_chnl.ready)) wait();
-                wait();
-            }
-            break;
             case STORE_DATA_REQ:
             {
                 int32_t end_sync_offset = (2 * SYNC_VAR_SIZE) + (2 * num_samples);
@@ -239,13 +164,6 @@ void fft2::store_output()
                 // Wait till the last write is accepted at the cache
                 wait();
                 while (!(this->dma_write_chnl.ready)) wait();
-            }
-            break;
-            case STORE_FENCE:
-            {
-                // Block till L2 to be ready to receive a fence, then send
-                this->acc_fence.put(0x2);
-                wait();
             }
             break;
             case ACC_DONE:
@@ -308,209 +226,117 @@ void fft2::compute_kernel()
         do_shift = config.do_shift;
     }
 
-    // while(true)
-    // {
-        // // Poll lock for new task
-        // {
-        //     HLS_PROTO("poll-for-new-task");
+    // Load input data
+    {
+        HLS_PROTO("load-input-data");
 
-        //     load_state_req = POLL_PREV_REQ;
+        load_state_req = LOAD_DATA_REQ;
 
-        //     compute_state_req_dbg.write(1);
+        compute_state_req_dbg.write(2);
 
-        //     this->compute_load_ready_handshake();
-        //     wait();
-        //     this->compute_load_done_handshake();
-        //     wait();
-        // }
+        this->compute_load_ready_handshake();
+        wait();
+        this->compute_load_done_handshake();
+        wait();
+    }
 
-        // Load input data
-        {
-            HLS_PROTO("load-input-data");
+    // Compute FFT
+    {
+        compute_state_req_dbg.write(3);
 
-            load_state_req = LOAD_DATA_REQ;
-
-            compute_state_req_dbg.write(2);
-
-            this->compute_load_ready_handshake();
-            wait();
-            this->compute_load_done_handshake();
-            wait();
+        unsigned offset = 0;  // Offset into Mem for start of this FFT
+        int sin_sign = (do_inverse) ? -1 : 1; // This modifes the mySin
+                                              // values used below
+        if (do_inverse && do_shift) {
+            fft2_do_shift(offset, num_samples, logn_samples);
         }
 
-        // Compute FFT
-        {
-            compute_state_req_dbg.write(3);
+        // Do the bit-reverse
+        fft2_bit_reverse(offset, num_samples, logn_samples);
 
-            unsigned offset = 0;  // Offset into Mem for start of this FFT
-            int sin_sign = (do_inverse) ? -1 : 1; // This modifes the mySin
-                                                  // values used below
-            if (do_inverse && do_shift) {
-                fft2_do_shift(offset, num_samples, logn_samples);
-            }
+        // Computing phase implementation
+        int m = 1;  // iterative FFT
 
-            // Do the bit-reverse
-            fft2_bit_reverse(offset, num_samples, logn_samples);
+        FFT2_SINGLE_L1:
+            for(unsigned s = 1; s <= logn_samples; s++) {
+                m = 1 << s;
+                CompNum wm(myCos(s), sin_sign*mySin(s));
 
-            // Computing phase implementation
-            int m = 1;  // iterative FFT
+            FFT2_SINGLE_L2:
+                for(unsigned k = 0; k < num_samples; k +=m) {
 
-            FFT2_SINGLE_L1:
-                for(unsigned s = 1; s <= logn_samples; s++) {
-                    m = 1 << s;
-                    CompNum wm(myCos(s), sin_sign*mySin(s));
+                    CompNum w((FPDATA) 1, (FPDATA) 0);
+                    int md2 = m / 2;
 
-                FFT2_SINGLE_L2:
-                    for(unsigned k = 0; k < num_samples; k +=m) {
+                FFT2_SINGLE_L3:
+                    for(int j = 0; j < md2; j++) {
 
-                        CompNum w((FPDATA) 1, (FPDATA) 0);
-                        int md2 = m / 2;
+                        int kj = offset + k + j;
+                        int kjm = offset + k + j + md2;
+                        CompNum akj, akjm;
+                        CompNum bkj, bkjm;
 
-                    FFT2_SINGLE_L3:
-                        for(int j = 0; j < md2; j++) {
+                        akj.re = int2fp<FPDATA, WORD_SIZE>(A0[2 * kj]);
+                        akj.im = int2fp<FPDATA, WORD_SIZE>(A0[2 * kj + 1]);
+                        akjm.re = int2fp<FPDATA, WORD_SIZE>(A0[2 * kjm]);
+                        akjm.im = int2fp<FPDATA, WORD_SIZE>(A0[2 * kjm + 1]);
 
-                            int kj = offset + k + j;
-                            int kjm = offset + k + j + md2;
-                            CompNum akj, akjm;
-                            CompNum bkj, bkjm;
+                        CompNum t;
+                        compMul(w, akjm, t);
+                        CompNum u(akj.re, akj.im);
+                        compAdd(u, t, bkj);
+                        compSub(u, t, bkjm);
+                        CompNum wwm;
+                        wwm.re = w.re - (wm.im * w.im + wm.re * w.re);
+                        wwm.im = w.im + (wm.im * w.re - wm.re * w.im);
+                        w = wwm;
 
-                            akj.re = int2fp<FPDATA, WORD_SIZE>(A0[2 * kj]);
-                            akj.im = int2fp<FPDATA, WORD_SIZE>(A0[2 * kj + 1]);
-                            akjm.re = int2fp<FPDATA, WORD_SIZE>(A0[2 * kjm]);
-                            akjm.im = int2fp<FPDATA, WORD_SIZE>(A0[2 * kjm + 1]);
+                        {
+                            HLS_PROTO("compute_write_A0");
+                            HLS_BREAK_DEP(A0);
+                            wait();
+                            A0[2 * kj] = fp2int<FPDATA, WORD_SIZE>(bkj.re);
+                            A0[2 * kj + 1] = fp2int<FPDATA, WORD_SIZE>(bkj.im);
+                            wait();
+                            A0[2 * kjm] = fp2int<FPDATA, WORD_SIZE>(bkjm.re);
+                            A0[2 * kjm + 1] = fp2int<FPDATA, WORD_SIZE>(bkjm.im);
+                        }
+                    } // for (j = 0 .. md2)
+                } // for (k = 0 .. num_samples)
+            } // for (s = 1 .. logn_samples)
 
-                            CompNum t;
-                            compMul(w, akjm, t);
-                            CompNum u(akj.re, akj.im);
-                            compAdd(u, t, bkj);
-                            compSub(u, t, bkjm);
-                            CompNum wwm;
-                            wwm.re = w.re - (wm.im * w.im + wm.re * w.re);
-                            wwm.im = w.im + (wm.im * w.re - wm.re * w.im);
-                            w = wwm;
-
-                            {
-                                HLS_PROTO("compute_write_A0");
-                                HLS_BREAK_DEP(A0);
-                                wait();
-                                A0[2 * kj] = fp2int<FPDATA, WORD_SIZE>(bkj.re);
-                                A0[2 * kj + 1] = fp2int<FPDATA, WORD_SIZE>(bkj.im);
-                                wait();
-                                A0[2 * kjm] = fp2int<FPDATA, WORD_SIZE>(bkjm.re);
-                                A0[2 * kjm + 1] = fp2int<FPDATA, WORD_SIZE>(bkjm.im);
-                            }
-                        } // for (j = 0 .. md2)
-                    } // for (k = 0 .. num_samples)
-                } // for (s = 1 .. logn_samples)
-
-            if ((!do_inverse) && (do_shift)) {
-                fft2_do_shift(offset, num_samples, logn_samples);
-            }
-        } // Compute
-
-        // // Poll lock for consumer's ready
-        // {
-        //     HLS_PROTO("poll-for-cons-ready");
-
-        //     load_state_req = POLL_NEXT_REQ;
-
-        //     compute_state_req_dbg.write(4);
-
-        //     this->compute_load_ready_handshake();
-        //     wait();
-        //     this->compute_load_done_handshake();
-        //     wait();
-        // }
-
-        // Store output data
-        {
-            HLS_PROTO("store-output-data");
-
-            store_state_req = STORE_DATA_REQ;
-
-            this->compute_store_ready_handshake();
-
-            compute_state_req_dbg.write(5);
-
-            wait();
-            this->compute_store_done_handshake();
-            wait();
-
-            // Wait for all writes to be done and then issue fence
-            store_state_req = STORE_FENCE;
-
-            compute_state_req_dbg.write(6);
-
-            this->compute_store_ready_handshake();
-            wait();
-            this->compute_store_done_handshake();
-            wait();
+        if ((!do_inverse) && (do_shift)) {
+            fft2_do_shift(offset, num_samples, logn_samples);
         }
+    } // Compute
 
-        // // update consumer for data ready
-        // {
-        //     HLS_PROTO("update-next-lock");
+    // Store output data
+    {
+        HLS_PROTO("store-output-data");
 
-        //     store_state_req = UPDATE_NEXT_REQ;
+        store_state_req = STORE_DATA_REQ;
 
-        //     compute_state_req_dbg.write(7);
+        this->compute_store_ready_handshake();
 
-        //     this->compute_store_ready_handshake();
-        //     wait();
-        //     this->compute_store_done_handshake();
-        //     wait();
+        compute_state_req_dbg.write(5);
 
-        //     // Wait for all writes to be done and then issue fence
-        //     store_state_req = STORE_FENCE;
+        wait();
+        this->compute_store_done_handshake();
+        wait();
+    }
 
-        //     compute_state_req_dbg.write(8);
+    // End operation
+    {
+        HLS_PROTO("end-acc");
 
-        //     this->compute_store_ready_handshake();
-        //     wait();
-        //     this->compute_store_done_handshake();
-        //     wait();
-        // }
+        store_state_req = ACC_DONE;
 
-        // // update producer for ready to accept
-        // {
-        //     HLS_PROTO("update-prev-lock");
+        compute_state_req_dbg.write(11);
 
-        //     store_state_req = UPDATE_PREV_REQ;
-
-        //     compute_state_req_dbg.write(9);
-
-        //     this->compute_store_ready_handshake();
-        //     wait();
-        //     this->compute_store_done_handshake();
-        //     wait();
-
-        //     // Wait for all writes to be done and then issue fence
-        //     store_state_req = STORE_FENCE;
-
-        //     compute_state_req_dbg.write(10);
-
-        //     this->compute_store_ready_handshake();
-        //     wait();
-        //     this->compute_store_done_handshake();
-        //     wait();
-        // }
-
-        // End operation
-        {
-            HLS_PROTO("end-acc");
-
-            // if (last_task == 1)
-            // {
-                store_state_req = ACC_DONE;
-
-                compute_state_req_dbg.write(11);
-
-                this->compute_store_ready_handshake();
-                wait();
-                this->compute_store_done_handshake();
-                wait();
-                this->process_done();
-            // }
-        }
-    // } // while (true)
+        this->compute_store_ready_handshake();
+        wait();
+        this->compute_store_done_handshake();
+        wait();
+        this->process_done();
+    }
 } // Function : compute_kernel

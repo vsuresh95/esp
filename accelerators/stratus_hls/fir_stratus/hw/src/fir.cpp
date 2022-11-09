@@ -56,48 +56,6 @@ void fir::load_input()
 
         switch (load_state_req)
         {
-            case POLL_PREV_REQ:
-            {
-                dma_info_t dma_info(0, SYNC_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
-                sc_dt::sc_bv<DMA_WIDTH> dataBv;
-                int32_t new_task = 0;
-
-                wait();
-
-                // Wait for producer to send new data
-                while (new_task != 1)
-                {
-                    HLS_UNROLL_LOOP(OFF);
-                    this->dma_read_ctrl.put(dma_info);
-                    dataBv = this->dma_read_chnl.get();
-                    wait();
-                    new_task = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
-                    dataBv = this->dma_read_chnl.get();
-                    wait();
-                    last_task = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
-                }
-            }
-            break;
-            case POLL_NEXT_REQ:
-            {
-                int32_t end_sync_offset = SYNC_VAR_SIZE + 2 * num_samples;
-                dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, 1, DMA_SIZE);
-                sc_dt::sc_bv<DMA_WIDTH> dataBv;
-                int32_t new_task = 1;
-
-                wait();
-
-                // Wait for consumer to accept new data
-                while (new_task == 1)
-                {
-                    HLS_UNROLL_LOOP(OFF);
-                    this->dma_read_ctrl.put(dma_info);
-                    dataBv = this->dma_read_chnl.get();
-                    wait();
-                    new_task = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
-                }
-            }
-            break;
             case LOAD_DATA_REQ:
             // Load input data
             {
@@ -223,39 +181,6 @@ void fir::store_output()
 
         switch (store_state_req)
         {
-            case UPDATE_PREV_REQ:
-            {
-                dma_info_t dma_info(0, 1, DMA_SIZE);
-                sc_dt::sc_bv<DMA_WIDTH> dataBv;
-                dataBv.range(DMA_WIDTH - 1, 0) = 0;
-
-                this->dma_write_ctrl.put(dma_info);
-                wait();
-                this->dma_write_chnl.put(dataBv);
-                wait();
-
-                // Wait till the write is accepted at the cache (and previous fences)
-                while (!(this->dma_write_chnl.ready)) wait();
-                wait();
-            }
-            break;
-            case UPDATE_NEXT_REQ:
-            {
-                int32_t end_sync_offset = SYNC_VAR_SIZE + 2 * num_samples;
-                dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, 1, DMA_SIZE);
-                sc_dt::sc_bv<DMA_WIDTH> dataBv;
-                dataBv.range(DMA_WIDTH - 1, 0) = 1;
-
-                this->dma_write_ctrl.put(dma_info);
-                wait();
-                this->dma_write_chnl.put(dataBv);
-                wait();
-
-                // Wait till the write is accepted at the cache (and previous fences)
-                while (!(this->dma_write_chnl.ready)) wait();
-                wait();
-            }
-            break;
             case STORE_DATA_REQ:
             {
                 int32_t end_sync_offset = (2 * SYNC_VAR_SIZE) + (2 * num_samples);
@@ -284,13 +209,6 @@ void fir::store_output()
                 // Wait till the last write is accepted at the cache
                 wait();
                 while (!(this->dma_write_chnl.ready)) wait();
-            }
-            break;
-            case STORE_FENCE:
-            {
-                // Block till L2 to be ready to receive a fence, then send
-                this->acc_fence.put(0x2);
-                wait();
             }
             break;
             case ACC_DONE:
@@ -349,249 +267,157 @@ void fir::compute_kernel()
         num_samples = 1 << logn_samples;
     }
 
-    // while(true)
-    // {
-        // // Poll lock for new task
-        // {
-        //     HLS_PROTO("poll-for-new-task");
+    // Load input data
+    {
+        HLS_PROTO("load-input-data");
 
-        //     load_state_req = POLL_PREV_REQ;
+        load_state_req = LOAD_DATA_REQ;
 
-        //     compute_state_req_dbg.write(1);
+        compute_state_req_dbg.write(2);
 
-        //     this->compute_load_ready_handshake();
-        //     wait();
-        //     this->compute_load_done_handshake();
-        //     wait();
-        // }
+        this->compute_load_ready_handshake();
+        wait();
+        this->compute_load_done_handshake();
+        wait();
 
-        // Load input data
+        compute_state_req_dbg.write(3);
+    }
+
+    // Compute
+    {
+        CompNum fpnk, fpk, f1k, f2k, tw, tdc;
+        CompNum tf, if0, ifn, of0, flt0, fltn, t0, tn;
+        CompNum fk, fnkc, fek, fok, tmp;
+        CompNum tmpbuf0, tmpbufn;
+
+        // First and last element
         {
-            HLS_PROTO("load-input-data");
+            // Post-process first and last element
+            tdc.re = int2fp<FPDATA, WORD_SIZE>(A0[0]);
+            tdc.im = int2fp<FPDATA, WORD_SIZE>(A0[1]);
 
-            load_state_req = LOAD_DATA_REQ;
+            if0.re = tdc.re + tdc.im;
+            if0.im = 0;
+            ifn.re = tdc.re - tdc.im;
+            ifn.im = 0;
 
-            compute_state_req_dbg.write(2);
+            // Reading filter values
+            flt0.re = int2fp<FPDATA, WORD_SIZE>(F0[0]);
+            flt0.im = int2fp<FPDATA, WORD_SIZE>(F0[1]);
+            fltn.re = int2fp<FPDATA, WORD_SIZE>(F0[(2 * num_samples)]);
+            fltn.im = int2fp<FPDATA, WORD_SIZE>(F0[(2 * num_samples) + 1]);
 
-            this->compute_load_ready_handshake();
-            wait();
-            this->compute_load_done_handshake();
-            wait();
+            // FIR
+            compMul(if0, flt0, t0);
+            compMul(ifn, fltn, tn);
 
-            compute_state_req_dbg.write(3);
+            // Pre-process first and last element
+            of0.re = t0.re + tn.re;
+            of0.im = t0.re - tn.re;
+
+            // Write back element 0 to memory
+            {
+                HLS_PROTO("write-back-elem-0");
+                HLS_BREAK_DEP(A0);
+                wait();
+                A0[0] = fp2int<FPDATA, WORD_SIZE>(of0.re);
+                A0[1] = fp2int<FPDATA, WORD_SIZE>(of0.im);
+            }
         }
 
-        // Compute
+        // Remaining elements
+        for (unsigned k = 2; k <= num_samples; k+=2)
         {
-            CompNum fpnk, fpk, f1k, f2k, tw, tdc;
-            CompNum tf, if0, ifn, of0, flt0, fltn, t0, tn;
-            CompNum fk, fnkc, fek, fok, tmp;
-            CompNum tmpbuf0, tmpbufn;
+            // Read FFT output
+            fpk.re = int2fp<FPDATA, WORD_SIZE>(A0[k]);
+            fpk.im = int2fp<FPDATA, WORD_SIZE>(A0[k + 1]);
+            fpnk.re = int2fp<FPDATA, WORD_SIZE>(A0[(2 * num_samples) - k]);
+            fpnk.im = - (int2fp<FPDATA, WORD_SIZE>(A0[(2 * num_samples) - k + 1]));
 
-            // First and last element
-            {
-                // Post-process first and last element
-                tdc.re = int2fp<FPDATA, WORD_SIZE>(A0[0]);
-                tdc.im = int2fp<FPDATA, WORD_SIZE>(A0[1]);
+            // Read twiddle factors
+            tf.re = int2fp<FPDATA, WORD_SIZE>(T0[k - 2]);
+            tf.im = int2fp<FPDATA, WORD_SIZE>(T0[k - 1]);
 
-                if0.re = tdc.re + tdc.im;
-                if0.im = 0;
-                ifn.re = tdc.re - tdc.im;
-                ifn.im = 0;
+            compAdd(fpk, fpnk, f1k);
+            compSub(fpk, fpnk, f2k);
+            compMul(f2k, tf, tw);
 
-                // Reading filter values
-                flt0.re = int2fp<FPDATA, WORD_SIZE>(F0[0]);
-                flt0.im = int2fp<FPDATA, WORD_SIZE>(F0[1]);
-                fltn.re = int2fp<FPDATA, WORD_SIZE>(F0[(2 * num_samples)]);
-                fltn.im = int2fp<FPDATA, WORD_SIZE>(F0[(2 * num_samples) + 1]);
+            // Computing freqdata's
+            compAdd(f1k, tw, if0);
+            if0.re /= 2; if0.im /= 2;
 
-                // FIR
-                compMul(if0, flt0, t0);
-                compMul(ifn, fltn, tn);
+            compSub(f1k, tw, ifn);
+            ifn.re /= 2; ifn.im /= 2;
+            ifn.im *= -1;
 
-                // Pre-process first and last element
-                of0.re = t0.re + tn.re;
-                of0.im = t0.re - tn.re;
+            // Reading filter values
+            flt0.re = int2fp<FPDATA, WORD_SIZE>(F0[k]);
+            flt0.im = int2fp<FPDATA, WORD_SIZE>(F0[k + 1]);
+            fltn.re = int2fp<FPDATA, WORD_SIZE>(F0[(2 * num_samples) - k]);
+            fltn.im = int2fp<FPDATA, WORD_SIZE>(F0[(2 * num_samples) - k + 1]);
 
-                // Write back element 0 to memory
-                {
-                    HLS_PROTO("write-back-elem-0");
-                    HLS_BREAK_DEP(A0);
-                    wait();
-                    A0[0] = fp2int<FPDATA, WORD_SIZE>(of0.re);
-                    A0[1] = fp2int<FPDATA, WORD_SIZE>(of0.im);
-                }
+            // FIR
+            compMul(if0, flt0, t0);
+            compMul(ifn, fltn, tn);
+
+            if (k == num_samples) {
+                fk = tn;
+            } else {
+                fk = t0;
             }
 
-            // Remaining elements
-            for (unsigned k = 2; k <= num_samples; k+=2)
+            fnkc.re = tn.re;
+            fnkc.im = - (tn.im);
+
+            tf.re *= -1; tf.im *= -1;
+
+            compAdd(fk, fnkc, fek);
+            compSub(fk, fnkc, tmp);
+            compMul(tmp, tf, fok);
+
+            compAdd(fek, fok, tmpbuf0);
+            compSub(fek, fok, tmpbufn);
+
             {
-                // Read FFT output
-                fpk.re = int2fp<FPDATA, WORD_SIZE>(A0[k]);
-                fpk.im = int2fp<FPDATA, WORD_SIZE>(A0[k + 1]);
-                fpnk.re = int2fp<FPDATA, WORD_SIZE>(A0[(2 * num_samples) - k]);
-                fpnk.im = - (int2fp<FPDATA, WORD_SIZE>(A0[(2 * num_samples) - k + 1]));
-
-                // Read twiddle factors
-                tf.re = int2fp<FPDATA, WORD_SIZE>(T0[k - 2]);
-                tf.im = int2fp<FPDATA, WORD_SIZE>(T0[k - 1]);
-
-                compAdd(fpk, fpnk, f1k);
-                compSub(fpk, fpnk, f2k);
-                compMul(f2k, tf, tw);
-
-                // Computing freqdata's
-                compAdd(f1k, tw, if0);
-                if0.re /= 2; if0.im /= 2;
-
-                compSub(f1k, tw, ifn);
-                ifn.re /= 2; ifn.im /= 2;
-                ifn.im *= -1;
-
-                // Reading filter values
-                flt0.re = int2fp<FPDATA, WORD_SIZE>(F0[k]);
-                flt0.im = int2fp<FPDATA, WORD_SIZE>(F0[k + 1]);
-                fltn.re = int2fp<FPDATA, WORD_SIZE>(F0[(2 * num_samples) - k]);
-                fltn.im = int2fp<FPDATA, WORD_SIZE>(F0[(2 * num_samples) - k + 1]);
-
-                // FIR
-                compMul(if0, flt0, t0);
-                compMul(ifn, fltn, tn);
-
-                if (k == num_samples) {
-                    fk = tn;
-                } else {
-                    fk = t0;
-                }
-
-                fnkc.re = tn.re;
-                fnkc.im = - (tn.im);
-
-                tf.re *= -1; tf.im *= -1;
-
-                compAdd(fk, fnkc, fek);
-                compSub(fk, fnkc, tmp);
-                compMul(tmp, tf, fok);
-
-                compAdd(fek, fok, tmpbuf0);
-                compSub(fek, fok, tmpbufn);
-
-                {
-                    HLS_PROTO("write-back-elem-k");
-                    HLS_BREAK_DEP(A0);
-                    wait();
-                    A0[k] = fp2int<FPDATA, WORD_SIZE>(tmpbuf0.re);
-                    A0[k + 1] = fp2int<FPDATA, WORD_SIZE>(tmpbuf0.im);
-                    wait();
-                    A0[(2 * num_samples) - k] = fp2int<FPDATA, WORD_SIZE>(tmpbufn.re);
-                    A0[(2 * num_samples) - k + 1] = - (fp2int<FPDATA, WORD_SIZE>(tmpbufn.im));
-                }
-            } // for (k = 0 .. num_samples)
-        } // Compute
-
-        // // Poll lock for consumer's ready
-        // {
-        //     HLS_PROTO("poll-for-cons-ready");
-
-        //     load_state_req = POLL_NEXT_REQ;
-
-        //     compute_state_req_dbg.write(4);
-
-        //     this->compute_load_ready_handshake();
-        //     wait();
-        //     this->compute_load_done_handshake();
-        //     wait();
-        // }
-
-        // Store output data
-        {
-            HLS_PROTO("store-output-data");
-
-            store_state_req = STORE_DATA_REQ;
-
-            this->compute_store_ready_handshake();
-
-            compute_state_req_dbg.write(5);
-
-            wait();
-            this->compute_store_done_handshake();
-            wait();
-
-            // Wait for all writes to be done and then issue fence
-            store_state_req = STORE_FENCE;
-
-            compute_state_req_dbg.write(6);
-
-            this->compute_store_ready_handshake();
-            wait();
-            this->compute_store_done_handshake();
-            wait();
-        }
-
-        // // update consumer for data ready
-        // {
-        //     HLS_PROTO("update-next-lock");
-
-        //     store_state_req = UPDATE_NEXT_REQ;
-
-        //     compute_state_req_dbg.write(7);
-
-        //     this->compute_store_ready_handshake();
-        //     wait();
-        //     this->compute_store_done_handshake();
-        //     wait();
-
-        //     // Wait for all writes to be done and then issue fence
-        //     store_state_req = STORE_FENCE;
-
-        //     compute_state_req_dbg.write(8);
-
-        //     this->compute_store_ready_handshake();
-        //     wait();
-        //     this->compute_store_done_handshake();
-        //     wait();
-        // }
-
-        // // update producer for ready to accept
-        // {
-        //     HLS_PROTO("update-prev-lock");
-
-        //     store_state_req = UPDATE_PREV_REQ;
-
-        //     compute_state_req_dbg.write(9);
-
-        //     this->compute_store_ready_handshake();
-        //     wait();
-        //     this->compute_store_done_handshake();
-        //     wait();
-
-        //     // Wait for all writes to be done and then issue fence
-        //     store_state_req = STORE_FENCE;
-
-        //     compute_state_req_dbg.write(10);
-
-        //     this->compute_store_ready_handshake();
-        //     wait();
-        //     this->compute_store_done_handshake();
-        //     wait();
-        // }
-
-        // End operation
-        {
-            HLS_PROTO("end-acc");
-
-            // if (last_task == 1)
-            // {
-                store_state_req = ACC_DONE;
-
-                compute_state_req_dbg.write(11);
-
-                this->compute_store_ready_handshake();
+                HLS_PROTO("write-back-elem-k");
+                HLS_BREAK_DEP(A0);
                 wait();
-                this->compute_store_done_handshake();
+                A0[k] = fp2int<FPDATA, WORD_SIZE>(tmpbuf0.re);
+                A0[k + 1] = fp2int<FPDATA, WORD_SIZE>(tmpbuf0.im);
                 wait();
-                this->process_done();
-            // }
-        }
-    // } // while (true)
+                A0[(2 * num_samples) - k] = fp2int<FPDATA, WORD_SIZE>(tmpbufn.re);
+                A0[(2 * num_samples) - k + 1] = - (fp2int<FPDATA, WORD_SIZE>(tmpbufn.im));
+            }
+        } // for (k = 0 .. num_samples)
+    } // Compute
+
+    // Store output data
+    {
+        HLS_PROTO("store-output-data");
+
+        store_state_req = STORE_DATA_REQ;
+
+        this->compute_store_ready_handshake();
+
+        compute_state_req_dbg.write(5);
+
+        wait();
+        this->compute_store_done_handshake();
+        wait();
+    }
+
+    // End operation
+    {
+        HLS_PROTO("end-acc");
+
+        store_state_req = ACC_DONE;
+
+        compute_state_req_dbg.write(11);
+
+        this->compute_store_ready_handshake();
+        wait();
+        this->compute_store_done_handshake();
+        wait();
+        this->process_done();
+    }
 } // Function : compute_kernel
