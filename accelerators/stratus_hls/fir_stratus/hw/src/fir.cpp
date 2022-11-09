@@ -80,9 +80,7 @@ void fir::load_input()
             break;
             case CFG_REQ:
             {
-                dma_info_t dma_info(SYNC_VAR_SIZE / DMA_WORD_PER_BEAT, 
-                                    SPANDEX_CONFIG_VAR_SIZE / DMA_WORD_PER_BEAT, 
-                                    DMA_SIZE);
+                dma_info_t dma_info(SYNC_VAR_SIZE / DMA_WORD_PER_BEAT, 1, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
 
                 wait();

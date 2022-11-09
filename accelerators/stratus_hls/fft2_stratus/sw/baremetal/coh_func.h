@@ -60,7 +60,8 @@ unsigned coherence = ACC_COH_FULL;
 #if (COH_MODE == 3)
 // Owner Prediction
 #define READ_CODE 0x4002B30B
-#define WRITE_CODE 0x2262B82B
+#define WRITE_CODE_FFT (0x2062B82B | 0x1 << 25)
+#define WRITE_CODE_FIR (0x2062B82B | 0x3 << 25)
 spandex_config_t spandex_config = {.spandex_reg = 0, .r_en = 1, .r_type = 2, .w_en = 1, .w_op = 1, .w_type = 1};
 const char print_coh[] = "Owner Prediction";
 #elif (COH_MODE == 2)

@@ -51,12 +51,24 @@ static inline uint64_t end_counter() {
 	return (t_end - t_start);
 }
 
-static inline void write_mem (void* dst, int64_t value_64)
+static inline void write_mem_fft (void* dst, int64_t value_64)
 {
 	asm volatile (
 		"mv t0, %0;"
 		"mv t1, %1;"
-		".word " QU(WRITE_CODE)
+		".word " QU(WRITE_CODE_FFT)
+		:
+		: "r" (dst), "r" (value_64)
+		: "t0", "t1", "memory"
+	);
+}
+
+static inline void write_mem_fir (void* dst, int64_t value_64)
+{
+	asm volatile (
+		"mv t0, %0;"
+		"mv t1, %1;"
+		".word " QU(WRITE_CODE_FIR)
 		:
 		: "r" (dst), "r" (value_64)
 		: "t0", "t1", "memory"
@@ -122,7 +134,7 @@ static void init_buf(token_t *in, float *gold, token_t *in_filter, int64_t *gold
 		in_data.value_32_1 = float2fx((native_t) gold[j], FX_IL);
 		in_data.value_32_2 = float2fx((native_t) gold[j+1], FX_IL);
 
-		write_mem(dst, in_data.value_64);
+		write_mem_fft(dst, in_data.value_64);
 		// printf("IN %u %llx\n", j, (in_data.value_64));
 	}
 
@@ -133,7 +145,7 @@ static void init_buf(token_t *in, float *gold, token_t *in_filter, int64_t *gold
 	{
 		value_64 = gold_filter[j];
 
-		write_mem(dst, value_64);
+		write_mem_fir(dst, value_64);
 		// printf("FLT %u %llx\n", j, value_64);
 	}
 }
@@ -159,7 +171,7 @@ static void flt_twd_fxp_conv(token_t *gold_filter_fxp, float *gold_filter, token
 		in_data.value_32_1 = float2fx((native_t) gold_twiddle[j], FX_IL);
 		in_data.value_32_2 = float2fx((native_t) gold_twiddle[j+1], FX_IL);
 
-		write_mem(dst, in_data.value_64);
+		write_mem_fir(dst, in_data.value_64);
 		// printf("TWD %u %llx\n", j, in_data.value_64);
 	}
 }
