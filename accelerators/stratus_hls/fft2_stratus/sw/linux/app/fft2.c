@@ -9,7 +9,7 @@
 
 #define COH_MODE 0
 // #define ESP
-#define ITERATIONS 1000
+#define ITERATIONS 100
 
 #include "coh_func.h"
 #include "sw_func.h"
@@ -260,14 +260,17 @@ int main(int argc, char **argv)
 	printf("   fxp_filters = %p\n", fxp_filters);
 
     fft2_cfg_000[0].esp.coherence = coherence;
+	fft2_cfg_000[0].spandex_conf = spandex_config.spandex_reg;
     
 	fir_cfg_000[0].esp.coherence = coherence;
     fir_cfg_000[0].src_offset = acc_size;
     fir_cfg_000[0].dst_offset = acc_size;
+	fir_cfg_000[0].spandex_conf = spandex_config.spandex_reg;
 
     fft2_cfg_001[0].esp.coherence = coherence;
 	fft2_cfg_001[0].src_offset = 2 * acc_size;
     fft2_cfg_001[0].dst_offset = 2 * acc_size;
+	fft2_cfg_001[0].spandex_conf = spandex_config.spandex_reg;
 
     // volatile token_t* sm_sync = (volatile token_t*) buf;
 

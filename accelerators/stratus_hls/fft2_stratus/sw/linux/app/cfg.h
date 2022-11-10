@@ -139,6 +139,7 @@ struct fft2_stratus_access fft2_cfg_000[] = {
 		.esp.p2p_store = 0,
 		.esp.p2p_nsrcs = 0,
 		.esp.p2p_srcs = {"", "", "", ""},
+		.spandex_conf = 0,
 	}
 };
 
@@ -156,6 +157,7 @@ struct fft2_stratus_access fft2_cfg_001[] = {
 		.esp.p2p_store = 0,
 		.esp.p2p_nsrcs = 0,
 		.esp.p2p_srcs = {"", "", "", ""},
+		.spandex_conf = 0,
 	}
 };
 
@@ -173,6 +175,7 @@ struct fir_stratus_access fir_cfg_000[] = {
 		.esp.p2p_store = 0,
 		.esp.p2p_nsrcs = 0,
 		.esp.p2p_srcs = {"", "", "", ""},
+		.spandex_conf = 0,
 	}
 };
 
