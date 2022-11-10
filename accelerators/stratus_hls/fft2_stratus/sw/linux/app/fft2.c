@@ -7,15 +7,12 @@
 #include <stdint.h>
 #include "utils/fft2_utils.h"
 
-#define COH_MODE 0
+#define COH_MODE 2
 // #define ESP
 #define ITERATIONS 100
 
 #include "coh_func.h"
 #include "sw_func.h"
-
-// static uint64_t t_start = 0;
-// static uint64_t t_end = 0;
 
 uint64_t t_cpu_write;
 uint64_t t_fft;
@@ -24,10 +21,37 @@ uint64_t t_ifft;
 uint64_t t_cpu_read;
 uint64_t t_sw;
 
-//sw counters
-static uint64_t t_fft_sw_start = 0;
-static uint64_t t_ifft_sw_start = 0;
-static uint64_t t_fir_sw_start = 0;
+// //sw counters
+// static uint64_t t_fft_sw_start = 0;
+// static uint64_t t_ifft_sw_start = 0;
+// static uint64_t t_fir_sw_start = 0;
+
+static uint64_t t_start = 0;
+static uint64_t t_end = 0;
+
+static inline void start_counter() {
+	asm volatile (
+		"li t0, 0;"
+		"csrr t0, cycle;"
+		"mv %0, t0"
+		: "=r" (t_start)
+		:
+		: "t0"
+	);
+}
+
+static inline uint64_t end_counter() {
+	asm volatile (
+		"li t0, 0;"
+		"csrr t0, cycle;"
+		"mv %0, t0"
+		: "=r" (t_end)
+		:
+		: "t0"
+	);
+
+	return (t_end - t_start);
+}
 
 static inline void write_mem (void* dst, int64_t value_64)
 {
@@ -62,17 +86,8 @@ static int validate_buffer(token_t *out, float *gold)
 {
 	int j;
 	unsigned errors = 0;
-	const unsigned num_samples = 1<<logn_samples;
-
-	// for (j = 0; j < 2 * num_ffts * num_samples; j++) {
-	// 	native_t val = fx2float(out[j+SYNC_VAR_SIZE], FX_IL);
-
-	// 	if ((fabs(gold[j] - val) / fabs(gold[j])) > ERR_TH) {
-	// 		// printf(" GOLD[%u] = %f vs %f = out[%u]\n", j, gold[j], val, j);
-	// 		errors++;
-	// 	}
-	// }
-	// printf("  + Relative error > %.02f for %d values out of %d\n", ERR_TH, errors, 2 * num_ffts * num_samples);
+	// const unsigned num_samples = 1<<logn_samples;
+	int local_len = len;
 
 	/* Add the following 3 lines */
 	/* For performance profiling */
@@ -85,7 +100,7 @@ static int validate_buffer(token_t *out, float *gold)
 
 	/* Change the conditions for the for-loop */
 	/* For performance profiling */
-	for (j = 0; j < 2 * num_ffts * num_samples; j += 2, dst += 8) {
+	for (j = 0; j < 2 * local_len; j += 2, dst += 8) {
 		/* Add the following 5 lines */
 		/* For performance profiling */
 		out_data.value_64 = read_mem(dst);
@@ -111,6 +126,7 @@ static int validate_buffer(token_t *out, float *gold)
 static void init_buffer(token_t *in, float *gold, token_t *in_filter, int64_t *gold_filter)
 {
 	int j;
+	int local_len = len;
 
 	// srand((unsigned int) time(NULL));
 
@@ -137,7 +153,7 @@ static void init_buffer(token_t *in, float *gold, token_t *in_filter, int64_t *g
 	dst = (void*)(in+SYNC_VAR_SIZE);
 	/* Change the conditions for the for-loop */
 	/* For performance profiling */
-	for (j = 0; j < 2 * len; j += 2, dst += 8) {
+	for (j = 0; j < 2 * local_len; j += 2, dst += 8) {
 	// for (j = 0; j < 2 * len; j += 2) {
 		// in[j+SYNC_VAR_SIZE] = float2fx((native_t) gold[j], FX_IL);
 
@@ -155,7 +171,7 @@ static void init_buffer(token_t *in, float *gold, token_t *in_filter, int64_t *g
 	dst = (void*)(in_filter);
 	/* Change the conditions for the for-loop */
 	/* For performance profiling */
-	for (j = 0; j < 2 * (len+1); ++j, dst += 8) {
+	for (j = 0; j < 2 * (local_len+1); ++j, dst += 8) {
 	// for (j = 0; j < 2 * (len+1); ++j) {
 		// in_filter[j] = float2fx((native_t) gold_filter[j], FX_IL);
 
@@ -236,7 +252,7 @@ int main(int argc, char **argv)
 	token_t *fxp_filters;
 
     // const float ERROR_COUNT_TH = 0.001;
-	const unsigned num_samples = (1 << logn_samples);
+	// const unsigned num_samples = (1 << logn_samples);
 
 	init_params();
 
@@ -247,13 +263,13 @@ int main(int argc, char **argv)
 	gold = esp_alloc((8 * out_len) * sizeof(float));
 	fxp_filters = esp_alloc((out_len + 2) * sizeof(token_t));
 
-	for (j = 0; j < acc_offset + (7 * out_len); j++) {
-        buf[j] = 0;
-    }
+	// for (j = 0; j < acc_offset + (7 * out_len); j++) {
+    //     buf[j] = 0;
+    // }
 
-	for (j = 0; j < (8 * out_len); j++) {
-        gold[j] = 0;
-    }
+	// for (j = 0; j < (8 * out_len); j++) {
+    //     gold[j] = 0;
+    // }
 
 	printf("   buf = %p\n", buf);
 	printf("   gold = %p\n", gold);
@@ -289,22 +305,22 @@ int main(int argc, char **argv)
 	//////////////////////////////////////////////////////
 	golden_data_init(gold, (gold + out_len) /* gold_ref*/, (gold + 2 * out_len) /* gold_filter */, (gold + 4 * out_len) /* gold_twiddle */);
 	
-	for (j = 0; j < ITERATIONS; ++j) {
-		// Compute FFT output
-		start_counter();
-		fft2_comp((gold + out_len), num_ffts, num_samples, logn_samples, 0 /* do_inverse */, do_shift);
-		t_fft_sw_start += end_counter();
+	// for (j = 0; j < ITERATIONS; ++j) {
+	// 	// Compute FFT output
+	// 	start_counter();
+	// 	fft2_comp((gold + out_len), num_ffts, num_samples, logn_samples, 0 /* do_inverse */, do_shift);
+	// 	t_fft_sw_start += end_counter();
 
-		start_counter();
-		// Compute FIR output
-		fir_sw_impl((gold + out_len) /* gold_ref*/, (gold + 2 * out_len) /* gold_filter */, (gold + 4 * out_len) /* gold_twiddle */, (gold + 6 * out_len) /* gold_freqdata */);
-		t_fir_sw_start += end_counter();
+	// 	start_counter();
+	// 	// Compute FIR output
+	// 	fir_sw_impl((gold + out_len) /* gold_ref*/, (gold + 2 * out_len) /* gold_filter */, (gold + 4 * out_len) /* gold_twiddle */, (gold + 6 * out_len) /* gold_freqdata */);
+	// 	t_fir_sw_start += end_counter();
 
-		start_counter();
-		// Compute IFFT output
-		fft2_comp((gold + out_len), num_ffts, num_samples, logn_samples, 1 /* do_inverse */, do_shift);
-		t_ifft_sw_start += end_counter();
-	}
+	// 	start_counter();
+	// 	// Compute IFFT output
+	// 	fft2_comp((gold + out_len), num_ffts, num_samples, logn_samples, 1 /* do_inverse */, do_shift);
+	// 	t_ifft_sw_start += end_counter();
+	// }
 
 	printf("  Mode: %s\n", print_coh);
 
@@ -317,68 +333,32 @@ int main(int argc, char **argv)
 	// Transfer to accelerator memory
 	///////////////////////////////////////////////////////////////
 	for (j = 0; j < ITERATIONS; ++j) {
-		printf("Iteration: %d\n", j);
-		// printf("Before CPU write\n");
 		start_counter();
 		init_buffer(buf, gold, (buf + 5 * acc_offset) /* in_filter */, (int64_t*) fxp_filters /* gold_filter */);
 		t_cpu_write += end_counter();
-		// printf("After CPU write\n");
 
-		// printf("Before FFT\n");
 		start_counter();
 		esp_run(cfg_000, NACC);
 		t_fft += end_counter();
-		// printf("After FFT\n");
 
-		// printf("Before FIR\n");
 		start_counter();
 		esp_run(cfg_001, NACC);
 		t_fir += end_counter();
-		// printf("After FIR\n");
 
-		// printf("Before IFFT\n");
 		start_counter();
 		esp_run(cfg_002, NACC);
 		t_ifft += end_counter();
-		// printf("After IFFT\n");
 
-		printf("\n  ** DONE **\n");
-
-		// printf("Before CPU read\n");
 		start_counter();
 		errors = validate_buffer(&buf[NUM_DEVICES*acc_offset], gold);
 		t_cpu_read += end_counter();
-		// printf("After CPU read\n");
 	}
-	// for (j = 0; j < acc_offset; j++) {
-	// 	printf("  1 BUF[%u] = %f\n", j, fx2float(buf[j], FX_IL));
-    // }
-
-	// for (j = 0; j < acc_offset; j++) {
-	// 	printf("  2 BUF[%u] = %f\n", j, fx2float(buf[acc_offset+j], FX_IL));
-    // }
-
-	// for (j = 0; j < acc_offset; j++) {
-	// 	printf("  3 BUF[%u] = %f\n", j, fx2float(buf[(2*acc_offset)+j], FX_IL));
-    // }
-
-	// for (j = 0; j < acc_offset; j++) {
-	// 	printf("  4 BUF[%u] = %f\n", j, fx2float(buf[(3*acc_offset)+j], FX_IL));
-    // }
-
-	// for (j = 0; j < out_len+2; j++) {
-	// 	printf("  FLT BUF[%u] = %f\n", j, fx2float(buf[(acc_offset + 4 * out_len)+j], FX_IL));
-    // }
-
-	// for (j = 0; j < out_len; j++) {
-	// 	printf("  TWD BUF[%u] = %f\n", j, fx2float(buf[(acc_offset + 6 * out_len)+j], FX_IL));
-    // }
 
 	esp_free(gold);
 	esp_free(buf);
 	esp_free(fxp_filters);
 
-	printf("  SW Time = %lu\n", t_sw / ITERATIONS);
+	// printf("  SW Time = %lu\n", t_sw / ITERATIONS);
 	printf("  CPU write = %lu\n", t_cpu_write/ITERATIONS);
 	printf("  FFT = %lu\n", t_fft/ITERATIONS);
 	printf("  FIR = %lu\n", t_fir/ITERATIONS);

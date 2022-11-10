@@ -186,20 +186,20 @@ static void esp_config(esp_thread_info_t* cfg[], unsigned nthreads, unsigned *na
 	}
 }
 
-static void print_time_info(esp_thread_info_t *info[], unsigned long long hw_ns, int nthreads, unsigned* nacc)
-{
-	int i, j;
-
-	printf("  > Test time: %llu ns\n", hw_ns);
-	for (i = 0; i < nthreads; i++) {
-		unsigned len = nacc[i];
-		for (j = 0; j < len; j++) {
-			esp_thread_info_t* cur = info[i] + j;
-			if (cur->run)
-				printf("	- %s time: %llu ns\n", cur->devname, cur->hw_ns);
-		}
-	}
-}
+// static void print_time_info(esp_thread_info_t *info[], unsigned long long hw_ns, int nthreads, unsigned* nacc)
+// {
+// 	int i, j;
+// 
+// 	printf("  > Test time: %llu ns\n", hw_ns);
+// 	for (i = 0; i < nthreads; i++) {
+// 		unsigned len = nacc[i];
+// 		for (j = 0; j < len; j++) {
+// 			esp_thread_info_t* cur = info[i] + j;
+// 			if (cur->run)
+// 				printf("	- %s time: %llu ns\n", cur->devname, cur->hw_ns);
+// 		}
+// 	}
+// }
 
 void esp_run(esp_thread_info_t cfg[], unsigned nacc)
 {
@@ -289,7 +289,7 @@ void esp_run_parallel(esp_thread_info_t* cfg[], unsigned nthreads, unsigned* nac
 	}
 
 	gettime(&th_end);
-	print_time_info(cfg, ts_subtract(&th_start, &th_end), nthreads, nacc);
+	// print_time_info(cfg, ts_subtract(&th_start, &th_end), nthreads, nacc);
 
 	free(thread);
 }

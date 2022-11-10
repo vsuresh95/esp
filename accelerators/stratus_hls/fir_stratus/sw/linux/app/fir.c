@@ -274,10 +274,11 @@ int main(int argc, char **argv)
 
 	fft2_cfg_000[0].esp.coherence = coherence;
 	fft2_cfg_000[0].spandex_conf = spandex_config.spandex_reg;
-	fft2_cfg_001[0].src_offset = acc_size;
-    fft2_cfg_001[0].dst_offset = acc_size;
 	fft2_cfg_001[0].esp.coherence = coherence;
 	fft2_cfg_001[0].spandex_conf = spandex_config.spandex_reg;
+
+	fft2_cfg_001[0].src_offset = 2 * acc_size;
+    fft2_cfg_001[0].dst_offset = 2 * acc_size;
 
 	printf("\n====== %s ======\n\n", cfg_000[0].devname);
 	/* <<--print-params-->> */
@@ -293,9 +294,10 @@ int main(int argc, char **argv)
 	// Initialize golden buffers and compute golden output
 	//////////////////////////////////////////////////////
 	golden_data_init(gold, (gold + out_len) /* gold_ref*/, (gold + 2 * out_len) /* gold_filter */, (gold + 4 * out_len) /* gold_twiddle */);
-	for (i = 0; i < ITERATIONS; ++i) {
-		chain_sw_impl(gold, (gold + 2 * out_len) /* gold_filter */,(gold + 4 * out_len) /* gold_twiddle */, (gold + 6 * out_len) /* gold_freqdata */);
-	}
+
+	// for (i = 0; i < 10; i++) {
+	// 	chain_sw_impl((gold + out_len), (gold + 2 * out_len) /* gold_filter */,(gold + 4 * out_len) /* gold_twiddle */, (gold + 6 * out_len) /* gold_freqdata */);
+	// }
 
 	printf("  Mode: %s\n", print_coh);
 
@@ -328,12 +330,10 @@ int main(int argc, char **argv)
 		t_ifft += end_counter();
 
 		start_counter();
-		errors = validate_buffer(&buf[out_offset], gold);
+		errors = validate_buffer(&buf[NUM_DEVICES*acc_offset], gold);
 		t_cpu_read += end_counter();
 	}
 
-	// printf("  SW Time = %lu\n", t_sw / ITERATIONS);
-	printf("  FFT SW Time (all iterations) = %lu\n", t_fft_sw);
 	printf("  FFT SW Time = %lu\n", t_fft_sw / ITERATIONS);
 	printf("  FIR SW Time = %lu\n", t_fir_sw / ITERATIONS);
 	printf("  IFFT SW Time = %lu\n", t_ifft_sw / ITERATIONS);
