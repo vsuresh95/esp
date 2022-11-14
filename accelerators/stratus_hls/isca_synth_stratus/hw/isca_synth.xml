@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sld>
+  <accelerator name="isca_synth" desc="Accelerator ISCA_SYNTH" data_size="4" device_id="04c" hls_tool="stratus_hls">
+    <param name="size" desc="size" />
+    <param name="compute_ratio" desc="compute_ratio" />
+  </accelerator>
+</sld>
