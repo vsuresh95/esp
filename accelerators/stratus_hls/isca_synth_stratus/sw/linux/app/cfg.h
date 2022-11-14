@@ -13,10 +13,13 @@ typedef int64_t token_t;
 #define SIZE 1
 
 /* <<--params-->> */
-const int32_t compute_ratio = COMPUTE_RATIO;
-const int32_t size = SIZE;
+int32_t compute_ratio = 40;
+int32_t size = 128;
+int32_t speedup = 20;
 
 #define NACC 1
+
+#define ITERATIONS 20
 
 struct isca_synth_stratus_access isca_synth_cfg_000[] = {
 	{
@@ -25,7 +28,7 @@ struct isca_synth_stratus_access isca_synth_cfg_000[] = {
 		.size = SIZE,
 		.src_offset = 0,
 		.dst_offset = 0,
-		.esp.coherence = ACC_COH_NONE,
+		.esp.coherence = ACC_COH_FULL,
 		.esp.p2p_store = 0,
 		.esp.p2p_nsrcs = 0,
 		.esp.p2p_srcs = {"", "", "", ""},
