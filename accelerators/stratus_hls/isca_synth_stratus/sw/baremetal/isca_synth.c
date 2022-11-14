@@ -22,8 +22,9 @@ static unsigned DMA_WORD_PER_BEAT(unsigned _st)
 #define DEV_NAME "sld,isca_synth_stratus"
 
 /* <<--params-->> */
-const int32_t compute_ratio = 1;
-const int32_t size = 1;
+int32_t compute_ratio = 40;
+int32_t size = 128;
+int32_t speedup = 20 / 4;
 
 static unsigned in_words_adj;
 static unsigned out_words_adj;
@@ -46,17 +47,53 @@ static unsigned mem_size;
 #define ISCA_SYNTH_COMPUTE_RATIO_REG 0x44
 #define ISCA_SYNTH_SIZE_REG 0x40
 
+#define ITERATIONS 100
+
+static uint64_t t_start = 0;
+static uint64_t t_end = 0;
+
+uint64_t t_sw;
+uint64_t t_cpu_write;
+uint64_t t_acc;
+uint64_t t_cpu_read;
+
+static inline void start_counter() {
+	asm volatile (
+		"li t0, 0;"
+		"csrr t0, mcycle;"
+		"mv %0, t0"
+		: "=r" (t_start)
+		:
+		: "t0"
+	);
+}
+
+static inline uint64_t end_counter() {
+	asm volatile (
+		"li t0, 0;"
+		"csrr t0, mcycle;"
+		"mv %0, t0"
+		: "=r" (t_end)
+		:
+		: "t0"
+	);
+
+	return (t_end - t_start);
+}
+
 
 static int validate_buf(token_t *out, token_t *gold)
 {
 	int i;
 	int j;
 	unsigned errors = 0;
+    int32_t local_size = size;
 
-	for (i = 0; i < 1; i++)
-		for (j = 0; j < size; j++)
-			if (gold[i * out_words_adj + j] != out[i * out_words_adj + j])
-				errors++;
+	start_counter();
+	for (j = 0; j < local_size; j++)
+		if (out[j] != 0)
+			errors++;
+    t_cpu_read += end_counter();
 
 	return errors;
 }
@@ -66,20 +103,25 @@ static void init_buf (token_t *in, token_t * gold)
 {
 	int i;
 	int j;
+    int32_t local_size = size;
+    int32_t local_compute_ratio = compute_ratio;
+    int32_t local_speedup = speedup;
 
-	for (i = 0; i < 1; i++)
-		for (j = 0; j < size; j++)
-			in[i * in_words_adj + j] = (token_t) j;
+	start_counter();
+	for (j = 0; j < local_size; j++)
+			in[j] = (token_t) j;
+    t_cpu_write += end_counter();
 
-	for (i = 0; i < 1; i++)
-		for (j = 0; j < size; j++)
-			gold[i * out_words_adj + j] = (token_t) j;
+	start_counter();
+	for (j = 0; j < local_size * local_compute_ratio * local_speedup; j++)
+		asm volatile ("nop");
+    t_sw += end_counter();
 }
 
 
 int main(int argc, char * argv[])
 {
-	int i;
+	int i, j;
 	int n;
 	int ndev;
 	struct esp_device *espdevs;
@@ -104,7 +146,6 @@ int main(int argc, char * argv[])
 	out_size = out_len * sizeof(token_t);
 	out_offset  = in_len;
 	mem_size = (out_offset * sizeof(token_t)) + out_size;
-
 
 	// Search for the device
 	printf("Scanning device tree... \n");
@@ -145,27 +186,22 @@ int main(int argc, char * argv[])
 		printf("  ptable = %p\n", ptable);
 		printf("  nchunk = %lu\n", NCHUNK(mem_size));
 
-#ifndef __riscv
-		for (coherence = ACC_COH_NONE; coherence <= ACC_COH_RECALL; coherence++) {
-#else
+        for (j = 0; j < 8; j++)
 		{
+	        t_sw = 0;
+	        t_cpu_write = 0;
+	        t_acc = 0;
+	        t_cpu_read = 0;
+
 			/* TODO: Restore full test once ESP caches are integrated */
-			coherence = ACC_COH_NONE;
-#endif
-			printf("  --------------------\n");
-			printf("  Generate input...\n");
-			init_buf(mem, gold);
+			coherence = ACC_COH_FULL;
 
 			// Pass common configuration parameters
 
 			iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
 			iowrite32(dev, COHERENCE_REG, coherence);
 
-#ifndef __sparc
 			iowrite32(dev, PT_ADDRESS_REG, (unsigned long long) ptable);
-#else
-			iowrite32(dev, PT_ADDRESS_REG, (unsigned) ptable);
-#endif
 			iowrite32(dev, PT_NCHUNK_REG, NCHUNK(mem_size));
 			iowrite32(dev, PT_SHIFT_REG, CHUNK_SHIFT);
 
@@ -175,33 +211,44 @@ int main(int argc, char * argv[])
 
 			// Pass accelerator-specific configuration parameters
 			/* <<--regs-config-->> */
-		iowrite32(dev, ISCA_SYNTH_COMPUTE_RATIO_REG, compute_ratio);
-		iowrite32(dev, ISCA_SYNTH_SIZE_REG, size);
+		    iowrite32(dev, ISCA_SYNTH_COMPUTE_RATIO_REG, compute_ratio);
+		    iowrite32(dev, ISCA_SYNTH_SIZE_REG, size);
 
-			// Flush (customize coherence model here)
-			esp_flush(coherence);
+            for (i = 0; i < ITERATIONS; i++)
+            {
+			    init_buf(mem, gold);
 
-			// Start accelerators
-			printf("  Start...\n");
-			iowrite32(dev, CMD_REG, CMD_MASK_START);
+			    // Flush (customize coherence model here)
+			    esp_flush(coherence);
 
-			// Wait for completion
-			done = 0;
-			while (!done) {
-				done = ioread32(dev, STATUS_REG);
-				done &= STATUS_MASK_DONE;
-			}
-			iowrite32(dev, CMD_REG, 0x0);
+			    // Start accelerators
+	            start_counter();
+			    iowrite32(dev, CMD_REG, CMD_MASK_START);
 
-			printf("  Done\n");
-			printf("  validating...\n");
+			    // Wait for completion
+			    done = 0;
+			    while (!done) {
+			    	done = ioread32(dev, STATUS_REG);
+			    	done &= STATUS_MASK_DONE;
+			    }
+			    iowrite32(dev, CMD_REG, 0x0);
+                t_acc += end_counter();
 
-			/* Validation */
-			errors = validate_buf(&mem[out_offset], gold);
-			if (errors)
-				printf("  ... FAIL\n");
-			else
-				printf("  ... PASS\n");
+			    /* Validation */
+			    errors = validate_buf(&mem[out_offset], gold);
+            }
+
+	        printf("  size = %d\n", size);
+	        printf("  SW = %lu\n", t_sw/ITERATIONS);
+	        printf("  CPU write = %lu\n", t_cpu_write/ITERATIONS);
+	        printf("  ACC = %lu\n", t_acc/ITERATIONS);
+	        printf("  CPU read = %lu\n", t_cpu_read/ITERATIONS);
+	        printf("  Speedup = %d\n", t_sw/(t_acc+t_cpu_write+t_cpu_read));
+
+            if (errors) printf("  ... FAIL\n");
+            else printf("  ... PASS\n");
+
+            size *= 2;
 		}
 		aligned_free(ptable);
 		aligned_free(mem);

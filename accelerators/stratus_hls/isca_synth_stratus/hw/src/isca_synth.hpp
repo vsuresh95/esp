@@ -17,7 +17,7 @@
 #define DATA_WIDTH 64
 #define DMA_SIZE SIZE_DWORD
 #define PLM_OUT_WORD 4096
-#define PLM_IN_WORD 4096
+#define PLM_IN_WORD 16384
 
 #define BURST_SIZE 2
 
