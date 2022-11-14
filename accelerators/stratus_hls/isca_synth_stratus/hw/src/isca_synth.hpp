@@ -19,24 +19,44 @@
 #define PLM_OUT_WORD 4096
 #define PLM_IN_WORD 4096
 
+#define BURST_SIZE 2
+
 class isca_synth : public esp_accelerator_3P<DMA_WIDTH>
 {
 public:
+    // Compute -> Load
+    handshake_t load_ready;
+
+    // Compute -> Store
+    handshake_t store_ready;
+
+    // Load -> Compute
+    handshake_t load_done;
+
+    // Store -> Compute
+    handshake_t store_done;
+
     // Constructor
     SC_HAS_PROCESS(isca_synth);
     isca_synth(const sc_module_name& name)
     : esp_accelerator_3P<DMA_WIDTH>(name)
         , cfg("config")
+        , load_ready("load_ready")
+        , store_ready("store_ready")
+        , load_done("load_done")
+        , store_done("store_done")
     {
         // Signal binding
         cfg.bind_with(*this);
 
         // Map arrays to memories
         /* <<--plm-bind-->> */
-        HLS_MAP_plm(plm_out_pong, PLM_OUT_NAME);
-        HLS_MAP_plm(plm_out_ping, PLM_OUT_NAME);
-        HLS_MAP_plm(plm_in_pong, PLM_IN_NAME);
         HLS_MAP_plm(plm_in_ping, PLM_IN_NAME);
+        
+        load_ready.bind_with(*this);
+        store_ready.bind_with(*this);
+        load_done.bind_with(*this);
+        store_done.bind_with(*this);
     }
 
     // Processes
@@ -57,10 +77,16 @@ public:
 
     // Private local memories
     sc_dt::sc_int<DATA_WIDTH> plm_in_ping[PLM_IN_WORD];
-    sc_dt::sc_int<DATA_WIDTH> plm_in_pong[PLM_IN_WORD];
-    sc_dt::sc_int<DATA_WIDTH> plm_out_ping[PLM_OUT_WORD];
-    sc_dt::sc_int<DATA_WIDTH> plm_out_pong[PLM_OUT_WORD];
 
+    // Handshakes
+    inline void compute_load_ready_handshake();
+    inline void load_compute_ready_handshake();
+    inline void compute_store_ready_handshake();
+    inline void store_compute_ready_handshake();
+    inline void compute_load_done_handshake();
+    inline void load_compute_done_handshake();
+    inline void compute_store_done_handshake();
+    inline void store_compute_done_handshake();
 };
 
 
