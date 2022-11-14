@@ -19,8 +19,6 @@
 #define PLM_OUT_WORD 4096
 #define PLM_IN_WORD 16384
 
-#define BURST_SIZE 2
-
 class isca_synth : public esp_accelerator_3P<DMA_WIDTH>
 {
 public:

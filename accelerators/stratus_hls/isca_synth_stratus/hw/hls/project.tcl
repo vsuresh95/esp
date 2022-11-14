@@ -74,21 +74,23 @@ define_system_module tb ../tb/system.cpp ../tb/sc_main.cpp
 set DEFAULT_ARGV ""
 
 foreach dma [list 64] {
-    define_io_config * IOCFG_DMA$dma -DDMA_WIDTH=$dma
+    foreach tile_size [list 2 4 8 16 32] {
+    define_io_config * IOCFG_TILE_SIZE$tile_size\_DMA$dma -DDMA_WIDTH=$dma -DTILE_SIZE=$tile_size
 
-    define_system_config tb TESTBENCH_DMA$dma -io_config IOCFG_DMA$dma
+    define_system_config tb TESTBENCH_TILE_SIZE$tile_size\_DMA$dma -io_config IOCFG_TILE_SIZE$tile_size\_DMA$dma
 
-    define_sim_config "BEHAV_DMA$dma" "isca_synth BEH" "tb TESTBENCH_DMA$dma" -io_config IOCFG_DMA$dma -argv $DEFAULT_ARGV
+    define_sim_config "BEHAV_TILE_SIZE$tile_size\_DMA$dma" "isca_synth BEH" "tb TESTBENCH_TILE_SIZE$tile_size\_DMA$dma" -io_config IOCFG_TILE_SIZE$tile_size\_DMA$dma -argv $DEFAULT_ARGV
 
     foreach cfg [list BASIC] {
-	set cname $cfg\_DMA$dma
-	define_hls_config isca_synth $cname -io_config IOCFG_DMA$dma --clock_period=$CLOCK_PERIOD $COMMON_HLS_FLAGS -DHLS_DIRECTIVES_$cfg
+	set cname $cfg\_TILE_SIZE$tile_size\_DMA$dma
+	define_hls_config isca_synth $cname -io_config IOCFG_TILE_SIZE$tile_size\_DMA$dma --clock_period=$CLOCK_PERIOD $COMMON_HLS_FLAGS -DHLS_DIRECTIVES_$cfg
 	if {$TECH_IS_XILINX == 1} {
-	    define_sim_config "$cname\_V" "isca_synth RTL_V $cname" "tb TESTBENCH_DMA$dma" -io_config IOCFG_DMA$dma -argv $DEFAULT_ARGV -verilog_top_modules glbl
+	    define_sim_config "$cname\_V" "isca_synth RTL_V $cname" "tb TESTBENCH_TILE_SIZE$tile_size\_DMA$dma" -io_config IOCFG_TILE_SIZE$tile_size\_DMA$dma -argv $DEFAULT_ARGV -verilog_top_modules glbl
 	} else {
-	    define_sim_config "$cname\_V" "isca_synth RTL_V $cname" "tb TESTBENCH_DMA$dma" -io_config IOCFG_DMA$dma -argv $DEFAULT_ARGV
+	    define_sim_config "$cname\_V" "isca_synth RTL_V $cname" "tb TESTBENCH_TILE_SIZE$tile_size\_DMA$dma" -io_config IOCFG_TILE_SIZE$tile_size\_DMA$dma -argv $DEFAULT_ARGV
 	}
     }
+}
 }
 
 #

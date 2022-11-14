@@ -47,37 +47,27 @@ void isca_synth::load_input()
     {
         HLS_PROTO("load-dma");
 
-        uint32_t offset = 0;
-
         wait();
 
         // Configure DMA transaction
+        uint32_t offset = 0;
         uint32_t len = size;
 
-        for (uint16_t i = 0; i < len; i += BURST_SIZE)
+        dma_info_t dma_info(offset, len, DMA_SIZE);
+
+        this->dma_read_ctrl.put(dma_info);
+
+        for (uint16_t i = 0; i < len; i++)
         {
-            HLS_UNROLL_LOOP(OFF);
-            this->load_compute_ready_handshake();
+            sc_dt::sc_bv<DMA_WIDTH> dataBv;
 
-            dma_info_t dma_info(offset, BURST_SIZE, DMA_SIZE);
+            dataBv = this->dma_read_chnl.get();
+            wait();
 
-            offset += BURST_SIZE;
-
-            this->dma_read_ctrl.put(dma_info);
-
-            for (uint16_t k = 0; k < BURST_SIZE; k++)
-            {
-                HLS_UNROLL_LOOP(OFF);
-                sc_dt::sc_bv<DMA_WIDTH> dataBv;
-
-                dataBv = this->dma_read_chnl.get();
-                wait();
-
-                plm_in_ping[i + k] = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
-            }
-
-            this->load_compute_done_handshake();
+            plm_in_ping[i] = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
         }
+
+        this->load_compute_handshake();
     }
 
     // Conclude
@@ -127,34 +117,25 @@ void isca_synth::store_output()
 
         wait();
 
+        this->store_compute_handshake();
+
         // Configure DMA transaction
         uint32_t offset = size;
         uint32_t len = size;
 
-        for (uint16_t i = 0; i < len; i += BURST_SIZE)
+        dma_info_t dma_info(offset, len, DMA_SIZE);
+
+        this->dma_write_ctrl.put(dma_info);
+
+        for (uint16_t i = 0; i < len; i++)
         {
-            HLS_UNROLL_LOOP(OFF);
-            this->store_compute_ready_handshake();
+            sc_dt::sc_bv<DMA_WIDTH> dataBv;
 
-            dma_info_t dma_info(offset, BURST_SIZE, DMA_SIZE);
+            wait();
 
-            offset += BURST_SIZE;
+            dataBv.range(DATA_WIDTH - 1, 0) = plm_in_ping[i];
 
-            this->dma_write_ctrl.put(dma_info);
-
-            for (uint16_t k = 0; k < BURST_SIZE; k++)
-            {
-                HLS_UNROLL_LOOP(OFF);
-                sc_dt::sc_bv<DMA_WIDTH> dataBv;
-
-                wait();
-
-                dataBv.range(DATA_WIDTH - 1, 0) = plm_in_ping[i + k];
-
-                this->dma_write_chnl.put(dataBv);
-            }
-
-            this->store_compute_done_handshake();
+            this->dma_write_chnl.put(dataBv);
         }
     }
 
@@ -203,31 +184,42 @@ void isca_synth::compute_kernel()
 
     // Compute
     {
-        HLS_PROTO("compute-loop");
-
         wait();
         uint32_t len = size;
 
-        for (uint16_t i = 0; i < len; i += BURST_SIZE)
-        {
-            HLS_UNROLL_LOOP(OFF);
-            wait();
-            this->compute_load_ready_handshake();
-            wait();
-            this->compute_load_done_handshake();
+        this->compute_load_handshake();
 
-            for (uint32_t k = 0; k < compute_ratio; k++)
-	        {
-                HLS_UNROLL_LOOP(OFF);
-                wait();
+        for (uint16_t i = 0; i < len; i+=TILE_SIZE)
+        {
+            uint64_t regs_elem[TILE_SIZE];
+            HLS_FLATTEN_ARRAY(regs_elem);
+
+            for (uint16_t j = 0; j < TILE_SIZE; j++)
+            {
+                HLS_UNROLL_LOOP(ON, "read-elem");
+                HLS_BREAK_ARRAY_DEPENDENCY(plm_in_ping);
+                regs_elem[j] = plm_in_ping[i+j];
             }
 
-            wait();
-            this->compute_store_ready_handshake();
-            wait();
-            this->compute_store_done_handshake();
+            for (uint16_t j = 0; j < TILE_SIZE; j++)
+            {
+                HLS_UNROLL_LOOP(ON, "self-mac");
+
+                uint64_t elem = regs_elem[j];
+                regs_elem[j] = elem * elem;
+                regs_elem[j] += elem;
+            }
+
+            for (uint16_t j = 0; j < TILE_SIZE; j++)
+            {
+                HLS_UNROLL_LOOP(ON, "write-elem");
+                HLS_BREAK_ARRAY_DEPENDENCY(plm_in_ping);
+                plm_in_ping[i+j] = regs_elem[j];
+            }
         }
-    } 
+
+        this->compute_store_handshake();
+    }
 
     // Conclude
     {

@@ -109,12 +109,14 @@ static void init_buf (token_t *in, token_t * gold)
 
 	start_counter();
 	for (j = 0; j < local_size; j++)
-			in[j] = (token_t) j;
+		in[j] = (token_t) j;
     t_cpu_write += end_counter();
 
 	start_counter();
-	for (j = 0; j < local_size * local_compute_ratio * local_speedup; j++)
-		asm volatile ("nop");
+	for (j = 0; j < local_size; j++) {
+        token_t elem = in[j];
+		gold[j] = elem * elem + elem;
+    }
     t_sw += end_counter();
 }
 
@@ -186,6 +188,8 @@ int main(int argc, char * argv[])
 		printf("  ptable = %p\n", ptable);
 		printf("  nchunk = %lu\n", NCHUNK(mem_size));
 
+        size = 128;
+
         for (j = 0; j < 8; j++)
 		{
 	        t_sw = 0;
@@ -245,11 +249,12 @@ int main(int argc, char * argv[])
 	        printf("  CPU read = %lu\n", t_cpu_read/ITERATIONS);
 	        printf("  Speedup = %d\n", t_sw/(t_acc+t_cpu_write+t_cpu_read));
 
-            if (errors) printf("  ... FAIL\n");
-            else printf("  ... PASS\n");
-
             size *= 2;
 		}
+
+        if (errors) printf("  ... FAIL\n");
+        else printf("  ... PASS\n");
+
 		aligned_free(ptable);
 		aligned_free(mem);
 		aligned_free(gold);
