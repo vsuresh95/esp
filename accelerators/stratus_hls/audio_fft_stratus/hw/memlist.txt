@@ -1,4 +1,1 @@
-audio_fft_plm_block_in_dma32 2 32 1w:0r 0w:1r
-audio_fft_plm_block_out_dma32 2 32 1w:0r 0w:1r
-audio_fft_plm_block_in_dma64 2 32 2w:0r 0w:1r
-audio_fft_plm_block_out_dma64 2 32 1w:0r 0w:2r
+audio_fft_plm_block_in_dma64 32768 32 2w:0r 0w:2r

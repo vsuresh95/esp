@@ -1,4 +1,4 @@
-// Copyright (c) 2011-2022 Columbia University, System Level Design Group
+// Copyright (c) 2011-2019 Columbia University, System Level Design Group
 // SPDX-License-Identifier: Apache-2.0
 
 #include "audio_fft.hpp"
@@ -12,25 +12,24 @@
 
 void audio_fft::load_input()
 {
-
     // Reset
     {
         HLS_PROTO("load-reset");
 
         this->reset_load_input();
 
-        // explicit PLM ports reset if any
+        load_state_req_dbg.write(0);
 
-        // User-defined reset code
+        load_ready.ack.reset_ack();
+        load_done.req.reset_req();
 
         wait();
     }
 
     // Config
     /* <<--params-->> */
-    int32_t do_inverse;
     int32_t logn_samples;
-    int32_t do_shift;
+    int32_t num_samples;
     {
         HLS_PROTO("load-config");
 
@@ -39,97 +38,99 @@ void audio_fft::load_input()
 
         // User-defined config code
         /* <<--local-params-->> */
-        do_inverse = config.do_inverse;
         logn_samples = config.logn_samples;
-        do_shift = config.do_shift;
+        num_samples = 1 << logn_samples;
     }
 
     // Load
+    while(true)
     {
         HLS_PROTO("load-dma");
+
         wait();
 
-        bool ping = true;
-        uint32_t offset = 0;
+        this->load_compute_ready_handshake();
 
-        // Batching
-        for (uint16_t b = 0; b < 1; b++)
+        load_state_req_dbg.write(load_state_req);
+
+        switch (load_state_req)
         {
-            wait();
-#if (DMA_WORD_PER_BEAT == 0)
-            uint32_t length = do_shift;
-#else
-            uint32_t length = round_up(do_shift, DMA_WORD_PER_BEAT);
-#endif
-            // Chunking
-            for (int rem = length; rem > 0; rem -= PLM_IN_WORD)
+#ifdef ENABLE_SM
+            case POLL_PROD_VALID_REQ:
             {
+                dma_info_t dma_info(VALID_FLAG_OFFSET / DMA_WORD_PER_BEAT, READY_FLAG_OFFSET / DMA_WORD_PER_BEAT, DMA_SIZE);
+                sc_dt::sc_bv<DMA_WIDTH> dataBv;
+                int32_t valid_task = 0;
+
                 wait();
-                // Configure DMA transaction
-                uint32_t len = rem > PLM_IN_WORD ? PLM_IN_WORD : rem;
-#if (DMA_WORD_PER_BEAT == 0)
-                // data word is wider than NoC links
-                dma_info_t dma_info(offset * DMA_BEAT_PER_WORD, len * DMA_BEAT_PER_WORD, DMA_SIZE);
-#else
-                dma_info_t dma_info(offset / DMA_WORD_PER_BEAT, len / DMA_WORD_PER_BEAT, DMA_SIZE);
+
+                // Wait for producer to send new data
+                while (valid_task != 1)
+                {
+                    HLS_UNROLL_LOOP(OFF);
+                    this->dma_read_ctrl.put(dma_info);
+                    dataBv = this->dma_read_chnl.get();
+                    wait();
+                    valid_task = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
+                    dataBv = this->dma_read_chnl.get();
+                    wait();
+                    last_task = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
+                }
+            }
+            break;
+            case POLL_CONS_READY_REQ:
+            {
+                int32_t end_sync_offset = SYNC_VAR_SIZE + 2 * num_samples + READY_FLAG_OFFSET;
+                dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                sc_dt::sc_bv<DMA_WIDTH> dataBv;
+                int32_t ready_for_task = 0;
+
+                wait();
+
+                // Wait for consumer to accept new data
+                while (ready_for_task != 1)
+                {
+                    HLS_UNROLL_LOOP(OFF);
+                    this->dma_read_ctrl.put(dma_info);
+                    dataBv = this->dma_read_chnl.get();
+                    wait();
+                    ready_for_task = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
+                }
+            }
+            break;
 #endif
-                offset += len;
+            case LOAD_DATA_REQ:
+            {
+                dma_info_t dma_info(SYNC_VAR_SIZE / DMA_WORD_PER_BEAT, 2 * num_samples / DMA_WORD_PER_BEAT, DMA_SIZE);
+                sc_dt::sc_bv<DMA_WIDTH> dataBv;
+
+                wait();
 
                 this->dma_read_ctrl.put(dma_info);
 
-#if (DMA_WORD_PER_BEAT == 0)
-                // data word is wider than NoC links
-                for (uint16_t i = 0; i < len; i++)
+                for (int i = 0; i < 2 * num_samples; i += DMA_WORD_PER_BEAT)
                 {
-                    sc_dt::sc_bv<DATA_WIDTH> dataBv;
-
-                    for (uint16_t k = 0; k < DMA_BEAT_PER_WORD; k++)
-                    {
-                        dataBv.range((k+1) * DMA_WIDTH - 1, k * DMA_WIDTH) = this->dma_read_chnl.get();
-                        wait();
-                    }
-
-                    // Write to PLM
-                    if (ping)
-                        plm_in_ping[i] = dataBv.to_int64();
-                    else
-                        plm_in_pong[i] = dataBv.to_int64();
-                }
-#else
-                for (uint16_t i = 0; i < len; i += DMA_WORD_PER_BEAT)
-                {
-                    HLS_BREAK_DEP(plm_in_ping);
-                    HLS_BREAK_DEP(plm_in_pong);
-
-                    sc_dt::sc_bv<DMA_WIDTH> dataBv;
+                    HLS_BREAK_DEP(A0);
 
                     dataBv = this->dma_read_chnl.get();
                     wait();
-
-                    // Write to PLM (all DMA_WORD_PER_BEAT words in one cycle)
                     for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
                     {
                         HLS_UNROLL_SIMPLE;
-                        if (ping)
-                            plm_in_ping[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
-                        else
-                            plm_in_pong[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
+                        A0[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
                     }
                 }
-#endif
-                this->load_compute_handshake();
-                ping = !ping;
             }
+            break;
+            default:
+            break;
         }
+
+        wait();
+
+        this->load_compute_done_handshake();
     }
-
-    // Conclude
-    {
-        this->process_done();
-    }
-}
-
-
+} // Function : load_input
 
 void audio_fft::store_output()
 {
@@ -139,125 +140,167 @@ void audio_fft::store_output()
 
         this->reset_store_output();
 
-        // explicit PLM ports reset if any
+        store_state_req_dbg.write(0);
 
-        // User-defined reset code
+        store_ready.ack.reset_ack();
+        store_done.req.reset_req();
 
         wait();
     }
 
     // Config
     /* <<--params-->> */
-    int32_t do_inverse;
     int32_t logn_samples;
-    int32_t do_shift;
+    int32_t num_samples;
     {
         HLS_PROTO("store-config");
 
         cfg.wait_for_config(); // config process
+
         conf_info_t config = this->conf_info.read();
 
         // User-defined config code
         /* <<--local-params-->> */
-        do_inverse = config.do_inverse;
         logn_samples = config.logn_samples;
-        do_shift = config.do_shift;
+        num_samples = 1 << logn_samples;
     }
 
     // Store
+    while(true)
     {
         HLS_PROTO("store-dma");
-        wait();
-
-        bool ping = true;
-#if (DMA_WORD_PER_BEAT == 0)
-        uint32_t store_offset = (do_shift) * 1;
-#else
-        uint32_t store_offset = round_up(do_shift, DMA_WORD_PER_BEAT) * 1;
-#endif
-        uint32_t offset = store_offset;
 
         wait();
-        // Batching
-        for (uint16_t b = 0; b < 1; b++)
+
+        this->store_compute_ready_handshake();
+
+        store_state_req_dbg.write(store_state_req);
+
+        switch (store_state_req)
         {
-            wait();
-#if (DMA_WORD_PER_BEAT == 0)
-            uint32_t length = do_shift;
-#else
-            uint32_t length = round_up(do_shift, DMA_WORD_PER_BEAT);
-#endif
-            // Chunking
-            for (int rem = length; rem > 0; rem -= PLM_OUT_WORD)
+#ifdef ENABLE_SM
+            case UPDATE_PROD_READY_REQ:
             {
+                dma_info_t dma_info(READY_FLAG_OFFSET / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                sc_dt::sc_bv<DMA_WIDTH> dataBv;
+                dataBv.range(DMA_WIDTH - 1, 0) = 1;
 
-                this->store_compute_handshake();
+                this->dma_write_ctrl.put(dma_info);
+                wait();
+                this->dma_write_chnl.put(dataBv);
+                wait();
 
-                // Configure DMA transaction
-                uint32_t len = rem > PLM_OUT_WORD ? PLM_OUT_WORD : rem;
-#if (DMA_WORD_PER_BEAT == 0)
-                // data word is wider than NoC links
-                dma_info_t dma_info(offset * DMA_BEAT_PER_WORD, len * DMA_BEAT_PER_WORD, DMA_SIZE);
-#else
-                dma_info_t dma_info(offset / DMA_WORD_PER_BEAT, len / DMA_WORD_PER_BEAT, DMA_SIZE);
+                // Wait till the write is accepted at the cache (and previous fences)
+                while (!(this->dma_write_chnl.ready)) wait();
+                wait();
+            }
+            break;
+            case UPDATE_PROD_VALID_REQ:
+            {
+                dma_info_t dma_info(VALID_FLAG_OFFSET / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                sc_dt::sc_bv<DMA_WIDTH> dataBv;
+                dataBv.range(DMA_WIDTH - 1, 0) = 0;
+
+                this->dma_write_ctrl.put(dma_info);
+                wait();
+                this->dma_write_chnl.put(dataBv);
+                wait();
+
+                // Wait till the write is accepted at the cache (and previous fences)
+                while (!(this->dma_write_chnl.ready)) wait();
+                wait();
+            }
+            break;
+            case UPDATE_CONS_VALID_REQ:
+            {
+                int32_t end_sync_offset = SYNC_VAR_SIZE + 2 * num_samples + VALID_FLAG_OFFSET;
+                dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                sc_dt::sc_bv<DMA_WIDTH> dataBv;
+                dataBv.range(DMA_WIDTH - 1, 0) = 1;
+
+                this->dma_write_ctrl.put(dma_info);
+                wait();
+                this->dma_write_chnl.put(dataBv);
+                wait();
+
+                // Wait till the write is accepted at the cache (and previous fences)
+                while (!(this->dma_write_chnl.ready)) wait();
+                wait();
+            }
+            break;
+            case UPDATE_CONS_READY_REQ:
+            {
+                int32_t end_sync_offset = SYNC_VAR_SIZE + 2 * num_samples + READY_FLAG_OFFSET;
+                dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                sc_dt::sc_bv<DMA_WIDTH> dataBv;
+                dataBv.range(DMA_WIDTH - 1, 0) = 0;
+
+                this->dma_write_ctrl.put(dma_info);
+                wait();
+                this->dma_write_chnl.put(dataBv);
+                wait();
+
+                // Wait till the write is accepted at the cache (and previous fences)
+                while (!(this->dma_write_chnl.ready)) wait();
+                wait();
+            }
+            break;
 #endif
-                offset += len;
+            case STORE_DATA_REQ:
+            {
+                int32_t end_sync_offset = (2 * SYNC_VAR_SIZE) + (2 * num_samples);
+                dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, 2 * num_samples / DMA_WORD_PER_BEAT, DMA_SIZE);
+                sc_dt::sc_bv<DMA_WIDTH> dataBv;
+
+                wait();
 
                 this->dma_write_ctrl.put(dma_info);
 
-#if (DMA_WORD_PER_BEAT == 0)
-                // data word is wider than NoC links
-                for (uint16_t i = 0; i < len; i++)
+                for (int i = 0; i < 2 * num_samples; i += DMA_WORD_PER_BEAT)
                 {
-                    // Read from PLM
-                    sc_dt::sc_int<DATA_WIDTH> data;
-                    wait();
-                    if (ping)
-                        data = plm_out_ping[i];
-                    else
-                        data = plm_out_pong[i];
-                    sc_dt::sc_bv<DATA_WIDTH> dataBv(data);
+                    HLS_BREAK_DEP(A0);
 
-                    uint16_t k = 0;
-                    for (k = 0; k < DMA_BEAT_PER_WORD - 1; k++)
-                    {
-                        this->dma_write_chnl.put(dataBv.range((k+1) * DMA_WIDTH - 1, k * DMA_WIDTH));
-                        wait();
-                    }
-                    // Last beat on the bus does not require wait(), which is
-                    // placed before accessing the PLM
-                    this->dma_write_chnl.put(dataBv.range((k+1) * DMA_WIDTH - 1, k * DMA_WIDTH));
-                }
-#else
-                for (uint16_t i = 0; i < len; i += DMA_WORD_PER_BEAT)
-                {
-                    sc_dt::sc_bv<DMA_WIDTH> dataBv;
-
-                    // Read from PLM
                     wait();
+
                     for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
                     {
                         HLS_UNROLL_SIMPLE;
-                        if (ping)
-                            dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH) = plm_out_ping[i + k];
-                        else
-                            dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH) = plm_out_pong[i + k];
+                        dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH) = A0[i + k];
                     }
+
                     this->dma_write_chnl.put(dataBv);
                 }
-#endif
-                ping = !ping;
+
+                // Wait till the last write is accepted at the cache
+                wait();
+                while (!(this->dma_write_chnl.ready)) wait();
             }
+            break;
+            case STORE_FENCE:
+            {
+                // Block till L2 to be ready to receive a fence, then send
+                this->acc_fence.put(0x2);
+                wait();
+            }
+            break;
+            case ACC_DONE:
+            {
+                // Ensure the previous fence was accepted, then acc_done
+                while (!(this->acc_fence.ready)) wait();
+                wait();
+                this->accelerator_done();
+                wait();
+            }
+            break;
+            default:
+            break;
         }
-    }
 
-    // Conclude
-    {
-        this->accelerator_done();
-        this->process_done();
-    }
-}
+        wait();
 
+        this->store_compute_done_handshake();
+    }
+} // Function : store_output
 
 void audio_fft::compute_kernel()
 {
@@ -267,17 +310,24 @@ void audio_fft::compute_kernel()
 
         this->reset_compute_kernel();
 
-        // explicit PLM ports reset if any
+        compute_state_req_dbg.write(0);
 
-        // User-defined reset code
+        load_ready.req.reset_req();
+        load_done.ack.reset_ack();
+        store_ready.req.reset_req();
+        store_done.ack.reset_ack();
+
+        load_state_req = 0;
+        store_state_req = 0;
 
         wait();
     }
 
     // Config
     /* <<--params-->> */
-    int32_t do_inverse;
     int32_t logn_samples;
+    int32_t num_samples;
+    int32_t do_inverse;
     int32_t do_shift;
     {
         HLS_PROTO("compute-config");
@@ -287,46 +337,268 @@ void audio_fft::compute_kernel()
 
         // User-defined config code
         /* <<--local-params-->> */
-        do_inverse = config.do_inverse;
         logn_samples = config.logn_samples;
+        num_samples = 1 << logn_samples;
+        do_inverse = config.do_inverse;
         do_shift = config.do_shift;
     }
 
-
-    // Compute
-    bool ping = true;
+    while(true)
     {
-        for (uint16_t b = 0; b < 1; b++)
+#ifdef ENABLE_SM
+        // Poll producer's valid for new task
         {
-            uint32_t in_length = do_shift;
-            uint32_t out_length = do_shift;
-            int out_rem = out_length;
+            HLS_PROTO("poll-prod-valid");
 
-            for (int in_rem = in_length; in_rem > 0; in_rem -= PLM_IN_WORD)
-            {
+            load_state_req = POLL_PROD_VALID_REQ;
 
-                uint32_t in_len  = in_rem  > PLM_IN_WORD  ? PLM_IN_WORD  : in_rem;
-                uint32_t out_len = out_rem > PLM_OUT_WORD ? PLM_OUT_WORD : out_rem;
+            compute_state_req_dbg.write(1);
 
-                this->compute_load_handshake();
+            this->compute_load_ready_handshake();
+            wait();
+            this->compute_load_done_handshake();
+            wait();
+        }
 
-                // Computing phase implementation
-                for (int i = 0; i < in_len; i++) {
-                    if (ping)
-                        plm_out_ping[i] = plm_in_ping[i];
-                    else
-                        plm_out_pong[i] = plm_in_pong[i];
-                }
+        // Reset producer's valid
+        {
+            HLS_PROTO("update-prod-valid");
 
-                out_rem -= PLM_OUT_WORD;
-                this->compute_store_handshake();
-                ping = !ping;
+            store_state_req = UPDATE_PROD_VALID_REQ;
+
+            compute_state_req_dbg.write(2);
+
+            this->compute_store_ready_handshake();
+            wait();
+            this->compute_store_done_handshake();
+            wait();
+
+            // Wait for all writes to be done and then issue fence
+            store_state_req = STORE_FENCE;
+
+            compute_state_req_dbg.write(3);
+
+            this->compute_store_ready_handshake();
+            wait();
+            this->compute_store_done_handshake();
+            wait();
+        }
+#endif
+        // Load input data
+        {
+            HLS_PROTO("load-input-data");
+
+            load_state_req = LOAD_DATA_REQ;
+
+            compute_state_req_dbg.write(4);
+
+            this->compute_load_ready_handshake();
+            wait();
+            this->compute_load_done_handshake();
+            wait();
+        }
+#ifdef ENABLE_SM
+        // update producer's ready to accept new data
+        {
+            HLS_PROTO("update-prod-ready");
+
+            store_state_req = UPDATE_PROD_READY_REQ;
+
+            compute_state_req_dbg.write(5);
+
+            this->compute_store_ready_handshake();
+            wait();
+            this->compute_store_done_handshake();
+            wait();
+
+            // Wait for all writes to be done and then issue fence
+            store_state_req = STORE_FENCE;
+
+            compute_state_req_dbg.write(6);
+
+            this->compute_store_ready_handshake();
+            wait();
+            this->compute_store_done_handshake();
+            wait();
+
+            compute_state_req_dbg.write(7);
+        }
+#endif
+        // Compute FFT
+        {
+            unsigned offset = 0;  // Offset into Mem for start of this FFT
+            int sin_sign = (do_inverse) ? -1 : 1; // This modifes the mySin
+                                                  // values used below
+            if (do_inverse && do_shift) {
+                fft2_do_shift(offset, num_samples, logn_samples);
             }
+
+            // Do the bit-reverse
+            fft2_bit_reverse(offset, num_samples, logn_samples);
+
+            // Computing phase implementation
+            int m = 1;  // iterative FFT
+
+            FFT2_SINGLE_L1:
+                for(unsigned s = 1; s <= logn_samples; s++) {
+                    m = 1 << s;
+                    CompNum wm(myCos(s), sin_sign*mySin(s));
+
+                FFT2_SINGLE_L2:
+                    for(unsigned k = 0; k < num_samples; k +=m) {
+
+                        CompNum w((FPDATA) 1, (FPDATA) 0);
+                        int md2 = m / 2;
+
+                    FFT2_SINGLE_L3:
+                        for(int j = 0; j < md2; j++) {
+
+                            int kj = offset + k + j;
+                            int kjm = offset + k + j + md2;
+                            CompNum akj, akjm;
+                            CompNum bkj, bkjm;
+
+                            akj.re = int2fp<FPDATA, WORD_SIZE>(A0[2 * kj]);
+                            akj.im = int2fp<FPDATA, WORD_SIZE>(A0[2 * kj + 1]);
+                            akjm.re = int2fp<FPDATA, WORD_SIZE>(A0[2 * kjm]);
+                            akjm.im = int2fp<FPDATA, WORD_SIZE>(A0[2 * kjm + 1]);
+
+                            CompNum t;
+                            compMul(w, akjm, t);
+                            CompNum u(akj.re, akj.im);
+                            compAdd(u, t, bkj);
+                            compSub(u, t, bkjm);
+                            CompNum wwm;
+                            wwm.re = w.re - (wm.im * w.im + wm.re * w.re);
+                            wwm.im = w.im + (wm.im * w.re - wm.re * w.im);
+                            w = wwm;
+
+                            {
+                                HLS_PROTO("compute_write_A0");
+                                HLS_BREAK_DEP(A0);
+                                wait();
+                                A0[2 * kj] = fp2int<FPDATA, WORD_SIZE>(bkj.re);
+                                A0[2 * kj + 1] = fp2int<FPDATA, WORD_SIZE>(bkj.im);
+                                wait();
+                                A0[2 * kjm] = fp2int<FPDATA, WORD_SIZE>(bkjm.re);
+                                A0[2 * kjm + 1] = fp2int<FPDATA, WORD_SIZE>(bkjm.im);
+                            }
+                        } // for (j = 0 .. md2)
+                    } // for (k = 0 .. num_samples)
+                } // for (s = 1 .. logn_samples)
+
+            if ((!do_inverse) && (do_shift)) {
+                fft2_do_shift(offset, num_samples, logn_samples);
+            }
+        } // Compute
+#ifdef ENABLE_SM
+        // Poll consumer's ready to know if we can send new data
+        {
+            HLS_PROTO("poll-for-cons-ready");
+
+            load_state_req = POLL_CONS_READY_REQ;
+
+            compute_state_req_dbg.write(8);
+
+            this->compute_load_ready_handshake();
+            wait();
+            this->compute_load_done_handshake();
+            wait();
         }
 
-        // Conclude
+        // Reset consumer's ready
         {
-            this->process_done();
+            HLS_PROTO("update-cons-ready");
+
+            store_state_req = UPDATE_CONS_READY_REQ;
+
+            compute_state_req_dbg.write(9);
+
+            this->compute_store_ready_handshake();
+            wait();
+            this->compute_store_done_handshake();
+            wait();
+
+            // Wait for all writes to be done and then issue fence
+            store_state_req = STORE_FENCE;
+
+            compute_state_req_dbg.write(10);
+
+            this->compute_store_ready_handshake();
+            wait();
+            this->compute_store_done_handshake();
+            wait();
         }
-    }
-}
+#endif
+        // Store output data
+        {
+            HLS_PROTO("store-output-data");
+
+            store_state_req = STORE_DATA_REQ;
+
+            this->compute_store_ready_handshake();
+
+            compute_state_req_dbg.write(11);
+
+            wait();
+            this->compute_store_done_handshake();
+            wait();
+
+            // Wait for all writes to be done and then issue fence
+            store_state_req = STORE_FENCE;
+
+            compute_state_req_dbg.write(12);
+
+            this->compute_store_ready_handshake();
+            wait();
+            this->compute_store_done_handshake();
+            wait();
+        }
+#ifdef ENABLE_SM
+        // update consumer's ready for new data available
+        {
+            HLS_PROTO("update-cons-valid");
+
+            store_state_req = UPDATE_CONS_VALID_REQ;
+
+            compute_state_req_dbg.write(13);
+
+            this->compute_store_ready_handshake();
+            wait();
+            this->compute_store_done_handshake();
+            wait();
+
+            // Wait for all writes to be done and then issue fence
+            store_state_req = STORE_FENCE;
+
+            compute_state_req_dbg.write(14);
+
+            this->compute_store_ready_handshake();
+            wait();
+            this->compute_store_done_handshake();
+            wait();
+        }
+#endif
+        // End operation
+        {
+            HLS_PROTO("end-acc");
+
+#ifdef ENABLE_SM
+            if (last_task == 1)
+            {
+#endif
+                store_state_req = ACC_DONE;
+
+                compute_state_req_dbg.write(15);
+
+                this->compute_store_ready_handshake();
+                wait();
+                this->compute_store_done_handshake();
+                wait();
+                this->process_done();
+#ifdef ENABLE_SM
+            }
+#endif
+        }
+    } // while (true)
+} // Function : compute_kernel
