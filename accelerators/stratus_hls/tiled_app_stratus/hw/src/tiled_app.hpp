@@ -27,11 +27,15 @@ public:
     tiled_app(const sc_module_name& name)
     : esp_accelerator_3P<DMA_WIDTH>(name)
         , cfg("config")
-        , load_store_cfg_done("load_store_cfg_done")
+        , load_sync_done("load_sync_done")
+        , store_sync_done("load_store_cfg_done")
+        , load_next_tile("load_next_tile")
     {
         // Signal binding
         cfg.bind_with(*this);
-	    load_store_cfg_done.bind_with<DMA_WIDTH>(*this);
+	    load_sync_done.bind_with<DMA_WIDTH>(*this);
+	    store_sync_done.bind_with<DMA_WIDTH>(*this);
+	    load_next_tile.bind_with<DMA_WIDTH>(*this);
 
         HLS_PRESERVE_SIGNAL(load_iter_dbg);
         HLS_PRESERVE_SIGNAL(store_iter_dbg);
@@ -74,13 +78,22 @@ public:
 
 
     // Custom handshakes
-    handshake_t load_store_cfg_done;
+    // handshake_t load_store_cfg_done;
+    handshake_t load_sync_done;
+    handshake_t store_sync_done;
+    handshake_t load_next_tile;
     // Functions
-
+    
+    inline void load_sync_done_req();
+    inline void load_sync_done_ack();
+    inline void store_sync_done_req();
+    inline void store_sync_done_ack();
+    inline void load_next_tile_req(); 
+    inline void load_next_tile_ack();
 
     // Configuration handshakes
-    inline void load_store_cfg_handshake();
-    inline void store_load_cfg_handshake();
+    // inline void load_store_cfg_handshake();
+    // inline void store_load_cfg_handshake();
 
     // Private local memories
     // sc_dt::sc_int<DATA_WIDTH> plm[PLM_IN_WORD];
