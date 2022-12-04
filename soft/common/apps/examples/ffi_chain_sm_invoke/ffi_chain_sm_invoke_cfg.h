@@ -57,7 +57,7 @@ struct audio_fir_stratus_access fir_cfg_000[] = {
 esp_thread_info_t cfg_000[] = {
 	{
 		.run = true,
-		.devname = "audio_fft_stratus.2",
+		.devname = "audio_fft_stratus.0",
 		.ioctl_req = AUDIO_FFT_STRATUS_IOC_ACCESS,
 		.esp_desc = &(fft_cfg_000[0].esp),
 	}
@@ -66,7 +66,7 @@ esp_thread_info_t cfg_000[] = {
 esp_thread_info_t cfg_001[] = {
 	{
 		.run = true,
-		.devname = "audio_fft_stratus.3",
+		.devname = "audio_fft_stratus.1",
 		.ioctl_req = AUDIO_FFT_STRATUS_IOC_ACCESS,
 		.esp_desc = &(fft_cfg_001[0].esp),
 	}
@@ -75,7 +75,7 @@ esp_thread_info_t cfg_001[] = {
 esp_thread_info_t cfg_002[] = {
 	{
 		.run = true,
-		.devname = "audio_fir_stratus.1",
+		.devname = "audio_fir_stratus.0",
 		.ioctl_req = AUDIO_FIR_STRATUS_IOC_ACCESS,
 		.esp_desc = &(fir_cfg_000[0].esp),
 	}
