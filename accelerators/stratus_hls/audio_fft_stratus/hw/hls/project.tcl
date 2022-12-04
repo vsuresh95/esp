@@ -94,7 +94,7 @@ foreach dma [list 64] {
 }
 
 foreach dma [list 64] {
-    define_io_config * IOCFG_DMA$dma\_SM -DDMA_WIDTH=$dma -DFX_WIDTH=32
+    define_io_config * IOCFG_DMA$dma\_SM -DDMA_WIDTH=$dma -DENABLE_SM -DFX_WIDTH=32
 
     define_system_config tb TESTBENCH_DMA$dma\_SM -io_config IOCFG_DMA$dma\_SM
 
