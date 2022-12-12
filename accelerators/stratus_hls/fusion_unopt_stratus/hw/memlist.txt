@@ -1,0 +1,4 @@
+fusion_unopt_plm_block_in_dma32 310820 32 1w:0r 0w:1r
+fusion_unopt_plm_block_out_dma32 15360 32 1w:0r 0w:1r
+fusion_unopt_plm_block_in_dma64 310820 32 2w:0r 0w:1r
+fusion_unopt_plm_block_out_dma64 15360 32 1w:0r 0w:2r

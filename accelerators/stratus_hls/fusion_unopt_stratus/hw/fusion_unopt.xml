@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sld>
+  <accelerator name="fusion_unopt" desc="Accelerator FUSION_UNOPT" data_size="4" device_id="167" hls_tool="stratus_hls">
+    <param name="sdf_block_size3" desc="sdf_block_size3" />
+    <param name="sdf_block_size" desc="sdf_block_size" />
+    <param name="imgheight" desc="imgheight" />
+    <param name="htdim" desc="htdim" />
+    <param name="imgwidth" desc="imgwidth" />
+    <param name="veno" desc="veno" />
+  </accelerator>
+</sld>
