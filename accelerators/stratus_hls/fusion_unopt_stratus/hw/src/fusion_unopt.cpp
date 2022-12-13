@@ -207,7 +207,7 @@ void fusion_unopt::store_output()
 #if (DMA_WORD_PER_BEAT == 0)
             uint32_t length = veno * sdf_block_size3;
 #else
-            uint32_t length = round_up(25 + imgwidth * imgheight + sdf_block_size3 * 2 + htdim * 5 + veno + 1, DMA_WORD_PER_BEAT);
+            uint32_t length = round_up(veno * sdf_block_size3, DMA_WORD_PER_BEAT);
             // uint32_t length = round_up(PLM_OUT_WORD, DMA_WORD_PER_BEAT);
 #endif
             // Chunking
