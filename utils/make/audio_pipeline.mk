@@ -137,7 +137,7 @@ AUDIO_SRCS = \
 	$(AUDIO_PIPELINE)/src/AmbisonicProcessor.cpp \
 	$(AUDIO_PIPELINE)/src/AmbisonicZoomer.cpp \
 	$(AUDIO_PIPELINE)/src/audio.cpp \
-	$(AUDIO_PIPELINE)/src/audio_main.cpp \
+	$(AUDIO_PIPELINE)/src/main.cpp \
 	$(AUDIO_PIPELINE)/src/kiss_fft.cpp \
 	$(AUDIO_PIPELINE)/src/kiss_fftr.cpp \
 	$(AUDIO_PIPELINE)/src/FFTAcc.cpp \
