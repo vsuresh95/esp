@@ -9,46 +9,30 @@
 #include "audio_dma_functions.hpp"
 
 // Processes
-
 void audio_dma::load_input()
 {
-
     // Reset
     {
         HLS_PROTO("load-reset");
 
-        rd_size_dbg.write(0);
-        rd_sp_offset_dbg.write(0);
-        src_offset_dbg.write(0);
+        this->reset_load_input();
 
         load_state_req_dbg.write(0);
+
+        load_ready.ack.reset_ack();
+        load_done.req.reset_req();
 
         for (int i = 0; i < NUM_CFG_REG; i++)
         {
             cfg_registers[i] = 0;
         }
 
-        this->reset_load_input();
-
-        load_ready.ack.reset_ack();
-        load_done.req.reset_req();
-
         wait();
     }
 
-    // Config
-    /* <<--params-->> */
-    int64_t rd_size;
-    int64_t rd_sp_offset;
-    int64_t src_offset;
-    {
-        HLS_PROTO("load-config");
-
-        cfg.wait_for_config(); // config process
-
-        // User-defined config code
-        /* <<--local-params-->> */
-    }
+    int32_t rd_size;
+    int32_t rd_sp_offset;
+    int32_t mem_src_offset;
 
     // Load
     while(true)
@@ -63,39 +47,66 @@ void audio_dma::load_input()
 
         switch (load_state_req)
         {
-            case POLL_REQ:
+            case POLL_PROD_VALID_REQ:
             {
-                dma_info_t dma_info(0, 1, DMA_SIZE);
-                sc_dt::sc_bv<DMA_WIDTH> dataBvin;
-                int64_t new_task = 0;
+                dma_info_t dma_info(VALID_FLAG_OFFSET / DMA_WORD_PER_BEAT, READY_FLAG_OFFSET / DMA_WORD_PER_BEAT, DMA_SIZE);
+                sc_dt::sc_bv<DMA_WIDTH> dataBv;
+                int32_t valid_task = 0;
 
                 wait();
 
-                //Wait for 1
-                while (new_task != 1)
+                // Wait for producer to send new data
+                while (valid_task != 1)
                 {
                     HLS_UNROLL_LOOP(OFF);
                     this->dma_read_ctrl.put(dma_info);
-                    dataBvin = this->dma_read_chnl.get();
+                    dataBv = this->dma_read_chnl.get();
                     wait();
-                    new_task = dataBvin.range(DMA_WIDTH - 1, 0).to_int64();
+                    valid_task = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
+                    dataBv = this->dma_read_chnl.get();
+                    wait();
+                    last_task = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
+                }
+            }
+            break;
+            case POLL_CONS_READY_REQ:
+            {
+                int32_t end_sync_offset = SYNC_VAR_SIZE + 2 * num_samples + READY_FLAG_OFFSET;
+                dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                sc_dt::sc_bv<DMA_WIDTH> dataBv;
+                int32_t ready_for_task = 0;
+
+                wait();
+
+                // Wait for consumer to accept new data
+                while (ready_for_task != 1)
+                {
+                    HLS_UNROLL_LOOP(OFF);
+                    this->dma_read_ctrl.put(dma_info);
+                    dataBv = this->dma_read_chnl.get();
+                    wait();
+                    ready_for_task = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
                 }
             }
             break;
             case CFG_REQ:
             {
-                dma_info_t dma_info(0, NUM_CFG_REG, DMA_SIZE);
+                dma_info_t dma_info(SYNC_VAR_SIZE / DMA_WORD_PER_BEAT, NUM_CFG_REG / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBvin;
 
                 wait();
 
                 this->dma_read_ctrl.put(dma_info);
 
-                for (int i = 0; i < NUM_CFG_REG; i++)
+                for (int i = 0; i < NUM_CFG_REG; i += DMA_WORD_PER_BEAT)
                 {
-                    dataBvin = this->dma_read_chnl.get();
+                    dataBv = this->dma_read_chnl.get();
                     wait();
-                    cfg_registers[i] = dataBvin.range(DMA_WIDTH - 1, 0).to_int64();
+                    for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
+                    {
+                        HLS_UNROLL_SIMPLE;
+                        cfg_registers[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
+                    }
                 }
             }
             break;
@@ -105,32 +116,27 @@ void audio_dma::load_input()
                 {
                     rd_size = cfg_registers[RD_SIZE];
                     rd_sp_offset = cfg_registers[RD_SP_OFFSET];
-                    src_offset = cfg_registers[SRC_OFFSET];
-                    src_offset += 10;
+                    mem_src_offset = cfg_registers[MEM_SRC_OFFSET];
                     wait();
                 }
 
+                dma_info_t dma_info(mem_src_offset / DMA_WORD_PER_BEAT, rd_size / DMA_WORD_PER_BEAT, DMA_SIZE);
+                sc_dt::sc_bv<DMA_WIDTH> dataBv;
+
+                wait();
+
+                this->dma_read_ctrl.put(dma_info);
+
+                for (int i = 0; i < rd_size; i += DMA_WORD_PER_BEAT)
                 {
-                    rd_size_dbg.write(rd_size);
-                    rd_sp_offset_dbg.write(rd_sp_offset);
-                    src_offset_dbg.write(src_offset);
+                    HLS_BREAK_DEP(plm_data);
+
+                    dataBv = this->dma_read_chnl.get();
                     wait();
-                }
-
-                // Main load operation
-                {
-                    dma_info_t dma_info(src_offset, rd_size, DMA_SIZE);
-                    sc_dt::sc_bv<DMA_WIDTH> dataBv;
-
-                    wait();
-
-                    this->dma_read_ctrl.put(dma_info);
-
-                    for (int i = 0; i < rd_size; i++)
+                    for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
                     {
-                        dataBv = this->dma_read_chnl.get();
-                        wait();
-                        plm_data[rd_sp_offset + i] = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
+                        HLS_UNROLL_SIMPLE;
+                        plm_data[rd_sp_offset + i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
                     }
                 }
             }
@@ -143,7 +149,7 @@ void audio_dma::load_input()
 
         this->load_compute_done_handshake();
     }
-}
+} // Function : load_input
 
 void audio_dma::store_output()
 {
@@ -151,13 +157,9 @@ void audio_dma::store_output()
     {
         HLS_PROTO("store-reset");
 
-        wr_size_dbg.write(0);
-        wr_sp_offset_dbg.write(0);
-        dst_offset_dbg.write(0);
+        this->reset_store_output();
 
         store_state_req_dbg.write(0);
-
-        this->reset_store_output();
 
         store_ready.ack.reset_ack();
         store_done.req.reset_req();
@@ -165,19 +167,9 @@ void audio_dma::store_output()
         wait();
     }
 
-    // Config
-    /* <<--params-->> */
-    int64_t wr_size;
-    int64_t wr_sp_offset;
-    int64_t dst_offset;
-    {
-        HLS_PROTO("store-config");
-
-        cfg.wait_for_config(); // config process
-
-        // User-defined config code
-        /* <<--local-params-->> */
-    }
+    int32_t wr_size;
+    int32_t wr_sp_offset;
+    int32_t mem_dst_offset;
 
     // Store
     while(true)
@@ -192,16 +184,65 @@ void audio_dma::store_output()
 
         switch (store_state_req)
         {
-            case UPDATE_REQ:
+            case UPDATE_PROD_READY_REQ:
             {
-                // Send the lock variable update
-                dma_info_t dma_info(0, 1, DMA_SIZE);
-                sc_dt::sc_bv<DMA_WIDTH> dataBvout;
-                dataBvout.range(DMA_WIDTH - 1, 0) = 0;
-                
+                dma_info_t dma_info(READY_FLAG_OFFSET / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                sc_dt::sc_bv<DMA_WIDTH> dataBv;
+                dataBv.range(DMA_WIDTH - 1, 0) = 1;
+
                 this->dma_write_ctrl.put(dma_info);
                 wait();
-                this->dma_write_chnl.put(dataBvout); 
+                this->dma_write_chnl.put(dataBv);
+                wait();
+
+                // Wait till the write is accepted at the cache (and previous fences)
+                while (!(this->dma_write_chnl.ready)) wait();
+                wait();
+            }
+            break;
+            case UPDATE_PROD_VALID_REQ:
+            {
+                dma_info_t dma_info(VALID_FLAG_OFFSET / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                sc_dt::sc_bv<DMA_WIDTH> dataBv;
+                dataBv.range(DMA_WIDTH - 1, 0) = 0;
+
+                this->dma_write_ctrl.put(dma_info);
+                wait();
+                this->dma_write_chnl.put(dataBv);
+                wait();
+
+                // Wait till the write is accepted at the cache (and previous fences)
+                while (!(this->dma_write_chnl.ready)) wait();
+                wait();
+            }
+            break;
+            case UPDATE_CONS_VALID_REQ:
+            {
+                int32_t end_sync_offset = SYNC_VAR_SIZE + 2 * num_samples + VALID_FLAG_OFFSET;
+                dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                sc_dt::sc_bv<DMA_WIDTH> dataBv;
+                dataBv.range(DMA_WIDTH - 1, 0) = 1;
+
+                this->dma_write_ctrl.put(dma_info);
+                wait();
+                this->dma_write_chnl.put(dataBv);
+                wait();
+
+                // Wait till the write is accepted at the cache (and previous fences)
+                while (!(this->dma_write_chnl.ready)) wait();
+                wait();
+            }
+            break;
+            case UPDATE_CONS_READY_REQ:
+            {
+                int32_t end_sync_offset = SYNC_VAR_SIZE + 2 * num_samples + READY_FLAG_OFFSET;
+                dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                sc_dt::sc_bv<DMA_WIDTH> dataBv;
+                dataBv.range(DMA_WIDTH - 1, 0) = 0;
+
+                this->dma_write_ctrl.put(dma_info);
+                wait();
+                this->dma_write_chnl.put(dataBv);
                 wait();
 
                 // Wait till the write is accepted at the cache (and previous fences)
@@ -215,37 +256,35 @@ void audio_dma::store_output()
                 {
                     wr_size = cfg_registers[WR_SIZE];
                     wr_sp_offset = cfg_registers[WR_SP_OFFSET];
-                    dst_offset = cfg_registers[DST_OFFSET];
-                    dst_offset += 10;
+                    mem_dst_offset = cfg_registers[MEM_DST_OFFSET];
                     wait();
                 }
+                
+                dma_info_t dma_info(mem_dst_offset / DMA_WORD_PER_BEAT, wr_size / DMA_WORD_PER_BEAT, DMA_SIZE);
+                sc_dt::sc_bv<DMA_WIDTH> dataBv;
 
+                wait();
+
+                this->dma_write_ctrl.put(dma_info);
+
+                for (int i = 0; i < wr_size; i += DMA_WORD_PER_BEAT)
                 {
-                    wr_size_dbg.write(wr_size);
-                    wr_sp_offset_dbg.write(wr_sp_offset);
-                    dst_offset_dbg.write(dst_offset);
-                    wait();
-                }
-
-                {
-                    dma_info_t dma_info(dst_offset, wr_size, DMA_SIZE);
-                    sc_dt::sc_bv<DMA_WIDTH> dataBv;
+                    HLS_BREAK_DEP(plm_data);
 
                     wait();
 
-                    this->dma_write_ctrl.put(dma_info);
-
-                    for (int i = 0; i < wr_size; i++)
+                    for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
                     {
-                        wait();
-                        dataBv.range(DATA_WIDTH - 1, 0) = plm_data[wr_sp_offset + i];
-                        this->dma_write_chnl.put(dataBv);
+                        HLS_UNROLL_SIMPLE;
+                        dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH) = plm_data[wr_sp_offset + i + k];
                     }
 
-                    // Wait till the last write is accepted at the cache
-                    wait();
-                    while (!(this->dma_write_chnl.ready)) wait();
+                    this->dma_write_chnl.put(dataBv);
                 }
+
+                // Wait till the last write is accepted at the cache
+                wait();
+                while (!(this->dma_write_chnl.ready)) wait();
             }
             break;
             case STORE_FENCE:
@@ -272,7 +311,7 @@ void audio_dma::store_output()
 
         this->store_compute_done_handshake();
     }
-}
+} // Function : store_output
 
 void audio_dma::compute_kernel()
 {
@@ -280,43 +319,58 @@ void audio_dma::compute_kernel()
     {
         HLS_PROTO("compute-reset");
 
-        load_store_dbg.write(0);
-        rd_op_dbg.write(0);
-        wr_op_dbg.write(0);
-
-        load_state_req = 0;
-        store_state_req = 0;
+        this->reset_compute_kernel();
 
         compute_state_req_dbg.write(0);
-
-        this->reset_compute_kernel();
 
         load_ready.req.reset_req();
         load_done.ack.reset_ack();
         store_ready.req.reset_req();
         store_done.ack.reset_ack();
 
+        load_state_req = 0;
+        store_state_req = 0;
+
         wait();
     }
 
-    int64_t load_store;
-    int64_t rd_op;
-    int64_t wr_op;
-
-    // Synchronization unit - polling new message location
     while(true)
     {
-        // Poll for new task
+        // Poll producer's valid for new task
         {
-            HLS_PROTO("poll-for-new-task");
+            HLS_PROTO("poll-prod-valid");
 
-            load_state_req = POLL_REQ;
+            load_state_req = POLL_PROD_VALID_REQ;
 
             compute_state_req_dbg.write(1);
 
             this->compute_load_ready_handshake();
             wait();
             this->compute_load_done_handshake();
+            wait();
+        }
+
+        // Reset producer's valid
+        {
+            HLS_PROTO("update-prod-valid");
+
+            store_state_req = UPDATE_PROD_VALID_REQ;
+
+            compute_state_req_dbg.write(2);
+
+            this->compute_store_ready_handshake();
+            wait();
+            this->compute_store_done_handshake();
+            wait();
+
+            // Wait for all writes to be done and then issue fence
+            store_state_req = STORE_FENCE;
+
+            compute_state_req_dbg.write(3);
+
+            this->compute_store_ready_handshake();
+            wait();
+            this->compute_store_done_handshake();
             wait();
         }
 
@@ -334,60 +388,35 @@ void audio_dma::compute_kernel()
             wait();
         }
 
-        // Schedule new task
+        // Load input data
         {
-            HLS_PROTO("schedule-new-task");
+            HLS_PROTO("load-input-data");
 
-            load_store = cfg_registers[LOAD_STORE];
-            rd_op = cfg_registers[RD_OP];
-            wr_op = cfg_registers[WR_OP];
+            load_state_req = LOAD_DATA_REQ;
 
-            load_store_dbg.write(load_store);
-            rd_op_dbg.write(rd_op);
-            wr_op_dbg.write(wr_op);
-        
-            if (load_store == 1)
-            {
-                // Start a store transfer
-                store_state_req = STORE_DATA_REQ;
+            compute_state_req_dbg.write(4);
 
-                this->compute_store_ready_handshake();
-
-                compute_state_req_dbg.write(3);
-
-                wait();
-                this->compute_store_done_handshake();
-                wait();
-
-                // Stall till all writes are received at the cache
-                store_state_req = STORE_FENCE;
-
-                compute_state_req_dbg.write(4);
-
-                this->compute_store_ready_handshake();
-                wait();
-                this->compute_store_done_handshake();
-                wait();
-            }
-            else
-            {
-                // Start a store transfer
-                load_state_req = LOAD_DATA_REQ;
-
-                compute_state_req_dbg.write(5);
-
-                this->compute_load_ready_handshake();
-                wait();
-                this->compute_load_done_handshake();
-                wait();
-            }
+            this->compute_load_ready_handshake();
+            wait();
+            this->compute_load_done_handshake();
+            wait();
         }
 
-        // Update lock
+        // update producer's ready to accept new data
         {
-            HLS_PROTO("schedule-new-task");
+            HLS_PROTO("update-prod-ready");
 
-            store_state_req = UPDATE_REQ;
+            store_state_req = UPDATE_PROD_READY_REQ;
+
+            compute_state_req_dbg.write(5);
+
+            this->compute_store_ready_handshake();
+            wait();
+            this->compute_store_done_handshake();
+            wait();
+
+            // Wait for all writes to be done and then issue fence
+            store_state_req = STORE_FENCE;
 
             compute_state_req_dbg.write(6);
 
@@ -396,10 +425,40 @@ void audio_dma::compute_kernel()
             this->compute_store_done_handshake();
             wait();
 
-            // Stall till lock variable update write is received at the cache
+            compute_state_req_dbg.write(7);
+        }
+
+        // Poll consumer's ready to know if we can send new data
+        {
+            HLS_PROTO("poll-for-cons-ready");
+
+            load_state_req = POLL_CONS_READY_REQ;
+
+            compute_state_req_dbg.write(8);
+
+            this->compute_load_ready_handshake();
+            wait();
+            this->compute_load_done_handshake();
+            wait();
+        }
+
+        // Reset consumer's ready
+        {
+            HLS_PROTO("update-cons-ready");
+
+            store_state_req = UPDATE_CONS_READY_REQ;
+
+            compute_state_req_dbg.write(9);
+
+            this->compute_store_ready_handshake();
+            wait();
+            this->compute_store_done_handshake();
+            wait();
+
+            // Wait for all writes to be done and then issue fence
             store_state_req = STORE_FENCE;
 
-            compute_state_req_dbg.write(7);
+            compute_state_req_dbg.write(10);
 
             this->compute_store_ready_handshake();
             wait();
@@ -407,15 +466,64 @@ void audio_dma::compute_kernel()
             wait();
         }
 
-        // Decide next iteration
+        // Store output data
+        {
+            HLS_PROTO("store-output-data");
+
+            store_state_req = STORE_DATA_REQ;
+
+            this->compute_store_ready_handshake();
+
+            compute_state_req_dbg.write(11);
+
+            wait();
+            this->compute_store_done_handshake();
+            wait();
+
+            // Wait for all writes to be done and then issue fence
+            store_state_req = STORE_FENCE;
+
+            compute_state_req_dbg.write(12);
+
+            this->compute_store_ready_handshake();
+            wait();
+            this->compute_store_done_handshake();
+            wait();
+        }
+
+        // update consumer's ready for new data available
+        {
+            HLS_PROTO("update-cons-valid");
+
+            store_state_req = UPDATE_CONS_VALID_REQ;
+
+            compute_state_req_dbg.write(13);
+
+            this->compute_store_ready_handshake();
+            wait();
+            this->compute_store_done_handshake();
+            wait();
+
+            // Wait for all writes to be done and then issue fence
+            store_state_req = STORE_FENCE;
+
+            compute_state_req_dbg.write(14);
+
+            this->compute_store_ready_handshake();
+            wait();
+            this->compute_store_done_handshake();
+            wait();
+        }
+
+        // End operation
         {
             HLS_PROTO("end-acc");
 
-            if (rd_op == 1 || wr_op == 1)
+            if (last_task == 1)
             {
                 store_state_req = ACC_DONE;
 
-                compute_state_req_dbg.write(8);
+                compute_state_req_dbg.write(15);
 
                 this->compute_store_ready_handshake();
                 wait();
@@ -424,5 +532,5 @@ void audio_dma::compute_kernel()
                 this->process_done();
             }
         }
-    }
-}
+    } // while (true)
+} // Function : compute_kernel
