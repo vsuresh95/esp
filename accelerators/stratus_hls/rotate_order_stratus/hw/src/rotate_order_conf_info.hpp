@@ -19,27 +19,23 @@ public:
     conf_info_t()
     {
         /* <<--ctor-->> */
-        this->num_channel = 16;
-        this->block_size = 1024;
+        this->logn_samples = 1024;
     }
 
     conf_info_t(
         /* <<--ctor-args-->> */
-        int32_t num_channel, 
-        int32_t block_size
+        int32_t logn_samples
         )
     {
         /* <<--ctor-custom-->> */
-        this->num_channel = num_channel;
-        this->block_size = block_size;
+        this->logn_samples = logn_samples;
     }
 
     // equals operator
     inline bool operator==(const conf_info_t &rhs) const
     {
         /* <<--eq-->> */
-        if (num_channel != rhs.num_channel) return false;
-        if (block_size != rhs.block_size) return false;
+        if (logn_samples != rhs.logn_samples) return false;
         return true;
     }
 
@@ -47,8 +43,7 @@ public:
     inline conf_info_t& operator=(const conf_info_t& other)
     {
         /* <<--assign-->> */
-        num_channel = other.num_channel;
-        block_size = other.block_size;
+        logn_samples = other.logn_samples;
         return *this;
     }
 
@@ -61,15 +56,13 @@ public:
     {
         os << "{";
         /* <<--print-->> */
-        os << "num_channel = " << conf_info.num_channel << ", ";
-        os << "block_size = " << conf_info.block_size << "";
+        os << "logn_samples = " << conf_info.logn_samples << "";
         os << "}";
         return os;
     }
 
         /* <<--params-->> */
-        int32_t num_channel;
-        int32_t block_size;
+        int32_t logn_samples;
 };
 
 #endif // __ROTATE_ORDER_CONF_INFO_HPP__

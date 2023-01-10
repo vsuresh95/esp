@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <sld>
   <accelerator name="rotate_order" desc="Accelerator ROTATE_ORDER" data_size="4" device_id="059" hls_tool="stratus_hls">
-    <param name="block_size" desc="block_size" />
-    <param name="num_channel" desc="num_channel" />
+    <param name="logn_samples" desc="logn_samples" />
   </accelerator>
 </sld>
