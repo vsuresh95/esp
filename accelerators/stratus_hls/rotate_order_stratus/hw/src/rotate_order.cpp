@@ -582,6 +582,11 @@ void rotate_order::compute_kernel()
 
 void rotate_order::rotate_order_1()
 {
+    // Reset
+    {
+        HLS_PROTO("rotate-1-reset");
+        wait();
+    }
 
     // Config
     /* <<--params-->> */
@@ -612,6 +617,8 @@ void rotate_order::rotate_order_1()
         {
             for (unsigned niSample = 0; niSample < num_samples; niSample++)
             {
+                HLS_BREAK_PROTOCOL("rotate-1-compute");
+
                 FPDATA m_pfTempSample[3];
                 FPDATA m_ppfChannels[3];
 
@@ -651,6 +658,11 @@ void rotate_order::rotate_order_1()
 
 void rotate_order::rotate_order_2()
 {
+    // Reset
+    {
+        HLS_PROTO("rotate-2-reset");
+        wait();
+    }
 
     // Config
     /* <<--params-->> */
@@ -680,9 +692,12 @@ void rotate_order::rotate_order_2()
         // Rotate Order 1
         {
             FPDATA fSqrt3 = sqrt(3);
+            FPDATA fPowSinBeta2 = m_fSinBeta * m_fSinBeta;
 
             for (unsigned niSample = 0; niSample < num_samples; niSample++)
             {
+                HLS_BREAK_PROTOCOL("rotate-2-compute");
+
                 FPDATA m_pfTempSample[5];
                 FPDATA m_ppfChannels[5];
 
@@ -709,14 +724,14 @@ void rotate_order::rotate_order_2()
                 m_ppfChannels[kT] = -m_fCosBeta * m_pfTempSample[kT]
                                                 + m_fSinBeta * m_pfTempSample[kV];
                 m_ppfChannels[kR] = (0.75f * m_fCos2Beta + 0.25f) * m_pfTempSample[kR]
-                                    + (0.5 * fSqrt3 * pow(m_fSinBeta,2.0) ) * m_pfTempSample[kU]
+                                    + (0.5 * fSqrt3 * fPowSinBeta2) * m_pfTempSample[kU]
                                     + (fSqrt3 * m_fSinBeta * m_fCosBeta) * m_pfTempSample[kS];
                 m_ppfChannels[kS] = m_fCos2Beta * m_pfTempSample[kS]
                                     - fSqrt3 * m_fCosBeta * m_fSinBeta * m_pfTempSample[kR]
                                     + m_fCosBeta * m_fSinBeta * m_pfTempSample[kU];
                 m_ppfChannels[kU] = (0.25f * m_fCos2Beta + 0.75f) * m_pfTempSample[kU]
                                     - m_fCosBeta * m_fSinBeta * m_pfTempSample[kS]
-                                    +0.5 * fSqrt3 * pow(m_fSinBeta,2.0) * m_pfTempSample[kR];
+                                    + 0.5 * fSqrt3 * fPowSinBeta2 * m_pfTempSample[kR];
 
                 // Gamma rotation
                 m_pfTempSample[kV] = - m_ppfChannels[kU] * m_fSin2Gamma
@@ -744,6 +759,11 @@ void rotate_order::rotate_order_2()
 
 void rotate_order::rotate_order_3()
 {
+    // Reset
+    {
+        HLS_PROTO("rotate-3-reset");
+        wait();
+    }
 
     // Config
     /* <<--params-->> */
@@ -776,8 +796,13 @@ void rotate_order::rotate_order_3()
             FPDATA fSqrt15 = sqrt(15.f);
             FPDATA fSqrt5_2 = sqrt(5.f/2.f);
 
+            FPDATA fPowSinBeta2 = m_fSinBeta * m_fSinBeta;
+            FPDATA fPowSinBeta3 = m_fSinBeta * m_fSinBeta * m_fSinBeta;
+
             for (unsigned niSample = 0; niSample < num_samples; niSample++)
             {
+                HLS_BREAK_PROTOCOL("rotate-3-compute");
+
                 FPDATA m_pfTempSample[7];
                 FPDATA m_ppfChannels[7];
 
@@ -806,30 +831,30 @@ void rotate_order::rotate_order_3()
 
                 // Beta rotation
                 m_ppfChannels[kQ] = 0.125f * m_pfTempSample[kQ] * (5.f + 3.f*m_fCos2Beta)
-                            - fSqrt3_2 * m_pfTempSample[kO] *m_fCosBeta * m_fSinBeta
-                            + 0.25f * fSqrt15 * m_pfTempSample[kM] * pow(m_fSinBeta,2.0f);
+                            - fSqrt3_2 * m_pfTempSample[kO] * m_fCosBeta * m_fSinBeta
+                            + 0.25f * fSqrt15 * m_pfTempSample[kM] * fPowSinBeta2;
                 m_ppfChannels[kO] = m_pfTempSample[kO] * m_fCos2Beta
                             - fSqrt5_2 * m_pfTempSample[kM] * m_fCosBeta * m_fSinBeta
                             + fSqrt3_2 * m_pfTempSample[kQ] * m_fCosBeta * m_fSinBeta;
                 m_ppfChannels[kM] = 0.125f * m_pfTempSample[kM] * (3.f + 5.f*m_fCos2Beta)
                             - fSqrt5_2 * m_pfTempSample[kO] *m_fCosBeta * m_fSinBeta
-                            + 0.25f * fSqrt15 * m_pfTempSample[kQ] * pow(m_fSinBeta,2.0f);
+                            + 0.25f * fSqrt15 * m_pfTempSample[kQ] * fPowSinBeta2;
                 m_ppfChannels[kK] = 0.25f * m_pfTempSample[kK] * m_fCosBeta * (-1.f + 15.f*m_fCos2Beta)
-                            + 0.5f * fSqrt15 * m_pfTempSample[kN] * m_fCosBeta * pow(m_fSinBeta,2.f)
-                            + 0.5f * fSqrt5_2 * m_pfTempSample[kP] * pow(m_fSinBeta,3.f)
+                            + 0.5f * fSqrt15 * m_pfTempSample[kN] * m_fCosBeta * fPowSinBeta2
+                            + 0.5f * fSqrt5_2 * m_pfTempSample[kP] * fPowSinBeta3
                             + 0.125f * fSqrt3_2 * m_pfTempSample[kL] * (m_fSinBeta + 5.f * m_fSin3Beta);
                 m_ppfChannels[kL] = 0.0625f * m_pfTempSample[kL] * (m_fCosBeta + 15.f * m_fCos3Beta)
                             + 0.25f * fSqrt5_2 * m_pfTempSample[kN] * (1.f + 3.f * m_fCos2Beta) * m_fSinBeta
-                            + 0.25f * fSqrt15 * m_pfTempSample[kP] * m_fCosBeta * pow(m_fSinBeta,2.f)
+                            + 0.25f * fSqrt15 * m_pfTempSample[kP] * m_fCosBeta * fPowSinBeta2
                             - 0.125 * fSqrt3_2 * m_pfTempSample[kK] * (m_fSinBeta + 5.f * m_fSin3Beta);
                 m_ppfChannels[kN] = 0.125f * m_pfTempSample[kN] * (5.f * m_fCosBeta + 3.f * m_fCos3Beta)
                             + 0.25f * fSqrt3_2 * m_pfTempSample[kP] * (3.f + m_fCos2Beta) * m_fSinBeta
-                            + 0.5f * fSqrt15 * m_pfTempSample[kK] * m_fCosBeta * pow(m_fSinBeta,2.f)
+                            + 0.5f * fSqrt15 * m_pfTempSample[kK] * m_fCosBeta * fPowSinBeta2
                             + 0.125 * fSqrt5_2 * m_pfTempSample[kL] * (m_fSinBeta - 3.f * m_fSin3Beta);
                 m_ppfChannels[kP] = 0.0625f * m_pfTempSample[kP] * (15.f * m_fCosBeta + m_fCos3Beta)
                             - 0.25f * fSqrt3_2 * m_pfTempSample[kN] * (3.f + m_fCos2Beta) * m_fSinBeta
-                            + 0.25f * fSqrt15 * m_pfTempSample[kL] * m_fCosBeta * pow(m_fSinBeta,2.f)
-                            - 0.5 * fSqrt5_2 * m_pfTempSample[kK] * pow(m_fSinBeta,3.f);
+                            + 0.25f * fSqrt15 * m_pfTempSample[kL] * m_fCosBeta * fPowSinBeta2
+                            - 0.5 * fSqrt5_2 * m_pfTempSample[kK] * fPowSinBeta3;
 
                 // Gamma rotation
                 m_pfTempSample[kQ] = - m_ppfChannels[kP] * m_fSin3Gamma
