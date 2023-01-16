@@ -18,12 +18,14 @@
 #define DMA_SIZE SIZE_WORD
 #define PLM_DATA_WORD 98304 // (16 * 1024 + 4 * 2050 + 32 * 2050 + buffer)
 
-#define NUM_CFG_REG 6
+#define NUM_CFG_REG 8
 
 #define SYNC_VAR_SIZE 10
 #define UPDATE_VAR_SIZE 2
 #define VALID_FLAG_OFFSET 0
 #define READY_FLAG_OFFSET 4
+#define FLT_VALID_FLAG_OFFSET 6
+#define FLT_READY_FLAG_OFFSET 8
 
 #define POLL_PROD_VALID_REQ 0
 #define POLL_CONS_READY_REQ 1
@@ -43,6 +45,8 @@
 #define WR_SIZE 3
 #define WR_SP_OFFSET 4
 #define MEM_DST_OFFSET 5
+#define CONS_VALID_OFFSET 6
+#define CONS_READY_OFFSET 7
 
 #define LOAD_OP 0
 #define STORE_OP 1

@@ -63,7 +63,7 @@ void audio_dma::load_input()
         {
             case POLL_PROD_VALID_REQ:
             {
-                int32_t start_sync_offset = start_offset + READY_FLAG_OFFSET;
+                int32_t start_sync_offset = start_offset + VALID_FLAG_OFFSET;
                 dma_info_t dma_info(start_sync_offset / DMA_WORD_PER_BEAT, READY_FLAG_OFFSET / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 int32_t valid_task = 0;
@@ -86,7 +86,7 @@ void audio_dma::load_input()
             break;
             case POLL_CONS_READY_REQ:
             {
-                int32_t end_sync_offset = cfg_registers[MEM_DST_OFFSET] + READY_FLAG_OFFSET;
+                int32_t end_sync_offset = cfg_registers[CONS_READY_OFFSET];
                 dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 int32_t ready_for_task = 0;
@@ -249,7 +249,7 @@ void audio_dma::store_output()
             break;
             case UPDATE_CONS_VALID_REQ:
             {
-                int32_t end_sync_offset = cfg_registers[MEM_DST_OFFSET] + VALID_FLAG_OFFSET;
+                int32_t end_sync_offset = cfg_registers[CONS_VALID_OFFSET];
                 dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 dataBv.range(DMA_WIDTH - 1, 0) = 1;
@@ -266,7 +266,7 @@ void audio_dma::store_output()
             break;
             case UPDATE_CONS_READY_REQ:
             {
-                int32_t end_sync_offset = cfg_registers[MEM_DST_OFFSET] + READY_FLAG_OFFSET;
+                int32_t end_sync_offset = cfg_registers[CONS_READY_OFFSET];
                 dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 dataBv.range(DMA_WIDTH - 1, 0) = 0;
@@ -290,8 +290,7 @@ void audio_dma::store_output()
                     mem_dst_offset = cfg_registers[MEM_DST_OFFSET];
                 }
                 
-                int32_t store_offset = mem_dst_offset + SYNC_VAR_SIZE;
-                dma_info_t dma_info(store_offset / DMA_WORD_PER_BEAT, wr_size / DMA_WORD_PER_BEAT, DMA_SIZE);
+                dma_info_t dma_info(mem_dst_offset / DMA_WORD_PER_BEAT, wr_size / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
 
                 wait();
