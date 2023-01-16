@@ -16,7 +16,7 @@
 /* <<--defines-->> */
 #define DATA_WIDTH 32
 #define DMA_SIZE SIZE_WORD
-#define PLM_DATA_WORD 4 * 1024
+#define PLM_DATA_WORD 98304 // (16 * 1024 + 4 * 2050 + 32 * 2050 + buffer)
 
 #define NUM_CFG_REG 6
 
@@ -27,7 +27,8 @@
 
 #define POLL_PROD_VALID_REQ 0
 #define POLL_CONS_READY_REQ 1
-#define LOAD_DATA_REQ 2
+#define CFG_REQ 2
+#define LOAD_DATA_REQ 3
 #define UPDATE_PROD_VALID_REQ 0
 #define UPDATE_PROD_READY_REQ 1
 #define UPDATE_CONS_VALID_REQ 2
@@ -42,6 +43,10 @@
 #define WR_SIZE 3
 #define WR_SP_OFFSET 4
 #define MEM_DST_OFFSET 5
+
+#define LOAD_OP 0
+#define STORE_OP 1
+#define END_OP 2
 
 class audio_dma : public esp_accelerator_3P<DMA_WIDTH>
 {
@@ -95,7 +100,7 @@ public:
 
     sc_int<32> cfg_registers[NUM_CFG_REG];
 
-    sc_int<32> last_task;
+    sc_int<32> load_store_op;
 
     // Processes
 

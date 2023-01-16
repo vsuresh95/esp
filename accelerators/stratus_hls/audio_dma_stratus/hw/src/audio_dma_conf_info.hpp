@@ -19,23 +19,23 @@ public:
     conf_info_t()
     {
         /* <<--ctor-->> */
-        this->size = 1;
+        this->start_offset = 1;
     }
 
     conf_info_t(
         /* <<--ctor-args-->> */
-        int32_t size
+        int32_t start_offset
         )
     {
         /* <<--ctor-custom-->> */
-        this->size = size;
+        this->start_offset = start_offset;
     }
 
     // equals operator
     inline bool operator==(const conf_info_t &rhs) const
     {
         /* <<--eq-->> */
-        if (size != rhs.size) return false;
+        if (start_offset != rhs.start_offset) return false;
         return true;
     }
 
@@ -43,7 +43,7 @@ public:
     inline conf_info_t& operator=(const conf_info_t& other)
     {
         /* <<--assign-->> */
-        size = other.size;
+        start_offset = other.start_offset;
         return *this;
     }
 
@@ -56,13 +56,13 @@ public:
     {
         os << "{";
         /* <<--print-->> */
-        os << "size = " << conf_info.size << "";
+        os << "start_offset = " << conf_info.start_offset << "";
         os << "}";
         return os;
     }
 
         /* <<--params-->> */
-        int32_t size;
+        int32_t start_offset;
 };
 
 #endif // __SM_SENSOR_CONF_INFO_HPP__

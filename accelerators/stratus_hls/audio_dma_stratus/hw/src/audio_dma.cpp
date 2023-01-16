@@ -30,6 +30,20 @@ void audio_dma::load_input()
         wait();
     }
 
+    // Config
+    /* <<--params-->> */
+    int32_t start_offset;
+    {
+        HLS_PROTO("load-config");
+
+        cfg.wait_for_config(); // config process
+        conf_info_t config = this->conf_info.read();
+
+        // User-defined config code
+        /* <<--local-params-->> */
+        start_offset = config.start_offset;
+    }
+
     int32_t rd_size;
     int32_t rd_sp_offset;
     int32_t mem_src_offset;
@@ -49,7 +63,8 @@ void audio_dma::load_input()
         {
             case POLL_PROD_VALID_REQ:
             {
-                dma_info_t dma_info(VALID_FLAG_OFFSET / DMA_WORD_PER_BEAT, READY_FLAG_OFFSET / DMA_WORD_PER_BEAT, DMA_SIZE);
+                int32_t start_sync_offset = start_offset + READY_FLAG_OFFSET;
+                dma_info_t dma_info(start_sync_offset / DMA_WORD_PER_BEAT, READY_FLAG_OFFSET / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 int32_t valid_task = 0;
 
@@ -65,13 +80,13 @@ void audio_dma::load_input()
                     valid_task = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
                     dataBv = this->dma_read_chnl.get();
                     wait();
-                    last_task = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
+                    load_store_op = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
                 }
             }
             break;
             case POLL_CONS_READY_REQ:
             {
-                int32_t end_sync_offset = SYNC_VAR_SIZE + 2 * num_samples + READY_FLAG_OFFSET;
+                int32_t end_sync_offset = cfg_registers[MEM_DST_OFFSET] + READY_FLAG_OFFSET;
                 dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 int32_t ready_for_task = 0;
@@ -91,8 +106,9 @@ void audio_dma::load_input()
             break;
             case CFG_REQ:
             {
-                dma_info_t dma_info(SYNC_VAR_SIZE / DMA_WORD_PER_BEAT, NUM_CFG_REG / DMA_WORD_PER_BEAT, DMA_SIZE);
-                sc_dt::sc_bv<DMA_WIDTH> dataBvin;
+                int32_t start_sync_offset = start_offset + SYNC_VAR_SIZE;
+                dma_info_t dma_info(start_sync_offset / DMA_WORD_PER_BEAT, NUM_CFG_REG / DMA_WORD_PER_BEAT, DMA_SIZE);
+                sc_dt::sc_bv<DMA_WIDTH> dataBv;
 
                 wait();
 
@@ -117,7 +133,6 @@ void audio_dma::load_input()
                     rd_size = cfg_registers[RD_SIZE];
                     rd_sp_offset = cfg_registers[RD_SP_OFFSET];
                     mem_src_offset = cfg_registers[MEM_SRC_OFFSET];
-                    wait();
                 }
 
                 dma_info_t dma_info(mem_src_offset / DMA_WORD_PER_BEAT, rd_size / DMA_WORD_PER_BEAT, DMA_SIZE);
@@ -167,6 +182,20 @@ void audio_dma::store_output()
         wait();
     }
 
+    // Config
+    /* <<--params-->> */
+    int32_t start_offset;
+    {
+        HLS_PROTO("load-config");
+
+        cfg.wait_for_config(); // config process
+        conf_info_t config = this->conf_info.read();
+
+        // User-defined config code
+        /* <<--local-params-->> */
+        start_offset = config.start_offset;
+    }
+
     int32_t wr_size;
     int32_t wr_sp_offset;
     int32_t mem_dst_offset;
@@ -186,7 +215,8 @@ void audio_dma::store_output()
         {
             case UPDATE_PROD_READY_REQ:
             {
-                dma_info_t dma_info(READY_FLAG_OFFSET / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                int32_t start_sync_offset = start_offset + READY_FLAG_OFFSET;
+                dma_info_t dma_info(start_sync_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 dataBv.range(DMA_WIDTH - 1, 0) = 1;
 
@@ -202,7 +232,8 @@ void audio_dma::store_output()
             break;
             case UPDATE_PROD_VALID_REQ:
             {
-                dma_info_t dma_info(VALID_FLAG_OFFSET / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                int32_t start_sync_offset = start_offset + VALID_FLAG_OFFSET;
+                dma_info_t dma_info(start_sync_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 dataBv.range(DMA_WIDTH - 1, 0) = 0;
 
@@ -218,7 +249,7 @@ void audio_dma::store_output()
             break;
             case UPDATE_CONS_VALID_REQ:
             {
-                int32_t end_sync_offset = SYNC_VAR_SIZE + 2 * num_samples + VALID_FLAG_OFFSET;
+                int32_t end_sync_offset = cfg_registers[MEM_DST_OFFSET] + VALID_FLAG_OFFSET;
                 dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 dataBv.range(DMA_WIDTH - 1, 0) = 1;
@@ -235,7 +266,7 @@ void audio_dma::store_output()
             break;
             case UPDATE_CONS_READY_REQ:
             {
-                int32_t end_sync_offset = SYNC_VAR_SIZE + 2 * num_samples + READY_FLAG_OFFSET;
+                int32_t end_sync_offset = cfg_registers[MEM_DST_OFFSET] + READY_FLAG_OFFSET;
                 dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 dataBv.range(DMA_WIDTH - 1, 0) = 0;
@@ -257,10 +288,10 @@ void audio_dma::store_output()
                     wr_size = cfg_registers[WR_SIZE];
                     wr_sp_offset = cfg_registers[WR_SP_OFFSET];
                     mem_dst_offset = cfg_registers[MEM_DST_OFFSET];
-                    wait();
                 }
                 
-                dma_info_t dma_info(mem_dst_offset / DMA_WORD_PER_BEAT, wr_size / DMA_WORD_PER_BEAT, DMA_SIZE);
+                int32_t store_offset = mem_dst_offset + SYNC_VAR_SIZE;
+                dma_info_t dma_info(store_offset / DMA_WORD_PER_BEAT, wr_size / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
 
                 wait();
@@ -380,20 +411,6 @@ void audio_dma::compute_kernel()
 
             load_state_req = CFG_REQ;
 
-            compute_state_req_dbg.write(2);
-
-            this->compute_load_ready_handshake();
-            wait();
-            this->compute_load_done_handshake();
-            wait();
-        }
-
-        // Load input data
-        {
-            HLS_PROTO("load-input-data");
-
-            load_state_req = LOAD_DATA_REQ;
-
             compute_state_req_dbg.write(4);
 
             this->compute_load_ready_handshake();
@@ -402,134 +419,180 @@ void audio_dma::compute_kernel()
             wait();
         }
 
-        // update producer's ready to accept new data
         {
-            HLS_PROTO("update-prod-ready");
+            HLS_PROTO("check-if-load-store");
 
-            store_state_req = UPDATE_PROD_READY_REQ;
-
-            compute_state_req_dbg.write(5);
-
-            this->compute_store_ready_handshake();
-            wait();
-            this->compute_store_done_handshake();
-            wait();
-
-            // Wait for all writes to be done and then issue fence
-            store_state_req = STORE_FENCE;
-
-            compute_state_req_dbg.write(6);
-
-            this->compute_store_ready_handshake();
-            wait();
-            this->compute_store_done_handshake();
-            wait();
-
-            compute_state_req_dbg.write(7);
-        }
-
-        // Poll consumer's ready to know if we can send new data
-        {
-            HLS_PROTO("poll-for-cons-ready");
-
-            load_state_req = POLL_CONS_READY_REQ;
-
-            compute_state_req_dbg.write(8);
-
-            this->compute_load_ready_handshake();
-            wait();
-            this->compute_load_done_handshake();
-            wait();
-        }
-
-        // Reset consumer's ready
-        {
-            HLS_PROTO("update-cons-ready");
-
-            store_state_req = UPDATE_CONS_READY_REQ;
-
-            compute_state_req_dbg.write(9);
-
-            this->compute_store_ready_handshake();
-            wait();
-            this->compute_store_done_handshake();
-            wait();
-
-            // Wait for all writes to be done and then issue fence
-            store_state_req = STORE_FENCE;
-
-            compute_state_req_dbg.write(10);
-
-            this->compute_store_ready_handshake();
-            wait();
-            this->compute_store_done_handshake();
-            wait();
-        }
-
-        // Store output data
-        {
-            HLS_PROTO("store-output-data");
-
-            store_state_req = STORE_DATA_REQ;
-
-            this->compute_store_ready_handshake();
-
-            compute_state_req_dbg.write(11);
-
-            wait();
-            this->compute_store_done_handshake();
-            wait();
-
-            // Wait for all writes to be done and then issue fence
-            store_state_req = STORE_FENCE;
-
-            compute_state_req_dbg.write(12);
-
-            this->compute_store_ready_handshake();
-            wait();
-            this->compute_store_done_handshake();
-            wait();
-        }
-
-        // update consumer's ready for new data available
-        {
-            HLS_PROTO("update-cons-valid");
-
-            store_state_req = UPDATE_CONS_VALID_REQ;
-
-            compute_state_req_dbg.write(13);
-
-            this->compute_store_ready_handshake();
-            wait();
-            this->compute_store_done_handshake();
-            wait();
-
-            // Wait for all writes to be done and then issue fence
-            store_state_req = STORE_FENCE;
-
-            compute_state_req_dbg.write(14);
-
-            this->compute_store_ready_handshake();
-            wait();
-            this->compute_store_done_handshake();
-            wait();
-        }
-
-        // End operation
-        {
-            HLS_PROTO("end-acc");
-
-            if (last_task == 1)
+            // Load input data
+            if (load_store_op == LOAD_OP)
             {
-                store_state_req = ACC_DONE;
+                {
+                    HLS_PROTO("load-input-data");
 
-                compute_state_req_dbg.write(15);
+                    load_state_req = LOAD_DATA_REQ;
 
-                this->compute_store_ready_handshake();
-                wait();
-                this->compute_store_done_handshake();
-                wait();
-                this->process_done();
+                    compute_state_req_dbg.write(5);
+
+                    this->compute_load_ready_handshake();
+                    wait();
+                    this->compute_load_done_handshake();
+                    wait();
+                }
+
+                // update producer's ready to accept new data
+                {
+                    HLS_PROTO("update-prod-ready");
+
+                    store_state_req = UPDATE_PROD_READY_REQ;
+
+                    compute_state_req_dbg.write(6);
+
+                    this->compute_store_ready_handshake();
+                    wait();
+                    this->compute_store_done_handshake();
+                    wait();
+
+                    // Wait for all writes to be done and then issue fence
+                    store_state_req = STORE_FENCE;
+
+                    compute_state_req_dbg.write(7);
+
+                    this->compute_store_ready_handshake();
+                    wait();
+                    this->compute_store_done_handshake();
+                    wait();
+
+                    compute_state_req_dbg.write(8);
+                }
+            } 
+            else if (load_store_op == STORE_OP)
+            {
+                // Poll consumer's ready to know if we can send new data
+                {
+                    HLS_PROTO("poll-for-cons-ready");
+
+                    load_state_req = POLL_CONS_READY_REQ;
+
+                    compute_state_req_dbg.write(9);
+
+                    this->compute_load_ready_handshake();
+                    wait();
+                    this->compute_load_done_handshake();
+                    wait();
+                }
+
+                // Reset consumer's ready
+                {
+                    HLS_PROTO("update-cons-ready");
+
+                    store_state_req = UPDATE_CONS_READY_REQ;
+
+                    compute_state_req_dbg.write(10);
+
+                    this->compute_store_ready_handshake();
+                    wait();
+                    this->compute_store_done_handshake();
+                    wait();
+
+                    // Wait for all writes to be done and then issue fence
+                    store_state_req = STORE_FENCE;
+
+                    compute_state_req_dbg.write(11);
+
+                    this->compute_store_ready_handshake();
+                    wait();
+                    this->compute_store_done_handshake();
+                    wait();
+                }
+
+                // Store output data
+                {
+                    HLS_PROTO("store-output-data");
+
+                    store_state_req = STORE_DATA_REQ;
+
+                    this->compute_store_ready_handshake();
+
+                    compute_state_req_dbg.write(12);
+
+                    wait();
+                    this->compute_store_done_handshake();
+                    wait();
+
+                    // Wait for all writes to be done and then issue fence
+                    store_state_req = STORE_FENCE;
+
+                    compute_state_req_dbg.write(13);
+
+                    this->compute_store_ready_handshake();
+                    wait();
+                    this->compute_store_done_handshake();
+                    wait();
+                }
+
+                // update consumer's ready for new data available
+                {
+                    HLS_PROTO("update-cons-valid");
+
+                    store_state_req = UPDATE_CONS_VALID_REQ;
+
+                    compute_state_req_dbg.write(14);
+
+                    this->compute_store_ready_handshake();
+                    wait();
+                    this->compute_store_done_handshake();
+                    wait();
+
+                    // Wait for all writes to be done and then issue fence
+                    store_state_req = STORE_FENCE;
+
+                    compute_state_req_dbg.write(15);
+
+                    this->compute_store_ready_handshake();
+                    wait();
+                    this->compute_store_done_handshake();
+                    wait();
+                }
+
+                // update producer's ready to accept new data
+                {
+                    HLS_PROTO("update-prod-ready");
+
+                    store_state_req = UPDATE_PROD_READY_REQ;
+
+                    compute_state_req_dbg.write(16);
+
+                    this->compute_store_ready_handshake();
+                    wait();
+                    this->compute_store_done_handshake();
+                    wait();
+
+                    // Wait for all writes to be done and then issue fence
+                    store_state_req = STORE_FENCE;
+
+                    compute_state_req_dbg.write(17);
+
+                    this->compute_store_ready_handshake();
+                    wait();
+                    this->compute_store_done_handshake();
+                    wait();
+                }
+            }
+            else // END_OP
+            {
+                HLS_PROTO("end-acc");
+
+                if (load_store_op == END_OP)
+                {
+                    store_state_req = ACC_DONE;
+
+                    compute_state_req_dbg.write(15);
+
+                    this->compute_store_ready_handshake();
+                    wait();
+                    this->compute_store_done_handshake();
+                    wait();
+                    this->process_done();
+                }
             }
         }
     } // while (true)
