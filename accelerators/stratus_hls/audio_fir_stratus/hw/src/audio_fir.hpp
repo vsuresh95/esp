@@ -15,13 +15,12 @@
 #define __round_mask(x, y) ((y)-1)
 #define round_up(x, y) ((((x)-1) | __round_mask(x, y))+1)
 /* <<--defines-->> */
-#define MAX_LOGN_SAMPLES 14
-#define MAX_NUM_SAMPLES  (1 << MAX_LOGN_SAMPLES)
 #define DATA_WIDTH 32
 #define DMA_SIZE SIZE_WORD
 
-#define PLM_IN_WORD  (MAX_NUM_SAMPLES << 1)
-#define PLM_OUT_WORD (MAX_NUM_SAMPLES << 1)
+#define PLM_IN_WORD 2048
+#define PLM_FLT_WORD 2050
+#define PLM_TWD_WORD 1024
 
 #define SYNC_VAR_SIZE 10
 #define UPDATE_VAR_SIZE 2
@@ -113,8 +112,8 @@ public:
 
     // Private local memories
     sc_dt::sc_int<DATA_WIDTH> A0[PLM_IN_WORD];
-    sc_dt::sc_int<DATA_WIDTH> F0[PLM_IN_WORD];
-    sc_dt::sc_int<DATA_WIDTH> T0[PLM_IN_WORD];
+    sc_dt::sc_int<DATA_WIDTH> F0[PLM_FLT_WORD];
+    sc_dt::sc_int<DATA_WIDTH> T0[PLM_TWD_WORD];
 
     // Handshakes
     inline void compute_load_ready_handshake();
