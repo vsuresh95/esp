@@ -84,26 +84,6 @@ void audio_dma::load_input()
                 }
             }
             break;
-            case POLL_CONS_READY_REQ:
-            {
-                int32_t end_sync_offset = cfg_registers[CONS_READY_OFFSET];
-                dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
-                sc_dt::sc_bv<DMA_WIDTH> dataBv;
-                int32_t ready_for_task = 0;
-
-                wait();
-
-                // Wait for consumer to accept new data
-                while (ready_for_task != 1)
-                {
-                    HLS_UNROLL_LOOP(OFF);
-                    this->dma_read_ctrl.put(dma_info);
-                    dataBv = this->dma_read_chnl.get();
-                    wait();
-                    ready_for_task = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
-                }
-            }
-            break;
             case CFG_REQ:
             {
                 int32_t start_sync_offset = start_offset + SYNC_VAR_SIZE;
@@ -264,23 +244,6 @@ void audio_dma::store_output()
                 wait();
             }
             break;
-            case UPDATE_CONS_READY_REQ:
-            {
-                int32_t end_sync_offset = cfg_registers[CONS_READY_OFFSET];
-                dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
-                sc_dt::sc_bv<DMA_WIDTH> dataBv;
-                dataBv.range(DMA_WIDTH - 1, 0) = 0;
-
-                this->dma_write_ctrl.put(dma_info);
-                wait();
-                this->dma_write_chnl.put(dataBv);
-                wait();
-
-                // Wait till the write is accepted at the cache (and previous fences)
-                while (!(this->dma_write_chnl.ready)) wait();
-                wait();
-            }
-            break;
             case STORE_DATA_REQ:
             {
                 // Configuration unit - reading store op, size, src, dst
@@ -362,6 +325,17 @@ void audio_dma::compute_kernel()
         store_state_req = 0;
 
         wait();
+    }
+
+    // Config
+    /* <<--params-->> */
+    {
+        HLS_PROTO("compute-config");
+
+        cfg.wait_for_config(); // config process
+
+        // User-defined config code
+        /* <<--local-params-->> */
     }
 
     while(true)
@@ -465,44 +439,6 @@ void audio_dma::compute_kernel()
             } 
             else if (load_store_op == STORE_OP)
             {
-                // Poll consumer's ready to know if we can send new data
-                {
-                    HLS_PROTO("poll-for-cons-ready");
-
-                    load_state_req = POLL_CONS_READY_REQ;
-
-                    compute_state_req_dbg.write(9);
-
-                    this->compute_load_ready_handshake();
-                    wait();
-                    this->compute_load_done_handshake();
-                    wait();
-                }
-
-                // Reset consumer's ready
-                {
-                    HLS_PROTO("update-cons-ready");
-
-                    store_state_req = UPDATE_CONS_READY_REQ;
-
-                    compute_state_req_dbg.write(10);
-
-                    this->compute_store_ready_handshake();
-                    wait();
-                    this->compute_store_done_handshake();
-                    wait();
-
-                    // Wait for all writes to be done and then issue fence
-                    store_state_req = STORE_FENCE;
-
-                    compute_state_req_dbg.write(11);
-
-                    this->compute_store_ready_handshake();
-                    wait();
-                    this->compute_store_done_handshake();
-                    wait();
-                }
-
                 // Store output data
                 {
                     HLS_PROTO("store-output-data");
@@ -511,7 +447,7 @@ void audio_dma::compute_kernel()
 
                     this->compute_store_ready_handshake();
 
-                    compute_state_req_dbg.write(12);
+                    compute_state_req_dbg.write(9);
 
                     wait();
                     this->compute_store_done_handshake();
@@ -520,7 +456,7 @@ void audio_dma::compute_kernel()
                     // Wait for all writes to be done and then issue fence
                     store_state_req = STORE_FENCE;
 
-                    compute_state_req_dbg.write(13);
+                    compute_state_req_dbg.write(10);
 
                     this->compute_store_ready_handshake();
                     wait();
@@ -534,7 +470,7 @@ void audio_dma::compute_kernel()
 
                     store_state_req = UPDATE_CONS_VALID_REQ;
 
-                    compute_state_req_dbg.write(14);
+                    compute_state_req_dbg.write(11);
 
                     this->compute_store_ready_handshake();
                     wait();
@@ -544,7 +480,7 @@ void audio_dma::compute_kernel()
                     // Wait for all writes to be done and then issue fence
                     store_state_req = STORE_FENCE;
 
-                    compute_state_req_dbg.write(15);
+                    compute_state_req_dbg.write(12);
 
                     this->compute_store_ready_handshake();
                     wait();
@@ -558,7 +494,7 @@ void audio_dma::compute_kernel()
 
                     store_state_req = UPDATE_PROD_READY_REQ;
 
-                    compute_state_req_dbg.write(16);
+                    compute_state_req_dbg.write(13);
 
                     this->compute_store_ready_handshake();
                     wait();
@@ -568,7 +504,7 @@ void audio_dma::compute_kernel()
                     // Wait for all writes to be done and then issue fence
                     store_state_req = STORE_FENCE;
 
-                    compute_state_req_dbg.write(17);
+                    compute_state_req_dbg.write(14);
 
                     this->compute_store_ready_handshake();
                     wait();

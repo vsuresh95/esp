@@ -5,7 +5,7 @@
 #define __SM_SENSOR_DIRECTIVES_HPP__
 
 #define DMA_BEAT_PER_WORD 1
-#define DMA_WORD_PER_BEAT 1
+#define DMA_WORD_PER_BEAT 2
 #define PLM_DATA_NAME "sensor_dma_plm_data_dma64"
 
 
