@@ -9,13 +9,22 @@
 #include <esp.h>
 
 #include "tiled_app_stratus.h"
+// #include "stdio.h"
 
 #define DRV_NAME	"tiled_app_stratus"
 
 /* <<--regs-->> */
+#define TILED_APP_OUTPUT_TILE_START_OFFSET_REG 0x60
+#define TILED_APP_INPUT_TILE_START_OFFSET_REG 0x5C
+#define TILED_APP_OUTPUT_UPDATE_SYNC_OFFSET_REG 0x58
+#define TILED_APP_INPUT_UPDATE_SYNC_OFFSET_REG 0x54
+#define TILED_APP_OUTPUT_SPIN_SYNC_OFFSET_REG 0x50
+#define TILED_APP_INPUT_SPIN_SYNC_OFFSET_REG 0x4C
 #define TILED_APP_NUM_TILES_REG 0x48
 #define TILED_APP_TILE_SIZE_REG 0x44
 #define TILED_APP_RD_WR_ENABLE_REG 0x40
+
+// #define SPANDEX_REG 0x34
 
 struct tiled_app_stratus_device {
 	struct esp_device esp;
@@ -46,13 +55,21 @@ static inline struct tiled_app_stratus_device *to_tiled_app(struct esp_device *e
 static void tiled_app_prep_xfer(struct esp_device *esp, void *arg)
 {
 	struct tiled_app_stratus_access *a = arg;
-
 	/* <<--regs-config-->> */
 	iowrite32be(a->num_tiles, esp->iomem + TILED_APP_NUM_TILES_REG);
 	iowrite32be(a->tile_size, esp->iomem + TILED_APP_TILE_SIZE_REG);
 	iowrite32be(a->rd_wr_enable, esp->iomem + TILED_APP_RD_WR_ENABLE_REG);
-	iowrite32be(a->src_offset, esp->iomem + SRC_OFFSET_REG);
-	iowrite32be(a->dst_offset, esp->iomem + DST_OFFSET_REG);
+	// iowrite32be(a->src_offset, esp->iomem + SRC_OFFSET_REG);
+	// iowrite32be(a->dst_offset, esp->iomem + DST_OFFSET_REG);
+	iowrite32be(a->output_tile_start_offset, esp->iomem + TILED_APP_OUTPUT_TILE_START_OFFSET_REG);
+	iowrite32be(a->input_tile_start_offset, esp->iomem + TILED_APP_INPUT_TILE_START_OFFSET_REG);
+	iowrite32be(a->output_update_sync_offset, esp->iomem + TILED_APP_OUTPUT_UPDATE_SYNC_OFFSET_REG);
+	iowrite32be(a->input_update_sync_offset, esp->iomem + TILED_APP_INPUT_UPDATE_SYNC_OFFSET_REG);
+	iowrite32be(a->output_spin_sync_offset, esp->iomem + TILED_APP_OUTPUT_SPIN_SYNC_OFFSET_REG);
+	iowrite32be(a->input_spin_sync_offset, esp->iomem + TILED_APP_INPUT_SPIN_SYNC_OFFSET_REG);
+
+	// printf("In %s func %s line %d Setting spandex reg: %x\n",  __FILE__, __func__, __LINE__, a->spandex_reg);
+	iowrite32be(a->spandex_reg, esp->iomem + SPANDEX_REG);
 
 }
 
@@ -129,6 +146,6 @@ module_exit(tiled_app_exit)
 
 MODULE_DEVICE_TABLE(of, tiled_app_device_ids);
 
-MODULE_AUTHOR("Emilio G. Cota <cota@braap.org>");
+MODULE_AUTHOR("Bakshree Mishra <bmishra3@illinois.edu>");
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("tiled_app_stratus driver");

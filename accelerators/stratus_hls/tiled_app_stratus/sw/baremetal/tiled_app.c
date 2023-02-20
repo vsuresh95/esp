@@ -33,7 +33,7 @@ typedef union
 } spandex_config_t;
 
 
-#define NUM_DEVICES 3
+#define NUM_DEVICES 1
 // #define PRINT_DEBUG
 // #define VALIDATE
 // #define MEM_DUMP 1
@@ -45,8 +45,8 @@ typedef union
 #define SYNC_VAR_SIZE 4
 
 /* Coherence Modes */
-#define COH_MODE 2
-// #define ESP
+#define COH_MODE 0
+#define ESP
 
 #ifdef ESP
 // ESP COHERENCE PROTOCOLS
@@ -735,7 +735,6 @@ int main(int argc, char * argv[])
 			return 0;
 		}
 
-		// if (ioread32(dev, PT_NCHUNK_MAX_REG) < NCHUNK(dev_mem_size)) {
 		if (ioread32(dev, PT_NCHUNK_MAX_REG) < NCHUNK(mem_size)) {
 			printf("  -> Not enough TLB entries available. Abort.\n");
 			return 0;
@@ -762,7 +761,7 @@ int main(int argc, char * argv[])
 		printf("  ptable = %p\n", ptable);
 		printf("  nchunk = %lu\n", NCHUNK(mem_size));
 
-        asm volatile ("fence rw, rw");
+        	asm volatile ("fence w, rw");
 
 		// If Spandex Caches
 #ifndef ESP
@@ -784,7 +783,7 @@ int main(int argc, char * argv[])
 		init_buf(mem, gold, out, mem_size/sizeof(token_t));
 		//print_mem(2);
 		//bmmishra3
-		asm volatile ("fence rw, rw");
+		asm volatile ("fence w, rw");
 		}
 		// Pass common configuration parameters
 
@@ -821,10 +820,10 @@ int main(int argc, char * argv[])
 		int32_t rel_accel_read_sync_spin_offset = rel_accel_read_sync_write_offset;	//+2
 
 		//debug, sync
-		accel_read_sync_spin_offset[n]  = n*(tile_size + SYNC_VAR_SIZE) + rel_accel_read_sync_spin_offset;
-		accel_write_sync_spin_offset[n] = n*(tile_size + SYNC_VAR_SIZE) + rel_accel_write_sync_spin_offset;
-		accel_read_sync_write_offset[n] = n*(tile_size + SYNC_VAR_SIZE) + rel_accel_read_sync_write_offset;
-		accel_write_sync_write_offset[n]= n*(tile_size + SYNC_VAR_SIZE) + rel_accel_write_sync_write_offset;
+		accel_read_sync_spin_offset[n]  	= n*(tile_size + SYNC_VAR_SIZE) + rel_accel_read_sync_spin_offset;
+		accel_write_sync_spin_offset[n] 	= n*(tile_size + SYNC_VAR_SIZE) + rel_accel_write_sync_spin_offset;
+		accel_read_sync_write_offset[n] 	= n*(tile_size + SYNC_VAR_SIZE) + rel_accel_read_sync_write_offset;
+		accel_write_sync_write_offset[n]	= n*(tile_size + SYNC_VAR_SIZE) + rel_accel_write_sync_write_offset;
 		input_buffer_offset[n]  		= n*(tile_size + SYNC_VAR_SIZE) + rel_input_buffer_offset;
 		output_buffer_offset[n] 		= n*(tile_size + SYNC_VAR_SIZE) + rel_output_buffer_offset;
 
@@ -843,7 +842,6 @@ int main(int argc, char * argv[])
 		printf("TILED_APP_OUTPUT_SPIN_SYNC_OFFSET_REG  : %d\n", accel_write_sync_spin_offset[n]);
 		printf("TILED_APP_INPUT_SPIN_SYNC_OFFSET_REG   : %d\n", accel_read_sync_spin_offset[n] );
 		printf("\n");
-
 
 		// iowrite32(dev, TILED_APP_OUTPUT_TILE_START_OFFSET_REG , rel_output_buffer_offset);
 		// iowrite32(dev, TILED_APP_INPUT_TILE_START_OFFSET_REG  , rel_input_buffer_offset);
@@ -870,35 +868,11 @@ int main(int argc, char * argv[])
 	printf("CPU write sync offset: %d\n", accel_read_sync_spin_offset[0]);
 
 
-
-
 	dev = &espdevs[ndev-1];
 		void* dst = (void*)(mem);
 		// Load 1st Tile
 //		load_mem();
-//#ifdef PRINT_DEBUG
-//		print_mem(1);
-//printf(".\n");
-//printf(".\n");
-//printf(".\n");
-//printf(".\n");
-//printf(".\n");
-//printf(".\n");
-//printf(".\n");
-//printf(".\n");
-//printf(".\n");
-//printf(".\n");
-//printf(".\n");
-//printf(".\n");
-//printf(".\n");
-//printf(".\n");
-//printf(".\n");
-//printf(".\n");
-//printf(".\n");
-//printf(".\n");
-//printf(".\n");
-//printf(".\n");
-//#endif
+
 //		update_load_sync();
 //#ifdef PRINT_DEBUG
 //		print_mem(2);
