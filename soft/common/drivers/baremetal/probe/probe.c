@@ -91,12 +91,12 @@ void esp_flush(int coherence)
 	int nl2 = 0;
 	int pid = get_pid();
 
-	switch (coherence) {
-	case ACC_COH_NONE	: printf("	-> Non-coherent DMA\n"); break;
-	case ACC_COH_LLC	: printf("	-> LLC-coherent DMA\n"); break;
-	case ACC_COH_RECALL : printf("	-> Coherent DMA\n"); break;
-	case ACC_COH_FULL	: printf("	-> Fully-coherent cache access\n"); break;
-	}
+	// switch (coherence) {
+	// case ACC_COH_NONE	: printf("	-> Non-coherent DMA\n"); break;
+	// case ACC_COH_LLC	: printf("	-> LLC-coherent DMA\n"); break;
+	// case ACC_COH_RECALL : printf("	-> Coherent DMA\n"); break;
+	// case ACC_COH_FULL	: printf("	-> Fully-coherent cache access\n"); break;
+	// }
 
 
 	if (coherence == ACC_COH_NONE)

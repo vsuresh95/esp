@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sld>
+  <accelerator name="audio_fft" desc="Accelerator AUDIO_FFT" data_size="4" device_id="055" hls_tool="stratus_hls">
+    <param name="do_shift" desc="do_shift" />
+    <param name="logn_samples" desc="logn_samples" />
+    <param name="do_inverse" desc="do_inverse" />
+  </accelerator>
+</sld>
