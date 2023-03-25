@@ -18,8 +18,8 @@ static unsigned DMA_WORD_PER_BEAT(unsigned _st)
 }
 
 
-#define SLD_AUDIO_FIR 0x056
-#define DEV_NAME "sld,audio_fir_stratus"
+#define SLD_AUDIO_FFI 0x057
+#define DEV_NAME "sld,audio_ffi_stratus"
 
 /* <<--params-->> */
 const int32_t do_inverse = 1;
@@ -44,9 +44,9 @@ static unsigned mem_size;
 
 /* User defined registers */
 /* <<--regs-->> */
-#define AUDIO_FIR_DO_INVERSE_REG 0x48
-#define AUDIO_FIR_LOGN_SAMPLES_REG 0x44
-#define AUDIO_FIR_DO_SHIFT_REG 0x40
+#define AUDIO_FFI_DO_INVERSE_REG 0x48
+#define AUDIO_FFI_LOGN_SAMPLES_REG 0x44
+#define AUDIO_FFI_DO_SHIFT_REG 0x40
 
 
 static int validate_buf(token_t *out, token_t *gold)
@@ -111,9 +111,9 @@ int main(int argc, char * argv[])
 	// Search for the device
 	printf("Scanning device tree... \n");
 
-	ndev = probe(&espdevs, VENDOR_SLD, SLD_AUDIO_FIR, DEV_NAME);
+	ndev = probe(&espdevs, VENDOR_SLD, SLD_AUDIO_FFI, DEV_NAME);
 	if (ndev == 0) {
-		printf("audio_fir not found\n");
+		printf("audio_ffi not found\n");
 		return 0;
 	}
 
@@ -177,9 +177,9 @@ int main(int argc, char * argv[])
 
 			// Pass accelerator-specific configuration parameters
 			/* <<--regs-config-->> */
-		iowrite32(dev, AUDIO_FIR_DO_INVERSE_REG, do_inverse);
-		iowrite32(dev, AUDIO_FIR_LOGN_SAMPLES_REG, logn_samples);
-		iowrite32(dev, AUDIO_FIR_DO_SHIFT_REG, do_shift);
+		iowrite32(dev, AUDIO_FFI_DO_INVERSE_REG, do_inverse);
+		iowrite32(dev, AUDIO_FFI_LOGN_SAMPLES_REG, logn_samples);
+		iowrite32(dev, AUDIO_FFI_DO_SHIFT_REG, do_shift);
 
 			// Flush (customize coherence model here)
 			esp_flush(coherence);

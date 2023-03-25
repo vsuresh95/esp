@@ -22,7 +22,7 @@ inline void compSub(const CompNum &x, const CompNum &y, CompNum &res)
     res.im = x.im - y.im;
 }
 
-// These values are the same whether audio_fir or iaudio_fir (i.e. indep of do_inverse)
+// These values are the same whether audio_ffi or iaudio_ffi (i.e. indep of do_inverse)
 inline FPDATA myCos(int m)
 {
 	switch(m) {
@@ -117,7 +117,7 @@ inline FPDATA myInvSin(int m)
 	}
 }
 
-inline void audio_fir::compute_load_ready_handshake()
+inline void audio_ffi::compute_load_ready_handshake()
 {
     {
         HLS_DEFINE_PROTOCOL("compute-load-ready-handshake");
@@ -126,7 +126,7 @@ inline void audio_fir::compute_load_ready_handshake()
     }
 }
 
-inline void audio_fir::load_compute_ready_handshake()
+inline void audio_ffi::load_compute_ready_handshake()
 {
     {
         HLS_DEFINE_PROTOCOL("load-compute-ready-handshake");
@@ -135,7 +135,7 @@ inline void audio_fir::load_compute_ready_handshake()
     }
 }
 
-inline void audio_fir::compute_store_ready_handshake()
+inline void audio_ffi::compute_store_ready_handshake()
 {
     {
         HLS_DEFINE_PROTOCOL("compute-store-ready-handshake");
@@ -144,7 +144,7 @@ inline void audio_fir::compute_store_ready_handshake()
     }
 }
 
-inline void audio_fir::store_compute_ready_handshake()
+inline void audio_ffi::store_compute_ready_handshake()
 {
     {
         HLS_DEFINE_PROTOCOL("store-compute-ready-handshake");
@@ -153,7 +153,7 @@ inline void audio_fir::store_compute_ready_handshake()
     }
 }
 
-inline void audio_fir::compute_load_done_handshake()
+inline void audio_ffi::compute_load_done_handshake()
 {
     {
         HLS_DEFINE_PROTOCOL("compute-load-done-handshake");
@@ -162,7 +162,7 @@ inline void audio_fir::compute_load_done_handshake()
     }
 }
 
-inline void audio_fir::load_compute_done_handshake()
+inline void audio_ffi::load_compute_done_handshake()
 {
     {
         HLS_DEFINE_PROTOCOL("load-compute-done-handshake");
@@ -171,7 +171,7 @@ inline void audio_fir::load_compute_done_handshake()
     }
 }
 
-inline void audio_fir::compute_store_done_handshake()
+inline void audio_ffi::compute_store_done_handshake()
 {
     {
         HLS_DEFINE_PROTOCOL("compute-store-done-handshake");
@@ -180,7 +180,7 @@ inline void audio_fir::compute_store_done_handshake()
     }
 }
 
-inline void audio_fir::store_compute_done_handshake()
+inline void audio_ffi::store_compute_done_handshake()
 {
     {
         HLS_DEFINE_PROTOCOL("store-compute-done-handshake");

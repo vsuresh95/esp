@@ -1,16 +1,16 @@
 // Copyright (c) 2011-2019 Columbia University, System Level Design Group
 // SPDX-License-Identifier: Apache-2.0
 
-#include "audio_fir.hpp"
-#include "audio_fir_directives.hpp"
+#include "audio_ffi.hpp"
+#include "audio_ffi_directives.hpp"
 
 // Functions
 
-#include "audio_fir_functions.hpp"
+#include "audio_ffi_functions.hpp"
 
 // Processes
 
-void audio_fir::load_input()
+void audio_ffi::load_input()
 {
     // Reset
     {
@@ -196,7 +196,7 @@ void audio_fir::load_input()
     }
 } // Function : load_input
 
-void audio_fir::store_output()
+void audio_ffi::store_output()
 {
     // Reset
     {
@@ -398,7 +398,7 @@ void audio_fir::store_output()
     }
 } // Function : store_output
 
-void audio_fir::compute_kernel()
+void audio_ffi::compute_kernel()
 {
     // Reset
     {

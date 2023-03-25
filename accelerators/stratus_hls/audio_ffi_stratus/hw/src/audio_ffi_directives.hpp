@@ -1,14 +1,14 @@
 // Copyright (c) 2011-2022 Columbia University, System Level Design Group
 // SPDX-License-Identifier: Apache-2.0
 
-#ifndef __AUDIO_FIR_DIRECTIVES_HPP__
-#define __AUDIO_FIR_DIRECTIVES_HPP__
+#ifndef __AUDIO_FFI_DIRECTIVES_HPP__
+#define __AUDIO_FFI_DIRECTIVES_HPP__
 
 #define DMA_BEAT_PER_WORD 1
 #define DMA_WORD_PER_BEAT 2
-#define PLM_IN_NAME "audio_fir_plm_block_in_dma64"
-#define PLM_FLT_NAME "audio_fir_plm_block_flt_dma64"
-#define PLM_TW_NAME "audio_fir_plm_block_twd_dma64"
+#define PLM_IN_NAME "audio_ffi_plm_block_in_dma64"
+#define PLM_FLT_NAME "audio_ffi_plm_block_flt_dma64"
+#define PLM_TW_NAME "audio_ffi_plm_block_twd_dma64"
 
 #if defined(STRATUS_HLS)
 
@@ -45,4 +45,4 @@
 
 #endif /* STRATUS_HLS */
 
-#endif /* __AUDIO_FIR_DIRECTIVES_HPP_ */
+#endif /* __AUDIO_FFI_DIRECTIVES_HPP_ */

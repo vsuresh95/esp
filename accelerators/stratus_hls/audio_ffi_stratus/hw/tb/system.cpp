@@ -37,7 +37,7 @@ void system_t::config_proc()
     {
         // Print information about begin time
         sc_time begin_time = sc_time_stamp();
-        ESP_REPORT_TIME(begin_time, "BEGIN - audio_fir");
+        ESP_REPORT_TIME(begin_time, "BEGIN - audio_ffi");
 
         // Wait the termination of the accelerator
         do { wait(); } while (!acc_done.read());
@@ -45,7 +45,7 @@ void system_t::config_proc()
 
         // Print information about end time
         sc_time end_time = sc_time_stamp();
-        ESP_REPORT_TIME(end_time, "END - audio_fir");
+        ESP_REPORT_TIME(end_time, "END - audio_ffi");
 
         esc_log_latency(sc_object::basename(), clock_cycle(end_time - begin_time));
         wait(); conf_done.write(false);

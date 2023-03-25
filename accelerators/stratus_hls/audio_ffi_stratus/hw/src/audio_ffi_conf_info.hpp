@@ -1,8 +1,8 @@
 // Copyright (c) 2011-2022 Columbia University, System Level Design Group
 // SPDX-License-Identifier: Apache-2.0
 
-#ifndef __AUDIO_FIR_CONF_INFO_HPP__
-#define __AUDIO_FIR_CONF_INFO_HPP__
+#ifndef __AUDIO_FFI_CONF_INFO_HPP__
+#define __AUDIO_FFI_CONF_INFO_HPP__
 
 #include <systemc.h>
 
@@ -79,4 +79,4 @@ public:
         int32_t do_shift;
 };
 
-#endif // __AUDIO_FIR_CONF_INFO_HPP__
+#endif // __AUDIO_FFI_CONF_INFO_HPP__

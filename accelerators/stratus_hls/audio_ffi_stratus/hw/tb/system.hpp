@@ -4,10 +4,10 @@
 #ifndef __SYSTEM_HPP__
 #define __SYSTEM_HPP__
 
-#include "audio_fir_conf_info.hpp"
-#include "audio_fir_debug_info.hpp"
-#include "audio_fir.hpp"
-#include "audio_fir_directives.hpp"
+#include "audio_ffi_conf_info.hpp"
+#include "audio_ffi_debug_info.hpp"
+#include "audio_ffi.hpp"
+#include "audio_ffi_directives.hpp"
 
 #include "esp_templates.hpp"
 
@@ -16,7 +16,7 @@ const size_t MEM_SIZE = 16 / (DMA_WIDTH/8);
 #include "core/systems/esp_system.hpp"
 
 #ifdef CADENCE
-#include "audio_fir_wrap.h"
+#include "audio_ffi_wrap.h"
 #endif
 
 class system_t : public esp_system<DMA_WIDTH, MEM_SIZE>
@@ -25,9 +25,9 @@ public:
 
     // ACC instance
 #ifdef CADENCE
-    audio_fir_wrapper *acc;
+    audio_ffi_wrapper *acc;
 #else
-    audio_fir *acc;
+    audio_ffi *acc;
 #endif
 
     // Constructor
@@ -37,9 +37,9 @@ public:
     {
         // ACC
 #ifdef CADENCE
-        acc = new audio_fir_wrapper("audio_fir_wrapper");
+        acc = new audio_ffi_wrapper("audio_ffi_wrapper");
 #else
-        acc = new audio_fir("audio_fir_wrapper");
+        acc = new audio_ffi("audio_ffi_wrapper");
 #endif
         // Binding ACC
         acc->clk(clk);

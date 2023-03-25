@@ -1,16 +1,16 @@
 // Copyright (c) 2011-2022 Columbia University, System Level Design Group
 // SPDX-License-Identifier: Apache-2.0
 
-#ifndef __AUDIO_FIR_HPP__
-#define __AUDIO_FIR_HPP__
+#ifndef __AUDIO_FFI_HPP__
+#define __AUDIO_FFI_HPP__
 
 #include "fpdata.hpp"
-#include "audio_fir_conf_info.hpp"
-#include "audio_fir_debug_info.hpp"
+#include "audio_ffi_conf_info.hpp"
+#include "audio_ffi_debug_info.hpp"
 
 #include "esp_templates.hpp"
 
-#include "audio_fir_directives.hpp"
+#include "audio_ffi_directives.hpp"
 
 #define __round_mask(x, y) ((y)-1)
 #define round_up(x, y) ((((x)-1) | __round_mask(x, y))+1)
@@ -43,7 +43,7 @@
 #define STORE_FENCE 7
 #define ACC_DONE 8
 
-class audio_fir : public esp_accelerator_3P<DMA_WIDTH>
+class audio_ffi : public esp_accelerator_3P<DMA_WIDTH>
 {
 public:
     // Compute -> Load
@@ -59,8 +59,8 @@ public:
     handshake_t store_done;
 
     // Constructor
-    SC_HAS_PROCESS(audio_fir);
-    audio_fir(const sc_module_name& name)
+    SC_HAS_PROCESS(audio_ffi);
+    audio_ffi(const sc_module_name& name)
     : esp_accelerator_3P<DMA_WIDTH>(name)
         , cfg("config")
         , load_ready("load_ready")
@@ -107,7 +107,7 @@ public:
     // Store the output data
     void store_output();
 
-    // Configure audio_fir
+    // Configure audio_ffi
     esp_config_proc cfg;
 
     // Private local memories
@@ -127,4 +127,4 @@ public:
 };
 
 
-#endif /* __AUDIO_FIR_HPP__ */
+#endif /* __AUDIO_FFI_HPP__ */

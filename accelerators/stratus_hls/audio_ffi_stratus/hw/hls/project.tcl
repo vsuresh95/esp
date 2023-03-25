@@ -60,7 +60,7 @@ set_attr clock_period $CLOCK_PERIOD
 #
 # System level modules to be synthesized
 #
-define_hls_module audio_fir ../src/audio_fir.cpp
+define_hls_module audio_ffi ../src/audio_ffi.cpp
 
 
 #
@@ -80,15 +80,15 @@ foreach dma [list 64] {
 
     define_system_config tb TESTBENCH_DMA$dma\_BASELINE -io_config IOCFG_DMA$dma\_BASELINE
 
-    define_sim_config "BEHAV_DMA$dma\_BASELINE" "audio_fir BEH" "tb TESTBENCH_DMA$dma\_BASELINE" -io_config IOCFG_DMA$dma\_BASELINE -argv $DEFAULT_ARGV
+    define_sim_config "BEHAV_DMA$dma\_BASELINE" "audio_ffi BEH" "tb TESTBENCH_DMA$dma\_BASELINE" -io_config IOCFG_DMA$dma\_BASELINE -argv $DEFAULT_ARGV
 
     foreach cfg [list BASIC] {
 	set cname $cfg\_DMA$dma\_BASELINE
-	define_hls_config audio_fir $cname -io_config IOCFG_DMA$dma\_BASELINE --clock_period=$CLOCK_PERIOD $COMMON_HLS_FLAGS -DHLS_DIRECTIVES_$cfg
+	define_hls_config audio_ffi $cname -io_config IOCFG_DMA$dma\_BASELINE --clock_period=$CLOCK_PERIOD $COMMON_HLS_FLAGS -DHLS_DIRECTIVES_$cfg
 	if {$TECH_IS_XILINX == 1} {
-	    define_sim_config "$cname\_V" "audio_fir RTL_V $cname" "tb TESTBENCH_DMA$dma\_BASELINE" -io_config IOCFG_DMA$dma\_BASELINE -argv $DEFAULT_ARGV -verilog_top_modules glbl
+	    define_sim_config "$cname\_V" "audio_ffi RTL_V $cname" "tb TESTBENCH_DMA$dma\_BASELINE" -io_config IOCFG_DMA$dma\_BASELINE -argv $DEFAULT_ARGV -verilog_top_modules glbl
 	} else {
-	    define_sim_config "$cname\_V" "audio_fir RTL_V $cname" "tb TESTBENCH_DMA$dma\_BASELINE" -io_config IOCFG_DMA$dma\_BASELINE -argv $DEFAULT_ARGV
+	    define_sim_config "$cname\_V" "audio_ffi RTL_V $cname" "tb TESTBENCH_DMA$dma\_BASELINE" -io_config IOCFG_DMA$dma\_BASELINE -argv $DEFAULT_ARGV
 	}
     }
 }
@@ -98,15 +98,15 @@ foreach dma [list 64] {
 
     define_system_config tb TESTBENCH_DMA$dma\_SM -io_config IOCFG_DMA$dma\_SM
 
-    define_sim_config "BEHAV_DMA$dma\_SM" "audio_fir BEH" "tb TESTBENCH_DMA$dma\_SM" -io_config IOCFG_DMA$dma\_SM -argv $DEFAULT_ARGV
+    define_sim_config "BEHAV_DMA$dma\_SM" "audio_ffi BEH" "tb TESTBENCH_DMA$dma\_SM" -io_config IOCFG_DMA$dma\_SM -argv $DEFAULT_ARGV
 
     foreach cfg [list BASIC] {
 	set cname $cfg\_DMA$dma\_SM
-	define_hls_config audio_fir $cname -io_config IOCFG_DMA$dma\_SM --clock_period=$CLOCK_PERIOD $COMMON_HLS_FLAGS -DHLS_DIRECTIVES_$cfg
+	define_hls_config audio_ffi $cname -io_config IOCFG_DMA$dma\_SM --clock_period=$CLOCK_PERIOD $COMMON_HLS_FLAGS -DHLS_DIRECTIVES_$cfg
 	if {$TECH_IS_XILINX == 1} {
-	    define_sim_config "$cname\_V" "audio_fir RTL_V $cname" "tb TESTBENCH_DMA$dma\_SM" -io_config IOCFG_DMA$dma\_SM -argv $DEFAULT_ARGV -verilog_top_modules glbl
+	    define_sim_config "$cname\_V" "audio_ffi RTL_V $cname" "tb TESTBENCH_DMA$dma\_SM" -io_config IOCFG_DMA$dma\_SM -argv $DEFAULT_ARGV -verilog_top_modules glbl
 	} else {
-	    define_sim_config "$cname\_V" "audio_fir RTL_V $cname" "tb TESTBENCH_DMA$dma\_SM" -io_config IOCFG_DMA$dma\_SM -argv $DEFAULT_ARGV
+	    define_sim_config "$cname\_V" "audio_ffi RTL_V $cname" "tb TESTBENCH_DMA$dma\_SM" -io_config IOCFG_DMA$dma\_SM -argv $DEFAULT_ARGV
 	}
     }
 }

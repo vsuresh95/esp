@@ -4,7 +4,7 @@
 #define __ESP_CFG_000_H__
 
 #include "libesp.h"
-#include "audio_fir_stratus.h"
+#include "audio_ffi_stratus.h"
 
 typedef int32_t token_t;
 
@@ -20,7 +20,7 @@ const int32_t do_shift = DO_SHIFT;
 
 #define NACC 1
 
-struct audio_fir_stratus_access audio_fir_cfg_000[] = {
+struct audio_ffi_stratus_access audio_ffi_cfg_000[] = {
 	{
 		/* <<--descriptor-->> */
 		.do_inverse = DO_INVERSE,
@@ -38,9 +38,9 @@ struct audio_fir_stratus_access audio_fir_cfg_000[] = {
 esp_thread_info_t cfg_000[] = {
 	{
 		.run = true,
-		.devname = "audio_fir_stratus.0",
-		.ioctl_req = AUDIO_FIR_STRATUS_IOC_ACCESS,
-		.esp_desc = &(audio_fir_cfg_000[0].esp),
+		.devname = "audio_ffi_stratus.0",
+		.ioctl_req = AUDIO_FFI_STRATUS_IOC_ACCESS,
+		.esp_desc = &(audio_ffi_cfg_000[0].esp),
 	}
 };
 
