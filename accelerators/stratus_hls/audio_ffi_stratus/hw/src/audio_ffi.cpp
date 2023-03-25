@@ -423,6 +423,7 @@ void audio_ffi::compute_kernel()
     /* <<--params-->> */
     int32_t logn_samples;
     int32_t num_samples;
+    int32_t do_shift;
     {
         HLS_PROTO("compute-config");
 
@@ -433,6 +434,7 @@ void audio_ffi::compute_kernel()
         /* <<--local-params-->> */
         logn_samples = config.logn_samples;
         num_samples = 1 << logn_samples;
+        do_shift = config.do_shift;
     }
 
     while(true)
@@ -578,7 +580,70 @@ void audio_ffi::compute_kernel()
             compute_state_req_dbg.write(12);
         }
 #endif
-        // Compute
+        // Compute - FFT
+        {
+            unsigned offset = 0;  // Offset into Mem for start of this FFT
+            int sin_sign = 1; // This modifes the mySin
+
+            // Do the bit-reverse
+            fft2_bit_reverse(offset, num_samples, logn_samples);
+
+            // Computing phase implementation
+            int m = 1;  // iterative FFT
+
+            FFT2_SINGLE_L1:
+                for(unsigned s = 1; s <= logn_samples; s++) {
+                    m = 1 << s;
+                    CompNum wm(myCos(s), sin_sign*mySin(s));
+
+                FFT2_SINGLE_L2:
+                    for(unsigned k = 0; k < num_samples; k +=m) {
+
+                        CompNum w((FPDATA) 1, (FPDATA) 0);
+                        int md2 = m / 2;
+
+                    FFT2_SINGLE_L3:
+                        for(int j = 0; j < md2; j++) {
+
+                            int kj = offset + k + j;
+                            int kjm = offset + k + j + md2;
+                            CompNum akj, akjm;
+                            CompNum bkj, bkjm;
+
+                            akj.re = int2fp<FPDATA, WORD_SIZE>(A0[2 * kj]);
+                            akj.im = int2fp<FPDATA, WORD_SIZE>(A0[2 * kj + 1]);
+                            akjm.re = int2fp<FPDATA, WORD_SIZE>(A0[2 * kjm]);
+                            akjm.im = int2fp<FPDATA, WORD_SIZE>(A0[2 * kjm + 1]);
+
+                            CompNum t;
+                            compMul(w, akjm, t);
+                            CompNum u(akj.re, akj.im);
+                            compAdd(u, t, bkj);
+                            compSub(u, t, bkjm);
+                            CompNum wwm;
+                            wwm.re = w.re - (wm.im * w.im + wm.re * w.re);
+                            wwm.im = w.im + (wm.im * w.re - wm.re * w.im);
+                            w = wwm;
+
+                            {
+                                HLS_PROTO("compute_write_A0_fft");
+                                HLS_BREAK_DEP(A0);
+                                wait();
+                                A0[2 * kj] = fp2int<FPDATA, WORD_SIZE>(bkj.re);
+                                A0[2 * kj + 1] = fp2int<FPDATA, WORD_SIZE>(bkj.im);
+                                wait();
+                                A0[2 * kjm] = fp2int<FPDATA, WORD_SIZE>(bkjm.re);
+                                A0[2 * kjm + 1] = fp2int<FPDATA, WORD_SIZE>(bkjm.im);
+                            }
+                        } // for (j = 0 .. md2)
+                    } // for (k = 0 .. num_samples)
+                } // for (s = 1 .. logn_samples)
+
+            if (do_shift) {
+                fft2_do_shift(offset, num_samples, logn_samples);
+            }
+        }
+        // Compute - FIR
         {
             CompNum fpnk, fpk, f1k, f2k, tw, tdc;
             CompNum tf, if0, ifn, of0, flt0, fltn, t0, tn;
@@ -684,6 +749,69 @@ void audio_ffi::compute_kernel()
                     A0[(2 * num_samples) - k + 1] = - (fp2int<FPDATA, WORD_SIZE>(tmpbufn.im));
                 }
             } // for (k = 0 .. num_samples)
+        }
+        // Compute - IFFT
+        {
+            unsigned offset = 0;  // Offset into Mem for start of this FFT
+            int sin_sign = -1; // This modifes the mySin
+                                                  // values used below
+            if (do_shift) {
+                fft2_do_shift(offset, num_samples, logn_samples);
+            }
+
+            // Do the bit-reverse
+            fft2_bit_reverse(offset, num_samples, logn_samples);
+
+            // Computing phase implementation
+            int m = 1;  // iterative FFT
+
+            IFFT2_SINGLE_L1:
+                for(unsigned s = 1; s <= logn_samples; s++) {
+                    m = 1 << s;
+                    CompNum wm(myCos(s), sin_sign*mySin(s));
+
+                IFFT2_SINGLE_L2:
+                    for(unsigned k = 0; k < num_samples; k +=m) {
+
+                        CompNum w((FPDATA) 1, (FPDATA) 0);
+                        int md2 = m / 2;
+
+                    IFFT2_SINGLE_L3:
+                        for(int j = 0; j < md2; j++) {
+
+                            int kj = offset + k + j;
+                            int kjm = offset + k + j + md2;
+                            CompNum akj, akjm;
+                            CompNum bkj, bkjm;
+
+                            akj.re = int2fp<FPDATA, WORD_SIZE>(A0[2 * kj]);
+                            akj.im = int2fp<FPDATA, WORD_SIZE>(A0[2 * kj + 1]);
+                            akjm.re = int2fp<FPDATA, WORD_SIZE>(A0[2 * kjm]);
+                            akjm.im = int2fp<FPDATA, WORD_SIZE>(A0[2 * kjm + 1]);
+
+                            CompNum t;
+                            compMul(w, akjm, t);
+                            CompNum u(akj.re, akj.im);
+                            compAdd(u, t, bkj);
+                            compSub(u, t, bkjm);
+                            CompNum wwm;
+                            wwm.re = w.re - (wm.im * w.im + wm.re * w.re);
+                            wwm.im = w.im + (wm.im * w.re - wm.re * w.im);
+                            w = wwm;
+
+                            {
+                                HLS_PROTO("compute_write_A0_ifft");
+                                HLS_BREAK_DEP(A0);
+                                wait();
+                                A0[2 * kj] = fp2int<FPDATA, WORD_SIZE>(bkj.re);
+                                A0[2 * kj + 1] = fp2int<FPDATA, WORD_SIZE>(bkj.im);
+                                wait();
+                                A0[2 * kjm] = fp2int<FPDATA, WORD_SIZE>(bkjm.re);
+                                A0[2 * kjm + 1] = fp2int<FPDATA, WORD_SIZE>(bkjm.im);
+                            }
+                        } // for (j = 0 .. md2)
+                    } // for (k = 0 .. num_samples)
+                } // for (s = 1 .. logn_samples)
         } // Compute
 #ifdef ENABLE_SM
         // Poll consumer's ready to know if we can send new data

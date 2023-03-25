@@ -27,6 +27,9 @@
 #define HLS_UNROLL_SIMPLE                       \
     HLS_UNROLL_LOOP(ON)
 
+#define HLS_UNROLL_N(_n, _name)                 \
+    HLS_UNROLL_LOOP(AGGRESSIVE, _n, _name)
+
 #if defined(HLS_DIRECTIVES_BASIC)
 
 #else
@@ -42,6 +45,7 @@
 #define HLS_FLAT(_a)
 #define HLS_BREAK_DEP(_a)
 #define HLS_UNROLL_SIMPLE
+#define HLS_UNROLL_N(_n, _name)
 
 #endif /* STRATUS_HLS */
 

@@ -110,6 +110,10 @@ public:
     // Configure audio_ffi
     esp_config_proc cfg;
 
+    // Functions
+    void fft2_do_shift(unsigned int offset, unsigned int num_samples, unsigned int logn_samples);
+    void fft2_bit_reverse(unsigned int offset, unsigned int n, unsigned int bits);
+
     // Private local memories
     sc_dt::sc_int<DATA_WIDTH> A0[PLM_IN_WORD];
     sc_dt::sc_int<DATA_WIDTH> F0[PLM_FLT_WORD];
