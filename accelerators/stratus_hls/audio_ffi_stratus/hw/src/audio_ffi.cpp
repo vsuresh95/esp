@@ -80,7 +80,8 @@ void audio_ffi::load_input()
             break;
             case POLL_FLT_PROD_VALID_REQ:
             {
-                dma_info_t dma_info(FLT_VALID_FLAG_OFFSET / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                int32_t end_sync_offset = SYNC_VAR_SIZE + 2 * num_samples + FLT_VALID_FLAG_OFFSET;
+                dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 int32_t valid_task = 0;
 
@@ -99,7 +100,7 @@ void audio_ffi::load_input()
             break;
             case POLL_CONS_READY_REQ:
             {
-                int32_t end_sync_offset = SYNC_VAR_SIZE + 2 * num_samples + READY_FLAG_OFFSET;
+                int32_t end_sync_offset = 3 * (SYNC_VAR_SIZE + 2 * num_samples) + READY_FLAG_OFFSET;
                 dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 int32_t ready_for_task = 0;
@@ -143,7 +144,7 @@ void audio_ffi::load_input()
             }
             // Load filters
             {
-                dma_info_t dma_info(4 * (2 * num_samples + SYNC_VAR_SIZE) / DMA_WORD_PER_BEAT, 2 * (num_samples + 1)/ DMA_WORD_PER_BEAT, DMA_SIZE);
+                dma_info_t dma_info(5 * (2 * num_samples + SYNC_VAR_SIZE) / DMA_WORD_PER_BEAT, 2 * (num_samples + 1)/ DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
 
                 wait();
@@ -165,7 +166,7 @@ void audio_ffi::load_input()
             }
             // Load twiddle factors 
             {
-                dma_info_t dma_info(6 * (2 * num_samples + SYNC_VAR_SIZE) / DMA_WORD_PER_BEAT, num_samples / DMA_WORD_PER_BEAT, DMA_SIZE);
+                dma_info_t dma_info(7 * (2 * num_samples + SYNC_VAR_SIZE) / DMA_WORD_PER_BEAT, num_samples / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
 
                 wait();
@@ -261,7 +262,8 @@ void audio_ffi::store_output()
             break;
             case UPDATE_FLT_PROD_READY_REQ:
             {
-                dma_info_t dma_info(FLT_READY_FLAG_OFFSET / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                int32_t end_sync_offset = SYNC_VAR_SIZE + 2 * num_samples + FLT_READY_FLAG_OFFSET;
+                dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 dataBv.range(DMA_WIDTH - 1, 0) = 1;
 
@@ -293,7 +295,8 @@ void audio_ffi::store_output()
             break;
             case UPDATE_FLT_PROD_VALID_REQ:
             {
-                dma_info_t dma_info(FLT_VALID_FLAG_OFFSET / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                int32_t end_sync_offset = SYNC_VAR_SIZE + 2 * num_samples + FLT_VALID_FLAG_OFFSET;
+                dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 dataBv.range(DMA_WIDTH - 1, 0) = 0;
 
@@ -309,7 +312,7 @@ void audio_ffi::store_output()
             break;
             case UPDATE_CONS_VALID_REQ:
             {
-                int32_t end_sync_offset = SYNC_VAR_SIZE + 2 * num_samples + VALID_FLAG_OFFSET;
+                int32_t end_sync_offset = 3 * (SYNC_VAR_SIZE + 2 * num_samples) + VALID_FLAG_OFFSET;
                 dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 dataBv.range(DMA_WIDTH - 1, 0) = 1;
@@ -326,7 +329,7 @@ void audio_ffi::store_output()
             break;
             case UPDATE_CONS_READY_REQ:
             {
-                int32_t end_sync_offset = SYNC_VAR_SIZE + 2 * num_samples + READY_FLAG_OFFSET;
+                int32_t end_sync_offset = 3 * (SYNC_VAR_SIZE + 2 * num_samples) + READY_FLAG_OFFSET;
                 dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 dataBv.range(DMA_WIDTH - 1, 0) = 0;
@@ -344,7 +347,7 @@ void audio_ffi::store_output()
 #endif
             case STORE_DATA_REQ:
             {
-                int32_t end_sync_offset = (2 * SYNC_VAR_SIZE) + (2 * num_samples);
+                int32_t end_sync_offset = 3 * (SYNC_VAR_SIZE + 2 * num_samples) + SYNC_VAR_SIZE;
                 dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, 2 * num_samples / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
 
