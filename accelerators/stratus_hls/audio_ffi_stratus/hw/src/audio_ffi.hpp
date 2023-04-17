@@ -29,9 +29,9 @@
 #define FLT_VALID_FLAG_OFFSET 6
 #define FLT_READY_FLAG_OFFSET 8
 
-#define POLL_PROD_VALID_REQ 0
-#define POLL_FLT_PROD_VALID_REQ 1
-#define POLL_CONS_READY_REQ 2
+#define TEST_PROD_VALID_REQ 0
+#define TEST_FLT_PROD_VALID_REQ 1
+#define TEST_CONS_READY_REQ 2
 #define LOAD_DATA_REQ 3
 #define UPDATE_PROD_VALID_REQ 0
 #define UPDATE_FLT_PROD_VALID_REQ 1
@@ -58,6 +58,18 @@ public:
     // Store -> Compute
     handshake_t store_done;
 
+    // Input ASI -> FFT
+    handshake_t input_to_fft;
+
+    // FFT -> FIR
+    handshake_t fft_to_fir;
+
+    // FIR -> IFFT
+    handshake_t fir_to_ifft;
+
+    // IFFT -> Output ASI 
+    handshake_t ifft_to_store;
+
     // Constructor
     SC_HAS_PROCESS(audio_ffi);
     audio_ffi(const sc_module_name& name)
@@ -67,34 +79,79 @@ public:
         , store_ready("store_ready")
         , load_done("load_done")
         , store_done("store_done")
+        , input_to_fft("input_to_fft")
+        , fft_to_fir("fft_to_fir")
+        , fir_to_ifft("fir_to_ifft")
+        , ifft_to_store("ifft_to_store")
     {
+        SC_CTHREAD(input_asi_kernel, this->clk.pos());
+        this->reset_signal_is(this->rst, false);
+        SC_CTHREAD(output_asi_kernel, this->clk.pos());
+        this->reset_signal_is(this->rst, false);
+        SC_CTHREAD(fft_kernel, this->clk.pos());
+        this->reset_signal_is(this->rst, false);
+        SC_CTHREAD(fir_kernel, this->clk.pos());
+        this->reset_signal_is(this->rst, false);
+        SC_CTHREAD(ifft_kernel, this->clk.pos());
+        this->reset_signal_is(this->rst, false);
+
         // Signal binding
         cfg.bind_with(*this);
 
         HLS_PRESERVE_SIGNAL(load_state_req_dbg, true);
         HLS_PRESERVE_SIGNAL(store_state_req_dbg, true);
-        HLS_PRESERVE_SIGNAL(compute_state_req_dbg, true);
+        HLS_PRESERVE_SIGNAL(input_state_req_dbg, true);
+        HLS_PRESERVE_SIGNAL(output_state_req_dbg, true);
+
+        HLS_PRESERVE_SIGNAL(fft_state_dbg, true);
+        HLS_PRESERVE_SIGNAL(fir_state_dbg, true);
+        HLS_PRESERVE_SIGNAL(ifft_state_dbg, true);
 
         // Map arrays to memories
         /* <<--plm-bind-->> */
         HLS_MAP_plm(A0, PLM_IN_NAME);
+        HLS_MAP_plm(B0, PLM_IN_NAME);
+        HLS_MAP_plm(C0, PLM_IN_NAME);
+        HLS_MAP_plm(D0, PLM_IN_NAME);
+        HLS_MAP_plm(A1, PLM_IN_NAME);
+        HLS_MAP_plm(B1, PLM_IN_NAME);
+        HLS_MAP_plm(C1, PLM_IN_NAME);
+        HLS_MAP_plm(D1, PLM_IN_NAME);
+
         HLS_MAP_plm(F0, PLM_FLT_NAME);
+        HLS_MAP_plm(F1, PLM_FLT_NAME);
         HLS_MAP_plm(T0, PLM_TW_NAME);
+        HLS_MAP_plm(T1, PLM_TW_NAME);
         
         load_ready.bind_with(*this);
         store_ready.bind_with(*this);
         load_done.bind_with(*this);
         store_done.bind_with(*this);
+        
+        input_to_fft.bind_with(*this);
+        fft_to_fir.bind_with(*this);
+        fir_to_ifft.bind_with(*this);
+        ifft_to_store.bind_with(*this);
     }
 
     sc_signal< sc_int<32> > load_state_req_dbg;
     sc_signal< sc_int<32> > store_state_req_dbg;
-    sc_signal< sc_int<32> > compute_state_req_dbg;
+    sc_signal< sc_int<32> > input_state_req_dbg;
+    sc_signal< sc_int<32> > output_state_req_dbg;
+
+    sc_signal< sc_int<32> > fft_state_dbg;
+    sc_signal< sc_int<32> > fir_state_dbg;
+    sc_signal< sc_int<32> > ifft_state_dbg;
 
     sc_int<32> load_state_req;
     sc_int<32> store_state_req;
 
+    sc_int<32> prod_valid;
     sc_int<32> last_task;
+    sc_int<32> cons_ready;
+
+    sc_signal<bool> load_arbiter;
+    sc_signal<bool> store_arbiter;
 
     // Processes
 
@@ -107,6 +164,21 @@ public:
     // Store the output data
     void store_output();
 
+    // ASI submodule for input
+    void input_asi_kernel();
+
+    // ASI submodule for output
+    void output_asi_kernel();
+
+    // FFT kernel
+    void fft_kernel();
+
+    // FIR kernel
+    void fir_kernel();
+
+    // IFFT kernel
+    void ifft_kernel();
+
     // Configure audio_ffi
     esp_config_proc cfg;
 
@@ -116,8 +188,18 @@ public:
 
     // Private local memories
     sc_dt::sc_int<DATA_WIDTH> A0[PLM_IN_WORD];
+    sc_dt::sc_int<DATA_WIDTH> A1[PLM_IN_WORD];
+    sc_dt::sc_int<DATA_WIDTH> B0[PLM_IN_WORD];
+    sc_dt::sc_int<DATA_WIDTH> B1[PLM_IN_WORD];
+    sc_dt::sc_int<DATA_WIDTH> C0[PLM_IN_WORD];
+    sc_dt::sc_int<DATA_WIDTH> C1[PLM_IN_WORD];
+    sc_dt::sc_int<DATA_WIDTH> D0[PLM_IN_WORD];
+    sc_dt::sc_int<DATA_WIDTH> D1[PLM_IN_WORD];
+
     sc_dt::sc_int<DATA_WIDTH> F0[PLM_FLT_WORD];
+    sc_dt::sc_int<DATA_WIDTH> F1[PLM_FLT_WORD];
     sc_dt::sc_int<DATA_WIDTH> T0[PLM_TWD_WORD];
+    sc_dt::sc_int<DATA_WIDTH> T1[PLM_TWD_WORD];
 
     // Handshakes
     inline void compute_load_ready_handshake();
@@ -128,6 +210,15 @@ public:
     inline void load_compute_done_handshake();
     inline void compute_store_done_handshake();
     inline void store_compute_done_handshake();
+
+    inline void input_fft_handshake();
+    inline void fft_input_handshake();
+    inline void fft_fir_handshake();
+    inline void fir_fft_handshake();
+    inline void fir_ifft_handshake();
+    inline void ifft_fir_handshake();
+    inline void ifft_output_handshake();
+    inline void output_ifft_handshake();
 };
 
 

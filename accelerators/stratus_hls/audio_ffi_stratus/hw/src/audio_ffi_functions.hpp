@@ -281,3 +281,75 @@ inline void audio_ffi::store_compute_done_handshake()
         store_done.req.req();
     }
 }
+
+inline void audio_ffi::input_fft_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("input-fft-handshake");
+
+        input_to_fft.req.req();
+    }
+}
+
+inline void audio_ffi::fft_input_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("fft-input-handshake");
+
+        input_to_fft.ack.ack();
+    }
+}
+
+inline void audio_ffi::fft_fir_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("fft-fir-handshake");
+
+        fft_to_fir.req.req();
+    }
+}
+
+inline void audio_ffi::fir_fft_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("fir-fft-handshake");
+
+        fft_to_fir.ack.ack();
+    }
+}
+
+inline void audio_ffi::fir_ifft_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("fir-ifft-handshake");
+
+        fir_to_ifft.req.req();
+    }
+}
+
+inline void audio_ffi::ifft_fir_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("ifft-fir-handshake");
+
+        fir_to_ifft.ack.ack();
+    }
+}
+
+inline void audio_ffi::ifft_output_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("ifft-output-handshake");
+
+        ifft_to_store.req.req();
+    }
+}
+
+inline void audio_ffi::output_ifft_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("output-ifft-handshake");
+
+        ifft_to_store.ack.ack();
+    }
+}
