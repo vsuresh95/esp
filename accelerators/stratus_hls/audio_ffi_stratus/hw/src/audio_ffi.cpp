@@ -20,11 +20,15 @@ void audio_ffi::load_input()
 
         load_state_req_dbg.write(0);
 
-        load_ready.ack.reset_ack();
-        load_done.req.reset_req();
+        input_load_start.ack.reset_ack();
+        output_load_start.ack.reset_ack();
+        load_input_done.req.reset_req();
+        load_output_done.req.reset_req();
 
         prod_valid = 0;
         cons_ready = 0;
+        load_state_req = 0;
+        load_state_req_module = false;
 
         wait();
     }
@@ -54,7 +58,18 @@ void audio_ffi::load_input()
 
         wait();
 
-        this->load_compute_ready_handshake();
+        // Wait for either input ASI or output ASI
+        while (!(input_load_req_valid || output_load_req_valid)) wait();
+
+        if (input_load_req_valid) {
+            this->load_input_start_handshake();
+            load_state_req = input_load_req;
+            load_state_req_module = true;
+        } else {
+            this->load_output_start_handshake();
+            load_state_req = output_load_req;
+            load_state_req_module = false;
+        }
 
         load_state_req_dbg.write(load_state_req);
 
@@ -180,7 +195,11 @@ void audio_ffi::load_input()
 
         wait();
 
-        this->load_compute_done_handshake();
+        if (load_state_req_module) {
+            this->load_input_done_handshake();
+        } else {
+            this->load_output_done_handshake();
+        }
     }
 } // Function : load_input
 
@@ -194,8 +213,13 @@ void audio_ffi::store_output()
 
         store_state_req_dbg.write(0);
 
-        store_ready.ack.reset_ack();
-        store_done.req.reset_req();
+        input_store_start.ack.reset_ack();
+        output_store_start.ack.reset_ack();
+        store_input_done.req.reset_req();
+        store_output_done.req.reset_req();
+
+        store_state_req = 0;
+        store_state_req_module = false;
 
         wait();
     }
@@ -226,7 +250,18 @@ void audio_ffi::store_output()
 
         wait();
 
-        this->store_compute_ready_handshake();
+        // Wait for either input ASI or output ASI
+        while (!(input_store_req_valid || output_store_req_valid)) wait();
+
+        if (input_store_req_valid) {
+            this->store_input_start_handshake();
+            store_state_req = input_store_req;
+            store_state_req_module = true;
+        } else {
+            this->store_output_start_handshake();
+            store_state_req = output_store_req;
+            store_state_req_module = false;
+        }
 
         store_state_req_dbg.write(store_state_req);
 
@@ -356,7 +391,11 @@ void audio_ffi::store_output()
 
         wait();
 
-        this->store_compute_done_handshake();
+        if (store_state_req_module) {
+            this->store_input_done_handshake();
+        } else {
+            this->store_output_done_handshake();
+        }
 
         pingpong = !pingpong;
     }
@@ -402,12 +441,16 @@ void audio_ffi::input_asi_kernel()
 
         input_state_req_dbg.write(0);
 
-        load_ready.req.reset_req();
-        load_done.ack.reset_ack();
+        input_load_start.req.reset_req();
+        input_store_start.req.reset_req();
+        load_input_done.ack.reset_ack();
+        store_input_done.ack.reset_ack();
         input_to_fft.req.reset_req();
 
-        load_state_req = 0;
-        load_arbiter.write(false);
+        input_load_req = 0;
+        input_store_req = 0;
+        input_load_req_valid = false;
+        input_store_req_valid = false;
 
         wait();
     }
@@ -430,16 +473,17 @@ void audio_ffi::input_asi_kernel()
         {
             HLS_PROTO("test-prod-valid");
 
-            if(load_arbiter.read()) load_arbiter.write(true); // Acquire load control
-            load_state_req = TEST_PROD_VALID_REQ;
+            input_load_req = TEST_PROD_VALID_REQ;
+            input_load_req_valid = true;
 
             input_state_req_dbg.write(1);
 
-            this->compute_load_ready_handshake();
+            this->input_load_start_handshake();
             wait();
-            this->compute_load_done_handshake();
+            input_load_req_valid = false;
             wait();
-            load_arbiter.write(false); // Release load control
+            this->input_load_done_handshake();
+            wait();
         }
 
         {
@@ -453,68 +497,77 @@ void audio_ffi::input_asi_kernel()
                 {
                     HLS_PROTO("update-prod-valid");
 
-                    if(store_arbiter.read()) store_arbiter.write(true); // Acquire store control
-                    store_state_req = UPDATE_PROD_VALID_REQ;
+                    input_store_req = UPDATE_PROD_VALID_REQ;
+                    input_store_req_valid = true;
 
                     input_state_req_dbg.write(2);
 
-                    this->compute_store_ready_handshake();
+                    this->input_store_start_handshake();
                     wait();
-                    this->compute_store_done_handshake();
+                    input_store_req_valid = false;
+                    wait();
+                    this->input_store_done_handshake();
                     wait();
 
                     // Wait for all writes to be done and then issue fence
-                    store_state_req = STORE_FENCE;
+                    input_store_req = STORE_FENCE;
+                    input_store_req_valid = true;
 
                     input_state_req_dbg.write(3);
 
-                    this->compute_store_ready_handshake();
+                    this->input_store_start_handshake();
                     wait();
-                    this->compute_store_done_handshake();
+                    input_store_req_valid = false;
                     wait();
-                    store_arbiter.write(false); // Release store control
+                    this->input_store_done_handshake();
+                    wait();
                 }
 
                 // Load input data
                 {
                     HLS_PROTO("load-input-data");
 
-                    if(load_arbiter.read()) load_arbiter.write(true); // Acquire load control
-                    load_state_req = LOAD_DATA_REQ;
+                    input_load_req = LOAD_DATA_REQ;
+                    input_load_req_valid = true;
 
                     input_state_req_dbg.write(7);
 
-                    this->compute_load_ready_handshake();
+                    this->input_load_start_handshake();
                     wait();
-                    this->compute_load_done_handshake();
+                    input_load_req_valid = false;
                     wait();
-                    load_arbiter.write(false); // Release load control
+                    this->input_load_done_handshake();
+                    wait();
                 }
 
                 // update producer's ready to accept new data
                 {
                     HLS_PROTO("update-prod-ready");
 
-                    if(store_arbiter.read()) store_arbiter.write(true); // Acquire store control
-                    store_state_req = UPDATE_PROD_READY_REQ;
+                    input_store_req = UPDATE_PROD_READY_REQ;
+                    input_store_req_valid = true;
 
                     input_state_req_dbg.write(8);
 
-                    this->compute_store_ready_handshake();
+                    this->input_store_start_handshake();
                     wait();
-                    this->compute_store_done_handshake();
+                    input_store_req_valid = false;
+                    wait();
+                    this->input_store_done_handshake();
                     wait();
 
                     // Wait for all writes to be done and then issue fence
-                    store_state_req = STORE_FENCE;
+                    input_store_req = STORE_FENCE;
+                    input_store_req_valid = true;
 
                     input_state_req_dbg.write(9);
 
-                    this->compute_store_ready_handshake();
+                    this->input_store_start_handshake();
                     wait();
-                    this->compute_store_done_handshake();
+                    input_store_req_valid = false;
                     wait();
-                    store_arbiter.write(false); // Release store control
+                    this->input_store_done_handshake();
+                    wait();
                 }
 
                 // Inform FFT to start
@@ -537,12 +590,16 @@ void audio_ffi::output_asi_kernel()
 
         output_state_req_dbg.write(0);
 
-        store_ready.req.reset_req();
-        store_done.ack.reset_ack();
+        output_load_start.req.reset_req();
+        output_store_start.req.reset_req();
+        load_output_done.ack.reset_ack();
+        store_output_done.ack.reset_ack();
         ifft_to_store.ack.reset_ack();
 
-        store_state_req = 0;
-        store_arbiter.write(false);
+        output_load_req = 0;
+        output_store_req = 0;
+        output_load_req_valid = false;
+        output_store_req_valid = false;
 
         wait();
     }
@@ -575,16 +632,17 @@ void audio_ffi::output_asi_kernel()
 
             while (cons_ready == 0)
             {
-                if(load_arbiter.read()) load_arbiter.write(true); // Acquire load control
-                load_state_req = TEST_CONS_READY_REQ;
+                output_load_req = TEST_CONS_READY_REQ;
+                output_load_req_valid = true;
 
                 output_state_req_dbg.write(13);
 
-                this->compute_load_ready_handshake();
+                this->output_load_start_handshake();
                 wait();
-                this->compute_load_done_handshake();
+                output_load_req_valid = false;
                 wait();
-                load_arbiter.write(false); // Release load control
+                this->output_load_done_handshake();
+                wait();
             }
         }
 
@@ -597,77 +655,88 @@ void audio_ffi::output_asi_kernel()
             {
                 HLS_PROTO("update-cons-ready");
 
-                if(store_arbiter.read()) store_arbiter.write(true); // Acquire store control
-                store_state_req = UPDATE_CONS_READY_REQ;
+                output_store_req = UPDATE_CONS_READY_REQ;
+                output_store_req_valid = true;
 
                 output_state_req_dbg.write(14);
 
-                this->compute_store_ready_handshake();
+                this->output_store_start_handshake();
                 wait();
-                this->compute_store_done_handshake();
+                output_store_req_valid = false;
+                wait();
+                this->output_store_done_handshake();
                 wait();
 
                 // Wait for all writes to be done and then issue fence
-                store_state_req = STORE_FENCE;
+                output_store_req = STORE_FENCE;
+                output_store_req_valid = true;
 
                 output_state_req_dbg.write(15);
 
-                this->compute_store_ready_handshake();
+                this->output_store_start_handshake();
                 wait();
-                this->compute_store_done_handshake();
+                output_store_req_valid = false;
                 wait();
-                store_arbiter.write(false); // Release store control
+                this->output_store_done_handshake();
+                wait();
             }
             // Store output data
             {
                 HLS_PROTO("store-output-data");
 
-                if(store_arbiter.read()) store_arbiter.write(true); // Acquire store control
-                store_state_req = STORE_DATA_REQ;
-
-                this->compute_store_ready_handshake();
+                output_store_req = STORE_DATA_REQ;
+                output_store_req_valid = true;
 
                 output_state_req_dbg.write(16);
 
+                this->output_store_start_handshake();
                 wait();
-                this->compute_store_done_handshake();
+                output_store_req_valid = false;
+                wait();
+                this->output_store_done_handshake();
                 wait();
 
                 // Wait for all writes to be done and then issue fence
-                store_state_req = STORE_FENCE;
+                output_store_req = STORE_FENCE;
+                output_store_req_valid = true;
 
                 output_state_req_dbg.write(17);
 
-                this->compute_store_ready_handshake();
+                this->output_store_start_handshake();
                 wait();
-                this->compute_store_done_handshake();
+                output_store_req_valid = false;
                 wait();
-                store_arbiter.write(false); // Release store control
+                this->output_store_done_handshake();
+                wait();
             }
             // update consumer's ready for new data available
             {
                 HLS_PROTO("update-cons-ready");
 
-                if(store_arbiter.read()) store_arbiter.write(true); // Acquire store control
-                store_state_req = UPDATE_CONS_VALID_REQ;
+                output_store_req = UPDATE_CONS_VALID_REQ;
+                output_store_req_valid = true;
 
                 output_state_req_dbg.write(18);
 
-                this->compute_store_ready_handshake();
+                this->output_store_start_handshake();
                 wait();
-                this->compute_store_done_handshake();
+                output_store_req_valid = false;
+                wait();
+                this->output_store_done_handshake();
                 wait();
 
                 // Wait for all writes to be done and then issue fence
-                store_state_req = STORE_FENCE;
+                output_store_req = STORE_FENCE;
+                output_store_req_valid = true;
 
                 output_state_req_dbg.write(19);
 
-                this->compute_store_ready_handshake();
+                this->output_store_start_handshake();
                 wait();
-                this->compute_store_done_handshake();
+                output_store_req_valid = false;
                 wait();
-                store_arbiter.write(false); // Release store control
+                this->output_store_done_handshake();
+                wait();
             }
 
             // End operation
@@ -676,16 +745,17 @@ void audio_ffi::output_asi_kernel()
 
                 if (last_task == 1)
                 {
-                    if(store_arbiter.read()) store_arbiter.write(true); // Acquire store control
-                    store_state_req = ACC_DONE;
+                    output_store_req = ACC_DONE;
+                    output_store_req_valid = true;
 
                     output_state_req_dbg.write(20);
 
-                    this->compute_store_ready_handshake();
+                    this->output_store_start_handshake();
                     wait();
-                    this->compute_store_done_handshake();
+                    output_store_req_valid = false;
                     wait();
-                    store_arbiter.write(false); // Release store control
+                    this->output_store_done_handshake();
+                    wait();
                     this->process_done();
                 }
             }
@@ -763,17 +833,13 @@ void audio_ffi::fft_kernel()
                     unsigned int ridx = 2*(offset + r);
 
                     if (!pingpong) {
-                        wait();
                         t1_real = A0[iidx];
                         t1_imag = A0[iidx + 1];
-                        wait();
                         t2_real = A0[ridx];
                         t2_imag = A0[ridx + 1];
                     } else {
-                        wait();
                         t1_real = A1[iidx];
                         t1_imag = A1[iidx + 1];
-                        wait();
                         t2_real = A1[ridx];
                         t2_imag = A1[ridx + 1];
                     }
@@ -1175,17 +1241,13 @@ void audio_ffi::ifft_kernel()
                     unsigned int ridx = 2*(offset + r);
 
                     if (!pingpong) {
-                        wait();
                         t1_real = C0[iidx];
                         t1_imag = C0[iidx + 1];
-                        wait();
                         t2_real = C0[ridx];
                         t2_imag = C0[ridx + 1];
                     } else {
-                        wait();
                         t1_real = C1[iidx];
                         t1_imag = C1[iidx + 1];
-                        wait();
                         t2_real = C1[ridx];
                         t2_imag = C1[ridx + 1];
                     }

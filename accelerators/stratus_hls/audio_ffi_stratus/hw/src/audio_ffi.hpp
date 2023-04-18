@@ -46,17 +46,29 @@
 class audio_ffi : public esp_accelerator_3P<DMA_WIDTH>
 {
 public:
-    // Compute -> Load
-    handshake_t load_ready;
+    // Input ASI -> Load
+    handshake_t input_load_start;
 
-    // Compute -> Store
-    handshake_t store_ready;
+    // Input ASI -> Store
+    handshake_t input_store_start;
 
-    // Load -> Compute
-    handshake_t load_done;
+    // Output ASI -> Load
+    handshake_t output_load_start;
 
-    // Store -> Compute
-    handshake_t store_done;
+    // Output ASI -> Store
+    handshake_t output_store_start;
+
+    // Load -> Input ASI
+    handshake_t load_input_done;
+
+    // Store -> Input ASI
+    handshake_t store_input_done;
+
+    // Load -> Output ASI
+    handshake_t load_output_done;
+
+    // Store -> Output ASI
+    handshake_t store_output_done;
 
     // Input ASI -> FFT
     handshake_t input_to_fft;
@@ -75,10 +87,14 @@ public:
     audio_ffi(const sc_module_name& name)
     : esp_accelerator_3P<DMA_WIDTH>(name)
         , cfg("config")
-        , load_ready("load_ready")
-        , store_ready("store_ready")
-        , load_done("load_done")
-        , store_done("store_done")
+        , input_load_start("input_load_start")
+        , input_store_start("input_store_start")
+        , output_load_start("output_load_start")
+        , output_store_start("output_store_start")
+        , load_input_done("load_input_done")
+        , store_input_done("store_input_done")
+        , load_output_done("load_output_done")
+        , store_output_done("store_output_done")
         , input_to_fft("input_to_fft")
         , fft_to_fir("fft_to_fir")
         , fir_to_ifft("fir_to_ifft")
@@ -123,10 +139,14 @@ public:
         HLS_MAP_plm(T0, PLM_TW_NAME);
         HLS_MAP_plm(T1, PLM_TW_NAME);
         
-        load_ready.bind_with(*this);
-        store_ready.bind_with(*this);
-        load_done.bind_with(*this);
-        store_done.bind_with(*this);
+        input_load_start.bind_with(*this);
+        input_store_start.bind_with(*this);
+        output_load_start.bind_with(*this);
+        output_store_start.bind_with(*this);
+        load_input_done.bind_with(*this);
+        store_input_done.bind_with(*this);
+        load_output_done.bind_with(*this);
+        store_output_done.bind_with(*this);
         
         input_to_fft.bind_with(*this);
         fft_to_fir.bind_with(*this);
@@ -144,14 +164,22 @@ public:
     sc_signal< sc_int<32> > ifft_state_dbg;
 
     sc_int<32> load_state_req;
+    sc_signal<bool> load_state_req_module;
     sc_int<32> store_state_req;
+    sc_signal<bool> store_state_req_module;
 
     sc_int<32> prod_valid;
     sc_int<32> last_task;
     sc_int<32> cons_ready;
 
-    sc_signal<bool> load_arbiter;
-    sc_signal<bool> store_arbiter;
+    sc_int<32> input_load_req;
+    sc_int<32> output_load_req;
+    sc_signal<bool> input_load_req_valid;
+    sc_signal<bool> output_load_req_valid;
+    sc_int<32> input_store_req;
+    sc_int<32> output_store_req;
+    sc_signal<bool> input_store_req_valid;
+    sc_signal<bool> output_store_req_valid;
 
     // Processes
 
@@ -202,14 +230,22 @@ public:
     sc_dt::sc_int<DATA_WIDTH> T1[PLM_TWD_WORD];
 
     // Handshakes
-    inline void compute_load_ready_handshake();
-    inline void load_compute_ready_handshake();
-    inline void compute_store_ready_handshake();
-    inline void store_compute_ready_handshake();
-    inline void compute_load_done_handshake();
-    inline void load_compute_done_handshake();
-    inline void compute_store_done_handshake();
-    inline void store_compute_done_handshake();
+    inline void input_load_start_handshake();
+    inline void load_input_start_handshake();
+    inline void input_store_start_handshake();
+    inline void store_input_start_handshake();
+    inline void output_load_start_handshake();
+    inline void load_output_start_handshake();
+    inline void output_store_start_handshake();
+    inline void store_output_start_handshake();
+    inline void load_input_done_handshake();
+    inline void input_load_done_handshake();
+    inline void store_input_done_handshake();
+    inline void input_store_done_handshake();
+    inline void load_output_done_handshake();
+    inline void output_load_done_handshake();
+    inline void store_output_done_handshake();
+    inline void output_store_done_handshake();
 
     inline void input_fft_handshake();
     inline void fft_input_handshake();
