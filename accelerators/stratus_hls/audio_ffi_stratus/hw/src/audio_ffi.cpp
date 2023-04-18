@@ -452,6 +452,8 @@ void audio_ffi::input_asi_kernel()
         input_load_req_valid = false;
         input_store_req_valid = false;
 
+        end_acc = 0;
+
         wait();
     }
 
@@ -492,6 +494,7 @@ void audio_ffi::input_asi_kernel()
             if (prod_valid == 1)
             {
                 prod_valid = 0;
+                end_acc = last_task;
 
                 // Reset producer's valid
                 {
@@ -743,7 +746,7 @@ void audio_ffi::output_asi_kernel()
             {
                 HLS_PROTO("end-acc");
 
-                if (last_task == 1)
+                if (end_acc == 1)
                 {
                     output_store_req = ACC_DONE;
                     output_store_req_valid = true;

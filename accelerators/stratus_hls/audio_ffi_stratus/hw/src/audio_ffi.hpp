@@ -171,6 +171,7 @@ public:
     sc_int<32> prod_valid;
     sc_int<32> last_task;
     sc_int<32> cons_ready;
+    sc_int<32> end_acc;
 
     sc_int<32> input_load_req;
     sc_int<32> output_load_req;
