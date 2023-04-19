@@ -396,8 +396,6 @@ void audio_ffi::store_output()
         } else {
             this->store_output_done_handshake();
         }
-
-        pingpong = !pingpong;
     }
 } // Function : store_output
 
@@ -849,8 +847,8 @@ void audio_ffi::fft_kernel()
 
                     if (i < r) {
                         HLS_PROTO("bit-rev-memwrite");
-                        HLS_BREAK_DEP(C0);
-                        HLS_BREAK_DEP(C1);
+                        HLS_BREAK_DEP(A0);
+                        HLS_BREAK_DEP(A1);
 
                         if (!pingpong) {
                             wait();
@@ -917,28 +915,40 @@ void audio_ffi::fft_kernel()
 
                             {
                                 HLS_PROTO("compute_write_A0_fft");
-                                HLS_BREAK_DEP(B0);
-                                HLS_BREAK_DEP(B1);
+                                HLS_BREAK_DEP(A0);
+                                HLS_BREAK_DEP(A1);
 
                                 if (!pingpong) {
                                     wait();
-                                    B0[2 * kj] = fp2int<FPDATA, WORD_SIZE>(bkj.re);
-                                    B0[2 * kj + 1] = fp2int<FPDATA, WORD_SIZE>(bkj.im);
+                                    A0[2 * kj] = fp2int<FPDATA, WORD_SIZE>(bkj.re);
+                                    A0[2 * kj + 1] = fp2int<FPDATA, WORD_SIZE>(bkj.im);
                                     wait();
-                                    B0[2 * kjm] = fp2int<FPDATA, WORD_SIZE>(bkjm.re);
-                                    B0[2 * kjm + 1] = fp2int<FPDATA, WORD_SIZE>(bkjm.im);
+                                    A0[2 * kjm] = fp2int<FPDATA, WORD_SIZE>(bkjm.re);
+                                    A0[2 * kjm + 1] = fp2int<FPDATA, WORD_SIZE>(bkjm.im);
                                 } else {
                                     wait();
-                                    B1[2 * kj] = fp2int<FPDATA, WORD_SIZE>(bkj.re);
-                                    B1[2 * kj + 1] = fp2int<FPDATA, WORD_SIZE>(bkj.im);
+                                    A1[2 * kj] = fp2int<FPDATA, WORD_SIZE>(bkj.re);
+                                    A1[2 * kj + 1] = fp2int<FPDATA, WORD_SIZE>(bkj.im);
                                     wait();
-                                    B1[2 * kjm] = fp2int<FPDATA, WORD_SIZE>(bkjm.re);
-                                    B1[2 * kjm + 1] = fp2int<FPDATA, WORD_SIZE>(bkjm.im);
+                                    A1[2 * kjm] = fp2int<FPDATA, WORD_SIZE>(bkjm.re);
+                                    A1[2 * kjm + 1] = fp2int<FPDATA, WORD_SIZE>(bkjm.im);
                                 }
                             }
                         } // for (j = 0 .. md2)
                     } // for (k = 0 .. num_samples)
                 } // for (s = 1 .. logn_samples)
+            
+            for (int p = 0; p < 2 * num_samples; p++) {
+                HLS_BREAK_DEP(A0);
+                HLS_BREAK_DEP(A1);
+                HLS_BREAK_DEP(B0);
+                HLS_BREAK_DEP(B1);
+
+                if (!pingpong)
+                    B0[p] = A0[p];
+                else
+                    B1[p] = A1[p];
+            }
         }
 
         // Inform FIR to start
@@ -1330,23 +1340,35 @@ void audio_ffi::ifft_kernel()
 
                                 if (!pingpong) {
                                     wait();
-                                    D0[2 * kj] = fp2int<FPDATA, WORD_SIZE>(bkj.re);
-                                    D0[2 * kj + 1] = fp2int<FPDATA, WORD_SIZE>(bkj.im);
+                                    C0[2 * kj] = fp2int<FPDATA, WORD_SIZE>(bkj.re);
+                                    C0[2 * kj + 1] = fp2int<FPDATA, WORD_SIZE>(bkj.im);
                                     wait();
-                                    D0[2 * kjm] = fp2int<FPDATA, WORD_SIZE>(bkjm.re);
-                                    D0[2 * kjm + 1] = fp2int<FPDATA, WORD_SIZE>(bkjm.im);
+                                    C0[2 * kjm] = fp2int<FPDATA, WORD_SIZE>(bkjm.re);
+                                    C0[2 * kjm + 1] = fp2int<FPDATA, WORD_SIZE>(bkjm.im);
                                 } else {
                                     wait();
-                                    D1[2 * kj] = fp2int<FPDATA, WORD_SIZE>(bkj.re);
-                                    D1[2 * kj + 1] = fp2int<FPDATA, WORD_SIZE>(bkj.im);
+                                    C1[2 * kj] = fp2int<FPDATA, WORD_SIZE>(bkj.re);
+                                    C1[2 * kj + 1] = fp2int<FPDATA, WORD_SIZE>(bkj.im);
                                     wait();
-                                    D1[2 * kjm] = fp2int<FPDATA, WORD_SIZE>(bkjm.re);
-                                    D1[2 * kjm + 1] = fp2int<FPDATA, WORD_SIZE>(bkjm.im);
+                                    C1[2 * kjm] = fp2int<FPDATA, WORD_SIZE>(bkjm.re);
+                                    C1[2 * kjm + 1] = fp2int<FPDATA, WORD_SIZE>(bkjm.im);
                                 }
                             }
                         } // for (j = 0 .. md2)
                     } // for (k = 0 .. num_samples)
                 } // for (s = 1 .. logn_samples)
+
+            for (int p = 0; p < 2 * num_samples; p++) {
+                HLS_BREAK_DEP(C0);
+                HLS_BREAK_DEP(C1);
+                HLS_BREAK_DEP(D0);
+                HLS_BREAK_DEP(D1);
+
+                if (!pingpong)
+                    D0[p] = C0[p];
+                else
+                    D1[p] = C1[p];
+            }
         } // Compute
 
         // Inform store to start
