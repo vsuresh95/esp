@@ -33,6 +33,7 @@
 #define TEST_FLT_PROD_VALID_REQ 1
 #define TEST_CONS_READY_REQ 2
 #define LOAD_DATA_REQ 3
+#define LOAD_FILTERS_REQ 4
 #define UPDATE_PROD_VALID_REQ 0
 #define UPDATE_FLT_PROD_VALID_REQ 1
 #define UPDATE_PROD_READY_REQ 2
@@ -43,14 +44,24 @@
 #define STORE_FENCE 7
 #define ACC_DONE 8
 
+#define INPUT_ASI 1
+#define FILTERS_ASI 2
+#define OUTPUT_ASI 3
+
 class audio_ffi : public esp_accelerator_3P<DMA_WIDTH>
 {
 public:
     // Input ASI -> Load
     handshake_t input_load_start;
 
+    // Filters ASI -> Load
+    handshake_t filters_load_start;
+
     // Input ASI -> Store
     handshake_t input_store_start;
+
+    // Filters ASI -> Store
+    handshake_t filters_store_start;
 
     // Output ASI -> Load
     handshake_t output_load_start;
@@ -64,6 +75,12 @@ public:
     // Store -> Input ASI
     handshake_t store_input_done;
 
+    // Load -> Filters ASI
+    handshake_t load_filters_done;
+
+    // Store -> Filters ASI
+    handshake_t store_filters_done;
+
     // Load -> Output ASI
     handshake_t load_output_done;
 
@@ -72,6 +89,9 @@ public:
 
     // Input ASI -> FFT
     handshake_t input_to_fft;
+
+    // Filters ASI -> FIR
+    handshake_t filters_to_fir;
 
     // FFT -> FIR
     handshake_t fft_to_fir;
@@ -89,18 +109,25 @@ public:
         , cfg("config")
         , input_load_start("input_load_start")
         , input_store_start("input_store_start")
+        , filters_load_start("filters_load_start")
+        , filters_store_start("filters_store_start")
         , output_load_start("output_load_start")
         , output_store_start("output_store_start")
         , load_input_done("load_input_done")
         , store_input_done("store_input_done")
+        , load_filters_done("load_input_done")
+        , store_filters_done("store_input_done")
         , load_output_done("load_output_done")
         , store_output_done("store_output_done")
         , input_to_fft("input_to_fft")
+        , filters_to_fir("filters_to_fir")
         , fft_to_fir("fft_to_fir")
         , fir_to_ifft("fir_to_ifft")
         , ifft_to_store("ifft_to_store")
     {
         SC_CTHREAD(input_asi_kernel, this->clk.pos());
+        this->reset_signal_is(this->rst, false);
+        SC_CTHREAD(filters_asi_kernel, this->clk.pos());
         this->reset_signal_is(this->rst, false);
         SC_CTHREAD(output_asi_kernel, this->clk.pos());
         this->reset_signal_is(this->rst, false);
@@ -117,6 +144,7 @@ public:
         HLS_PRESERVE_SIGNAL(load_state_req_dbg, true);
         HLS_PRESERVE_SIGNAL(store_state_req_dbg, true);
         HLS_PRESERVE_SIGNAL(input_state_req_dbg, true);
+        HLS_PRESERVE_SIGNAL(filters_state_req_dbg, true);
         HLS_PRESERVE_SIGNAL(output_state_req_dbg, true);
 
         HLS_PRESERVE_SIGNAL(fft_state_dbg, true);
@@ -141,14 +169,19 @@ public:
         
         input_load_start.bind_with(*this);
         input_store_start.bind_with(*this);
+        filters_load_start.bind_with(*this);
+        filters_store_start.bind_with(*this);
         output_load_start.bind_with(*this);
         output_store_start.bind_with(*this);
         load_input_done.bind_with(*this);
         store_input_done.bind_with(*this);
+        load_filters_done.bind_with(*this);
+        store_filters_done.bind_with(*this);
         load_output_done.bind_with(*this);
         store_output_done.bind_with(*this);
         
         input_to_fft.bind_with(*this);
+        filters_to_fir.bind_with(*this);
         fft_to_fir.bind_with(*this);
         fir_to_ifft.bind_with(*this);
         ifft_to_store.bind_with(*this);
@@ -157,6 +190,7 @@ public:
     sc_signal< sc_int<32> > load_state_req_dbg;
     sc_signal< sc_int<32> > store_state_req_dbg;
     sc_signal< sc_int<32> > input_state_req_dbg;
+    sc_signal< sc_int<32> > filters_state_req_dbg;
     sc_signal< sc_int<32> > output_state_req_dbg;
 
     sc_signal< sc_int<32> > fft_state_dbg;
@@ -164,22 +198,27 @@ public:
     sc_signal< sc_int<32> > ifft_state_dbg;
 
     sc_int<32> load_state_req;
-    sc_signal<bool> load_state_req_module;
+    sc_int<32> load_state_req_module;
     sc_int<32> store_state_req;
-    sc_signal<bool> store_state_req_module;
+    sc_int<32> store_state_req_module;
 
     sc_int<32> prod_valid;
+    sc_int<32> flt_valid;
     sc_int<32> last_task;
     sc_int<32> cons_ready;
     sc_int<32> end_acc;
 
     sc_int<32> input_load_req;
+    sc_int<32> filters_load_req;
     sc_int<32> output_load_req;
     sc_signal<bool> input_load_req_valid;
+    sc_signal<bool> filters_load_req_valid;
     sc_signal<bool> output_load_req_valid;
     sc_int<32> input_store_req;
+    sc_int<32> filters_store_req;
     sc_int<32> output_store_req;
     sc_signal<bool> input_store_req_valid;
+    sc_signal<bool> filters_store_req_valid;
     sc_signal<bool> output_store_req_valid;
 
     // Processes
@@ -195,6 +234,9 @@ public:
 
     // ASI submodule for input
     void input_asi_kernel();
+
+    // ASI submodule for filters
+    void filters_asi_kernel();
 
     // ASI submodule for output
     void output_asi_kernel();
@@ -235,6 +277,10 @@ public:
     inline void load_input_start_handshake();
     inline void input_store_start_handshake();
     inline void store_input_start_handshake();
+    inline void filters_load_start_handshake();
+    inline void load_filters_start_handshake();
+    inline void filters_store_start_handshake();
+    inline void store_filters_start_handshake();
     inline void output_load_start_handshake();
     inline void load_output_start_handshake();
     inline void output_store_start_handshake();
@@ -243,6 +289,10 @@ public:
     inline void input_load_done_handshake();
     inline void store_input_done_handshake();
     inline void input_store_done_handshake();
+    inline void load_filters_done_handshake();
+    inline void filters_load_done_handshake();
+    inline void store_filters_done_handshake();
+    inline void filters_store_done_handshake();
     inline void load_output_done_handshake();
     inline void output_load_done_handshake();
     inline void store_output_done_handshake();
@@ -250,6 +300,8 @@ public:
 
     inline void input_fft_handshake();
     inline void fft_input_handshake();
+    inline void filters_fir_handshake();
+    inline void fir_filters_handshake();
     inline void fft_fir_handshake();
     inline void fir_fft_handshake();
     inline void fir_ifft_handshake();

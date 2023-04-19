@@ -251,6 +251,46 @@ inline void audio_ffi::store_input_start_handshake()
 }
 
 //////////////////////////////////////////////////////
+// FILTERS -> LOAD/STORE START HANDSHAKES
+//////////////////////////////////////////////////////
+
+inline void audio_ffi::filters_load_start_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("filters-load-start-handshake");
+
+        filters_load_start.req.req();
+    }
+}
+
+inline void audio_ffi::load_filters_start_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("load-filters-start-handshake");
+
+        filters_load_start.ack.ack();
+    }
+}
+
+inline void audio_ffi::filters_store_start_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("filters-store-start-handshake");
+
+        filters_store_start.req.req();
+    }
+}
+
+inline void audio_ffi::store_filters_start_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("store-filters-start-handshake");
+
+        filters_store_start.ack.ack();
+    }
+}
+
+//////////////////////////////////////////////////////
 // OUTPUT -> LOAD/STORE START HANDSHAKES
 //////////////////////////////////////////////////////
 
@@ -331,6 +371,46 @@ inline void audio_ffi::store_input_done_handshake()
 }
 
 //////////////////////////////////////////////////////
+// LOAD/STORE -> FILTERS DONE HANDSHAKES
+//////////////////////////////////////////////////////
+
+inline void audio_ffi::filters_load_done_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("filters-load-done-handshake");
+
+        load_filters_done.ack.ack();
+    }
+}
+
+inline void audio_ffi::load_filters_done_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("load-filters-done-handshake");
+
+        load_filters_done.req.req();
+    }
+}
+
+inline void audio_ffi::filters_store_done_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("filters-store-done-handshake");
+
+        store_filters_done.ack.ack();
+    }
+}
+
+inline void audio_ffi::store_filters_done_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("store-filters-done-handshake");
+
+        store_filters_done.req.req();
+    }
+}
+
+//////////////////////////////////////////////////////
 // LOAD/STORE -> OUTPUT DONE HANDSHAKES
 //////////////////////////////////////////////////////
 
@@ -384,6 +464,24 @@ inline void audio_ffi::input_fft_handshake()
 }
 
 inline void audio_ffi::fft_input_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("fft-input-handshake");
+
+        input_to_fft.ack.ack();
+    }
+}
+
+inline void audio_ffi::filters_fir_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("filters-fir-handshake");
+
+        filters_to_fir.req.req();
+    }
+}
+
+inline void audio_ffi::fir_filters_handshake()
 {
     {
         HLS_DEFINE_PROTOCOL("fft-input-handshake");

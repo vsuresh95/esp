@@ -21,14 +21,17 @@ void audio_ffi::load_input()
         load_state_req_dbg.write(0);
 
         input_load_start.ack.reset_ack();
+        filters_load_start.ack.reset_ack();
         output_load_start.ack.reset_ack();
         load_input_done.req.reset_req();
+        load_filters_done.req.reset_req();
         load_output_done.req.reset_req();
 
         prod_valid = 0;
+        flt_valid = 0;
         cons_ready = 0;
         load_state_req = 0;
-        load_state_req_module = false;
+        load_state_req_module = 0;
 
         wait();
     }
@@ -38,6 +41,7 @@ void audio_ffi::load_input()
     int32_t logn_samples;
     int32_t num_samples;
     bool pingpong;
+    bool flt_pingpong;
     {
         HLS_PROTO("load-config");
 
@@ -49,6 +53,7 @@ void audio_ffi::load_input()
         logn_samples = config.logn_samples;
         num_samples = 1 << logn_samples;
         pingpong = false;
+        flt_pingpong = false;
     }
 
     // Load
@@ -59,16 +64,20 @@ void audio_ffi::load_input()
         wait();
 
         // Wait for either input ASI or output ASI
-        while (!(input_load_req_valid || output_load_req_valid)) wait();
+        while (!(input_load_req_valid || filters_load_req_valid || output_load_req_valid)) wait();
 
         if (input_load_req_valid) {
             this->load_input_start_handshake();
             load_state_req = input_load_req;
-            load_state_req_module = true;
+            load_state_req_module = INPUT_ASI;
+        } else if (filters_load_req_valid) {
+            this->load_filters_start_handshake();
+            load_state_req = filters_load_req;
+            load_state_req_module = FILTERS_ASI;
         } else {
             this->load_output_start_handshake();
             load_state_req = output_load_req;
-            load_state_req_module = false;
+            load_state_req_module = OUTPUT_ASI;
         }
 
         load_state_req_dbg.write(load_state_req);
@@ -90,6 +99,20 @@ void audio_ffi::load_input()
                 dataBv = this->dma_read_chnl.get();
                 wait();
                 last_task = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
+            }
+            break;
+            case TEST_FLT_PROD_VALID_REQ:
+            {
+                int32_t end_sync_offset = SYNC_VAR_SIZE + 2 * num_samples + FLT_VALID_FLAG_OFFSET;
+                dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                sc_dt::sc_bv<DMA_WIDTH> dataBv;
+
+                wait();
+                this->dma_read_ctrl.put(dma_info);
+
+                dataBv = this->dma_read_chnl.get();
+                wait();
+                flt_valid = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
             }
             break;
             case TEST_CONS_READY_REQ:
@@ -134,6 +157,10 @@ void audio_ffi::load_input()
                     }
                 }
             }
+
+            pingpong = !pingpong;
+            break;
+            case LOAD_FILTERS_REQ:
             // Load filters
             {
                 dma_info_t dma_info(5 * (2 * num_samples + SYNC_VAR_SIZE) / DMA_WORD_PER_BEAT, 2 * (num_samples + 1)/ DMA_WORD_PER_BEAT, DMA_SIZE);
@@ -153,7 +180,7 @@ void audio_ffi::load_input()
                     for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
                     {
                         HLS_UNROLL_SIMPLE;
-                        if (!pingpong)
+                        if (!flt_pingpong)
                             F0[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
                         else
                             F1[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
@@ -179,7 +206,7 @@ void audio_ffi::load_input()
                     for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
                     {
                         HLS_UNROLL_SIMPLE;
-                        if (!pingpong)
+                        if (!flt_pingpong)
                             T0[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
                         else
                             T1[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
@@ -187,7 +214,7 @@ void audio_ffi::load_input()
                 }
             }
 
-            pingpong = !pingpong;
+            flt_pingpong = !flt_pingpong;
             break;
             default:
             break;
@@ -195,11 +222,15 @@ void audio_ffi::load_input()
 
         wait();
 
-        if (load_state_req_module) {
+        if (load_state_req_module == INPUT_ASI) {
             this->load_input_done_handshake();
+        } else if (load_state_req_module == FILTERS_ASI) {
+            this->load_filters_done_handshake();
         } else {
             this->load_output_done_handshake();
         }
+
+        load_state_req_module = 0;
     }
 } // Function : load_input
 
@@ -214,12 +245,14 @@ void audio_ffi::store_output()
         store_state_req_dbg.write(0);
 
         input_store_start.ack.reset_ack();
+        filters_store_start.ack.reset_ack();
         output_store_start.ack.reset_ack();
         store_input_done.req.reset_req();
+        store_filters_done.req.reset_req();
         store_output_done.req.reset_req();
 
         store_state_req = 0;
-        store_state_req_module = false;
+        store_state_req_module = 0;
 
         wait();
     }
@@ -251,16 +284,20 @@ void audio_ffi::store_output()
         wait();
 
         // Wait for either input ASI or output ASI
-        while (!(input_store_req_valid || output_store_req_valid)) wait();
+        while (!(input_store_req_valid || filters_store_req_valid || output_store_req_valid)) wait();
 
         if (input_store_req_valid) {
             this->store_input_start_handshake();
             store_state_req = input_store_req;
-            store_state_req_module = true;
+            store_state_req_module = INPUT_ASI;
+        } else if (filters_store_req_valid) {
+            this->store_filters_start_handshake();
+            store_state_req = filters_store_req;
+            store_state_req_module = FILTERS_ASI;
         } else {
             this->store_output_start_handshake();
             store_state_req = output_store_req;
-            store_state_req_module = false;
+            store_state_req_module = OUTPUT_ASI;
         }
 
         store_state_req_dbg.write(store_state_req);
@@ -283,9 +320,43 @@ void audio_ffi::store_output()
                 wait();
             }
             break;
+            case UPDATE_FLT_PROD_READY_REQ:
+            {
+                int32_t end_sync_offset = SYNC_VAR_SIZE + 2 * num_samples + FLT_READY_FLAG_OFFSET;
+                dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                sc_dt::sc_bv<DMA_WIDTH> dataBv;
+                dataBv.range(DMA_WIDTH - 1, 0) = 1;
+
+                this->dma_write_ctrl.put(dma_info);
+                wait();
+                this->dma_write_chnl.put(dataBv);
+                wait();
+
+                // Wait till the write is accepted at the cache (and previous fences)
+                while (!(this->dma_write_chnl.ready)) wait();
+                wait();
+            }
+            break;
             case UPDATE_PROD_VALID_REQ:
             {
                 dma_info_t dma_info(VALID_FLAG_OFFSET / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                sc_dt::sc_bv<DMA_WIDTH> dataBv;
+                dataBv.range(DMA_WIDTH - 1, 0) = 0;
+
+                this->dma_write_ctrl.put(dma_info);
+                wait();
+                this->dma_write_chnl.put(dataBv);
+                wait();
+
+                // Wait till the write is accepted at the cache (and previous fences)
+                while (!(this->dma_write_chnl.ready)) wait();
+                wait();
+            }
+            break;
+            case UPDATE_FLT_PROD_VALID_REQ:
+            {
+                int32_t end_sync_offset = SYNC_VAR_SIZE + 2 * num_samples + FLT_VALID_FLAG_OFFSET;
+                dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 dataBv.range(DMA_WIDTH - 1, 0) = 0;
 
@@ -391,11 +462,15 @@ void audio_ffi::store_output()
 
         wait();
 
-        if (store_state_req_module) {
+        if (store_state_req_module == INPUT_ASI) {
             this->store_input_done_handshake();
+        } else if (store_state_req_module == FILTERS_ASI) {
+            this->store_filters_done_handshake();
         } else {
             this->store_output_done_handshake();
         }
+
+        store_state_req_module = 0;
     }
 } // Function : store_output
 
@@ -461,7 +536,6 @@ void audio_ffi::input_asi_kernel()
         HLS_PROTO("input-asi-config");
 
         cfg.wait_for_config(); // config process
-        conf_info_t config = this->conf_info.read();
 
         // User-defined config code
         /* <<--local-params-->> */
@@ -583,6 +657,154 @@ void audio_ffi::input_asi_kernel()
     }
 }
 
+void audio_ffi::filters_asi_kernel()
+{
+    // Reset
+    {
+        HLS_PROTO("filters-asi-reset");
+
+        filters_state_req_dbg.write(0);
+
+        filters_load_start.req.reset_req();
+        filters_store_start.req.reset_req();
+        load_filters_done.ack.reset_ack();
+        store_filters_done.ack.reset_ack();
+        filters_to_fir.req.reset_req();
+
+        filters_load_req = 0;
+        filters_store_req = 0;
+        filters_load_req_valid = false;
+        filters_store_req_valid = false;
+
+        wait();
+    }
+
+    // Config
+    /* <<--params-->> */
+    {
+        HLS_PROTO("filters-asi-config");
+
+        cfg.wait_for_config(); // config process
+
+        // User-defined config code
+        /* <<--local-params-->> */
+    }
+
+    while(true)
+    {
+        // Test filter producer's valid for new filters
+        {
+            HLS_PROTO("test-flt-valid");
+
+            filters_load_req = TEST_FLT_PROD_VALID_REQ;
+            filters_load_req_valid = true;
+
+            filters_state_req_dbg.write(1);
+
+            this->filters_load_start_handshake();
+            wait();
+            filters_load_req_valid = false;
+            wait();
+            this->filters_load_done_handshake();
+            wait();
+        }
+
+        {
+            HLS_PROTO("flt-valid-check");
+
+            if (flt_valid == 1)
+            {
+                flt_valid = 0;
+
+                // Reset filter producer's valid
+                {
+                    HLS_PROTO("update-flt-prod-valid");
+
+                    filters_store_req = UPDATE_FLT_PROD_VALID_REQ;
+                    filters_store_req_valid = true;
+
+                    filters_state_req_dbg.write(2);
+
+                    this->filters_store_start_handshake();
+                    wait();
+                    filters_store_req_valid = false;
+                    wait();
+                    this->filters_store_done_handshake();
+                    wait();
+
+                    // Wait for all writes to be done and then issue fence
+                    filters_store_req = STORE_FENCE;
+                    filters_store_req_valid = true;
+
+                    filters_state_req_dbg.write(3);
+
+                    this->filters_store_start_handshake();
+                    wait();
+                    filters_store_req_valid = false;
+                    wait();
+                    this->filters_store_done_handshake();
+                    wait();
+                }
+
+                // Load filters data
+                {
+                    HLS_PROTO("load-filters-data");
+
+                    filters_load_req = LOAD_FILTERS_REQ;
+                    filters_load_req_valid = true;
+
+                    filters_state_req_dbg.write(7);
+
+                    this->filters_load_start_handshake();
+                    wait();
+                    filters_load_req_valid = false;
+                    wait();
+                    this->filters_load_done_handshake();
+                    wait();
+                }
+
+                // update filter producer's ready to accept new filters
+                {
+                    HLS_PROTO("update-flt-prod-ready");
+
+                    filters_store_req = UPDATE_FLT_PROD_READY_REQ;
+                    filters_store_req_valid = true;
+
+                    filters_state_req_dbg.write(8);
+
+                    this->filters_store_start_handshake();
+                    wait();
+                    filters_store_req_valid = false;
+                    wait();
+                    this->filters_store_done_handshake();
+                    wait();
+
+                    // Wait for all writes to be done and then issue fence
+                    filters_store_req = STORE_FENCE;
+                    filters_store_req_valid = true;
+
+                    filters_state_req_dbg.write(9);
+
+                    this->filters_store_start_handshake();
+                    wait();
+                    filters_store_req_valid = false;
+                    wait();
+                    this->filters_store_done_handshake();
+                    wait();
+                }
+
+                // Inform FIR that filters are ready
+                {
+                    HLS_PROTO("inform-fir-start");
+
+                    this->filters_fir_handshake();
+                    wait();
+                }
+            }
+        }
+    }
+}
+
 void audio_ffi::output_asi_kernel()
 {
     // Reset
@@ -611,7 +833,6 @@ void audio_ffi::output_asi_kernel()
         HLS_PROTO("output-asi-config");
 
         cfg.wait_for_config(); // config process
-        conf_info_t config = this->conf_info.read();
 
         // User-defined config code
         /* <<--local-params-->> */
