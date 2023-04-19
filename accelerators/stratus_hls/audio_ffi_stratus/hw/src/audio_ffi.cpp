@@ -42,6 +42,7 @@ void audio_ffi::load_input()
     int32_t num_samples;
     bool pingpong;
     bool flt_pingpong;
+    int32_t task_arbiter;
     {
         HLS_PROTO("load-config");
 
@@ -54,6 +55,7 @@ void audio_ffi::load_input()
         num_samples = 1 << logn_samples;
         pingpong = false;
         flt_pingpong = false;
+        task_arbiter = 0;
     }
 
     // Load
@@ -66,18 +68,25 @@ void audio_ffi::load_input()
         // Wait for either input ASI or output ASI
         while (!(input_load_req_valid || filters_load_req_valid || output_load_req_valid)) wait();
 
-        if (input_load_req_valid) {
+        if (task_arbiter == 0 && input_load_req_valid) {
             this->load_input_start_handshake();
             load_state_req = input_load_req;
             load_state_req_module = INPUT_ASI;
-        } else if (filters_load_req_valid) {
+            task_arbiter++;
+        } else if (task_arbiter == 1 && filters_load_req_valid) {
             this->load_filters_start_handshake();
             load_state_req = filters_load_req;
             load_state_req_module = FILTERS_ASI;
-        } else {
+            task_arbiter++;
+        } else if (task_arbiter == 2 && output_load_req_valid) {
             this->load_output_start_handshake();
             load_state_req = output_load_req;
             load_state_req_module = OUTPUT_ASI;
+            task_arbiter = 0;
+        } else {
+            if (task_arbiter == 2) task_arbiter = 0;
+            else task_arbiter++;
+            continue;
         }
 
         load_state_req_dbg.write(load_state_req);
