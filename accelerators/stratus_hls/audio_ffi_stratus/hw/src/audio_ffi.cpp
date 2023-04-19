@@ -1228,6 +1228,14 @@ void audio_ffi::fir_kernel()
 
             this->fir_fft_handshake();
             wait();
+        }
+
+        // Wait for Filters ASI to be complete
+        {
+            HLS_PROTO("wait-for-filters-asi");
+
+            this->fir_filters_handshake();
+            wait();
 
             fir_state_dbg.write(1);
         }

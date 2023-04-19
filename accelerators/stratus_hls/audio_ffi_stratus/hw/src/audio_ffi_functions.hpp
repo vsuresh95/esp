@@ -486,7 +486,7 @@ inline void audio_ffi::fir_filters_handshake()
     {
         HLS_DEFINE_PROTOCOL("fft-input-handshake");
 
-        input_to_fft.ack.ack();
+        filters_to_fir.ack.ack();
     }
 }
 
