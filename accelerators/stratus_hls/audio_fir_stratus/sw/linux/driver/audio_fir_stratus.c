@@ -53,6 +53,7 @@ static void audio_fir_prep_xfer(struct esp_device *esp, void *arg)
 	iowrite32be(a->do_shift, esp->iomem + AUDIO_FIR_DO_SHIFT_REG);
 	iowrite32be(a->src_offset, esp->iomem + SRC_OFFSET_REG);
 	iowrite32be(a->dst_offset, esp->iomem + DST_OFFSET_REG);
+	iowrite32be(a->spandex_conf, esp->iomem + SPANDEX_REG);
 
 }
 

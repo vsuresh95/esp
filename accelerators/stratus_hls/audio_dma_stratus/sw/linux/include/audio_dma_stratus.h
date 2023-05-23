@@ -23,6 +23,7 @@ struct audio_dma_stratus_access {
 	unsigned size;
 	unsigned src_offset;
 	unsigned dst_offset;
+    unsigned spandex_conf;
 };
 
 #define SM_SENSOR_STRATUS_IOC_ACCESS	_IOW ('S', 0, struct audio_dma_stratus_access)
