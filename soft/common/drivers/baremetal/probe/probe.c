@@ -233,9 +233,9 @@ static void esp_done(const struct fdt_scan_node *node, void *extra)
 	const char *name = (*espdevs)[0].name;
 
 	if ((*espdevs)[ndev].compat != 0) {
-		printf("[probe] %s.%d registered\n", name, ndev);
-		printf("		Address   : 0x%08x\n", (unsigned) (*espdevs)[ndev].addr);
-		printf("		Interrupt : %d\n", (*espdevs)[ndev].irq);
+		// printf("[probe] %s.%d registered\n", name, ndev);
+		// printf("		Address   : 0x%08x\n", (unsigned) (*espdevs)[ndev].addr);
+		// printf("		Interrupt : %d\n", (*espdevs)[ndev].irq);
 		ndev++;
 
 		// Initialize new entry (may not be discovered!)

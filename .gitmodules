@@ -53,3 +53,7 @@
 [submodule "soft/common/drivers/common/utils/eigen"]
 	path = soft/common/drivers/common/utils/eigen
 	url = https://gitlab.com/libeigen/eigen.git
+[submodule "soft/ariane/audio_pipeline"]
+	path = soft/ariane/audio_pipeline
+	url = git@github.com:vsuresh95/audio_pipeline.git
+	branch = f_baremetal
