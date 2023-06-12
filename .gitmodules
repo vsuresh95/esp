@@ -51,3 +51,7 @@
 	path = soft/ariane/mini-era
 	url = git@github.com:vsuresh95/mini-era.git
 	branch = f_sensor_dev
+[submodule "soft/ariane/audio_pipeline"]
+	path = soft/ariane/audio_pipeline
+	url = git@github.com:vsuresh95/audio_pipeline.git
+	branch = f_baremetal

@@ -25,6 +25,7 @@ struct audio_fft_stratus_access {
 	unsigned do_shift;
 	unsigned src_offset;
 	unsigned dst_offset;
+    unsigned spandex_conf;
 };
 
 #define AUDIO_FFT_STRATUS_IOC_ACCESS	_IOW ('S', 0, struct audio_fft_stratus_access)
