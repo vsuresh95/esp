@@ -664,7 +664,7 @@ void audio_fir::compute_kernel()
                 fnkc.re = tn.re;
                 fnkc.im = - (tn.im);
 
-                tf.re *= -1; tf.im *= -1;
+                tf.im *= -1;
 
                 compAdd(fk, fnkc, fek);
                 compSub(fk, fnkc, tmp);
