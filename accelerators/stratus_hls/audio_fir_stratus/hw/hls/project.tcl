@@ -73,7 +73,7 @@ define_system_module tb ../tb/system.cpp ../tb/sc_main.cpp
 ######################################################################
 set DEFAULT_ARGV ""
 
-set FX_IL "-DFX32_IL=4 -DFX64_IL=42"
+set FX_IL "-DFX32_IL=14 -DFX64_IL=42"
 
 foreach dma [list 64] {
     define_io_config * IOCFG_DMA$dma\_BASELINE -DDMA_WIDTH=$dma -DFX_WIDTH=32
