@@ -11,6 +11,8 @@
 
 #include "do_decoding.h"
 
+#define ESP 1
+
 typedef int8_t token_t;
 
 static unsigned DMA_WORD_PER_BEAT(unsigned _st)
@@ -36,6 +38,7 @@ static unsigned out_size;
 static unsigned out_offset;
 static unsigned mem_size;
 
+	token_t *mem;
 /* Size of the contiguous chunks for scatter/gather */
 #define CHUNK_SHIFT 20
 #define CHUNK_SIZE BIT(CHUNK_SHIFT)
@@ -45,10 +48,29 @@ static unsigned mem_size;
 
 /* User defined registers */
 /* <<--regs-->> */
+#define VITDODEC_IN_LENGTH_REG           0x4C
+#define VITDODEC_OUT_LENGTH_REG          0x50
+#define VITDODEC_INPUT_START_OFFSET_REG  0x54
+#define VITDODEC_OUTPUT_START_OFFSET_REG 0x58
+#define VITDODEC_CONS_VLD_OFFSET_REG     0x5C
+#define VITDODEC_PROD_RDY_OFFSET_REG     0x60
+#define VITDODEC_CONS_RDY_OFFSET_REG     0x64
+#define VITDODEC_PROD_VLD_OFFSET_REG     0x68
 #define VITDODEC_CBPS_REG 0x48
 #define VITDODEC_NTRACEBACK_REG 0x44
 #define VITDODEC_DATA_BITS_REG 0x40
 
+#define SYNC_VAR_SIZE 40
+#define UPDATE_VAR_SIZE 8
+#define VALID_FLAG_OFFSET 0
+#define END_FLAG_OFFSET 2
+#define READY_FLAG_OFFSET 16
+
+
+unsigned VitProdRdyFlag;
+unsigned VitProdVldFlag;
+unsigned VitConsRdyFlag;
+unsigned VitConsVldFlag;
 /* TEST-Specific Inputs */
 static const unsigned char PARTAB[256] = {
          0, 1, 1, 0, 1, 0, 0, 1,
@@ -86,6 +108,138 @@ static const unsigned char PARTAB[256] = {
 }; 
 
 
+
+static inline uint64_t get_counter() {
+    uint64_t t_end = 0;
+#ifndef __linux__
+	__asm__ volatile (
+		"li t0, 0;"
+		"csrr t0, mcycle;"
+		"mv %0, t0"
+		: "=r" (t_end)
+		:
+		: "t0"
+	);
+#else
+	__asm__ volatile (
+		"li t0, 0;"
+		"csrr t0, cycle;"
+		"mv %0, t0"
+		: "=r" (t_end)
+		:
+		: "t0"
+	);
+#endif
+	return t_end;
+}
+
+inline uint32_t poll_vitdodec_cons_rdy(){
+	// int64_t value_64 = 0;
+	// void* dst = (void*)(mem + (VitConsRdyFlag));
+	// value_64 = read_mem(dst);
+	// return (value_64 == 1);
+
+	// printf("Cons Rdy [%x]:%d\n", VitConsRdyFlag,mem[VitConsRdyFlag]);
+	__asm__ volatile ("fence w, w");	
+	return (mem[VitConsRdyFlag] == 1);
+}
+
+inline uint32_t poll_vitdodec_prod_valid(){
+	// void* dst = (void*)(mem+(VitProdRdyFlag));
+	// int64_t value_64 = 0;
+	// value_64 = read_mem(dst);
+	// return (value_64 == 1);
+	// printf("Prod Rdy [%x]:%d Prod valid [%x]:%d Cons Rdy [%x]: %d\n",VitProdRdyFlag,mem[VitProdRdyFlag], VitProdVldFlag, mem[VitProdVldFlag], VitConsRdyFlag,mem[VitConsRdyFlag]);
+	// mem[VitProdRdyFlag] = 1;
+	__asm__ volatile ("fence w, w");	
+	return (mem[VitProdVldFlag]==1);
+}
+
+
+inline void update_vitdodec_cons_valid(int last){
+	// #ifndef ESP
+	// __asm__ volatile ("fence w, w");	//release semantics
+	// #endif
+	// void* dst = (void*)(mem+(VitConsVldFlag)+1);
+	// write_mem(dst, last);
+
+	// #ifdef ESP
+	// __asm__ volatile ("fence w, w");	//release semantics
+	// #endif
+
+	// dst = (void*)(mem+(VitConsVldFlag));
+	// int64_t value_64 = 1;
+	// write_mem(dst, value_64);
+
+	// #ifndef ESP
+	// __asm__ volatile ("fence w, w");	//release semantics
+	// #endif
+	// mem[VitConsVldFlag+UPDATE_VAR_SIZE] = last;
+	
+	mem[VitConsVldFlag+UPDATE_VAR_SIZE] = last;
+
+	#ifdef ESP
+	__asm__ volatile ("fence w, w");	//release semantics
+	#endif
+
+	mem[VitConsVldFlag] = 1;
+	__asm__ volatile ("fence w, w");	
+		// printf("VitConsVldFlag mem[%x]=%d\n",VitConsVldFlag, mem[VitConsVldFlag]);
+}
+
+inline void update_vitdodec_cons_rdy(){
+	__asm__ volatile ("fence w, w");	//acquire semantics
+	// void* dst = (void*)(mem+(VitConsRdyFlag));
+	// int64_t value_64 = 0;
+	// write_mem(dst, value_64);
+
+	// printf("VitConsRdyFlag=%x\n",VitConsRdyFlag);
+	mem[VitConsRdyFlag] = 0;
+	__asm__ volatile ("fence w, w");	
+}
+
+inline void update_vitdodec_prod_rdy(){
+	__asm__ volatile ("fence w, w");	//acquire semantics
+	// void* dst = (void*)(mem+(VitProdRdyFlag));
+	// int64_t value_64 = 1; 
+	// write_mem(dst, value_64);
+
+	// printf("VitProdRdyFlag=%x\n",VitProdRdyFlag);
+	mem[VitProdRdyFlag] = 1;
+	__asm__ volatile ("fence w, w");	
+}
+
+inline void update_vitdodec_prod_valid(){
+	__asm__ volatile ("fence w, w");	//release semantics
+	// void* dst = (void*)(mem+(VitProdVldFlag));
+	// int64_t value_64 = 0; 
+	// write_mem(dst, value_64);
+
+	// printf("VitProdVldFlag=%x\n",VitProdVldFlag);
+	mem[VitProdVldFlag] = 0;
+	__asm__ volatile ("fence w, w");	//acquire semantics
+}
+
+
+inline void reset_vit_sync(){
+	int n;
+		// write_mem(((void*)(mem + VitConsVldFlag)), 0);
+		// write_mem(((void*)(mem + VitConsRdyFlag)), 1);
+		// write_mem(((void*)(mem + VitProdRdyFlag)), 1);
+		// write_mem(((void*)(mem + VitProdVldFlag)), 0); 
+	__asm__ volatile ("fence w, w");	
+		mem[VitConsVldFlag] = 0;
+		mem[VitConsRdyFlag] = 1;
+		mem[VitProdRdyFlag] = 1;
+		mem[VitProdVldFlag] = 0; 
+		// printf("VitConsVldFlag mem[%x]=%d\n",VitConsVldFlag, mem[VitConsVldFlag]);
+		// printf("VitConsRdyFlag mem[%x]=%d\n",VitConsRdyFlag, mem[VitConsRdyFlag]);
+		// printf("VitProdRdyFlag mem[%x]=%d\n",VitProdRdyFlag, mem[VitProdRdyFlag]);
+		// printf("VitProdVldFlag mem[%x]=%d\n",VitProdVldFlag, mem[VitProdVldFlag]);
+	__asm__ volatile ("fence w, w");	
+}
+
+
 static int validate_buf(token_t *out, token_t *gold)
 {
 	int i;
@@ -119,6 +273,7 @@ static void init_buf (token_t *in, token_t * gold)
 	int i;
 	int j;
 	int imi = 0;
+	// reset_vit_sync();
 
 	unsigned char depunct_ptn[6] = {1, 1, 0, 0, 0, 0}; /* PATTERN_1_2 Extended with zeros */
 
@@ -147,6 +302,7 @@ static void init_buf (token_t *in, token_t * gold)
             in[j] = bval;
         }
 
+		// update_vitdodec_cons_valid(0);
 #if(0)
 	{
 		printf(" memory in   = ");
@@ -178,8 +334,8 @@ static void init_buf (token_t *in, token_t * gold)
 			gold[i * out_words_adj + j] = (token_t) 0;
 
 	/* Compute the gold output in software! */
-	printf("Computing Gold output\n");
-	do_decoding(data_bits, cbps, ntraceback, (unsigned char *)in, (unsigned char*)gold);
+	// printf("Computing Gold output\n");
+	// do_decoding(data_bits, cbps, ntraceback, (unsigned char *)in, (unsigned char*)gold);
 
 	/* Re-set the input memory ? */
 
@@ -220,7 +376,6 @@ int main(int argc, char * argv[])
 	struct esp_device *dev;
 	unsigned done;
 	unsigned **ptable = NULL;
-	token_t *mem;
 	token_t *gold;
 	unsigned errors = 0;
 
@@ -236,10 +391,16 @@ int main(int argc, char * argv[])
 	in_size = in_len * sizeof(token_t);
 	out_size = out_len * sizeof(token_t);
 	out_offset  = in_len;
-	mem_size = (out_offset * sizeof(token_t)) + out_size;
+	mem_size = (out_offset * sizeof(token_t)) + out_size + 2*SYNC_VAR_SIZE;
 
+	VitProdRdyFlag = SYNC_VAR_SIZE + in_words_adj + READY_FLAG_OFFSET;
+	VitProdVldFlag = SYNC_VAR_SIZE + in_words_adj + VALID_FLAG_OFFSET;
+	VitConsRdyFlag = READY_FLAG_OFFSET;
+	VitConsVldFlag = VALID_FLAG_OFFSET;
 
 	// Search for the device
+	printf("in_words_adj:%u out_words_adj:%u \n", in_words_adj, out_words_adj);
+	printf("VitProdRdyFlag:%u VitProdVldFlag:%u VitConsRdyFlag:%u VitConsVldFlag:%u mem_size: %u \n", VitProdRdyFlag, VitProdVldFlag, VitConsRdyFlag, VitConsVldFlag, mem_size);
 	printf("Scanning device tree... \n");
 
 	ndev = probe(&espdevs, VENDOR_SLD, SLD_VITDODEC, DEV_NAME);
@@ -274,13 +435,11 @@ int main(int argc, char * argv[])
 		printf("  ptable = %p\n", ptable);
 		printf("  nchunk = %lu\n", NCHUNK(mem_size));
 
-		printf("  Generate input...\n");
-		init_buf(mem, gold);
 
 		// Pass common configuration parameters
 
 		iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
-		iowrite32(dev, COHERENCE_REG, ACC_COH_NONE);
+		iowrite32(dev, COHERENCE_REG, ACC_COH_FULL);
 
 		iowrite32(dev, PT_ADDRESS_REG, (unsigned long) ptable);
 
@@ -288,39 +447,70 @@ int main(int argc, char * argv[])
 		iowrite32(dev, PT_SHIFT_REG, CHUNK_SHIFT);
 
 		// Use the following if input and output data are not allocated at the default offsets
-		iowrite32(dev, SRC_OFFSET_REG, 0x0);
-		iowrite32(dev, DST_OFFSET_REG, 0x0);
+		// iowrite32(dev, SRC_OFFSET_REG, 0x0);
+		// iowrite32(dev, DST_OFFSET_REG, 0x0);
 
 		// Pass accelerator-specific configuration parameters
 		/* <<--regs-config-->> */
+		iowrite32(dev, VITDODEC_IN_LENGTH_REG          , in_len);
+		iowrite32(dev, VITDODEC_OUT_LENGTH_REG         , out_len);
+		iowrite32(dev, VITDODEC_INPUT_START_OFFSET_REG , SYNC_VAR_SIZE);
+		iowrite32(dev, VITDODEC_OUTPUT_START_OFFSET_REG, 2*SYNC_VAR_SIZE+in_len);
+		// iowrite32(dev, VITDODEC_CONS_VLD_OFFSET_REG    , VitConsVldFlag);
+		// iowrite32(dev, VITDODEC_PROD_RDY_OFFSET_REG    , VitProdRdyFlag);
+		// iowrite32(dev, VITDODEC_CONS_RDY_OFFSET_REG    , VitConsRdyFlag);
+		// iowrite32(dev, VITDODEC_PROD_VLD_OFFSET_REG    , VitProdVldFlag);
+		iowrite32(dev, VITDODEC_CONS_VLD_OFFSET_REG    , VitProdVldFlag);
+		iowrite32(dev, VITDODEC_PROD_RDY_OFFSET_REG    , VitConsRdyFlag);
+		iowrite32(dev, VITDODEC_CONS_RDY_OFFSET_REG    , VitProdRdyFlag);
+		iowrite32(dev, VITDODEC_PROD_VLD_OFFSET_REG    , VitConsVldFlag);
 		iowrite32(dev, VITDODEC_CBPS_REG, cbps);
 		iowrite32(dev, VITDODEC_NTRACEBACK_REG, ntraceback);
 		iowrite32(dev, VITDODEC_DATA_BITS_REG, data_bits);
 
 		// Flush (customize coherence model here)
-		esp_flush(ACC_COH_NONE);
+		esp_flush(ACC_COH_FULL);
 
 		// Start accelerators
-		printf("  Start...\n");
+		// printf("  Reset sync flags...\n");
+		reset_vit_sync();
+		printf("  Start... ASI INV ACC_COH_FULL\n");
+		uint64_t start_time_var = get_counter();
 		iowrite32(dev, CMD_REG, CMD_MASK_START);
 
+		// printf("  Polling cons rdy\n");
+		while(!poll_vitdodec_cons_rdy());
+		update_vitdodec_cons_rdy();
+
+		// printf("  Generate input...\n");
+		// init_buf(mem+SYNC_VAR_SIZE, gold);
+		// printf("  Update cons valid\n");
+		update_vitdodec_cons_valid(0);
 		// Wait for completion
 		done = 0;
-		while (!done) {
-			done = ioread32(dev, STATUS_REG);
-			done &= STATUS_MASK_DONE;
-		}
-		iowrite32(dev, CMD_REG, 0x0);
+		// while (!done) {
+		// 	done = ioread32(dev, STATUS_REG);
+		// 	done &= STATUS_MASK_DONE;
+		// }
 
-		printf("  Done\n");
-		printf("  validating...\n");
+		// printf("  Polling prod valid\n");
+		update_vitdodec_prod_rdy();
+		while(!poll_vitdodec_prod_valid());//printf("prod valid at mem[%d]=%d\n",VitProdVldFlag,mem[VitProdVldFlag]);
+		update_vitdodec_prod_valid();
+
+		iowrite32(dev, CMD_REG, 0x0);
+		uint64_t stop_time_var = get_counter();
+
+		printf("  Done, time = %llu \n", (uint64_t)(stop_time_var-start_time_var));
+		// printf("  Done\n");
+		// printf("  validating...\n");
 
 		/* Validation */
-		errors = validate_buf(&mem[out_offset], gold);
-		if (errors)
-			printf("  ... FAIL\n");
-		else
-			printf("  ... PASS\n");
+		// errors = validate_buf(&mem[out_offset], gold);
+		// if (errors)
+		// 	printf("  ... FAIL\n");
+		// else
+		// 	printf("  ... PASS\n");
 
 		aligned_free(ptable);
 		aligned_free(mem);

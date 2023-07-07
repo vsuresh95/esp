@@ -17,6 +17,26 @@
 #endif
 
 
+#define POLL_PROD_VALID_REQ 1
+#define LOAD_DATA_REQ 2
+#define POLL_CONS_READY_REQ 3
+#define LOAD_DONE 5
+
+#define UPDATE_CONS_VALID_REQ 6
+#define UPDATE_PROD_VALID_REQ 7
+#define UPDATE_CONS_READY_REQ 8
+#define UPDATE_PROD_READY_REQ 9
+#define STORE_DATA_REQ 10
+#define STORE_DONE 11
+#define STORE_FENCE 12
+
+#define POLL_DONE 13
+#define UPDATE_DONE 14
+
+#define COMPUTE 4
+
+#define ALPHA 1
+
 #if defined(STRATUS_HLS)
 
 #define HLS_MAP_plm(_mem, _plm_block_name)      \
@@ -49,6 +69,7 @@
 #define HLS_FLAT(_a)
 #define HLS_BREAK_DEP(_a)
 #define HLS_UNROLL_SIMPLE
+
 
 #endif /* STRATUS_HLS */
 

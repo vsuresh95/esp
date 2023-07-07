@@ -17,8 +17,16 @@ void vitdodec::load_input()
     {
         HLS_PROTO("load-reset");
 
-        this->reset_load_input();
+        // this->reset_load_input();
 
+        load_iter_dbg.write(0);
+        load_state_dbg.write(0);
+        load_unit_sp_write_dbg.write(0);
+        load_next_tile.ack.reset_ack();
+
+        load_done.req.reset_req();
+
+        this->reset_dma_read();
         // explicit PLM ports reset if any
 
         // User-defined reset code
@@ -32,6 +40,9 @@ void vitdodec::load_input()
     int32_t ntraceback;
     int32_t data_bits;
     int32_t in_length;
+    int32_t input_start_offset;
+    int32_t accel_cons_rdy_offset;
+    int32_t accel_prod_vld_offset ;
     {
         HLS_PROTO("load-config");
 
@@ -44,126 +55,197 @@ void vitdodec::load_input()
         ntraceback = config.ntraceback;
         data_bits = config.data_bits;
         in_length = config.in_length;
+        accel_cons_rdy_offset = config.accel_cons_rdy_offset  ;
+        accel_prod_vld_offset  = config.accel_prod_vld_offset   ;
+        input_start_offset = config.input_start_offset;
     }
 
     // Load
+    // {
+    //     HLS_PROTO("load-dma");
+    //     bool ping = true;
+    //     uint32_t offset = 0;
+
+    //     wait();
+    //     // Batching
+    //     // Load
+    while(true)
     {
+        HLS_UNROLL_LOOP(OFF);
         HLS_PROTO("load-dma");
-        bool ping = true;
-        uint32_t offset = 0;
 
         wait();
-        // Batching
-        for (uint16_t b = 0; b < 1; b++)
+        this->load_next_tile_ack();
+        //BM this->load_compute_ready_handshake();
+        wait();
+        load_state_dbg.write(load_state);
+        // load_iter_dbg.write(curr_tile);
+        wait();
+        // load_state_req_dbg.write(load_state_req);
+
+#ifdef ENABLE_SM
+        switch (load_state)
         {
-            wait();
+            case POLL_PROD_VALID_REQ: 
+            case POLL_CONS_READY_REQ: { 
+                {
+                    HLS_PROTO("load-dma-poll");
+                    int32_t sync_offset = accel_prod_vld_offset;
+                    int32_t sync_len = 2*DMA_WORD_PER_BEAT;//2;
+                    if(load_state == POLL_CONS_READY_REQ) {
+                        sync_offset = accel_cons_rdy_offset;
+                        sync_len = 1*DMA_WORD_PER_BEAT;
+                    }
+                    // Wait on SYNC FLAG
+                    while(true){ 
+                        HLS_UNROLL_LOOP(OFF);
+                        sc_dt::sc_bv<DMA_WIDTH> dataBvin;
+
 #if (DMA_WORD_PER_BEAT == 0)
-            uint32_t length = in_length;
+                    // data word is wider than NoC links
+                    dma_info_t dma_info2(sync_offset * DMA_BEAT_PER_WORD, sync_len * DMA_BEAT_PER_WORD, DMA_SIZE);
 #else
-            uint32_t length = round_up(in_length, DMA_WORD_PER_BEAT);
+                    dma_info_t dma_info2(sync_offset / DMA_WORD_PER_BEAT, sync_len / DMA_WORD_PER_BEAT, DMA_SIZE);
 #endif
-            // Chunking
-            for (int rem = length; rem > 0; rem -= PLM_IN_WORD)
+                        // dma_info_t dma_info2(sync_offset, sync_len, DMA_SIZE);
+                        this->dma_read_ctrl.put(dma_info2);
+                        wait();
+                        load_unit_sp_write_dbg.write(1); 
+
+#if (DMA_WORD_PER_BEAT == 0)
+                        for (uint16_t k = 0; k < DMA_BEAT_PER_WORD; k++)
+                        {
+                            dataBv.range((k+1) * DMA_WIDTH - 1, k * DMA_WIDTH) = this->dma_read_chnl.get();
+                            wait();
+                        }
+#else
+                        dataBvin.range(DMA_WIDTH - 1, 0) = this->dma_read_chnl.get();
+#endif
+                        wait();
+                        load_unit_sp_write_dbg.write(2); 
+                        int64_t data = dataBvin.range(DMA_WIDTH, 0).to_int64();
+                        wait();
+                        load_unit_sp_write_dbg.write(3); 
+                        if(load_state == POLL_PROD_VALID_REQ) {
+                            dataBvin.range(DMA_WIDTH - 1, 0) = this->dma_read_chnl.get();
+// #if (DMA_WORD_PER_BEAT == 0)
+//                         for (uint16_t k = 0; k < DMA_BEAT_PER_WORD; k++)
+//                         {
+//                             dataBv.range((k+1) * DMA_WIDTH - 1, k * DMA_WIDTH) = this->dma_read_chnl.get();
+//                             wait();
+//                         }
+// #else
+//                         dataBvin.range(DMA_WIDTH - 1, 0) = this->dma_read_chnl.get();
+// #endif
+
+                            int64_t data2 = dataBvin.range(DMA_WIDTH - 1, 0).to_int64();
+                            // int8_t data2 = data>>8;
+                            wait();
+                            if(data2&0x1==1) last_task = 1;
+                            load_unit_sp_write_dbg.write(4); 
+                            wait();
+                        }
+                        // curr_tile++;
+                        if(data&0x1 == 1){
+                            load_state_dbg.write(POLL_DONE);
+                            wait();
+                            load_unit_sp_write_dbg.write(5); 
+                            break;
+                        }
+                    }
+                    wait();
+                }
+                // wait(); 
+            }
+            break;
+            case LOAD_DATA_REQ:
+#else
+            for (uint16_t b = 0; b < 1; b++)
+#endif
             {
                 wait();
-                // Configure DMA transaction
-                uint32_t len = rem > PLM_IN_WORD ? PLM_IN_WORD : rem;
+                uint32_t offset = input_start_offset; //BM
 #if (DMA_WORD_PER_BEAT == 0)
-                // data word is wider than NoC links
-                dma_info_t dma_info(offset * DMA_BEAT_PER_WORD, len * DMA_BEAT_PER_WORD, DMA_SIZE);
+                uint32_t length = in_length;
 #else
-                dma_info_t dma_info(offset / DMA_WORD_PER_BEAT, len / DMA_WORD_PER_BEAT, DMA_SIZE);
+                uint32_t length = round_up(in_length, DMA_WORD_PER_BEAT);
 #endif
-                offset += len;
-
-                this->dma_read_ctrl.put(dma_info);
-
-#if (DMA_WORD_PER_BEAT == 0)
-                // data word is wider than NoC links
-                for (uint16_t i = 0; i < len; i++)
+                // Chunking
+                for (int rem = length; rem > 0; rem -= PLM_IN_WORD)
                 {
-                    sc_dt::sc_bv<DATA_WIDTH> dataBv;
-
-                    for (uint16_t k = 0; k < DMA_BEAT_PER_WORD; k++)
-                    {
-                        dataBv.range((k+1) * DMA_WIDTH - 1, k * DMA_WIDTH) = this->dma_read_chnl.get();
-                        wait();
-                    }
-
-                    // Write to PLM
-                    //if (ping)
-                        plm_in_ping[i] = dataBv.to_int64();
-                    //else
-                    //    plm_in_pong[i] = dataBv.to_int64();
-                }
-#else
-                for (uint16_t i = 0; i < len; i += DMA_WORD_PER_BEAT)
-                {
-                    HLS_BREAK_DEP(plm_in_ping);
-                    //HLS_BREAK_DEP(plm_in_pong);
-
-                    sc_dt::sc_bv<DMA_WIDTH> dataBv;
-
-                    dataBv = this->dma_read_chnl.get();
                     wait();
-
-                    // Write to PLM (all DMA_WORD_PER_BEAT words in one cycle)
-                    for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
-                    {
-                        HLS_UNROLL_SIMPLE;
-                        //if (ping)
-                            plm_in_ping[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
-                        //else
-                        //    plm_in_pong[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
-                    }
-                }
-  #if(0)
-                {
-                    printf(" memory in   = ");
-                    int limi = 0;
-                    for (int li = 0; li < 32; li++) {
-                        std::cout << plm_in_ping[limi++];
-                        if ((li % 8) == 7) { std::cout << " "; }
-                    }
-                    printf("\n      brtb1    ");
-                    for (int li = 0; li < 32; li++) {
-                        std::cout << plm_in_ping[limi++];
-                        if ((li % 8) == 7) { std::cout << " "; }
-                    }
-                    printf("\n      depnc    ");
-                    for (int li = 0; li < 8; li++) {
-                        std::cout << plm_in_ping[limi++];
-                    }
-                    printf("\n      depdta   ");
-                    for (int li = 0; li < 32; li++) {
-                        std::cout << plm_in_ping[limi++];
-                        if ((li % 8) == 7) { std::cout << " "; }
-                    }
-                    printf("\n");
-
-                    printf(" memory out  = ");
-                    limi = 0;
-                    for (int li = 0; li < 32; li++) {
-                        std::cout << plm_out_ping[limi++];
-                        if ((li % 8) == 7) { std::cout << " "; }
-                    }
-                    printf("\n\n");
-
-                    //sc_stop();
-                    //wait();
-                }
-  #endif
+                    // Configure DMA transaction
+                    uint32_t len = rem > PLM_IN_WORD ? PLM_IN_WORD : rem;
+#if (DMA_WORD_PER_BEAT == 0)
+                    // data word is wider than NoC links
+                    dma_info_t dma_info(offset * DMA_BEAT_PER_WORD, len * DMA_BEAT_PER_WORD, DMA_SIZE);
+#else
+                    dma_info_t dma_info(offset / DMA_WORD_PER_BEAT, len / DMA_WORD_PER_BEAT, DMA_SIZE);
 #endif
-                this->load_compute_handshake();
-                //ping = !ping;
-            } // for (rem = 
-        } // for (b = 0 ...
-    } // Load
+                    offset += len;
 
+                    this->dma_read_ctrl.put(dma_info);
+
+#if (DMA_WORD_PER_BEAT == 0)
+                    // data word is wider than NoC links
+                    for (uint16_t i = 0; i < len; i++)
+                    {
+                        sc_dt::sc_bv<DATA_WIDTH> dataBv;
+
+                        for (uint16_t k = 0; k < DMA_BEAT_PER_WORD; k++)
+                        {
+                            dataBv.range((k+1) * DMA_WIDTH - 1, k * DMA_WIDTH) = this->dma_read_chnl.get();
+                            wait();
+                        }
+
+                        // Write to PLM
+                        //if (ping)
+                            plm_in_ping[i] = dataBv.to_int64();
+                        //else
+                        //    plm_in_pong[i] = dataBv.to_int64();
+                    }
+#else
+                    for (uint16_t i = 0; i < len; i += DMA_WORD_PER_BEAT)
+                    {
+                        HLS_BREAK_DEP(plm_in_ping);
+                        //HLS_BREAK_DEP(plm_in_pong);
+
+                        sc_dt::sc_bv<DMA_WIDTH> dataBv;
+
+                        dataBv = this->dma_read_chnl.get();
+                        wait();
+
+                        // Write to PLM (all DMA_WORD_PER_BEAT words in one cycle)
+                        for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
+                        {
+                            HLS_UNROLL_SIMPLE;
+                            //if (ping)
+                                plm_in_ping[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
+                            //else
+                            //    plm_in_pong[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
+                        }
+                    }
+
+#endif
+                    // BM: this->load_compute_handshake();
+                    //ping = !ping;
+                } // for (rem = 
+            } // for (b = 0 ... // switch case
+#ifdef ENABLE_SM
+            break;
+            default:
+            break;
+        } // switch case
+#endif
+        //BM ASI
+        this->load_done_req();
+    } // Load - while true
+#ifndef ENABLE_SM
     // Conclude
     {
         this->process_done();
     }
+#endif
 }
 
 
@@ -174,7 +256,16 @@ void vitdodec::store_output()
     {
         HLS_PROTO("store-reset");
 
-        this->reset_store_output();
+        // this->reset_store_output();
+
+	    store_iter_dbg.write(0);
+        store_state_dbg.write(0);
+
+        output_ready.ack.reset_ack();
+        store_done.req.reset_req();
+        wait();
+        // explicit PLM ports reset if any
+        this->reset_dma_write();
 
         // explicit PLM ports reset if any
 
@@ -189,6 +280,11 @@ void vitdodec::store_output()
     int32_t ntraceback;
     int32_t data_bits;
     int32_t out_length;
+    int32_t output_start_offset;
+    int32_t accel_cons_vld_offset;
+    int32_t accel_prod_rdy_offset ;
+    int32_t accel_cons_rdy_offset;
+    int32_t accel_prod_vld_offset ;
     {
         HLS_PROTO("store-config");
 
@@ -201,22 +297,124 @@ void vitdodec::store_output()
         ntraceback = config.ntraceback;
         data_bits = config.data_bits;
         out_length = config.out_length;
+        output_start_offset = config.output_start_offset;
+        accel_cons_vld_offset = config.accel_cons_vld_offset;
+        accel_prod_rdy_offset  = config.accel_prod_rdy_offset ;
+        accel_cons_rdy_offset = config.accel_cons_rdy_offset;
+        accel_prod_vld_offset  = config.accel_prod_vld_offset ;
     }
 
+ // Store
+#ifdef ENABLE_SM
+    while(true){
+        HLS_UNROLL_LOOP(OFF);
+        // store_iter_dbg.write(curr_tile);
+        // Wait for handshake
+         {
+            HLS_PROTO("store-dma-handshake");
+            this->store_compute_handshake();
+            wait();
+            store_state_dbg.write(store_state);
+            wait();
+         }
+        int64_t sync_flag = (store_state == UPDATE_PROD_VALID_REQ || store_state == UPDATE_CONS_READY_REQ )? 0 : 1;
+        // uint32_t offset = output_start_offset;
+
+#if (DMA_WORD_PER_BEAT == 0)
+        uint32_t offset = output_start_offset;// (24852) * 1;
+#else
+        // uint32_t store_offset = round_up(24852, DMA_WORD_PER_BEAT) * 1;
+        uint32_t offset = round_up(output_start_offset, DMA_WORD_PER_BEAT) * 1;
+#endif
+        switch(store_state){
+            // case STORE_DONE:
+            // {
+            //     this->process_done();
+            // }
+            case STORE_FENCE:{
+                this->acc_fence.put(0x2);
+                wait();
+                while (!(this->acc_fence.ready)) wait();
+                wait();
+            }
+            break;
+            //State for last task
+            case UPDATE_CONS_VALID_REQ:
+            case UPDATE_PROD_VALID_REQ:
+            case UPDATE_CONS_READY_REQ:
+            case UPDATE_PROD_READY_REQ:{
+                {
+                    HLS_PROTO("store-dma-poll");
+             
+
+
+#if (DMA_WORD_PER_BEAT == 0)       
+                    int32_t sync_offset = accel_prod_rdy_offset; //READY_FLAG_OFFSET;
+                    int32_t sync_len = 1;
+                    if(store_state == UPDATE_PROD_VALID_REQ) sync_offset = accel_prod_vld_offset;//VALID_FLAG_OFFSET;
+                    else if(store_state == UPDATE_CONS_VALID_REQ) {
+                        sync_offset = accel_cons_vld_offset;
+                        sync_len = 2;
+                    }
+                    else if(store_state == UPDATE_CONS_READY_REQ) sync_offset = accel_cons_rdy_offset;
+#else
+                    int32_t sync_offset = round_up(accel_prod_rdy_offset, DMA_WORD_PER_BEAT) * 1 ; //READY_FLAG_OFFSET;
+                    int32_t sync_len = 1*DMA_WORD_PER_BEAT;
+                    if(store_state == UPDATE_PROD_VALID_REQ) sync_offset = round_up(accel_prod_vld_offset, DMA_WORD_PER_BEAT) * 1 ;//VALID_FLAG_OFFSET;
+                    else if(store_state == UPDATE_CONS_VALID_REQ) {
+                        sync_offset = round_up(accel_cons_vld_offset, DMA_WORD_PER_BEAT) * 1 ;
+                        sync_len = 2*DMA_WORD_PER_BEAT;
+                    }
+                    else if(store_state == UPDATE_CONS_READY_REQ) sync_offset = round_up(accel_cons_rdy_offset, DMA_WORD_PER_BEAT) * 1 ;
+#endif
+
+#if (DMA_WORD_PER_BEAT == 0)
+                // data word is wider than NoC links
+                dma_info_t dma_info(sync_offset * DMA_BEAT_PER_WORD, sync_len * DMA_BEAT_PER_WORD, DMA_SIZE);
+#else
+                dma_info_t dma_info(sync_offset / DMA_WORD_PER_BEAT, sync_len / DMA_WORD_PER_BEAT, DMA_SIZE);
+#endif
+                    // dma_info_t dma_info(sync_offset / DMA_WORD_PER_BEAT, sync_len / DMA_WORD_PER_BEAT, DMA_SIZE);
+                    sc_dt::sc_bv<DMA_WIDTH> dataBv;
+                    dataBv.range(DMA_WIDTH-1, 0) = sync_flag;
+                    this->dma_write_ctrl.put(dma_info);
+                    wait();
+                    this->dma_write_chnl.put(dataBv);
+                    wait();
+                    if(store_state == UPDATE_CONS_VALID_REQ){
+                        dataBv.range(DMA_WIDTH-1, 0) = (last_task);
+                        this->dma_write_chnl.put(dataBv);
+                        wait();
+                    }
+
+                    // this->dma_write_chnl.put(dataBv);
+                    // wait();
+
+                    // Wait till the write is accepted at the cache (and previous fences)
+                    while (!(this->dma_write_chnl.ready)) wait();
+                    wait();
+                }
+            }
+            break;
+
+            case STORE_DATA_REQ:
+#else
     // Store
     {
         HLS_PROTO("store-dma");
         bool ping = true;
 #if (DMA_WORD_PER_BEAT == 0)
-        uint32_t store_offset = (24852) * 1;
+        uint32_t store_offset = output_start_offset;// (24852) * 1;
 #else
-        uint32_t store_offset = round_up(24852, DMA_WORD_PER_BEAT) * 1;
+        // uint32_t store_offset = round_up(24852, DMA_WORD_PER_BEAT) * 1;
+        uint32_t store_offset = round_up(output_start_offset, DMA_WORD_PER_BEAT) * 1;
 #endif
         uint32_t offset = store_offset;
 
         wait();
         // Batching
         for (uint16_t b = 0; b < 1; b++)
+#endif //if enable_sm
         {
             wait();
 #if (DMA_WORD_PER_BEAT == 0)
@@ -227,8 +425,8 @@ void vitdodec::store_output()
             // Chunking
             for (int rem = length; rem > 0; rem -= PLM_OUT_WORD)
             {
-
-                this->store_compute_handshake();
+                // BM
+                // this->store_compute_handshake();
 
                 // Configure DMA transaction
                 uint32_t len = rem > PLM_OUT_WORD ? PLM_OUT_WORD : rem;
@@ -285,14 +483,28 @@ void vitdodec::store_output()
 #endif
                 //ping = !ping;
             }
-        }
-    }
+            wait();
+            while (!(this->dma_write_chnl.ready)) wait();
+        } // batch/case
+#ifdef ENABLE_SM
+        break;
+        default:
+        break;
+    } //end switch
+        wait();
+        // this->store_compute_done_handshake();
+        this->store_done_req();
+    } //end while true
+    
+#else
+    } // end load-dma
 
     // Conclude
     {
         this->accelerator_done();
         this->process_done();
     }
+    #endif
 }
 
 
@@ -302,8 +514,16 @@ void vitdodec::compute_kernel()
     {
         HLS_PROTO("compute-reset");
 
-        this->reset_compute_kernel();
+        // this->reset_compute_kernel();
 
+        // load_ready.req.reset_req();
+        // load_done.ack.reset_ack();
+        // store_ready.req.reset_req();
+        // store_done.ack.reset_ack();
+
+        input_ready.ack.reset_ack();
+        compute_done.req.reset_req();
+        compute_state_dbg.write(0);
         // explicit PLM ports reset if any
 
         // User-defined reset code
@@ -333,10 +553,16 @@ void vitdodec::compute_kernel()
     // Compute
     bool ping = true;
     {
-        for (uint16_t b = 0; b < 1; b++)
+        uint32_t in_length = 24852;
+        uint32_t out_length = 18585;
+        while(true)
+        //for (uint16_t b = 0; b < 1; b++)
         {
-            uint32_t in_length = 24852;
-            uint32_t out_length = 18585;
+            {
+                HLS_PROTO("compute-block-input-handshake");
+                this->compute_load_handshake(); // Ack new input tile
+                wait();
+            }
             // int out_rem = out_length;
 
             // for (int in_rem = in_length; in_rem > 0; in_rem -= PLM_IN_WORD)
@@ -345,7 +571,8 @@ void vitdodec::compute_kernel()
                 // uint32_t in_len  = in_rem  > PLM_IN_WORD  ? PLM_IN_WORD  : in_rem;
                 // uint32_t out_len = out_rem > PLM_OUT_WORD ? PLM_OUT_WORD : out_rem;
 
-                this->compute_load_handshake();
+                //BM: this->compute_load_handshake();
+
 
                 {
                     // INPUTS/OUTPUTS:          :  I/O   : Offset : Size
@@ -393,55 +620,7 @@ void vitdodec::compute_kernel()
                     HLS_FLAT(l_ppresult);
 
 
-#if(0)
-                    {
-                        printf(" d_brtab27_0 = ");
-                        for (int li = 0; li < 32; li++) {
-                            printf("%u", (unsigned char)plm_in_ping[idx_brtab27_0+li]);
-                            if ((li % 8) == 7) { printf(" "); }
-                        }
-                        printf("\n d_brtab27_1 = ");
-                        for (int li = 0; li < 32; li++) {
-                            printf("%u", (unsigned char)plm_in_ping[idx_brtab27_1+li]);
-                            if ((li % 8) == 7) { printf(" "); }
-                        }
-                        printf("\n depunct_ptn = ");
-                        for (int li = 0; li < 8; li++) {
-                            printf("%u", (unsigned char)plm_in_ping[idx_depunc_ptn+li]);
-                        }
-                        printf("\n dep_data    = ");
-                        for (int li = 0; li < 32; li++) {
-                            printf("%u", (unsigned char)plm_in_ping[idx_depd_data+li]);
-                            if ((li % 8) == 7) { printf(" "); }
-                        }
-                        printf("\n");
-                        printf("\n");
 
-                        int limi = 0;
-
-                        printf(" plm_in_ping = ");
-                        limi = 0;
-                        for (int li = 0; li < 32; li++) {
-                            printf("%u", (unsigned char)plm_in_ping[limi++]);
-                            if ((li % 8) == 7) { printf(" "); }
-                        }
-                        printf("\n      brtb1    ");
-                        for (int li = 0; li < 32; li++) {
-                            printf("%u", (unsigned char)plm_in_ping[limi++]);
-                            if ((li % 8) == 7) { printf(" "); }
-                        } 
-                        printf("\n      depnc    ");
-                        for (int li = 0; li < 8; li++) {
-                            printf("%u", (unsigned char)plm_in_ping[limi++]);
-                        }
-                        printf("\n      depdta   ");
-                        for (int li = 0; li < 32; li++) {
-                            printf("%u", (unsigned char)plm_in_ping[limi++]);
-                            if ((li % 8) == 7) { std::cout << " "; }
-                        }
-                        printf("\n\n");
-                    }
-#endif
 
                     // This is the "reset" portion:
                     //  Do this before the real operation so local memories are "cleared to zero"
@@ -785,22 +964,173 @@ void vitdodec::compute_kernel()
                 }
 #endif
 
-                // // Computing phase implementation
-                // for (int i = 0; i < in_len; i++) {
-                //     //if (ping)
-                //         plm_out_ping[i] = plm_in_ping[i];
-                //     //else
-                //     //    plm_out_pong[i] = plm_in_pong[i];
-                // }
 
                 //out_rem -= PLM_OUT_WORD;
-                this->compute_store_handshake();
+                //BM: this->compute_store_handshake();
                 //ping = !ping;
             }
+            //BM
+            {
+                HLS_PROTO("compute-block-output-handshake");
+                this->compute_done_req(); // Ack new input tile
+                wait();
+            }
+            // this->compute_done_req();
         }
 
-        // Conclude
-        {
+        // // Conclude
+        // {
+        //     this->process_done();
+        // }
+    }
+}
+
+
+void vitdodec::asi_controller(){
+    {
+        HLS_PROTO("asi_controller-reset");
+        load_next_tile.req.reset_req(); //invoke load
+        load_done.ack.reset_ack();
+        input_ready.req.reset_req(); //invoke compute
+        compute_done.ack.reset_ack();
+        output_ready.req.reset_req(); //invoke store
+        store_done.ack.reset_ack();
+
+        asi_state_dbg.write(0);
+
+        this->reset_accelerator_done();
+        wait();
+    }
+    conf_info_t config;
+    // int32_t num_tiles;
+    {
+        HLS_PROTO("asi_controller-config");
+        cfg.wait_for_config(); // config process
+        config = this->conf_info.read();
+
+        // User-defined config code
+        /* <<--local-params-->> */
+        // num_tiles = config.num_tiles;
+    }
+
+    while(true){
+        HLS_PROTO("asi_controller-body");
+        HLS_UNROLL_LOOP(OFF);
+
+        //Read next tile
+        asi_state_dbg.write(POLL_PROD_VALID_REQ);
+        load_state = POLL_PROD_VALID_REQ;
+        this->load_next_tile_req();  //Enable next iteration of input data tile
+        wait();
+        this->load_done_ack();
+        wait();
+
+
+        asi_state_dbg.write(UPDATE_PROD_VALID_REQ);
+        store_state = UPDATE_PROD_VALID_REQ;
+        this->compute_store_handshake(); //Non blocking signal to Store to resume
+        wait();
+        this->store_done_ack();  
+        wait();
+
+        //Write Fence
+        asi_state_dbg.write(STORE_FENCE);
+        store_state = STORE_FENCE;
+        this->compute_store_handshake(); //Non blocking signal to Store to resume
+        wait();
+        this->store_done_ack();  
+        wait();
+
+        asi_state_dbg.write(LOAD_DATA_REQ);
+        load_state = LOAD_DATA_REQ;
+        this->load_next_tile_req();  
+        wait();
+        this->load_done_ack();
+        wait();
+
+        if(! last_task){
+            //Update load sync
+            asi_state_dbg.write(UPDATE_PROD_READY_REQ);
+            store_state = UPDATE_PROD_READY_REQ;
+            this->compute_store_handshake(); //Non blocking signal to Store to resume
+            wait();
+            this->store_done_ack(); //Block till Store has finished writing previous data over DMA
+            wait();
+
+            //Write Fence
+            asi_state_dbg.write(STORE_FENCE);
+            store_state = STORE_FENCE;
+            this->compute_store_handshake(); //Non blocking signal to Store to resume
+            wait();
+            this->store_done_ack();  
+            wait();
+        }
+
+        //Compute Intensity
+        asi_state_dbg.write(COMPUTE);
+        this->load_compute_handshake();
+        wait();
+        this->compute_done_ack();
+        wait();
+
+        //Check if can store next tile
+        asi_state_dbg.write(POLL_CONS_READY_REQ);
+        load_state = POLL_CONS_READY_REQ;
+        this->load_next_tile_req();  
+        wait();
+        this->load_done_ack();
+        wait();
+
+        //Store next tile
+        asi_state_dbg.write(UPDATE_CONS_READY_REQ);
+        store_state = UPDATE_CONS_READY_REQ;
+        this->compute_store_handshake(); //Non blocking signal to Store to resume
+        wait();
+        this->store_done_ack();  
+        wait();
+
+        //Write Fence
+        asi_state_dbg.write(STORE_FENCE);
+        store_state = STORE_FENCE;
+        this->compute_store_handshake(); //Non blocking signal to Store to resume
+        wait();
+        this->store_done_ack();  
+        wait();
+
+        //Store next tile
+        asi_state_dbg.write(STORE_DATA_REQ);
+        store_state = STORE_DATA_REQ;
+        this->compute_store_handshake(); //Non blocking signal to Store to resume
+        wait();
+        this->store_done_ack();  
+        wait();
+        
+        //Write Fence
+        asi_state_dbg.write(STORE_FENCE);
+        store_state = STORE_FENCE;
+        this->compute_store_handshake(); //Non blocking signal to Store to resume
+        wait();
+        this->store_done_ack();  
+        wait();
+
+        //Store next tile
+        asi_state_dbg.write(UPDATE_CONS_VALID_REQ);
+        store_state = UPDATE_CONS_VALID_REQ;
+        this->compute_store_handshake(); //Non blocking signal to Store to resume
+        wait();
+        this->store_done_ack();  
+        wait();
+
+        //Write Fence
+        asi_state_dbg.write(STORE_FENCE);
+        store_state = STORE_FENCE;
+        this->compute_store_handshake(); //Non blocking signal to Store to resume
+        wait();
+        this->store_done_ack();  
+        wait();
+
+        if(last_task){ 
+            this->accelerator_done();
             this->process_done();
         }
     }

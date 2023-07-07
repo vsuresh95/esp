@@ -6,5 +6,11 @@
     <param name="cbps" desc="cbps" />
     <param name="in_length" desc="in_length" />
     <param name="out_length" desc="out_length" />
+    <param name="input_start_offset" desc="input_start_offset" />
+    <param name="output_start_offset" desc="output_start_offset" />
+    <param name="accel_cons_vld_offset" desc="accel_cons_vld_offset" />
+    <param name="accel_prod_rdy_offset" desc="accel_prod_rdy_offset" />
+    <param name="accel_cons_rdy_offset" desc="accel_cons_rdy_offset" />
+    <param name="accel_prod_vld_offset" desc="accel_prod_vld_offset" /> 
   </accelerator>
 </sld>
