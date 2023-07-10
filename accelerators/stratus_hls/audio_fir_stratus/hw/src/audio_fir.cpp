@@ -30,6 +30,16 @@ void audio_fir::load_input()
     /* <<--params-->> */
     int32_t logn_samples;
     int32_t num_samples;
+    int32_t prod_valid_offset;
+    int32_t prod_ready_offset;
+    int32_t flt_prod_valid_offset;
+    int32_t flt_prod_ready_offset;
+    int32_t cons_valid_offset;
+    int32_t cons_ready_offset;
+    int32_t load_data_offset;
+    int32_t flt_load_data_offset;
+    int32_t twd_load_data_offset;
+    int32_t store_data_offset;
     {
         HLS_PROTO("load-config");
 
@@ -40,6 +50,18 @@ void audio_fir::load_input()
         /* <<--local-params-->> */
         logn_samples = config.logn_samples;
         num_samples = 1 << logn_samples;
+
+        // Configured shared memory offsets for sync flags
+        prod_valid_offset = config.prod_valid_offset;
+        prod_ready_offset = config.prod_ready_offset;
+        flt_prod_valid_offset = config.flt_prod_valid_offset;
+        flt_prod_ready_offset = config.flt_prod_ready_offset;
+        cons_valid_offset = config.cons_valid_offset;
+        cons_ready_offset = config.cons_ready_offset;
+        load_data_offset = config.load_data_offset;
+        flt_load_data_offset = config.flt_load_data_offset;
+        twd_load_data_offset = config.twd_load_data_offset;
+        store_data_offset = config.store_data_offset;
     }
 
     // Load
@@ -58,7 +80,7 @@ void audio_fir::load_input()
 #ifdef ENABLE_SM
             case POLL_PROD_VALID_REQ:
             {
-                dma_info_t dma_info(VALID_FLAG_OFFSET / DMA_WORD_PER_BEAT, READY_FLAG_OFFSET / DMA_WORD_PER_BEAT, DMA_SIZE);
+                dma_info_t dma_info(prod_valid_offset / DMA_WORD_PER_BEAT, 2 * TEST_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 int32_t valid_task = 0;
 
@@ -80,7 +102,7 @@ void audio_fir::load_input()
             break;
             case POLL_FLT_PROD_VALID_REQ:
             {
-                dma_info_t dma_info(FLT_VALID_FLAG_OFFSET / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                dma_info_t dma_info(flt_prod_valid_offset / DMA_WORD_PER_BEAT, TEST_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 int32_t valid_task = 0;
 
@@ -99,8 +121,7 @@ void audio_fir::load_input()
             break;
             case POLL_CONS_READY_REQ:
             {
-                int32_t end_sync_offset = SYNC_VAR_SIZE + 2 * num_samples + READY_FLAG_OFFSET;
-                dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                dma_info_t dma_info(cons_ready_offset / DMA_WORD_PER_BEAT, TEST_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 int32_t ready_for_task = 0;
 
@@ -121,7 +142,7 @@ void audio_fir::load_input()
             case LOAD_DATA_REQ:
             // Load input data
             {
-                dma_info_t dma_info(SYNC_VAR_SIZE / DMA_WORD_PER_BEAT, 2 * num_samples / DMA_WORD_PER_BEAT, DMA_SIZE);
+                dma_info_t dma_info(load_data_offset / DMA_WORD_PER_BEAT, 2 * num_samples / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
 
                 wait();
@@ -143,7 +164,7 @@ void audio_fir::load_input()
             }
             // Load filters
             {
-                dma_info_t dma_info(4 * (2 * num_samples + SYNC_VAR_SIZE) / DMA_WORD_PER_BEAT, 2 * (num_samples + 1)/ DMA_WORD_PER_BEAT, DMA_SIZE);
+                dma_info_t dma_info(flt_load_data_offset / DMA_WORD_PER_BEAT, 2 * (num_samples + 1) / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
 
                 wait();
@@ -165,7 +186,7 @@ void audio_fir::load_input()
             }
             // Load twiddle factors 
             {
-                dma_info_t dma_info(6 * (2 * num_samples + SYNC_VAR_SIZE) / DMA_WORD_PER_BEAT, num_samples / DMA_WORD_PER_BEAT, DMA_SIZE);
+                dma_info_t dma_info(twd_load_data_offset / DMA_WORD_PER_BEAT, num_samples / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
 
                 wait();
@@ -216,6 +237,16 @@ void audio_fir::store_output()
     /* <<--params-->> */
     int32_t logn_samples;
     int32_t num_samples;
+    int32_t prod_valid_offset;
+    int32_t prod_ready_offset;
+    int32_t flt_prod_valid_offset;
+    int32_t flt_prod_ready_offset;
+    int32_t cons_valid_offset;
+    int32_t cons_ready_offset;
+    int32_t load_data_offset;
+    int32_t flt_load_data_offset;
+    int32_t twd_load_data_offset;
+    int32_t store_data_offset;
     {
         HLS_PROTO("store-config");
 
@@ -227,6 +258,18 @@ void audio_fir::store_output()
         /* <<--local-params-->> */
         logn_samples = config.logn_samples;
         num_samples = 1 << logn_samples;
+
+        // Configured shared memory offsets for sync flags
+        prod_valid_offset = config.prod_valid_offset;
+        prod_ready_offset = config.prod_ready_offset;
+        flt_prod_valid_offset = config.flt_prod_valid_offset;
+        flt_prod_ready_offset = config.flt_prod_ready_offset;
+        cons_valid_offset = config.cons_valid_offset;
+        cons_ready_offset = config.cons_ready_offset;
+        load_data_offset = config.load_data_offset;
+        flt_load_data_offset = config.flt_load_data_offset;
+        twd_load_data_offset = config.twd_load_data_offset;
+        store_data_offset = config.store_data_offset;
     }
 
     // Store
@@ -245,7 +288,7 @@ void audio_fir::store_output()
 #ifdef ENABLE_SM
             case UPDATE_PROD_READY_REQ:
             {
-                dma_info_t dma_info(READY_FLAG_OFFSET / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                dma_info_t dma_info(prod_ready_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 dataBv.range(DMA_WIDTH - 1, 0) = 1;
 
@@ -261,7 +304,7 @@ void audio_fir::store_output()
             break;
             case UPDATE_FLT_PROD_READY_REQ:
             {
-                dma_info_t dma_info(FLT_READY_FLAG_OFFSET / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                dma_info_t dma_info(flt_prod_ready_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 dataBv.range(DMA_WIDTH - 1, 0) = 1;
 
@@ -277,7 +320,7 @@ void audio_fir::store_output()
             break;
             case UPDATE_PROD_VALID_REQ:
             {
-                dma_info_t dma_info(VALID_FLAG_OFFSET / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                dma_info_t dma_info(prod_valid_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 dataBv.range(DMA_WIDTH - 1, 0) = 0;
 
@@ -293,7 +336,7 @@ void audio_fir::store_output()
             break;
             case UPDATE_FLT_PROD_VALID_REQ:
             {
-                dma_info_t dma_info(FLT_VALID_FLAG_OFFSET / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                dma_info_t dma_info(flt_prod_valid_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 dataBv.range(DMA_WIDTH - 1, 0) = 0;
 
@@ -309,8 +352,7 @@ void audio_fir::store_output()
             break;
             case UPDATE_CONS_VALID_REQ:
             {
-                int32_t end_sync_offset = SYNC_VAR_SIZE + 2 * num_samples + VALID_FLAG_OFFSET;
-                dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                dma_info_t dma_info(cons_valid_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 dataBv.range(DMA_WIDTH - 1, 0) = 1;
 
@@ -326,8 +368,7 @@ void audio_fir::store_output()
             break;
             case UPDATE_CONS_READY_REQ:
             {
-                int32_t end_sync_offset = SYNC_VAR_SIZE + 2 * num_samples + READY_FLAG_OFFSET;
-                dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                dma_info_t dma_info(cons_ready_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 dataBv.range(DMA_WIDTH - 1, 0) = 0;
 
@@ -344,8 +385,7 @@ void audio_fir::store_output()
 #endif
             case STORE_DATA_REQ:
             {
-                int32_t end_sync_offset = (2 * SYNC_VAR_SIZE) + (2 * num_samples);
-                dma_info_t dma_info(end_sync_offset / DMA_WORD_PER_BEAT, 2 * num_samples / DMA_WORD_PER_BEAT, DMA_SIZE);
+                dma_info_t dma_info(store_data_offset / DMA_WORD_PER_BEAT, 2 * num_samples / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
 
                 wait();
@@ -444,7 +484,7 @@ void audio_fir::compute_kernel()
 
             load_state_req = POLL_PROD_VALID_REQ;
 
-            compute_state_req_dbg.write(1);
+            compute_state_req_dbg.write(POLL_PROD_VALID_REQ);
 
             this->compute_load_ready_handshake();
             wait();
@@ -458,7 +498,7 @@ void audio_fir::compute_kernel()
 
             store_state_req = UPDATE_PROD_VALID_REQ;
 
-            compute_state_req_dbg.write(2);
+            compute_state_req_dbg.write(UPDATE_PROD_VALID_REQ);
 
             this->compute_store_ready_handshake();
             wait();
@@ -468,7 +508,7 @@ void audio_fir::compute_kernel()
             // Wait for all writes to be done and then issue fence
             store_state_req = STORE_FENCE;
 
-            compute_state_req_dbg.write(3);
+            compute_state_req_dbg.write(STORE_FENCE);
 
             this->compute_store_ready_handshake();
             wait();
@@ -482,7 +522,7 @@ void audio_fir::compute_kernel()
 
             load_state_req = POLL_FLT_PROD_VALID_REQ;
 
-            compute_state_req_dbg.write(4);
+            compute_state_req_dbg.write(POLL_FLT_PROD_VALID_REQ);
 
             this->compute_load_ready_handshake();
             wait();
@@ -496,7 +536,7 @@ void audio_fir::compute_kernel()
 
             store_state_req = UPDATE_FLT_PROD_VALID_REQ;
 
-            compute_state_req_dbg.write(5);
+            compute_state_req_dbg.write(UPDATE_FLT_PROD_VALID_REQ);
 
             this->compute_store_ready_handshake();
             wait();
@@ -506,7 +546,7 @@ void audio_fir::compute_kernel()
             // Wait for all writes to be done and then issue fence
             store_state_req = STORE_FENCE;
 
-            compute_state_req_dbg.write(6);
+            compute_state_req_dbg.write(STORE_FENCE);
 
             this->compute_store_ready_handshake();
             wait();
@@ -520,7 +560,7 @@ void audio_fir::compute_kernel()
 
             load_state_req = LOAD_DATA_REQ;
 
-            compute_state_req_dbg.write(7);
+            compute_state_req_dbg.write(LOAD_DATA_REQ);
 
             this->compute_load_ready_handshake();
             wait();
@@ -534,7 +574,7 @@ void audio_fir::compute_kernel()
 
             store_state_req = UPDATE_PROD_READY_REQ;
 
-            compute_state_req_dbg.write(8);
+            compute_state_req_dbg.write(UPDATE_PROD_READY_REQ);
 
             this->compute_store_ready_handshake();
             wait();
@@ -544,7 +584,7 @@ void audio_fir::compute_kernel()
             // Wait for all writes to be done and then issue fence
             store_state_req = STORE_FENCE;
 
-            compute_state_req_dbg.write(9);
+            compute_state_req_dbg.write(STORE_FENCE);
 
             this->compute_store_ready_handshake();
             wait();
@@ -558,7 +598,7 @@ void audio_fir::compute_kernel()
 
             store_state_req = UPDATE_FLT_PROD_READY_REQ;
 
-            compute_state_req_dbg.write(10);
+            compute_state_req_dbg.write(UPDATE_FLT_PROD_READY_REQ);
 
             this->compute_store_ready_handshake();
             wait();
@@ -575,7 +615,7 @@ void audio_fir::compute_kernel()
             this->compute_store_done_handshake();
             wait();
 
-            compute_state_req_dbg.write(12);
+            compute_state_req_dbg.write(COMPUTE);
         }
 #endif
         // Compute
@@ -692,7 +732,7 @@ void audio_fir::compute_kernel()
 
             load_state_req = POLL_CONS_READY_REQ;
 
-            compute_state_req_dbg.write(13);
+            compute_state_req_dbg.write(POLL_CONS_READY_REQ);
 
             this->compute_load_ready_handshake();
             wait();
@@ -706,7 +746,7 @@ void audio_fir::compute_kernel()
 
             store_state_req = UPDATE_CONS_READY_REQ;
 
-            compute_state_req_dbg.write(14);
+            compute_state_req_dbg.write(UPDATE_CONS_READY_REQ);
 
             this->compute_store_ready_handshake();
             wait();
@@ -716,7 +756,7 @@ void audio_fir::compute_kernel()
             // Wait for all writes to be done and then issue fence
             store_state_req = STORE_FENCE;
 
-            compute_state_req_dbg.write(15);
+            compute_state_req_dbg.write(STORE_FENCE);
 
             this->compute_store_ready_handshake();
             wait();
@@ -732,7 +772,7 @@ void audio_fir::compute_kernel()
 
             this->compute_store_ready_handshake();
 
-            compute_state_req_dbg.write(16);
+            compute_state_req_dbg.write(STORE_DATA_REQ);
 
             wait();
             this->compute_store_done_handshake();
@@ -741,7 +781,7 @@ void audio_fir::compute_kernel()
             // Wait for all writes to be done and then issue fence
             store_state_req = STORE_FENCE;
 
-            compute_state_req_dbg.write(17);
+            compute_state_req_dbg.write(STORE_FENCE);
 
             this->compute_store_ready_handshake();
             wait();
@@ -755,7 +795,7 @@ void audio_fir::compute_kernel()
 
             store_state_req = UPDATE_CONS_VALID_REQ;
 
-            compute_state_req_dbg.write(18);
+            compute_state_req_dbg.write(UPDATE_CONS_VALID_REQ);
 
             this->compute_store_ready_handshake();
             wait();
@@ -765,7 +805,7 @@ void audio_fir::compute_kernel()
             // Wait for all writes to be done and then issue fence
             store_state_req = STORE_FENCE;
 
-            compute_state_req_dbg.write(19);
+            compute_state_req_dbg.write(STORE_FENCE);
 
             this->compute_store_ready_handshake();
             wait();
@@ -783,7 +823,7 @@ void audio_fir::compute_kernel()
 #endif
                 store_state_req = ACC_DONE;
 
-                compute_state_req_dbg.write(20);
+                compute_state_req_dbg.write(ACC_DONE);
 
                 this->compute_store_ready_handshake();
                 wait();

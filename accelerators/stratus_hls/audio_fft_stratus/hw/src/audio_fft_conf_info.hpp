@@ -22,19 +22,37 @@ public:
         this->do_inverse = 1;
         this->logn_samples = 1;
         this->do_shift = 1;
+        this->prod_valid_offset = 0;
+        this->prod_ready_offset = 0;
+        this->cons_valid_offset = 0;
+        this->cons_ready_offset = 0;
+        this->load_data_offset = 0;
+        this->store_data_offset = 0;
     }
 
     conf_info_t(
         /* <<--ctor-args-->> */
         int32_t do_inverse, 
         int32_t logn_samples, 
-        int32_t do_shift
+        int32_t do_shift,
+        int32_t prod_valid_offset,
+        int32_t prod_ready_offset,
+        int32_t cons_valid_offset,
+        int32_t cons_ready_offset,
+        int32_t load_data_offset,
+        int32_t store_data_offset
         )
     {
         /* <<--ctor-custom-->> */
         this->do_inverse = do_inverse;
         this->logn_samples = logn_samples;
         this->do_shift = do_shift;
+        this->prod_valid_offset = prod_valid_offset;
+        this->prod_ready_offset = prod_ready_offset;
+        this->cons_valid_offset = cons_valid_offset;
+        this->cons_ready_offset = cons_ready_offset;
+        this->load_data_offset = load_data_offset;
+        this->store_data_offset = store_data_offset;
     }
 
     // equals operator
@@ -44,6 +62,12 @@ public:
         if (do_inverse != rhs.do_inverse) return false;
         if (logn_samples != rhs.logn_samples) return false;
         if (do_shift != rhs.do_shift) return false;
+        if (prod_valid_offset != rhs.prod_valid_offset) return false;
+        if (prod_ready_offset != rhs.prod_ready_offset) return false;
+        if (cons_valid_offset != rhs.cons_valid_offset) return false;
+        if (cons_ready_offset != rhs.cons_valid_offset) return false;
+        if (load_data_offset != rhs.load_data_offset) return false;
+        if (store_data_offset != rhs.store_data_offset) return false;
         return true;
     }
 
@@ -54,6 +78,12 @@ public:
         do_inverse = other.do_inverse;
         logn_samples = other.logn_samples;
         do_shift = other.do_shift;
+        prod_valid_offset = other.prod_valid_offset;
+        prod_ready_offset = other.prod_ready_offset;
+        cons_valid_offset = other.cons_valid_offset;
+        cons_ready_offset = other.cons_ready_offset;
+        load_data_offset = other.load_data_offset;
+        store_data_offset = other.store_data_offset;
         return *this;
     }
 
@@ -68,7 +98,13 @@ public:
         /* <<--print-->> */
         os << "do_inverse = " << conf_info.do_inverse << ", ";
         os << "logn_samples = " << conf_info.logn_samples << ", ";
-        os << "do_shift = " << conf_info.do_shift << "";
+        os << "do_shift = " << conf_info.do_shift << ", ";
+        os << "prod_valid_offset = " << conf_info.prod_valid_offset << ", ";
+        os << "prod_ready_offset = " << conf_info.prod_ready_offset << ", ";
+        os << "cons_valid_offset = " << conf_info.cons_valid_offset << ", ";
+        os << "cons_ready_offset = " << conf_info.cons_ready_offset << ", ";
+        os << "load_data_offset = " << conf_info.load_data_offset << ", ";
+        os << "store_data_offset = " << conf_info.store_data_offset << "";
         os << "}";
         return os;
     }
@@ -77,6 +113,12 @@ public:
         int32_t do_inverse;
         int32_t logn_samples;
         int32_t do_shift;
+        int32_t prod_valid_offset;
+        int32_t prod_ready_offset;
+        int32_t cons_valid_offset;
+        int32_t cons_ready_offset;
+        int32_t load_data_offset;
+        int32_t store_data_offset;
 };
 
 #endif // __AUDIO_FFT_CONF_INFO_HPP__

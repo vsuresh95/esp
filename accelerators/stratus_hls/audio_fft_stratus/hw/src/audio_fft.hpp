@@ -20,10 +20,8 @@
 
 #define PLM_IN_WORD 2048
 
-#define SYNC_VAR_SIZE 10
 #define UPDATE_VAR_SIZE 2
-#define VALID_FLAG_OFFSET 0
-#define READY_FLAG_OFFSET 4
+#define TEST_VAR_SIZE 2
 
 #define POLL_PROD_VALID_REQ 0
 #define POLL_CONS_READY_REQ 1
@@ -35,6 +33,7 @@
 #define STORE_DATA_REQ 4
 #define STORE_FENCE 5
 #define ACC_DONE 6
+#define COMPUTE 7
 
 class audio_fft : public esp_accelerator_3P<DMA_WIDTH>
 {
