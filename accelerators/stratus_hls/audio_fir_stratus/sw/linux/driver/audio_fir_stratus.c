@@ -17,6 +17,17 @@
 #define AUDIO_FIR_LOGN_SAMPLES_REG 0x44
 #define AUDIO_FIR_DO_SHIFT_REG 0x40
 
+#define AUDIO_FFT_PROD_VALID_OFFSET 0x4C
+#define AUDIO_FFT_PROD_READY_OFFSET 0x50
+#define AUDIO_FFT_FLT_PROD_VALID_OFFSET 0x54
+#define AUDIO_FFT_FLT_PROD_READY_OFFSET 0x58
+#define AUDIO_FFT_CONS_VALID_OFFSET 0x5C
+#define AUDIO_FFT_CONS_READY_OFFSET 0x60
+#define AUDIO_FFT_LOAD_DATA_OFFSET 0x64
+#define AUDIO_FFT_FLT_LOAD_DATA_OFFSET 0x68
+#define AUDIO_FFT_TWD_LOAD_DATA_OFFSET 0x6C
+#define AUDIO_FFT_STORE_DATA_OFFSET 0x70
+
 struct audio_fir_stratus_device {
 	struct esp_device esp;
 };
@@ -51,6 +62,18 @@ static void audio_fir_prep_xfer(struct esp_device *esp, void *arg)
 	iowrite32be(a->do_inverse, esp->iomem + AUDIO_FIR_DO_INVERSE_REG);
 	iowrite32be(a->logn_samples, esp->iomem + AUDIO_FIR_LOGN_SAMPLES_REG);
 	iowrite32be(a->do_shift, esp->iomem + AUDIO_FIR_DO_SHIFT_REG);
+
+	iowrite32be(a->prod_valid_offset, esp->iomem + AUDIO_FFT_PROD_VALID_OFFSET);
+	iowrite32be(a->prod_ready_offset, esp->iomem + AUDIO_FFT_PROD_READY_OFFSET);
+	iowrite32be(a->flt_prod_valid_offset, esp->iomem + AUDIO_FFT_FLT_PROD_VALID_OFFSET);
+	iowrite32be(a->flt_prod_ready_offset, esp->iomem + AUDIO_FFT_FLT_PROD_READY_OFFSET);
+	iowrite32be(a->cons_valid_offset, esp->iomem + AUDIO_FFT_CONS_VALID_OFFSET);
+	iowrite32be(a->cons_ready_offset, esp->iomem + AUDIO_FFT_CONS_READY_OFFSET);
+	iowrite32be(a->load_data_offset, esp->iomem + AUDIO_FFT_LOAD_DATA_OFFSET);
+	iowrite32be(a->flt_load_data_offset, esp->iomem + AUDIO_FFT_FLT_LOAD_DATA_OFFSET);
+	iowrite32be(a->twd_load_data_offset, esp->iomem + AUDIO_FFT_TWD_LOAD_DATA_OFFSET);
+	iowrite32be(a->store_data_offset, esp->iomem + AUDIO_FFT_STORE_DATA_OFFSET);
+
 	iowrite32be(a->src_offset, esp->iomem + SRC_OFFSET_REG);
 	iowrite32be(a->dst_offset, esp->iomem + DST_OFFSET_REG);
 	iowrite32be(a->spandex_conf, esp->iomem + SPANDEX_REG);
