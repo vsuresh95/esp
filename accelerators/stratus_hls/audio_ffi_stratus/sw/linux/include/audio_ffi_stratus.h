@@ -23,6 +23,19 @@ struct audio_ffi_stratus_access {
 	unsigned do_inverse;
 	unsigned logn_samples;
 	unsigned do_shift;
+
+	// ASI sync flag offsets
+	unsigned prod_valid_offset;
+	unsigned prod_ready_offset;
+	unsigned flt_prod_valid_offset;
+	unsigned flt_prod_ready_offset;
+	unsigned cons_valid_offset;
+	unsigned cons_ready_offset;
+	unsigned load_data_offset;
+	unsigned flt_load_data_offset;
+	unsigned twd_load_data_offset;
+	unsigned store_data_offset;
+	
 	unsigned src_offset;
 	unsigned dst_offset;
 };
