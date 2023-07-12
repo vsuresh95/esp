@@ -1,6 +1,8 @@
 // Copyright (c) 2011-2019 Columbia University, System Level Design Group
 // SPDX-License-Identifier: Apache-2.0
 
+#ifndef ENABLE_PP
+
 #include "audio_fft.hpp"
 #include "audio_fft_directives.hpp"
 
@@ -32,8 +34,8 @@ void audio_fft::load_input()
     int32_t num_samples;
     int32_t prod_valid_offset;
     int32_t prod_ready_offset;
-    int32_t cons_ready_offset;
     int32_t cons_valid_offset;
+    int32_t cons_ready_offset;
     int32_t load_data_offset;
     int32_t store_data_offset;
     {
@@ -50,8 +52,8 @@ void audio_fft::load_input()
         // Configured shared memory offsets for sync flags
         prod_valid_offset = config.prod_valid_offset;
         prod_ready_offset = config.prod_ready_offset;
-        cons_ready_offset = config.cons_ready_offset;
         cons_valid_offset = config.cons_valid_offset;
+        cons_ready_offset = config.cons_ready_offset;
         load_data_offset = config.load_data_offset;
         store_data_offset = config.store_data_offset;
     }
@@ -113,6 +115,7 @@ void audio_fft::load_input()
             break;
 #endif
             case LOAD_DATA_REQ:
+            // Load input data
             {
                 dma_info_t dma_info(load_data_offset / DMA_WORD_PER_BEAT, 2 * num_samples / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
@@ -167,8 +170,8 @@ void audio_fft::store_output()
     int32_t num_samples;
     int32_t prod_valid_offset;
     int32_t prod_ready_offset;
-    int32_t cons_ready_offset;
     int32_t cons_valid_offset;
+    int32_t cons_ready_offset;
     int32_t load_data_offset;
     int32_t store_data_offset;
     {
@@ -626,3 +629,9 @@ void audio_fft::compute_kernel()
         }
     } // while (true)
 } // Function : compute_kernel
+
+#else // ENABLE_PP
+
+#include "audio_fft_pipelined.cpp"
+
+#endif // ENABLE_PP

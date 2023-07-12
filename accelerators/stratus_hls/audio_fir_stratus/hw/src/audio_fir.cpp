@@ -1,6 +1,8 @@
 // Copyright (c) 2011-2019 Columbia University, System Level Design Group
 // SPDX-License-Identifier: Apache-2.0
 
+#ifndef ENABLE_PP
+
 #include "audio_fir.hpp"
 #include "audio_fir_directives.hpp"
 
@@ -791,7 +793,7 @@ void audio_fir::compute_kernel()
 #ifdef ENABLE_SM
         // update consumer's ready for new data available
         {
-            HLS_PROTO("update-cons-ready");
+            HLS_PROTO("update-cons-valid");
 
             store_state_req = UPDATE_CONS_VALID_REQ;
 
@@ -836,3 +838,9 @@ void audio_fir::compute_kernel()
         }
     } // while (true)
 } // Function : compute_kernel
+
+#else // ENABLE_PP
+
+#include "audio_fir_pipelined.cpp"
+
+#endif // ENABLE_PP
