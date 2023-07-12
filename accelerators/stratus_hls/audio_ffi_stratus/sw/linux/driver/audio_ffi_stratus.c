@@ -23,10 +23,10 @@
 #define AUDIO_FFI_FLT_PROD_READY_OFFSET 0x58
 #define AUDIO_FFI_CONS_VALID_OFFSET 0x5C
 #define AUDIO_FFI_CONS_READY_OFFSET 0x60
-#define AUDIO_FFI_LOAD_DATA_OFFSET 0x64
-#define AUDIO_FFI_FLT_LOAD_DATA_OFFSET 0x68
-#define AUDIO_FFI_TWD_LOAD_DATA_OFFSET 0x6C
-#define AUDIO_FFI_STORE_DATA_OFFSET 0x70
+#define AUDIO_FFI_INPUT_OFFSET 0x64
+#define AUDIO_FFI_FLT_INPUT_OFFSET 0x68
+#define AUDIO_FFI_TWD_INPUT_OFFSET 0x6C
+#define AUDIO_FFI_OUTPUT_OFFSET 0x70
 
 struct audio_ffi_stratus_device {
 	struct esp_device esp;
@@ -69,10 +69,10 @@ static void audio_ffi_prep_xfer(struct esp_device *esp, void *arg)
 	iowrite32be(a->flt_prod_ready_offset, esp->iomem + AUDIO_FFI_FLT_PROD_READY_OFFSET);
 	iowrite32be(a->cons_valid_offset, esp->iomem + AUDIO_FFI_CONS_VALID_OFFSET);
 	iowrite32be(a->cons_ready_offset, esp->iomem + AUDIO_FFI_CONS_READY_OFFSET);
-	iowrite32be(a->load_data_offset, esp->iomem + AUDIO_FFI_LOAD_DATA_OFFSET);
-	iowrite32be(a->flt_load_data_offset, esp->iomem + AUDIO_FFI_FLT_LOAD_DATA_OFFSET);
-	iowrite32be(a->twd_load_data_offset, esp->iomem + AUDIO_FFI_TWD_LOAD_DATA_OFFSET);
-	iowrite32be(a->store_data_offset, esp->iomem + AUDIO_FFI_STORE_DATA_OFFSET);
+	iowrite32be(a->input_offset, esp->iomem + AUDIO_FFI_INPUT_OFFSET);
+	iowrite32be(a->flt_input_offset, esp->iomem + AUDIO_FFI_FLT_INPUT_OFFSET);
+	iowrite32be(a->twd_input_offset, esp->iomem + AUDIO_FFI_TWD_INPUT_OFFSET);
+	iowrite32be(a->output_offset, esp->iomem + AUDIO_FFI_OUTPUT_OFFSET);
 
 	iowrite32be(a->src_offset, esp->iomem + SRC_OFFSET_REG);
 	iowrite32be(a->dst_offset, esp->iomem + DST_OFFSET_REG);

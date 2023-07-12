@@ -41,8 +41,8 @@ void audio_fft::load_input()
     int32_t prod_ready_offset;
     int32_t cons_ready_offset;
     int32_t cons_valid_offset;
-    int32_t load_data_offset;
-    int32_t store_data_offset;
+    int32_t input_offset;
+    int32_t output_offset;
     bool pingpong;
     int32_t task_arbiter;
     {
@@ -61,8 +61,8 @@ void audio_fft::load_input()
         prod_ready_offset = config.prod_ready_offset;
         cons_ready_offset = config.cons_ready_offset;
         cons_valid_offset = config.cons_valid_offset;
-        load_data_offset = config.load_data_offset;
-        store_data_offset = config.store_data_offset;
+        input_offset = config.input_offset;
+        output_offset = config.output_offset;
 
         pingpong = false;
         task_arbiter = 0;
@@ -131,7 +131,7 @@ void audio_fft::load_input()
             break;
             case LOAD_DATA_REQ:
             {
-                dma_info_t dma_info(load_data_offset / DMA_WORD_PER_BEAT, 2 * num_samples / DMA_WORD_PER_BEAT, DMA_SIZE);
+                dma_info_t dma_info(input_offset / DMA_WORD_PER_BEAT, 2 * num_samples / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
 
                 wait();
@@ -203,8 +203,8 @@ void audio_fft::store_output()
     int32_t prod_ready_offset;
     int32_t cons_valid_offset;
     int32_t cons_ready_offset;
-    int32_t load_data_offset;
-    int32_t store_data_offset;
+    int32_t input_offset;
+    int32_t output_offset;
     bool pingpong;
     {
         HLS_PROTO("store-config");
@@ -223,8 +223,8 @@ void audio_fft::store_output()
         prod_ready_offset = config.prod_ready_offset;
         cons_valid_offset = config.cons_valid_offset;
         cons_ready_offset = config.cons_ready_offset;
-        load_data_offset = config.load_data_offset;
-        store_data_offset = config.store_data_offset;
+        input_offset = config.input_offset;
+        output_offset = config.output_offset;
 
         pingpong = false;
     }
@@ -319,7 +319,7 @@ void audio_fft::store_output()
             break;
             case STORE_DATA_REQ:
             {
-                dma_info_t dma_info(store_data_offset / DMA_WORD_PER_BEAT, 2 * num_samples / DMA_WORD_PER_BEAT, DMA_SIZE);
+                dma_info_t dma_info(output_offset / DMA_WORD_PER_BEAT, 2 * num_samples / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
 
                 wait();

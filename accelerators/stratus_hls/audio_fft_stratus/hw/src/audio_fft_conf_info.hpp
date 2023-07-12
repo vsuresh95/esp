@@ -26,8 +26,8 @@ public:
         this->prod_ready_offset = 0;
         this->cons_valid_offset = 0;
         this->cons_ready_offset = 0;
-        this->load_data_offset = 0;
-        this->store_data_offset = 0;
+        this->input_offset = 0;
+        this->output_offset = 0;
     }
 
     conf_info_t(
@@ -39,8 +39,8 @@ public:
         int32_t prod_ready_offset,
         int32_t cons_valid_offset,
         int32_t cons_ready_offset,
-        int32_t load_data_offset,
-        int32_t store_data_offset
+        int32_t input_offset,
+        int32_t output_offset
         )
     {
         /* <<--ctor-custom-->> */
@@ -51,8 +51,8 @@ public:
         this->prod_ready_offset = prod_ready_offset;
         this->cons_valid_offset = cons_valid_offset;
         this->cons_ready_offset = cons_ready_offset;
-        this->load_data_offset = load_data_offset;
-        this->store_data_offset = store_data_offset;
+        this->input_offset = input_offset;
+        this->output_offset = output_offset;
     }
 
     // equals operator
@@ -66,8 +66,8 @@ public:
         if (prod_ready_offset != rhs.prod_ready_offset) return false;
         if (cons_valid_offset != rhs.cons_valid_offset) return false;
         if (cons_ready_offset != rhs.cons_valid_offset) return false;
-        if (load_data_offset != rhs.load_data_offset) return false;
-        if (store_data_offset != rhs.store_data_offset) return false;
+        if (input_offset != rhs.input_offset) return false;
+        if (output_offset != rhs.output_offset) return false;
         return true;
     }
 
@@ -82,8 +82,8 @@ public:
         prod_ready_offset = other.prod_ready_offset;
         cons_valid_offset = other.cons_valid_offset;
         cons_ready_offset = other.cons_ready_offset;
-        load_data_offset = other.load_data_offset;
-        store_data_offset = other.store_data_offset;
+        input_offset = other.input_offset;
+        output_offset = other.output_offset;
         return *this;
     }
 
@@ -103,8 +103,8 @@ public:
         os << "prod_ready_offset = " << conf_info.prod_ready_offset << ", ";
         os << "cons_valid_offset = " << conf_info.cons_valid_offset << ", ";
         os << "cons_ready_offset = " << conf_info.cons_ready_offset << ", ";
-        os << "load_data_offset = " << conf_info.load_data_offset << ", ";
-        os << "store_data_offset = " << conf_info.store_data_offset << "";
+        os << "input_offset = " << conf_info.input_offset << ", ";
+        os << "output_offset = " << conf_info.output_offset << "";
         os << "}";
         return os;
     }
@@ -117,8 +117,8 @@ public:
         int32_t prod_ready_offset;
         int32_t cons_valid_offset;
         int32_t cons_ready_offset;
-        int32_t load_data_offset;
-        int32_t store_data_offset;
+        int32_t input_offset;
+        int32_t output_offset;
 };
 
 #endif // __AUDIO_FFT_CONF_INFO_HPP__
