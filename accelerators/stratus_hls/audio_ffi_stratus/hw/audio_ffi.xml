@@ -10,9 +10,9 @@
     <param name="flt_prod_ready_offset" desc="flt_prod_ready_offset" />
     <param name="cons_valid_offset" desc="cons_valid_offset" />
     <param name="cons_ready_offset" desc="cons_ready_offset" />
-    <param name="load_data_offset" desc="load_data_offset" />
-    <param name="flt_load_data_offset" desc="flt_load_data_offset" />
-    <param name="twd_load_data_offset" desc="twd_load_data_offset" />
-    <param name="store_data_offset" desc="store_data_offset" />
+    <param name="input_offset" desc="input_offset" />
+    <param name="flt_input_offset" desc="flt_input_offset" />
+    <param name="twd_input_offset" desc="twd_input_offset" />
+    <param name="output_offset" desc="output_offset" />
   </accelerator>
 </sld>
