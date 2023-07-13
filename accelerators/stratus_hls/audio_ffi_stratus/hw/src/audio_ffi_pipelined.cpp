@@ -701,6 +701,11 @@ void audio_ffi::input_asi_kernel()
                     end_fft = end_input_asi;
                     this->input_fft_handshake();
                     wait();
+                    
+                    if (end_input_asi == 1)
+                    {
+                        this->process_done();
+                    }
                 }
             }
         }
@@ -849,6 +854,11 @@ void audio_ffi::filters_asi_kernel()
 
                     this->filters_fir_handshake();
                     wait();
+                    
+                    if (end_input_asi == 1)
+                    {
+                        this->process_done();
+                    }
                 }
             }
         }
