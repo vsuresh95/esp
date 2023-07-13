@@ -17,6 +17,13 @@
 #define AUDIO_FFT_LOGN_SAMPLES_REG 0x44
 #define AUDIO_FFT_DO_SHIFT_REG 0x40
 
+#define AUDIO_FFT_PROD_VALID_OFFSET 0x4C
+#define AUDIO_FFT_PROD_READY_OFFSET 0x50
+#define AUDIO_FFT_CONS_VALID_OFFSET 0x54
+#define AUDIO_FFT_CONS_READY_OFFSET 0x58
+#define AUDIO_FFT_INPUT_OFFSET 0x5C
+#define AUDIO_FFT_OUTPUT_OFFSET 0x60
+
 struct audio_fft_stratus_device {
 	struct esp_device esp;
 };
@@ -51,6 +58,14 @@ static void audio_fft_prep_xfer(struct esp_device *esp, void *arg)
 	iowrite32be(a->do_inverse, esp->iomem + AUDIO_FFT_DO_INVERSE_REG);
 	iowrite32be(a->logn_samples, esp->iomem + AUDIO_FFT_LOGN_SAMPLES_REG);
 	iowrite32be(a->do_shift, esp->iomem + AUDIO_FFT_DO_SHIFT_REG);
+
+	iowrite32be(a->prod_valid_offset, esp->iomem + AUDIO_FFT_PROD_VALID_OFFSET);
+	iowrite32be(a->prod_ready_offset, esp->iomem + AUDIO_FFT_PROD_READY_OFFSET);
+	iowrite32be(a->cons_valid_offset, esp->iomem + AUDIO_FFT_CONS_VALID_OFFSET);
+	iowrite32be(a->cons_ready_offset, esp->iomem + AUDIO_FFT_CONS_READY_OFFSET);
+	iowrite32be(a->input_offset, esp->iomem + AUDIO_FFT_INPUT_OFFSET);
+	iowrite32be(a->output_offset, esp->iomem + AUDIO_FFT_OUTPUT_OFFSET);
+
 	iowrite32be(a->src_offset, esp->iomem + SRC_OFFSET_REG);
 	iowrite32be(a->dst_offset, esp->iomem + DST_OFFSET_REG);
 	iowrite32be(a->spandex_conf, esp->iomem + SPANDEX_REG);

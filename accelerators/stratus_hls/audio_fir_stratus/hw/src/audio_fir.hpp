@@ -22,12 +22,8 @@
 #define PLM_FLT_WORD 2050
 #define PLM_TWD_WORD 1024
 
-#define SYNC_VAR_SIZE 10
 #define UPDATE_VAR_SIZE 2
-#define VALID_FLAG_OFFSET 0
-#define READY_FLAG_OFFSET 4
-#define FLT_VALID_FLAG_OFFSET 6
-#define FLT_READY_FLAG_OFFSET 8
+#define TEST_VAR_SIZE 2
 
 #define POLL_PROD_VALID_REQ 0
 #define POLL_FLT_PROD_VALID_REQ 1
@@ -42,6 +38,7 @@
 #define STORE_DATA_REQ 6
 #define STORE_FENCE 7
 #define ACC_DONE 8
+#define COMPUTE 9
 
 class audio_fir : public esp_accelerator_3P<DMA_WIDTH>
 {

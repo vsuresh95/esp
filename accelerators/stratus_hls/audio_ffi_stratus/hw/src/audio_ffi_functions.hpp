@@ -210,336 +210,74 @@ inline FPDATA myInvSin(int m)
 	}
 }
 
-//////////////////////////////////////////////////////
-// INPUT -> LOAD/STORE START HANDSHAKES
-//////////////////////////////////////////////////////
-
-inline void audio_ffi::input_load_start_handshake()
+inline void audio_ffi::compute_load_ready_handshake()
 {
     {
-        HLS_DEFINE_PROTOCOL("input-load-start-handshake");
+        HLS_DEFINE_PROTOCOL("compute-load-ready-handshake");
 
-        input_load_start.req.req();
+        load_ready.req.req();
     }
 }
 
-inline void audio_ffi::load_input_start_handshake()
+inline void audio_ffi::load_compute_ready_handshake()
 {
     {
-        HLS_DEFINE_PROTOCOL("load-input-start-handshake");
+        HLS_DEFINE_PROTOCOL("load-compute-ready-handshake");
 
-        input_load_start.ack.ack();
+        load_ready.ack.ack();
     }
 }
 
-inline void audio_ffi::input_store_start_handshake()
+inline void audio_ffi::compute_store_ready_handshake()
 {
     {
-        HLS_DEFINE_PROTOCOL("input-store-start-handshake");
+        HLS_DEFINE_PROTOCOL("compute-store-ready-handshake");
 
-        input_store_start.req.req();
+        store_ready.req.req();
     }
 }
 
-inline void audio_ffi::store_input_start_handshake()
+inline void audio_ffi::store_compute_ready_handshake()
 {
     {
-        HLS_DEFINE_PROTOCOL("store-input-start-handshake");
+        HLS_DEFINE_PROTOCOL("store-compute-ready-handshake");
 
-        input_store_start.ack.ack();
+        store_ready.ack.ack();
     }
 }
 
-//////////////////////////////////////////////////////
-// FILTERS -> LOAD/STORE START HANDSHAKES
-//////////////////////////////////////////////////////
-
-inline void audio_ffi::filters_load_start_handshake()
+inline void audio_ffi::compute_load_done_handshake()
 {
     {
-        HLS_DEFINE_PROTOCOL("filters-load-start-handshake");
+        HLS_DEFINE_PROTOCOL("compute-load-done-handshake");
 
-        filters_load_start.req.req();
+        load_done.ack.ack();
     }
 }
 
-inline void audio_ffi::load_filters_start_handshake()
+inline void audio_ffi::load_compute_done_handshake()
 {
     {
-        HLS_DEFINE_PROTOCOL("load-filters-start-handshake");
+        HLS_DEFINE_PROTOCOL("load-compute-done-handshake");
 
-        filters_load_start.ack.ack();
+        load_done.req.req();
     }
 }
 
-inline void audio_ffi::filters_store_start_handshake()
+inline void audio_ffi::compute_store_done_handshake()
 {
     {
-        HLS_DEFINE_PROTOCOL("filters-store-start-handshake");
+        HLS_DEFINE_PROTOCOL("compute-store-done-handshake");
 
-        filters_store_start.req.req();
+        store_done.ack.ack();
     }
 }
 
-inline void audio_ffi::store_filters_start_handshake()
+inline void audio_ffi::store_compute_done_handshake()
 {
     {
-        HLS_DEFINE_PROTOCOL("store-filters-start-handshake");
+        HLS_DEFINE_PROTOCOL("store-compute-done-handshake");
 
-        filters_store_start.ack.ack();
-    }
-}
-
-//////////////////////////////////////////////////////
-// OUTPUT -> LOAD/STORE START HANDSHAKES
-//////////////////////////////////////////////////////
-
-inline void audio_ffi::output_load_start_handshake()
-{
-    {
-        HLS_DEFINE_PROTOCOL("output-load-start-handshake");
-
-        output_load_start.req.req();
-    }
-}
-
-inline void audio_ffi::load_output_start_handshake()
-{
-    {
-        HLS_DEFINE_PROTOCOL("load-output-start-handshake");
-
-        output_load_start.ack.ack();
-    }
-}
-
-inline void audio_ffi::output_store_start_handshake()
-{
-    {
-        HLS_DEFINE_PROTOCOL("output-store-start-handshake");
-
-        output_store_start.req.req();
-    }
-}
-
-inline void audio_ffi::store_output_start_handshake()
-{
-    {
-        HLS_DEFINE_PROTOCOL("store-output-start-handshake");
-
-        output_store_start.ack.ack();
-    }
-}
-
-//////////////////////////////////////////////////////
-// LOAD/STORE -> INPUT DONE HANDSHAKES
-//////////////////////////////////////////////////////
-
-inline void audio_ffi::input_load_done_handshake()
-{
-    {
-        HLS_DEFINE_PROTOCOL("input-load-done-handshake");
-
-        load_input_done.ack.ack();
-    }
-}
-
-inline void audio_ffi::load_input_done_handshake()
-{
-    {
-        HLS_DEFINE_PROTOCOL("load-input-done-handshake");
-
-        load_input_done.req.req();
-    }
-}
-
-inline void audio_ffi::input_store_done_handshake()
-{
-    {
-        HLS_DEFINE_PROTOCOL("input-store-done-handshake");
-
-        store_input_done.ack.ack();
-    }
-}
-
-inline void audio_ffi::store_input_done_handshake()
-{
-    {
-        HLS_DEFINE_PROTOCOL("store-input-done-handshake");
-
-        store_input_done.req.req();
-    }
-}
-
-//////////////////////////////////////////////////////
-// LOAD/STORE -> FILTERS DONE HANDSHAKES
-//////////////////////////////////////////////////////
-
-inline void audio_ffi::filters_load_done_handshake()
-{
-    {
-        HLS_DEFINE_PROTOCOL("filters-load-done-handshake");
-
-        load_filters_done.ack.ack();
-    }
-}
-
-inline void audio_ffi::load_filters_done_handshake()
-{
-    {
-        HLS_DEFINE_PROTOCOL("load-filters-done-handshake");
-
-        load_filters_done.req.req();
-    }
-}
-
-inline void audio_ffi::filters_store_done_handshake()
-{
-    {
-        HLS_DEFINE_PROTOCOL("filters-store-done-handshake");
-
-        store_filters_done.ack.ack();
-    }
-}
-
-inline void audio_ffi::store_filters_done_handshake()
-{
-    {
-        HLS_DEFINE_PROTOCOL("store-filters-done-handshake");
-
-        store_filters_done.req.req();
-    }
-}
-
-//////////////////////////////////////////////////////
-// LOAD/STORE -> OUTPUT DONE HANDSHAKES
-//////////////////////////////////////////////////////
-
-inline void audio_ffi::output_load_done_handshake()
-{
-    {
-        HLS_DEFINE_PROTOCOL("output-load-done-handshake");
-
-        load_output_done.ack.ack();
-    }
-}
-
-inline void audio_ffi::load_output_done_handshake()
-{
-    {
-        HLS_DEFINE_PROTOCOL("load-output-done-handshake");
-
-        load_output_done.req.req();
-    }
-}
-
-inline void audio_ffi::output_store_done_handshake()
-{
-    {
-        HLS_DEFINE_PROTOCOL("output-store-done-handshake");
-
-        store_output_done.ack.ack();
-    }
-}
-
-inline void audio_ffi::store_output_done_handshake()
-{
-    {
-        HLS_DEFINE_PROTOCOL("store-output-done-handshake");
-
-        store_output_done.req.req();
-    }
-}
-
-//////////////////////////////////////////////////////
-// ASI <-> COMPUTE HANDSHAKES
-//////////////////////////////////////////////////////
-
-inline void audio_ffi::input_fft_handshake()
-{
-    {
-        HLS_DEFINE_PROTOCOL("input-fft-handshake");
-
-        input_to_fft.req.req();
-    }
-}
-
-inline void audio_ffi::fft_input_handshake()
-{
-    {
-        HLS_DEFINE_PROTOCOL("fft-input-handshake");
-
-        input_to_fft.ack.ack();
-    }
-}
-
-inline void audio_ffi::filters_fir_handshake()
-{
-    {
-        HLS_DEFINE_PROTOCOL("filters-fir-handshake");
-
-        filters_to_fir.req.req();
-    }
-}
-
-inline void audio_ffi::fir_filters_handshake()
-{
-    {
-        HLS_DEFINE_PROTOCOL("fft-input-handshake");
-
-        filters_to_fir.ack.ack();
-    }
-}
-
-inline void audio_ffi::fft_fir_handshake()
-{
-    {
-        HLS_DEFINE_PROTOCOL("fft-fir-handshake");
-
-        fft_to_fir.req.req();
-    }
-}
-
-inline void audio_ffi::fir_fft_handshake()
-{
-    {
-        HLS_DEFINE_PROTOCOL("fir-fft-handshake");
-
-        fft_to_fir.ack.ack();
-    }
-}
-
-inline void audio_ffi::fir_ifft_handshake()
-{
-    {
-        HLS_DEFINE_PROTOCOL("fir-ifft-handshake");
-
-        fir_to_ifft.req.req();
-    }
-}
-
-inline void audio_ffi::ifft_fir_handshake()
-{
-    {
-        HLS_DEFINE_PROTOCOL("ifft-fir-handshake");
-
-        fir_to_ifft.ack.ack();
-    }
-}
-
-inline void audio_ffi::ifft_output_handshake()
-{
-    {
-        HLS_DEFINE_PROTOCOL("ifft-output-handshake");
-
-        ifft_to_store.req.req();
-    }
-}
-
-inline void audio_ffi::output_ifft_handshake()
-{
-    {
-        HLS_DEFINE_PROTOCOL("output-ifft-handshake");
-
-        ifft_to_store.ack.ack();
+        store_done.req.req();
     }
 }
