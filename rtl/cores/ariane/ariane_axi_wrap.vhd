@@ -28,31 +28,33 @@ entity ariane_axi_wrap is
     DRAMLength       : std_logic_vector(63 downto 0) := X"0000_0000_2000_0000";
     DRAMCachedLength : std_logic_vector(63 downto 0) := X"0000_0000_2000_0000");
   port (
-    clk         : in  std_logic;
-    rstn        : in  std_logic;
-    HART_ID     : in  std_logic_vector(63 downto 0);
-    irq         : in  std_logic_vector(1 downto 0);
-    timer_irq   : in  std_logic;
-    ipi         : in  std_logic;
-    romi        : out axi_mosi_type;
-    romo        : in  axi_somi_type;
-    drami       : out axi_mosi_type;
-    dramo       : in  axi_somi_type;
-    clinti      : out axi_mosi_type;
-    clinto      : in  axi_somi_type;
-    slmi        : out axi_mosi_type;
-    slmo        : in  axi_somi_type;
-    slmddri     : out axi_mosi_type;
-    slmddro     : in  axi_somi_type;
-    apbi        : out apb_slv_in_type;
-    apbo        : in  apb_slv_out_vector;
-    apb_req     : out std_ulogic;
-    apb_ack     : in  std_ulogic;
-    ace_req     : in  ace_req_type;
-    ace_resp    : out ace_resp_type;
-    fence_l2    : out std_logic_vector(1 downto 0);
-    flush_l1    : in std_logic;
-    flush_done  : out std_logic
+    clk               : in  std_logic;
+    rstn              : in  std_logic;
+    HART_ID           : in  std_logic_vector(63 downto 0);
+    irq               : in  std_logic_vector(1 downto 0);
+    timer_irq         : in  std_logic;
+    ipi               : in  std_logic;
+    romi              : out axi_mosi_type;
+    romo              : in  axi_somi_type;
+    drami             : out axi_mosi_type;
+    dramo             : in  axi_somi_type;
+    clinti            : out axi_mosi_type;
+    clinto            : in  axi_somi_type;
+    slmi              : out axi_mosi_type;
+    slmo              : in  axi_somi_type;
+    slmddri           : out axi_mosi_type;
+    slmddro           : in  axi_somi_type;
+    apbi              : out apb_slv_in_type;
+    apbo              : in  apb_slv_out_vector;
+    apb_req           : out std_ulogic;
+    apb_ack           : in  std_ulogic;
+    ace_req           : in  ace_req_type;
+    ace_resp          : out ace_resp_type;
+    fence_l2_data     : out std_logic_vector(1 downto 0);
+    fence_l2_valid    : out std_ulogic;
+    fence_l2_ready    : in std_ulogic;
+    flush_l1          : in std_logic;
+    flush_done        : out std_logic
     );
 
 end ariane_axi_wrap;
@@ -329,7 +331,9 @@ architecture rtl of ariane_axi_wrap is
       prdata          : in  std_logic_vector(31 downto 0);
       pready          : in  std_logic;
       pslverr         : in  std_logic;
-      fence_l2        : out std_logic_vector(1 downto 0);
+      fence_l2_data   : out std_logic_vector(1 downto 0);
+      fence_l2_valid  : out std_logic;
+      fence_l2_ready  : in std_logic;
       flush_l1        : in std_logic;
       flush_done      : out std_logic
       );
@@ -619,7 +623,9 @@ begin  -- architecture rtl
       prdata          => prdata,
       pready          => apb_ack,
       pslverr         => '0',
-      fence_l2        => fence_l2,
+      fence_l2_data   => fence_l2_data,
+      fence_l2_valid  => fence_l2_valid,
+      fence_l2_ready  => fence_l2_ready,
       flush_l1        => flush_l1,
       flush_done      => flush_done
       );
