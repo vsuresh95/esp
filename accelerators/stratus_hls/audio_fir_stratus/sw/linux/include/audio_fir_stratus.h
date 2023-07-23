@@ -31,10 +31,10 @@ struct audio_fir_stratus_access {
 	unsigned flt_prod_ready_offset;
 	unsigned cons_valid_offset;
 	unsigned cons_ready_offset;
-	unsigned load_data_offset;
-	unsigned flt_load_data_offset;
-	unsigned twd_load_data_offset;
-	unsigned store_data_offset;
+	unsigned input_offset;
+	unsigned flt_input_offset;
+	unsigned twd_input_offset;
+	unsigned output_offset;
 
 	unsigned src_offset;
 	unsigned dst_offset;
