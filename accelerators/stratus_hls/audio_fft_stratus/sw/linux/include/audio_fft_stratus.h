@@ -29,8 +29,8 @@ struct audio_fft_stratus_access {
     unsigned prod_ready_offset;
     unsigned cons_valid_offset;
     unsigned cons_ready_offset;
-    unsigned load_data_offset;
-    unsigned store_data_offset;
+    unsigned input_offset;
+    unsigned output_offset;
 
 	unsigned src_offset;
 	unsigned dst_offset;
