@@ -29,7 +29,8 @@ void rotate_order1_sw(float *gold)
         // Beta rotation
         gold[kY*sample_length+i] = temp_sample[kY];
         gold[kZ*sample_length+i] = temp_sample[kZ] * m_fCosBeta +  temp_sample[kX] * m_fSinBeta;
-        gold[kX*sample_length+i] = temp_sample[kX] * m_fCosBeta - temp_sample[kZ] * m_fSinBeta;
+		// Issue: - to + to match with accelerator design
+        gold[kX*sample_length+i] = temp_sample[kX] * m_fCosBeta + temp_sample[kZ] * m_fSinBeta;
 
         // Gamma rotation
         temp_sample[kY] = -gold[kX*sample_length+i] * m_fSinGamma + gold[kY*sample_length+i] * m_fCosGamma;
@@ -164,7 +165,7 @@ static int validate_buffer(token_t *out, float *gold)
 	// Copying input data to accelerator buffer - transposed
 	for (unsigned i = 0; i < init_length; i++) {
 		for (unsigned j = 0; j < init_channel; j++) {
-			if (i != 0) {
+			if (j != 0) {
 				native_t val = fixed32_to_float(out[i*init_channel + j], FX_IL);
 
 				if ((fabs(gold[j*init_length + i] - val) / fabs(gold[j*init_length + i])) > ERR_TH) {
@@ -240,9 +241,7 @@ static void init_buffer(token_t *in, float *gold)
 	// Copying input data to accelerator buffer - transposed
 	for (unsigned i = 0; i < init_length; i++) {
 		for (unsigned j = 0; j < init_channel; j++) {
-			if (i != 0) {
-				in[i*init_channel + j] = float_to_fixed32(gold[j*init_length + i], FX_IL);
-			}
+			in[i*init_channel + j] = float_to_fixed32(gold[j*init_length + i], FX_IL);
 		}
 	}
 
