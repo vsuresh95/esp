@@ -19,7 +19,7 @@ typedef float native_t;
 #endif /* FFT2_FX_WIDTH */
 
 /* <<--params-def-->> */
-#define LOGN_SAMPLES 6
+#define LOGN_SAMPLES 13
 //#define NUM_FFTS     46
 #define NUM_FFTS     1
 //#define LOGN_SAMPLES 12
@@ -49,7 +49,7 @@ struct fft2_stratus_access fft2_cfg_000[] = {
 		.scale_factor = SCALE_FACTOR,
 		.src_offset = 0,
 		.dst_offset = 0,
-		.esp.coherence = ACC_COH_NONE,
+		.esp.coherence = ACC_COH_RECALL,
 		.esp.p2p_store = 0,
 		.esp.p2p_nsrcs = 0,
 		.esp.p2p_srcs = {"", "", "", ""},

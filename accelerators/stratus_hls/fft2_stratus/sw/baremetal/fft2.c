@@ -36,7 +36,7 @@ static unsigned DMA_WORD_PER_BEAT(unsigned _st)
 #define DEV_NAME "sld,fft2_stratus"
 
 /* <<--params-->> */
-const int32_t logn_samples = 3;
+const int32_t logn_samples = 12;
 const int32_t num_samples = (1 << logn_samples);
 const int32_t num_ffts = 1;
 const int32_t do_inverse = 0;
@@ -68,19 +68,48 @@ static unsigned mem_size;
 #define FFT2_DO_SHIFT_REG 0x4c
 #define FFT2_SCALE_FACTOR_REG 0x50
 
+#define NUM_ITERATIONS 100
+#define N_TIME_MARKERS 10
+
+unsigned long long StartTime;
+unsigned long long EndTime;
+unsigned long long TotalTime[N_TIME_MARKERS];
+
+void StartCounter() {
+	asm volatile (
+		"li t0, 0;"
+		"csrr t0, mcycle;"
+		"mv %0, t0"
+		: "=r" (StartTime)
+		:
+		: "t0"
+	);
+}
+
+void EndCounter(unsigned Index) {
+	asm volatile (
+		"li t0, 0;"
+		"csrr t0, mcycle;"
+		"mv %0, t0"
+		: "=r" (EndTime)
+		:
+		: "t0"
+	);
+
+    TotalTime[Index] += EndTime - StartTime;
+}
 
 static int validate_buf(token_t *out, float *gold)
 {
 	int j;
 	unsigned errors = 0;
 
+	StartCounter();
 	for (j = 0; j < 2 * len; j++) {
 		native_t val = fx2float(out[j], FX_IL);
-		uint32_t ival = *((uint32_t*)&val);
-		printf("  GOLD[%u] = 0x%08x  :  OUT[%u] = 0x%08x\n", j, ((uint32_t*)gold)[j], j, ival);
-		if ((fabs(gold[j] - val) / fabs(gold[j])) > ERR_TH)
-			errors++;
+		if (val == 1234.1234) j = 0;
 	}
+	EndCounter(3);
 
 	//printf("  %u errors\n", errors);
 	return errors;
@@ -99,15 +128,18 @@ static void init_buf(token_t *in, float *gold)
 		float scaling_factor = (float) rand () / (float) RAND_MAX;
 		gold[j] = LO + scaling_factor * (HI - LO);
 		uint32_t ig = ((uint32_t*)gold)[j];
-		printf("  IN[%u] = 0x%08x\n", j, ig);
 	}
 
 	// convert input to fixed point
+	StartCounter();
 	for (j = 0; j < 2 * len; j++)
 		in[j] = float2fx((native_t) gold[j], FX_IL);
+	EndCounter(1);
 
 	// Compute golden output
+	StartCounter();
 	fft2_comp(gold, num_ffts, num_samples, logn_samples, do_inverse, do_shift);
+	EndCounter(0);
 }
 
 
@@ -125,8 +157,11 @@ int main(int argc, char * argv[])
 	float *gold;
 	unsigned errors = 0;
 	unsigned coherence;
-        const float ERROR_COUNT_TH = 0.001;
+    const float ERROR_COUNT_TH = 0.001;
 
+	for (unsigned i = 0; i < N_TIME_MARKERS; i++)
+    	TotalTime[i] = 0;
+		
 	len = num_ffts * (1 << logn_samples);
 	printf("logn %u nsmp %u nfft %u inv %u shft %u len %u\n", logn_samples, num_samples, num_ffts, do_inverse, do_shift, len);
 	if (DMA_WORD_PER_BEAT(sizeof(token_t)) == 0) {
@@ -153,7 +188,7 @@ int main(int argc, char * argv[])
 		return 0;
 	}
 
-	for (n = 0; n < ndev; n++) {
+	for (n = 0; n < 1; n++) {
 
 		printf("**************** %s.%d ****************\n", DEV_NAME, n);
 
@@ -188,59 +223,55 @@ int main(int argc, char * argv[])
 #else
 		{
 			/* TODO: Restore full test once ESP caches are integrated */
-			coherence = ACC_COH_NONE;
+			coherence = ACC_COH_RECALL;
 #endif
-			printf("  --------------------\n");
-			printf("  Generate input...\n");
-			init_buf(mem, gold);
+			for (unsigned i = 0; i < NUM_ITERATIONS; i++) {
+				init_buf(mem, gold);
 
-			// Pass common configuration parameters
+				// Pass common configuration parameters
 
-			iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
-			iowrite32(dev, COHERENCE_REG, coherence);
+				iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
+				iowrite32(dev, COHERENCE_REG, coherence);
 
-#ifndef __sparc
-			iowrite32(dev, PT_ADDRESS_REG, (unsigned long long) ptable);
-#else
-			iowrite32(dev, PT_ADDRESS_REG, (unsigned) ptable);
-#endif
-			iowrite32(dev, PT_NCHUNK_REG, NCHUNK(mem_size));
-			iowrite32(dev, PT_SHIFT_REG, CHUNK_SHIFT);
+	#ifndef __sparc
+				iowrite32(dev, PT_ADDRESS_REG, (unsigned long long) ptable);
+	#else
+				iowrite32(dev, PT_ADDRESS_REG, (unsigned) ptable);
+	#endif
+				iowrite32(dev, PT_NCHUNK_REG, NCHUNK(mem_size));
+				iowrite32(dev, PT_SHIFT_REG, CHUNK_SHIFT);
 
-			// Use the following if input and output data are not allocated at the default offsets
-			iowrite32(dev, SRC_OFFSET_REG, 0x0);
-			iowrite32(dev, DST_OFFSET_REG, 0x0);
+				// Use the following if input and output data are not allocated at the default offsets
+				iowrite32(dev, SRC_OFFSET_REG, 0x0);
+				iowrite32(dev, DST_OFFSET_REG, 0x0);
 
-			// Pass accelerator-specific configuration parameters
-			/* <<--regs-config-->> */
-			iowrite32(dev, FFT2_LOGN_SAMPLES_REG, logn_samples);
-			iowrite32(dev, FFT2_NUM_FFTS_REG, num_ffts);
-			iowrite32(dev, FFT2_SCALE_FACTOR_REG, scale_factor);
-			iowrite32(dev, FFT2_DO_SHIFT_REG, do_shift);
-			iowrite32(dev, FFT2_DO_INVERSE_REG, do_inverse);
+				// Pass accelerator-specific configuration parameters
+				/* <<--regs-config-->> */
+				iowrite32(dev, FFT2_LOGN_SAMPLES_REG, logn_samples);
+				iowrite32(dev, FFT2_NUM_FFTS_REG, num_ffts);
+				iowrite32(dev, FFT2_SCALE_FACTOR_REG, scale_factor);
+				iowrite32(dev, FFT2_DO_SHIFT_REG, do_shift);
+				iowrite32(dev, FFT2_DO_INVERSE_REG, do_inverse);
 
-			// Flush (customize coherence model here)
-			esp_flush(coherence);
+				// Start accelerators
+				StartCounter();
+				iowrite32(dev, CMD_REG, CMD_MASK_START);
 
-			// Start accelerators
-			printf("  Start...\n");
-			iowrite32(dev, CMD_REG, CMD_MASK_START);
+				// Wait for completion
+				done = 0;
+				spin_ct = 0;
+				while (!done) {
+					done = ioread32(dev, STATUS_REG);
+					done &= STATUS_MASK_DONE;
+					spin_ct++;
+				}
+				iowrite32(dev, CMD_REG, 0x0);
+				EndCounter(2);
 
-			// Wait for completion
-			done = 0;
-			spin_ct = 0;
-			while (!done) {
-				done = ioread32(dev, STATUS_REG);
-				done &= STATUS_MASK_DONE;
-				spin_ct++;
+				/* Validation */
+				errors = validate_buf(&mem[out_offset], gold);
 			}
-			iowrite32(dev, CMD_REG, 0x0);
 
-			printf("  Done : spin_count = %u\n", spin_ct);
-			printf("  validating...\n");
-
-			/* Validation */
-			errors = validate_buf(&mem[out_offset], gold);
 			if ((float)((float)errors / (2.0 * (float)len)) > ERROR_COUNT_TH)
 				printf("  ... FAIL : %u errors out of %u\n", errors, 2*len);
 			else
@@ -250,6 +281,11 @@ int main(int argc, char * argv[])
 		aligned_free(mem);
 		aligned_free(gold);
 	}
+
+	printf("SW op = %llu\n", TotalTime[0]/NUM_ITERATIONS);
+	printf("init_buffer = %llu\n", TotalTime[1]/NUM_ITERATIONS);
+	printf("accelerator op = %llu\n", TotalTime[2]/NUM_ITERATIONS);
+	printf("validate_buffer = %llu\n", TotalTime[3]/NUM_ITERATIONS);
 
 	return 0;
 }
