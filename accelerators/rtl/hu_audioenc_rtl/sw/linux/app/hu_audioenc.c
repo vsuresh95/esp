@@ -14,148 +14,67 @@ static unsigned size;
 
 const float ERR_TH = 0.05;
 
-void rotate_order1_sw(float *gold)
+unsigned m_nDelayBufferLength;
+float m_fDelay;
+int m_nDelay;
+int m_nIn;
+int m_nOutA;
+int m_nOutB;
+
+void audio_enc_sw(float *gold_in, float *gold_out, float *delay_buffer)
 {
-	float temp_sample[NUM_CHANNELS];
 	unsigned sample_length = BLOCK_SIZE;
+	unsigned sample_channels = NUM_CHANNELS;
+	float SAMPLE_DIV = (2 << 14) - 1;
+	float amp = 1.0f;
+    float fSrcSample = 0;
 
-    for(unsigned i = 0; i < sample_length; i++)
-    {
-		// Alpha rotation
-        temp_sample[kY] = -gold[kX*sample_length+i] * m_fSinAlpha + gold[kY*sample_length+i] * m_fCosAlpha;
-        temp_sample[kZ] = gold[kZ*sample_length+i];
-        temp_sample[kX] = gold[kX*sample_length+i] * m_fCosAlpha + gold[kY*sample_length+i] * m_fSinAlpha;
+    for (unsigned i = 0; i < sample_length; i++) {
+        gold_out[i] = amp * (gold_in[i] / SAMPLE_DIV);
 
-        // Beta rotation
-        gold[kY*sample_length+i] = temp_sample[kY];
-        gold[kZ*sample_length+i] = temp_sample[kZ] * m_fCosBeta +  temp_sample[kX] * m_fSinBeta;
-        gold[kX*sample_length+i] = temp_sample[kX] * m_fCosBeta - temp_sample[kZ] * m_fSinBeta;
+		//Store
+		delay_buffer[m_nIn] = gold_out[i];
 
-        // Gamma rotation
-        temp_sample[kY] = -gold[kX*sample_length+i] * m_fSinGamma + gold[kY*sample_length+i] * m_fCosGamma;
-        temp_sample[kZ] = gold[kZ*sample_length+i];
-        temp_sample[kX] = gold[kX*sample_length+i] * m_fCosGamma + gold[kY*sample_length+i] * m_fSinGamma;
+		//Read
+		fSrcSample = delay_buffer[m_nOutA] * (1.f - m_fDelay)
+					+ delay_buffer[m_nOutB] * m_fDelay;
+					
+        gold_out[kW*sample_length+i] = fSrcSample * cfg_src_coeff[kW] * cfg_chan_coeff[kW];
 
-        gold[kX*sample_length+i] = temp_sample[kX];
-        gold[kY*sample_length+i] = temp_sample[kY];
-        gold[kZ*sample_length+i] = temp_sample[kZ];
+        for(unsigned j = 1; j < sample_channels; j++)
+        {
+            gold_out[j*sample_length+i] = fSrcSample * cfg_src_coeff[j] * cfg_chan_coeff[j];
+        }
+
+        m_nIn = (m_nIn + 1) % m_nDelayBufferLength;
+        m_nOutA = (m_nOutA + 1) % m_nDelayBufferLength;
+        m_nOutB = (m_nOutB + 1) % m_nDelayBufferLength;
     }
 }
 
-void rotate_order2_sw(float *gold)
+void audio_sw_workaround(float *gold_in, float *workaround_in, float *delay_buffer)
 {
-	float temp_sample[NUM_CHANNELS];
-	unsigned sample_length = BLOCK_SIZE;
+	float SAMPLE_DIV = (2 << 14) - 1;
+	float amp = 1.0f;
 
-    float fSqrt3 = sqrt(3.f);
+    for (unsigned i = 0; i < BLOCK_SIZE; i++) {
+		//Store
+		delay_buffer[m_nIn] = gold_in[i];
 
-    for(unsigned i = 0; i < sample_length; i++)
-    {
-        // Alpha rotation
-        temp_sample[kV] = - gold[kU*sample_length+i] * m_fSin2Alpha + gold[kV*sample_length+i] * m_fCos2Alpha;
-        temp_sample[kT] = - gold[kS*sample_length+i] * m_fSinAlpha + gold[kT*sample_length+i] * m_fCosAlpha;
-        temp_sample[kR] = gold[kR*sample_length+i];
-        temp_sample[kS] = gold[kS*sample_length+i] * m_fCosAlpha + gold[kT*sample_length+i] * m_fSinAlpha;
-        temp_sample[kU] = gold[kU*sample_length+i] * m_fCos2Alpha + gold[kV*sample_length+i] * m_fSin2Alpha;
+		//Read
+		workaround_in[i] = delay_buffer[m_nOutA] * (1.f - m_fDelay)
+					+ delay_buffer[m_nOutB] * m_fDelay;
 
-        // Beta rotation
-        gold[kV*sample_length+i] = -m_fSinBeta * temp_sample[kT] + m_fCosBeta * temp_sample[kV];
-        gold[kT*sample_length+i] = -m_fCosBeta * temp_sample[kT] + m_fSinBeta * temp_sample[kV];
-        gold[kR*sample_length+i] = (0.75f * m_fCos2Beta + 0.25f) * temp_sample[kR]
-                            + (0.5 * fSqrt3 * pow(m_fSinBeta,2.0) ) * temp_sample[kU]
-                            + (fSqrt3 * m_fSinBeta * m_fCosBeta) * temp_sample[kS];
-        gold[kS*sample_length+i] = m_fCos2Beta * temp_sample[kS]
-                            - fSqrt3 * m_fCosBeta * m_fSinBeta * temp_sample[kR]
-                            + m_fCosBeta * m_fSinBeta * temp_sample[kU];
-        gold[kU*sample_length+i] = (0.25f * m_fCos2Beta + 0.75f) * temp_sample[kU]
-                            - m_fCosBeta * m_fSinBeta * temp_sample[kS]
-                            +0.5 * fSqrt3 * pow(m_fSinBeta,2.0) * temp_sample[kR];
+        m_nIn = (m_nIn + 1) % m_nDelayBufferLength;
+        m_nOutA = (m_nOutA + 1) % m_nDelayBufferLength;
+        m_nOutB = (m_nOutB + 1) % m_nDelayBufferLength;
 
-        // Gamma rotation
-        temp_sample[kV] = - gold[kU*sample_length+i] * m_fSin2Gamma + gold[kV*sample_length+i] * m_fCos2Gamma;
-        temp_sample[kT] = - gold[kS*sample_length+i] * m_fSinGamma + gold[kT*sample_length+i] * m_fCosGamma;
-
-        temp_sample[kR] = gold[kR*sample_length+i];
-        temp_sample[kS] = gold[kS*sample_length+i] * m_fCosGamma + gold[kT*sample_length+i] * m_fSinGamma;
-        temp_sample[kU] = gold[kU*sample_length+i] * m_fCos2Gamma + gold[kV*sample_length+i] * m_fSin2Gamma;
-
-        gold[kR*sample_length+i] = temp_sample[kR];
-        gold[kS*sample_length+i] = temp_sample[kS];
-        gold[kT*sample_length+i] = temp_sample[kT];
-        gold[kU*sample_length+i] = temp_sample[kU];
-        gold[kV*sample_length+i] = temp_sample[kV];
-    }
-}
-
-void rotate_order3_sw(float *gold)
-{
-	float temp_sample[NUM_CHANNELS];
-	unsigned sample_length = BLOCK_SIZE;
-
-	/* (should move these somewhere that does recompute each time) */
-	float fSqrt3_2 = sqrt(3.f/2.f);
-	float fSqrt15 = sqrt(15.f);
-	float fSqrt5_2 = sqrt(5.f/2.f);
-
-    for(unsigned i = 0; i < sample_length; i++)
-    {
-        // Alpha rotation
-        temp_sample[kQ] = - gold[kP*sample_length+i] * m_fSin3Alpha + gold[kQ*sample_length+i] * m_fCos3Alpha;
-        temp_sample[kO] = - gold[kN*sample_length+i] * m_fSin2Alpha + gold[kO*sample_length+i] * m_fCos2Alpha;
-        temp_sample[kM] = - gold[kL*sample_length+i] * m_fSinAlpha + gold[kM*sample_length+i] * m_fCosAlpha;
-        temp_sample[kK] = gold[kK*sample_length+i];
-        temp_sample[kL] = gold[kL*sample_length+i] * m_fCosAlpha + gold[kM*sample_length+i] * m_fSinAlpha;
-        temp_sample[kN] = gold[kN*sample_length+i] * m_fCos2Alpha + gold[kO*sample_length+i] * m_fSin2Alpha;
-        temp_sample[kP] = gold[kP*sample_length+i] * m_fCos3Alpha + gold[kQ*sample_length+i] * m_fSin3Alpha;
-
-        // Beta rotation
-        gold[kQ*sample_length+i] = 0.125f * temp_sample[kQ] * (5.f + 3.f*m_fCos2Beta)
-                    - fSqrt3_2 * temp_sample[kO] *m_fCosBeta * m_fSinBeta
-                    + 0.25f * fSqrt15 * temp_sample[kM] * pow(m_fSinBeta,2.0f);
-        gold[kO*sample_length+i] = temp_sample[kO] * m_fCos2Beta
-                    - fSqrt5_2 * temp_sample[kM] * m_fCosBeta * m_fSinBeta
-                    + fSqrt3_2 * temp_sample[kQ] * m_fCosBeta * m_fSinBeta;
-        gold[kM*sample_length+i] = 0.125f * temp_sample[kM] * (3.f + 5.f*m_fCos2Beta)
-                    - fSqrt5_2 * temp_sample[kO] *m_fCosBeta * m_fSinBeta
-                    + 0.25f * fSqrt15 * temp_sample[kQ] * pow(m_fSinBeta,2.0f);
-        gold[kK*sample_length+i] = 0.25f * temp_sample[kK] * m_fCosBeta * (-1.f + 15.f*m_fCos2Beta)
-                    + 0.5f * fSqrt15 * temp_sample[kN] * m_fCosBeta * pow(m_fSinBeta,2.f)
-                    + 0.5f * fSqrt5_2 * temp_sample[kP] * pow(m_fSinBeta,3.f)
-                    + 0.125f * fSqrt3_2 * temp_sample[kL] * (m_fSinBeta + 5.f * m_fSin3Beta);
-        gold[kL*sample_length+i] = 0.0625f * temp_sample[kL] * (m_fCosBeta + 15.f * m_fCos3Beta)
-                    + 0.25f * fSqrt5_2 * temp_sample[kN] * (1.f + 3.f * m_fCos2Beta) * m_fSinBeta
-                    + 0.25f * fSqrt15 * temp_sample[kP] * m_fCosBeta * pow(m_fSinBeta,2.f)
-                    - 0.125 * fSqrt3_2 * temp_sample[kK] * (m_fSinBeta + 5.f * m_fSin3Beta);
-        gold[kN*sample_length+i] = 0.125f * temp_sample[kN] * (5.f * m_fCosBeta + 3.f * m_fCos3Beta)
-                    + 0.25f * fSqrt3_2 * temp_sample[kP] * (3.f + m_fCos2Beta) * m_fSinBeta
-                    + 0.5f * fSqrt15 * temp_sample[kK] * m_fCosBeta * pow(m_fSinBeta,2.f)
-                    + 0.125 * fSqrt5_2 * temp_sample[kL] * (m_fSinBeta - 3.f * m_fSin3Beta);
-        gold[kP*sample_length+i] = 0.0625f * temp_sample[kP] * (15.f * m_fCosBeta + m_fCos3Beta)
-                    - 0.25f * fSqrt3_2 * temp_sample[kN] * (3.f + m_fCos2Beta) * m_fSinBeta
-                    + 0.25f * fSqrt15 * temp_sample[kL] * m_fCosBeta * pow(m_fSinBeta,2.f)
-                    - 0.5 * fSqrt5_2 * temp_sample[kK] * pow(m_fSinBeta,3.f);
-
-        // Gamma rotation
-        temp_sample[kQ] = - gold[kP*sample_length+i] * m_fSin3Gamma + gold[kQ*sample_length+i] * m_fCos3Gamma;
-        temp_sample[kO] = - gold[kN*sample_length+i] * m_fSin2Gamma + gold[kO*sample_length+i] * m_fCos2Gamma;
-        temp_sample[kM] = - gold[kL*sample_length+i] * m_fSinGamma + gold[kM*sample_length+i] * m_fCosGamma;
-        temp_sample[kK] = gold[kK*sample_length+i];
-        temp_sample[kL] = gold[kL*sample_length+i] * m_fCosGamma + gold[kM*sample_length+i] * m_fSinGamma;
-        temp_sample[kN] = gold[kN*sample_length+i] * m_fCos2Gamma + gold[kO*sample_length+i] * m_fSin2Gamma;
-        temp_sample[kP] = gold[kP*sample_length+i] * m_fCos3Gamma + gold[kQ*sample_length+i] * m_fSin3Gamma;
-
-        gold[kQ*sample_length+i] = temp_sample[kQ];
-        gold[kO*sample_length+i] = temp_sample[kO];
-        gold[kM*sample_length+i] = temp_sample[kM];
-        gold[kK*sample_length+i] = temp_sample[kK];
-        gold[kL*sample_length+i] = temp_sample[kL];
-        gold[kN*sample_length+i] = temp_sample[kN];
-        gold[kP*sample_length+i] = temp_sample[kP];
+        workaround_in[i] = amp * (workaround_in[i] * SAMPLE_DIV);
     }
 }
 
 /* User-defined code */
-static int validate_buffer(token_t *out, float *gold)
+static int validate_buffer(token_t *out, float *gold_out)
 {
 	unsigned init_length = BLOCK_SIZE;
 	unsigned init_channel = NUM_CHANNELS;
@@ -164,15 +83,13 @@ static int validate_buffer(token_t *out, float *gold)
 	// Copying input data to accelerator buffer - transposed
 	for (unsigned i = 0; i < init_length; i++) {
 		for (unsigned j = 0; j < init_channel; j++) {
-			if (i != 0) {
-				native_t val = fixed32_to_float(out[i*init_channel + j], FX_IL);
+			native_t val = fixed32_to_float(out[i*init_channel + j], FX_IL);
 
-				if ((fabs(gold[j*init_length + i] - val) / fabs(gold[j*init_length + i])) > ERR_TH) {
-					if (errors < 2) {
-						printf(" GOLD[%u] = %f vs %f = out[%u]\n", j*init_length + i, gold[j*init_length + i], val, j*init_length + i);
-					}
-					errors++;
+			if ((fabs(gold_out[j*init_length + i] - val) / fabs(gold_out[j*init_length + i])) > ERR_TH) {
+				if (errors < 2) {
+					printf(" GOLD_OUT[%u] = %f vs %f = out[%u]\n", j*init_length + i, gold_out[j*init_length + i], val, j*init_length + i);
 				}
+				errors++;
 			}
 		}
 	}
@@ -181,7 +98,7 @@ static int validate_buffer(token_t *out, float *gold)
 }
 
 /* User-defined code */
-static void init_buffer(token_t *in, float *gold)
+static void init_buffer(token_t *in, float *gold_in, float* gold_out)
 {
 	unsigned init_length = BLOCK_SIZE;
 	unsigned init_channel = NUM_CHANNELS;
@@ -193,66 +110,65 @@ static void init_buffer(token_t *in, float *gold)
 	float scaling_factor;
 
 	// Initializing random input data for test
-	for (unsigned i = 0; i < init_channel; i++) {
-		for (unsigned j = 0; j < init_length; j++) {
-			scaling_factor = (float) rand () / (float) RAND_MAX;
-			gold[i*init_length + j] = LO + scaling_factor * (HI - LO);
-		}
+	for (unsigned i = 0; i < init_length; i++) {
+		scaling_factor = (float) rand () / (float) RAND_MAX;
+		gold_in[i] = LO + scaling_factor * (HI - LO);
 	}
 
-	scaling_factor = (float) rand () / (float) RAND_MAX;
-	m_fCosAlpha = LO + scaling_factor * (HI - LO);
-	scaling_factor = (float) rand () / (float) RAND_MAX;
-	m_fSinAlpha = LO + scaling_factor * (HI - LO);
-	scaling_factor = (float) rand () / (float) RAND_MAX;
-	m_fCosBeta = LO + scaling_factor * (HI - LO);
-	scaling_factor = (float) rand () / (float) RAND_MAX;
-	m_fSinBeta = LO + scaling_factor * (HI - LO);
-	scaling_factor = (float) rand () / (float) RAND_MAX;
-	m_fCosGamma = LO + scaling_factor * (HI - LO);
-	scaling_factor = (float) rand () / (float) RAND_MAX;
-	m_fSinGamma = LO + scaling_factor * (HI - LO);
-	scaling_factor = (float) rand () / (float) RAND_MAX;
-	m_fCos2Alpha = LO + scaling_factor * (HI - LO);
-	scaling_factor = (float) rand () / (float) RAND_MAX;
-	m_fSin2Alpha = LO + scaling_factor * (HI - LO);
-	scaling_factor = (float) rand () / (float) RAND_MAX;
-	m_fCos2Beta = LO + scaling_factor * (HI - LO);
-	scaling_factor = (float) rand () / (float) RAND_MAX;
-	m_fSin2Beta = LO + scaling_factor * (HI - LO);
-	scaling_factor = (float) rand () / (float) RAND_MAX;
-	m_fCos2Gamma = LO + scaling_factor * (HI - LO);
-	scaling_factor = (float) rand () / (float) RAND_MAX;
-	m_fSin2Gamma = LO + scaling_factor * (HI - LO);
-	scaling_factor = (float) rand () / (float) RAND_MAX;
-	m_fCos3Alpha = LO + scaling_factor * (HI - LO);
-	scaling_factor = (float) rand () / (float) RAND_MAX;
-	m_fSin3Alpha = LO + scaling_factor * (HI - LO);
-	scaling_factor = (float) rand () / (float) RAND_MAX;
-	m_fCos3Beta = LO + scaling_factor * (HI - LO);
-	scaling_factor = (float) rand () / (float) RAND_MAX;
-	m_fSin3Beta = LO + scaling_factor * (HI - LO);
-	scaling_factor = (float) rand () / (float) RAND_MAX;
-	m_fCos3Gamma = LO + scaling_factor * (HI - LO);
-	scaling_factor = (float) rand () / (float) RAND_MAX;
-	m_fSin3Gamma = LO + scaling_factor * (HI - LO);
+	for (unsigned i = 0; i < init_channel; i++) {
+		scaling_factor = (float) rand () / (float) RAND_MAX;
+		cfg_src_coeff[i] = LO + scaling_factor * (HI - LO);
+		scaling_factor = (float) rand () / (float) RAND_MAX;
+		cfg_chan_coeff[i] = LO + scaling_factor * (HI - LO);
+	}
 
-	// Copying input data to accelerator buffer - transposed
-	for (unsigned i = 0; i < init_length; i++) {
-		for (unsigned j = 0; j < init_channel; j++) {
-			if (i != 0) {
-				in[i*init_channel + j] = float_to_fixed32(gold[j*init_length + i], FX_IL);
-			}
-		}
+	// SW workaround parameters
+	float *workaround_in, *delay_buffer;
+	m_nDelayBufferLength = (unsigned)((float) 150 * 48000 / 344 + 0.5f);
+	workaround_in = malloc(in_size);
+	delay_buffer = malloc(m_nDelayBufferLength);
+	
+    m_fDelay = (rand () / RAND_MAX) / 344 * 48000 + 0.5f;
+    m_nDelay = (int) m_fDelay;
+    m_fDelay -= m_nDelay;
+    m_nIn = 0;
+    m_nOutA = (m_nIn - m_nDelay + m_nDelayBufferLength) % m_nDelayBufferLength;
+    m_nOutB = (m_nOutA + 1) % m_nDelayBufferLength;
+
+	for (unsigned i = 0; i < m_nDelayBufferLength; i++) {
+		delay_buffer[i] = 0;
 	}
 
 	struct timespec th_start;
 	struct timespec th_end;
 
 	gettime(&th_start);
-	rotate_order1_sw(gold);
-	rotate_order2_sw(gold);
-	rotate_order3_sw(gold);
+	audio_sw_workaround(gold_in, workaround_in, delay_buffer);
+	gettime(&th_end);
+
+	printf("  > Software workaround time: %llu ns\n", ts_subtract(&th_start, &th_end));
+
+	free(workaround_in);
+	free(delay_buffer);
+
+	// Copying input data to accelerator buffer - transposed
+	for (unsigned i = 0; i < init_length; i++) {
+		in[i] = float_to_fixed32(workaround_in[i], FX_IL);
+	}
+	
+    m_fDelay = (rand () / RAND_MAX) / 344 * 48000 + 0.5f;
+    m_nDelay = (int) m_fDelay;
+    m_fDelay -= m_nDelay;
+    m_nIn = 0;
+    m_nOutA = (m_nIn - m_nDelay + m_nDelayBufferLength) % m_nDelayBufferLength;
+    m_nOutB = (m_nOutA + 1) % m_nDelayBufferLength;
+
+	for (unsigned i = 0; i < m_nDelayBufferLength; i++) {
+		delay_buffer[i] = 0;
+	}
+
+	gettime(&th_start);
+	audio_enc_sw(gold_in, gold_out, delay_buffer);
 	gettime(&th_end);
 
 	printf("  > Software time: %llu ns\n", ts_subtract(&th_start, &th_end));
@@ -263,10 +179,10 @@ static void init_buffer(token_t *in, float *gold)
 static void init_parameters()
 {
 	if (DMA_WORD_PER_BEAT(sizeof(token_t)) == 0) {
-		in_words_adj = BLOCK_SIZE * NUM_CHANNELS;
+		in_words_adj = BLOCK_SIZE;
 		out_words_adj = BLOCK_SIZE * NUM_CHANNELS;
 	} else {
-		in_words_adj = round_up(BLOCK_SIZE * NUM_CHANNELS, DMA_WORD_PER_BEAT(sizeof(token_t)));
+		in_words_adj = round_up(BLOCK_SIZE, DMA_WORD_PER_BEAT(sizeof(token_t)));
 		out_words_adj = round_up(BLOCK_SIZE * NUM_CHANNELS, DMA_WORD_PER_BEAT(sizeof(token_t)));
 	}
 	in_len = in_words_adj * (1);
@@ -282,7 +198,8 @@ int main(int argc, char **argv)
 {
 	int errors;
 
-	float *gold;
+	float *gold_in;
+	float *gold_out;
 	token_t *buf;
 
 	init_parameters();
@@ -290,39 +207,58 @@ int main(int argc, char **argv)
 	buf = (token_t *) esp_alloc(size);
 	cfg_000[0].hw_buf = buf;
     
-	gold = malloc(out_size);
+	gold_in = malloc(in_size);
+	gold_out = malloc(out_size);
 
-	init_buffer(buf, gold);
+	init_buffer(buf, gold_in, gold_out);
 
 	printf("\n====== %s ======\n\n", cfg_000[0].devname);
 	printf("\n  ** START **\n");
 
-	hu_audiodec_cfg_000[0].cfg_regs_8   = float_to_fixed32(m_fCosAlpha, FX_IL);
-	hu_audiodec_cfg_000[0].cfg_regs_9   = float_to_fixed32(m_fSinAlpha, FX_IL);
-	hu_audiodec_cfg_000[0].cfg_regs_10  = float_to_fixed32(m_fCosBeta, FX_IL);
-	hu_audiodec_cfg_000[0].cfg_regs_11  = float_to_fixed32(m_fSinBeta, FX_IL);
-	hu_audiodec_cfg_000[0].cfg_regs_12  = float_to_fixed32(m_fCosGamma, FX_IL);
-	hu_audiodec_cfg_000[0].cfg_regs_13  = float_to_fixed32(m_fSinGamma, FX_IL);
-	hu_audiodec_cfg_000[0].cfg_regs_14  = float_to_fixed32(m_fCos2Alpha, FX_IL);
-	hu_audiodec_cfg_000[0].cfg_regs_15  = float_to_fixed32(m_fSin2Alpha, FX_IL);
-	hu_audiodec_cfg_000[0].cfg_regs_16  = float_to_fixed32(m_fCos2Beta, FX_IL);
-	hu_audiodec_cfg_000[0].cfg_regs_17  = float_to_fixed32(m_fSin2Beta, FX_IL);
-	hu_audiodec_cfg_000[0].cfg_regs_18  = float_to_fixed32(m_fCos2Gamma, FX_IL);
-	hu_audiodec_cfg_000[0].cfg_regs_19  = float_to_fixed32(m_fSin2Gamma, FX_IL);
-	hu_audiodec_cfg_000[0].cfg_regs_20  = float_to_fixed32(m_fCos3Alpha, FX_IL);
-	hu_audiodec_cfg_000[0].cfg_regs_21  = float_to_fixed32(m_fSin3Alpha, FX_IL);
-	hu_audiodec_cfg_000[0].cfg_regs_22  = float_to_fixed32(m_fCos3Beta, FX_IL);
-	hu_audiodec_cfg_000[0].cfg_regs_23  = float_to_fixed32(m_fSin3Beta, FX_IL);
-	hu_audiodec_cfg_000[0].cfg_regs_24  = float_to_fixed32(m_fCos3Gamma, FX_IL);
-	hu_audiodec_cfg_000[0].cfg_regs_25  = float_to_fixed32(m_fSin3Gamma, FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_16 = float_to_fixed32(cfg_src_coeff[0], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_17 = float_to_fixed32(cfg_src_coeff[1], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_18 = float_to_fixed32(cfg_src_coeff[2], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_19 = float_to_fixed32(cfg_src_coeff[3], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_20 = float_to_fixed32(cfg_src_coeff[4], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_21 = float_to_fixed32(cfg_src_coeff[5], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_22 = float_to_fixed32(cfg_src_coeff[6], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_23 = float_to_fixed32(cfg_src_coeff[7], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_24 = float_to_fixed32(cfg_src_coeff[8], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_25 = float_to_fixed32(cfg_src_coeff[9], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_26 = float_to_fixed32(cfg_src_coeff[10], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_27 = float_to_fixed32(cfg_src_coeff[11], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_28 = float_to_fixed32(cfg_src_coeff[12], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_29 = float_to_fixed32(cfg_src_coeff[13], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_30 = float_to_fixed32(cfg_src_coeff[14], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_31 = float_to_fixed32(cfg_src_coeff[15], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_32 = float_to_fixed32(cfg_chan_coeff[0], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_33 = float_to_fixed32(cfg_chan_coeff[1], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_34 = float_to_fixed32(cfg_chan_coeff[2], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_35 = float_to_fixed32(cfg_chan_coeff[3], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_36 = float_to_fixed32(cfg_chan_coeff[4], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_37 = float_to_fixed32(cfg_chan_coeff[5], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_38 = float_to_fixed32(cfg_chan_coeff[6], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_39 = float_to_fixed32(cfg_chan_coeff[7], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_40 = float_to_fixed32(cfg_chan_coeff[8], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_41 = float_to_fixed32(cfg_chan_coeff[9], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_42 = float_to_fixed32(cfg_chan_coeff[10], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_43 = float_to_fixed32(cfg_chan_coeff[11], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_44 = float_to_fixed32(cfg_chan_coeff[12], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_45 = float_to_fixed32(cfg_chan_coeff[13], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_46 = float_to_fixed32(cfg_chan_coeff[14], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_47 = float_to_fixed32(cfg_chan_coeff[15], FX_IL);
+
+	hu_audioenc_cfg_000[0].src_offset = 0;
+	hu_audioenc_cfg_000[0].dst_offset = (BLOCK_SIZE) * sizeof(token_t);
 
 	esp_run(cfg_000, NACC);
 
 	printf("\n  ** DONE **\n");
 
-	errors = validate_buffer(&buf[out_offset], gold);
+	errors = validate_buffer(&buf[out_offset], gold_out);
 
-	free(gold);
+	free(gold_in);
+	free(gold_out);
 	esp_free(buf);
 
 	if (!errors)
