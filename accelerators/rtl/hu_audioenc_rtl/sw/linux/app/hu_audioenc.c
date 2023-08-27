@@ -20,19 +20,19 @@ int m_nDelay;
 int m_nIn;
 int m_nOutA;
 int m_nOutB;
-
-float *workaround_in, *delay_buffer;
+float m_fInteriorGain;
+float m_fExteriorGain;
 
 void audio_enc_sw(float *gold_in, float *gold_out, float *delay_buffer)
 {
 	unsigned sample_length = BLOCK_SIZE;
 	unsigned sample_channels = NUM_CHANNELS;
 	float SAMPLE_DIV = (2 << 14) - 1;
-	float amp = 1.0f;
     float fSrcSample = 0;
 
-    for (unsigned i = 0; i < sample_length; i++) {
-        gold_out[i] = amp * (gold_in[i] / SAMPLE_DIV);
+	for (unsigned i = 0; i < sample_length; i++) {
+        // gold_out[i] = cfg_src_coeff[0] * (gold_in[i] / SAMPLE_DIV);
+        gold_out[i] = cfg_src_coeff[0] * gold_in[i];
 
 		//Store
 		delay_buffer[m_nIn] = gold_out[i];
@@ -40,12 +40,13 @@ void audio_enc_sw(float *gold_in, float *gold_out, float *delay_buffer)
 		//Read
 		fSrcSample = delay_buffer[m_nOutA] * (1.f - m_fDelay)
 					+ delay_buffer[m_nOutB] * m_fDelay;
-					
-        gold_out[kW*sample_length+i] = fSrcSample * cfg_src_coeff[kW] * cfg_chan_coeff[kW];
 
+        gold_out[kW*sample_length+i] = fSrcSample * m_fInteriorGain * cfg_chan_coeff[kW];
+
+        fSrcSample *= m_fExteriorGain;
         for(unsigned j = 1; j < sample_channels; j++)
         {
-            gold_out[j*sample_length+i] = fSrcSample * cfg_src_coeff[j] * cfg_chan_coeff[j];
+            gold_out[j*sample_length+i] = fSrcSample * m_fExteriorGain * cfg_chan_coeff[j];
         }
 
         m_nIn = (m_nIn + 1) % m_nDelayBufferLength;
@@ -57,11 +58,10 @@ void audio_enc_sw(float *gold_in, float *gold_out, float *delay_buffer)
 void audio_sw_workaround(float *gold_in, float *workaround_in, float *delay_buffer)
 {
 	float SAMPLE_DIV = (2 << 14) - 1;
-	float amp = 1.0f;
 
     for (unsigned i = 0; i < BLOCK_SIZE; i++) {
 		//Store
-		delay_buffer[m_nIn] = gold_in[i];
+		delay_buffer[m_nIn] = cfg_src_coeff[0] * (gold_in[i] / SAMPLE_DIV);
 
 		//Read
 		workaround_in[i] = delay_buffer[m_nOutA] * (1.f - m_fDelay)
@@ -71,7 +71,7 @@ void audio_sw_workaround(float *gold_in, float *workaround_in, float *delay_buff
         m_nOutA = (m_nOutA + 1) % m_nDelayBufferLength;
         m_nOutB = (m_nOutB + 1) % m_nDelayBufferLength;
 
-        workaround_in[i] = amp * (workaround_in[i] * SAMPLE_DIV);
+        workaround_in[i] = (workaround_in[i] * SAMPLE_DIV * SAMPLE_DIV) / cfg_src_coeff[0];
     }
 }
 
@@ -88,9 +88,9 @@ static int validate_buffer(token_t *out, float *gold_out)
 			native_t val = fixed32_to_float(out[i*init_channel + j], FX_IL);
 
 			if ((fabs(gold_out[j*init_length + i] - val) / fabs(gold_out[j*init_length + i])) > ERR_TH) {
-				if (errors < 2) {
+				// if (errors < 2) {
 					printf(" GOLD_OUT[%u] = %f vs %f = out[%u]\n", j*init_length + i, gold_out[j*init_length + i], val, j*init_length + i);
-				}
+				// }
 				errors++;
 			}
 		}
@@ -100,10 +100,11 @@ static int validate_buffer(token_t *out, float *gold_out)
 }
 
 /* User-defined code */
-static void init_buffer(token_t *in, float *gold_in, float* gold_out)
+static void init_buffer(token_t *in, float *gold_in, float* gold_out, float *workaround_in, float *delay_buffer)
 {
 	unsigned init_length = BLOCK_SIZE;
 	unsigned init_channel = NUM_CHANNELS;
+	unsigned init_sources = NUM_SRCS;
 	const float LO = -2.0;
 	const float HI = 2.0;
 
@@ -117,9 +118,17 @@ static void init_buffer(token_t *in, float *gold_in, float* gold_out)
 		gold_in[i] = LO + scaling_factor * (HI - LO);
 	}
 
-	for (unsigned i = 0; i < init_channel; i++) {
+	scaling_factor = (float) rand () / (float) RAND_MAX;
+	m_fInteriorGain = LO + scaling_factor * (HI - LO);
+	scaling_factor = (float) rand () / (float) RAND_MAX;
+	m_fExteriorGain = LO + scaling_factor * (HI - LO);
+
+	for (unsigned i = 0; i < init_sources; i++) {
 		scaling_factor = (float) rand () / (float) RAND_MAX;
 		cfg_src_coeff[i] = LO + scaling_factor * (HI - LO);
+	}
+
+	for (unsigned i = 0; i < init_channel; i++) {
 		scaling_factor = (float) rand () / (float) RAND_MAX;
 		cfg_chan_coeff[i] = LO + scaling_factor * (HI - LO);
 	}
@@ -198,6 +207,8 @@ int main(int argc, char **argv)
 	float *gold_in;
 	float *gold_out;
 	token_t *buf;
+	float *workaround_in;
+	float *delay_buffer;
 
 	init_parameters();
 
@@ -210,7 +221,7 @@ int main(int argc, char **argv)
 	workaround_in = malloc(in_size);
 	delay_buffer = malloc(m_nDelayBufferLength * sizeof(native_t));
 	
-	init_buffer(buf, gold_in, gold_out);
+	init_buffer(buf, gold_in, gold_out, workaround_in, delay_buffer);
 
 	free(gold_in);
 
@@ -218,37 +229,22 @@ int main(int argc, char **argv)
 	printf("\n  ** START **\n");
 
 	hu_audioenc_cfg_000[0].cfg_regs_16 = float_to_fixed32(cfg_src_coeff[0], FX_IL);
-	hu_audioenc_cfg_000[0].cfg_regs_17 = float_to_fixed32(cfg_src_coeff[1], FX_IL);
-	hu_audioenc_cfg_000[0].cfg_regs_18 = float_to_fixed32(cfg_src_coeff[2], FX_IL);
-	hu_audioenc_cfg_000[0].cfg_regs_19 = float_to_fixed32(cfg_src_coeff[3], FX_IL);
-	hu_audioenc_cfg_000[0].cfg_regs_20 = float_to_fixed32(cfg_src_coeff[4], FX_IL);
-	hu_audioenc_cfg_000[0].cfg_regs_21 = float_to_fixed32(cfg_src_coeff[5], FX_IL);
-	hu_audioenc_cfg_000[0].cfg_regs_22 = float_to_fixed32(cfg_src_coeff[6], FX_IL);
-	hu_audioenc_cfg_000[0].cfg_regs_23 = float_to_fixed32(cfg_src_coeff[7], FX_IL);
-	hu_audioenc_cfg_000[0].cfg_regs_24 = float_to_fixed32(cfg_src_coeff[8], FX_IL);
-	hu_audioenc_cfg_000[0].cfg_regs_25 = float_to_fixed32(cfg_src_coeff[9], FX_IL);
-	hu_audioenc_cfg_000[0].cfg_regs_26 = float_to_fixed32(cfg_src_coeff[10], FX_IL);
-	hu_audioenc_cfg_000[0].cfg_regs_27 = float_to_fixed32(cfg_src_coeff[11], FX_IL);
-	hu_audioenc_cfg_000[0].cfg_regs_28 = float_to_fixed32(cfg_src_coeff[12], FX_IL);
-	hu_audioenc_cfg_000[0].cfg_regs_29 = float_to_fixed32(cfg_src_coeff[13], FX_IL);
-	hu_audioenc_cfg_000[0].cfg_regs_30 = float_to_fixed32(cfg_src_coeff[14], FX_IL);
-	hu_audioenc_cfg_000[0].cfg_regs_31 = float_to_fixed32(cfg_src_coeff[15], FX_IL);
-	hu_audioenc_cfg_000[0].cfg_regs_32 = float_to_fixed32(cfg_chan_coeff[0], FX_IL);
-	hu_audioenc_cfg_000[0].cfg_regs_33 = float_to_fixed32(cfg_chan_coeff[1], FX_IL);
-	hu_audioenc_cfg_000[0].cfg_regs_34 = float_to_fixed32(cfg_chan_coeff[2], FX_IL);
-	hu_audioenc_cfg_000[0].cfg_regs_35 = float_to_fixed32(cfg_chan_coeff[3], FX_IL);
-	hu_audioenc_cfg_000[0].cfg_regs_36 = float_to_fixed32(cfg_chan_coeff[4], FX_IL);
-	hu_audioenc_cfg_000[0].cfg_regs_37 = float_to_fixed32(cfg_chan_coeff[5], FX_IL);
-	hu_audioenc_cfg_000[0].cfg_regs_38 = float_to_fixed32(cfg_chan_coeff[6], FX_IL);
-	hu_audioenc_cfg_000[0].cfg_regs_39 = float_to_fixed32(cfg_chan_coeff[7], FX_IL);
-	hu_audioenc_cfg_000[0].cfg_regs_40 = float_to_fixed32(cfg_chan_coeff[8], FX_IL);
-	hu_audioenc_cfg_000[0].cfg_regs_41 = float_to_fixed32(cfg_chan_coeff[9], FX_IL);
-	hu_audioenc_cfg_000[0].cfg_regs_42 = float_to_fixed32(cfg_chan_coeff[10], FX_IL);
-	hu_audioenc_cfg_000[0].cfg_regs_43 = float_to_fixed32(cfg_chan_coeff[11], FX_IL);
-	hu_audioenc_cfg_000[0].cfg_regs_44 = float_to_fixed32(cfg_chan_coeff[12], FX_IL);
-	hu_audioenc_cfg_000[0].cfg_regs_45 = float_to_fixed32(cfg_chan_coeff[13], FX_IL);
-	hu_audioenc_cfg_000[0].cfg_regs_46 = float_to_fixed32(cfg_chan_coeff[14], FX_IL);
-	hu_audioenc_cfg_000[0].cfg_regs_47 = float_to_fixed32(cfg_chan_coeff[15], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_32 = float_to_fixed32(m_fInteriorGain * cfg_chan_coeff[0], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_33 = float_to_fixed32(m_fExteriorGain * cfg_chan_coeff[1], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_34 = float_to_fixed32(m_fExteriorGain * cfg_chan_coeff[2], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_35 = float_to_fixed32(m_fExteriorGain * cfg_chan_coeff[3], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_36 = float_to_fixed32(m_fExteriorGain * cfg_chan_coeff[4], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_37 = float_to_fixed32(m_fExteriorGain * cfg_chan_coeff[5], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_38 = float_to_fixed32(m_fExteriorGain * cfg_chan_coeff[6], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_39 = float_to_fixed32(m_fExteriorGain * cfg_chan_coeff[7], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_40 = float_to_fixed32(m_fExteriorGain * cfg_chan_coeff[8], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_41 = float_to_fixed32(m_fExteriorGain * cfg_chan_coeff[9], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_42 = float_to_fixed32(m_fExteriorGain * cfg_chan_coeff[10], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_43 = float_to_fixed32(m_fExteriorGain * cfg_chan_coeff[11], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_44 = float_to_fixed32(m_fExteriorGain * cfg_chan_coeff[12], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_45 = float_to_fixed32(m_fExteriorGain * cfg_chan_coeff[13], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_46 = float_to_fixed32(m_fExteriorGain * cfg_chan_coeff[14], FX_IL);
+	hu_audioenc_cfg_000[0].cfg_regs_47 = float_to_fixed32(m_fExteriorGain * cfg_chan_coeff[15], FX_IL);
 
 	hu_audioenc_cfg_000[0].src_offset = 0;
 	hu_audioenc_cfg_000[0].dst_offset = (NUM_CHANNELS * BLOCK_SIZE) * sizeof(token_t);

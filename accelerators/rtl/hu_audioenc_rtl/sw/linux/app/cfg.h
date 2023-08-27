@@ -16,6 +16,7 @@ typedef float native_t;
 
 #define BLOCK_SIZE 1024
 #define NUM_CHANNELS 16
+#define NUM_SRCS 1
 
 enum BFormatChannels3D
 {
@@ -26,14 +27,14 @@ enum BFormatChannels3D
     kNumOfBformatChannels3D
 };
 
-float cfg_src_coeff[NUM_CHANNELS];
+float cfg_src_coeff[NUM_SRCS];
 float cfg_chan_coeff[NUM_CHANNELS];
 
 struct hu_audioenc_rtl_access hu_audioenc_cfg_000[] = {
 	{
 		/* <<--descriptor-->> */
 		.cfg_regs_00 = 0,
-		.cfg_regs_01 = NUM_CHANNELS,
+		.cfg_regs_01 = NUM_SRCS,
 		.cfg_regs_02 = BLOCK_SIZE,
 		.cfg_regs_03 = 0,
 		.cfg_regs_04 = 0,
