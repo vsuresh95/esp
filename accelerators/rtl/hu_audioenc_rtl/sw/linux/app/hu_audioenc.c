@@ -21,6 +21,8 @@ int m_nIn;
 int m_nOutA;
 int m_nOutB;
 
+float *workaround_in, *delay_buffer;
+
 void audio_enc_sw(float *gold_in, float *gold_out, float *delay_buffer)
 {
 	unsigned sample_length = BLOCK_SIZE;
@@ -123,11 +125,6 @@ static void init_buffer(token_t *in, float *gold_in, float* gold_out)
 	}
 
 	// SW workaround parameters
-	float *workaround_in, *delay_buffer;
-	m_nDelayBufferLength = (unsigned)((float) 150 * 48000 / 344 + 0.5f);
-	workaround_in = malloc(in_size);
-	delay_buffer = malloc(m_nDelayBufferLength);
-	
     m_fDelay = (rand () / RAND_MAX) / 344 * 48000 + 0.5f;
     m_nDelay = (int) m_fDelay;
     m_fDelay -= m_nDelay;
@@ -148,12 +145,11 @@ static void init_buffer(token_t *in, float *gold_in, float* gold_out)
 
 	printf("  > Software workaround time: %llu ns\n", ts_subtract(&th_start, &th_end));
 
-	free(workaround_in);
-	free(delay_buffer);
-
 	// Copying input data to accelerator buffer - transposed
-	for (unsigned i = 0; i < init_length; i++) {
-		in[i] = float_to_fixed32(workaround_in[i], FX_IL);
+	for (unsigned j = 0; j < init_channel; j++) {
+		for (unsigned i = 0; i < init_length; i++) {
+			in[j*init_length+i] = float_to_fixed32(workaround_in[i], FX_IL);
+		}
 	}
 	
     m_fDelay = (rand () / RAND_MAX) / 344 * 48000 + 0.5f;
@@ -179,10 +175,10 @@ static void init_buffer(token_t *in, float *gold_in, float* gold_out)
 static void init_parameters()
 {
 	if (DMA_WORD_PER_BEAT(sizeof(token_t)) == 0) {
-		in_words_adj = BLOCK_SIZE;
+		in_words_adj = BLOCK_SIZE * NUM_CHANNELS;
 		out_words_adj = BLOCK_SIZE * NUM_CHANNELS;
 	} else {
-		in_words_adj = round_up(BLOCK_SIZE, DMA_WORD_PER_BEAT(sizeof(token_t)));
+		in_words_adj = round_up(BLOCK_SIZE * NUM_CHANNELS, DMA_WORD_PER_BEAT(sizeof(token_t)));
 		out_words_adj = round_up(BLOCK_SIZE * NUM_CHANNELS, DMA_WORD_PER_BEAT(sizeof(token_t)));
 	}
 	in_len = in_words_adj * (1);
@@ -191,6 +187,7 @@ static void init_parameters()
 	out_size = out_len * sizeof(token_t);
 	out_offset = in_len;
 	size = (out_offset * sizeof(token_t)) + out_size;
+	m_nDelayBufferLength = (unsigned)((float) 150 * 48000 / 344 + 0.5f);
 }
 
 
@@ -210,7 +207,12 @@ int main(int argc, char **argv)
 	gold_in = malloc(in_size);
 	gold_out = malloc(out_size);
 
+	workaround_in = malloc(in_size);
+	delay_buffer = malloc(m_nDelayBufferLength * sizeof(native_t));
+	
 	init_buffer(buf, gold_in, gold_out);
+
+	free(gold_in);
 
 	printf("\n====== %s ======\n\n", cfg_000[0].devname);
 	printf("\n  ** START **\n");
@@ -249,7 +251,7 @@ int main(int argc, char **argv)
 	hu_audioenc_cfg_000[0].cfg_regs_47 = float_to_fixed32(cfg_chan_coeff[15], FX_IL);
 
 	hu_audioenc_cfg_000[0].src_offset = 0;
-	hu_audioenc_cfg_000[0].dst_offset = (BLOCK_SIZE) * sizeof(token_t);
+	hu_audioenc_cfg_000[0].dst_offset = (NUM_CHANNELS * BLOCK_SIZE) * sizeof(token_t);
 
 	esp_run(cfg_000, NACC);
 
@@ -257,9 +259,11 @@ int main(int argc, char **argv)
 
 	errors = validate_buffer(&buf[out_offset], gold_out);
 
-	free(gold_in);
 	free(gold_out);
 	esp_free(buf);
+
+	free(workaround_in);
+	free(delay_buffer);
 
 	if (!errors)
 		printf("+ Test PASSED\n");

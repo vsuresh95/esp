@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2022 Columbia University, System Level Design Group */
+/* Copyright (c) 2011-2021 Columbia University, System Level Design Group */
 /* SPDX-License-Identifier: Apache-2.0 */
 
 #include <stdio.h>
@@ -14,49 +14,65 @@ typedef int32_t token_t;
 
 static unsigned DMA_WORD_PER_BEAT(unsigned _st)
 {
-        return (sizeof(void *) / _st);
+    return (sizeof(void *) / _st);
 }
 
-
-#define SLD_HU_AUDIODEC 0x077
-#define DEV_NAME "sld,hu_audiodec_rtl"
+#define SLD_HU_AUDIOENC 0x088
+#define DEV_NAME "sld,hu_audioenc_rtl"
 
 /* <<--params-->> */
-const int32_t cfg_regs_31 = 1;
-const int32_t cfg_regs_30 = 1;
-const int32_t cfg_regs_26 = 1;
-const int32_t cfg_regs_27 = 1;
-const int32_t cfg_regs_24 = 1;
-const int32_t cfg_regs_25 = 1;
-const int32_t cfg_regs_22 = 1;
-const int32_t cfg_regs_23 = 1;
-const int32_t cfg_regs_8 = 1;
-const int32_t cfg_regs_20 = 1;
-const int32_t cfg_regs_9 = 1;
-const int32_t cfg_regs_21 = 1;
-const int32_t cfg_regs_6 = 1;
-const int32_t cfg_regs_7 = 1;
-const int32_t cfg_regs_4 = 1;
-const int32_t cfg_regs_5 = 1;
-const int32_t cfg_regs_2 = 1;
-const int32_t cfg_regs_3 = 1;
-const int32_t cfg_regs_0 = 1;
-const int32_t cfg_regs_28 = 1;
-const int32_t cfg_regs_1 = 1;
-const int32_t cfg_regs_29 = 1;
-const int32_t cfg_regs_19 = 1;
-const int32_t cfg_regs_18 = 1;
-const int32_t cfg_regs_17 = 1;
-const int32_t cfg_regs_16 = 1;
-const int32_t cfg_regs_15 = 1;
-const int32_t cfg_regs_14 = 1;
-const int32_t cfg_regs_13 = 1;
-const int32_t cfg_regs_12 = 1;
-const int32_t cfg_regs_11 = 1;
-const int32_t cfg_regs_10 = 1;
+const int32_t conf_0  =  0;   // 0: dummy
+const int32_t conf_1  = 16;   // 16 source audios
+const int32_t conf_2  =  8;   // audio block dize
+// FIXME need to set dma_read_index and dma_write_index properly
+const int32_t conf_3  =  0;   // dma_read_index  
+const int32_t conf_4  =  32;  // dma_write_index 128*16b/64b = 32 
+const int32_t conf_5  =  0;   // 5-15: dummy
+const int32_t conf_6  =  0;
+const int32_t conf_7  =  0;
+const int32_t conf_8  =  0;
+const int32_t conf_9  =  0;
+const int32_t conf_10 =  0;
+const int32_t conf_11 =  0;
+const int32_t conf_12 =  0;
+const int32_t conf_13 =  0;
+const int32_t conf_14 =  0;
+const int32_t conf_15 =  0;
+// 16:31 cfg_src_coeff[16], bitcast fxp<32,16> to int32
+const int32_t conf_16 = 38915; 
+const int32_t conf_17 = 71047; 
+const int32_t conf_18 = 50547;
+const int32_t conf_19 = 59133;
+const int32_t conf_20 = 87923;
+const int32_t conf_21 = 84679;
+const int32_t conf_22 = 45665;
+const int32_t conf_23 = 97897;
+const int32_t conf_24 = 80530;
+const int32_t conf_25 = 63615;
+const int32_t conf_26 = 78066;
+const int32_t conf_27 = 48883;
+const int32_t conf_28 = 60044;
+const int32_t conf_29 = 90026;
+const int32_t conf_30 = 45442;
+const int32_t conf_31 = 50646; 
+// 32:47 cfg_chan_coeff[16], bitcast fxp<32,16> to int32
+const int32_t conf_32 = 88657;
+const int32_t conf_33 = 66800;
+const int32_t conf_34 = 73013;
+const int32_t conf_35 = 36542;
+const int32_t conf_36 = 42277;
+const int32_t conf_37 = 38620;
+const int32_t conf_38 = 82234;
+const int32_t conf_39 = 68884;
+const int32_t conf_40 = 69933;
+const int32_t conf_41 = 55620;
+const int32_t conf_42 = 45396;
+const int32_t conf_43 = 89620;
+const int32_t conf_44 = 65149;
+const int32_t conf_45 = 47625;
+const int32_t conf_46 = 44190;
+const int32_t conf_47 = 95558;
 
-static unsigned in_words_adj;
-static unsigned out_words_adj;
 static unsigned in_len;
 static unsigned out_len;
 static unsigned in_size;
@@ -67,236 +83,260 @@ static unsigned mem_size;
 /* Size of the contiguous chunks for scatter/gather */
 #define CHUNK_SHIFT 20
 #define CHUNK_SIZE BIT(CHUNK_SHIFT)
-#define NCHUNK(_sz) ((_sz % CHUNK_SIZE == 0) ?		\
-			(_sz / CHUNK_SIZE) :		\
-			(_sz / CHUNK_SIZE) + 1)
+#define NCHUNK(_sz) ((_sz % CHUNK_SIZE == 0) ?	\
+		     (_sz / CHUNK_SIZE) :	\
+		     (_sz / CHUNK_SIZE) + 1)
 
 /* User defined registers */
 /* <<--regs-->> */
-#define HU_AUDIODEC_CFG_REGS_31_REG 0xbc
-#define HU_AUDIODEC_CFG_REGS_30_REG 0xb8
-#define HU_AUDIODEC_CFG_REGS_26_REG 0xb4
-#define HU_AUDIODEC_CFG_REGS_27_REG 0xb0
-#define HU_AUDIODEC_CFG_REGS_24_REG 0xac
-#define HU_AUDIODEC_CFG_REGS_25_REG 0xa8
-#define HU_AUDIODEC_CFG_REGS_22_REG 0xa4
-#define HU_AUDIODEC_CFG_REGS_23_REG 0xa0
-#define HU_AUDIODEC_CFG_REGS_8_REG 0x9c
-#define HU_AUDIODEC_CFG_REGS_20_REG 0x98
-#define HU_AUDIODEC_CFG_REGS_9_REG 0x94
-#define HU_AUDIODEC_CFG_REGS_21_REG 0x90
-#define HU_AUDIODEC_CFG_REGS_6_REG 0x8c
-#define HU_AUDIODEC_CFG_REGS_7_REG 0x88
-#define HU_AUDIODEC_CFG_REGS_4_REG 0x84
-#define HU_AUDIODEC_CFG_REGS_5_REG 0x80
-#define HU_AUDIODEC_CFG_REGS_2_REG 0x7c
-#define HU_AUDIODEC_CFG_REGS_3_REG 0x78
-#define HU_AUDIODEC_CFG_REGS_0_REG 0x74
-#define HU_AUDIODEC_CFG_REGS_28_REG 0x70
-#define HU_AUDIODEC_CFG_REGS_1_REG 0x6c
-#define HU_AUDIODEC_CFG_REGS_29_REG 0x68
-#define HU_AUDIODEC_CFG_REGS_19_REG 0x64
-#define HU_AUDIODEC_CFG_REGS_18_REG 0x60
-#define HU_AUDIODEC_CFG_REGS_17_REG 0x5c
-#define HU_AUDIODEC_CFG_REGS_16_REG 0x58
-#define HU_AUDIODEC_CFG_REGS_15_REG 0x54
-#define HU_AUDIODEC_CFG_REGS_14_REG 0x50
-#define HU_AUDIODEC_CFG_REGS_13_REG 0x4c
-#define HU_AUDIODEC_CFG_REGS_12_REG 0x48
-#define HU_AUDIODEC_CFG_REGS_11_REG 0x44
-#define HU_AUDIODEC_CFG_REGS_10_REG 0x40
 
-
-static int validate_buf(token_t *out, token_t *gold)
+static int validate_buf(token_t* out, token_t* gold)
 {
-	int i;
-	int j;
-	unsigned errors = 0;
+    int i;
+    unsigned errors = 0;
 
-	for (i = 0; i < 1; i++)
-		for (j = 0; j < cfg_regs_10; j++)
-			if (gold[i * out_words_adj + j] != out[i * out_words_adj + j])
-				errors++;
+    for (i = 0; i < 128; i++)
+	if (gold[i] != out[i])
+	    errors++;
 
-	return errors;
+    return errors;
+}
+
+static void init_buf (token_t* in, token_t* gold)
+{
+    int i;
+    int j;
+  
+    // union object for bit packing
+    union {
+	int16_t val16[2];
+	int32_t val32;
+    } val;
+
+    // audio_in[16][8] 16 sources and block size of 8
+    int16_t audio_in[128] = {
+	-10817, 10966, -12084, 10039, 30813, -12348, 17160, 28411, 
+	10253, -29296, 25301, -16789, -14230, -17301, 8348, 4588, 
+	-19607, -18308, -10021, 7911, 14061, -13249, 3225, 5457, 
+	22372, 788, -25635, 19719, 13067, -17834, 8915, 14659, 
+	-11418, -29502, 30548, -21548,20813, -3633, 3030, -25891, 	
+	4086, 24359, -31592, 9563, -30547, -26922, 8009, 10527, 
+	222, -8808, 9993, -2524, -14468, -23731, 12290, 11932, 
+	-20823, 22710, -928, 8258, -27837, -24694, 6957, 12366, 
+	-18070, 11538, -5927, -8955, 15913, -12060, 30240, -5238, 
+	16046, 18944, 14095, -13160, -28020, 11720, 31077, -31400, 
+	-2936, -6344, 24909, 2056, -31262, -18056, 21943, 23241, 
+	31292, -20097, 360, 19472, 32588, 5054, 3723, 28830, 
+	-24151, -212, 21569, 1601, -13833, -15816, -11993, 6928, 
+	24695, -27484, 9148, 29961, -11617, 14476, 23838, 20758, 
+	-5418, 21841, -24430, 3994, -7159, -29303, 26628, -304, 
+	-940, 19304, 13329, -2049, -1949, -3207, -2445, -9499
+    };
+
+    // audio_out[8][16] block size of 8, and 16 channels 
+    // reference output
+    int32_t audio_out[128] = {
+	-28975, -21831, -23863, -11947, -13822, -12626, -26875, -22516, 
+	-22856, -18183, -14840, -29290, -21294, -15570, -14447, -31228, 
+	-45580, -34346, -37538, -18792, -21738, -19860, -42279, -35416, 
+	-35955, -28600, -23343, -46075, -33496, -24491, -22723, -49125, 
+	154648, 116520, 127358, 63737, 73743, 67364, 143443, 120155, 
+	121985, 97016, 79184, 156327, 113640, 83072, 77078, 166688, 
+	115478, 87006, 95101, 47591, 55062, 50298, 107113, 89721, 
+	91088, 72443, 59127, 116731, 84856, 62028, 57554, 124468, 
+	-252669, -190379, -208086, -104149, -120492, -110071, -234364, -196317, 
+	-199309, -158517, -129380, -255411, -185674, -135734, -125943, -272336, 
+	-498011, -375240, -410139, -205273, -237487, -216945, -461933, -386943, 
+	-392837, -312437, -255006, -503423, -365963, -267526, -248231, -536776, 
+	534921, 403045, 440531, 220476, 255080, 233014, 496169, 415617, 
+	421947, 335585, 273898, 540731, 393082, 287349, 266621, 576559, 
+	228660, 172283, 188311, 94242, 109034, 99604, 212092, 177658, 
+	180366, 143449, 117079, 231146, 168028, 122827, 113969, 246458
+    };
+
+    // pack int16_t into int32_t data, little endian
+    for (i = 0; i < 64; i++) {
+	val.val16[0] = audio_in[i*2];
+	val.val16[1] = audio_in[i*2+1];
+	in[i] = val.val32;
+    }
+
+    for (i = 0; i < 128; i++) {
+	gold[i] = audio_out[i];
+    }
+
 }
 
 
-static void init_buf (token_t *in, token_t * gold)
-{
-	int i;
-	int j;
 
-	for (i = 0; i < 1; i++)
-		for (j = 0; j < cfg_regs_10; j++)
-			in[i * in_words_adj + j] = (token_t) j;
 
-	for (i = 0; i < 1; i++)
-		for (j = 0; j < cfg_regs_10; j++)
-			gold[i * out_words_adj + j] = (token_t) j;
-}
 
 
 int main(int argc, char * argv[])
 {
-	int i;
-	int n;
-	int ndev;
-	struct esp_device *espdevs;
-	struct esp_device *dev;
-	unsigned done;
-	unsigned **ptable;
-	token_t *mem;
-	token_t *gold;
-	unsigned errors = 0;
-	unsigned coherence;
+    int i;
+    int n;
+    int ndev;
+    struct esp_device *espdevs;
+    struct esp_device *dev;
+    unsigned done;
+    unsigned **ptable;
+    token_t *mem;
+    token_t *gold;
+    unsigned errors = 0;
+    unsigned coherence;
 
-	if (DMA_WORD_PER_BEAT(sizeof(token_t)) == 0) {
-		in_words_adj = cfg_regs_10;
-		out_words_adj = cfg_regs_10;
-	} else {
-		in_words_adj = round_up(cfg_regs_10, DMA_WORD_PER_BEAT(sizeof(token_t)));
-		out_words_adj = round_up(cfg_regs_10, DMA_WORD_PER_BEAT(sizeof(token_t)));
+    in_len = 128 >> 1; // 128*16b => 64*32b
+    out_len = 128;
+	
+    in_size = in_len * sizeof(token_t);
+    out_size = out_len * sizeof(token_t);	
+    out_offset = in_len;
+    mem_size = in_size + out_size;
+    // Search for the device
+    printf("Scanning device tree... \n");
+
+    ndev = probe(&espdevs, VENDOR_SLD, SLD_HU_AUDIOENC, DEV_NAME);
+    if (ndev == 0) {
+	printf("device not found\n");
+	return 0;
+    }
+
+
+    for (n = 0; n < ndev; n++) {
+
+	printf("**************** %s.%d ****************\n", DEV_NAME, n);
+
+	dev = &espdevs[n];
+
+	// Check DMA capabilities
+	if (ioread32(dev, PT_NCHUNK_MAX_REG) == 0) {
+	    printf("  -> scatter-gather DMA is disabled. Abort.\n");
+	    return 0;
 	}
-	in_len = in_words_adj * (1);
-	out_len = out_words_adj * (1);
-	in_size = in_len * sizeof(token_t);
-	out_size = out_len * sizeof(token_t);
-	out_offset  = in_len;
-	mem_size = (out_offset * sizeof(token_t)) + out_size;
 
-
-	// Search for the device
-	printf("Scanning device tree... \n");
-
-	ndev = probe(&espdevs, VENDOR_SLD, SLD_HU_AUDIODEC, DEV_NAME);
-	if (ndev == 0) {
-		printf("hu_audiodec not found\n");
-		return 0;
+	if (ioread32(dev, PT_NCHUNK_MAX_REG) < NCHUNK(mem_size)) {
+	    printf("  -> Not enough TLB entries available. Abort.\n");
+	    return 0;
 	}
 
-	for (n = 0; n < ndev; n++) {
+	// Allocate memory
+	gold = aligned_malloc(out_size);
+	mem = aligned_malloc(mem_size);
+	printf("  memory buffer base-address = %p\n", mem);
 
-		printf("**************** %s.%d ****************\n", DEV_NAME, n);
+	// Alocate and populate page table
+	ptable = aligned_malloc(NCHUNK(mem_size) * sizeof(unsigned *));
+	for (i = 0; i < NCHUNK(mem_size); i++)
+	    ptable[i] = (unsigned *) &mem[i * (CHUNK_SIZE / sizeof(token_t))];
 
-		dev = &espdevs[n];
+	printf("  ptable = %p\n", ptable);
+	printf("  nchunk = %lu\n", NCHUNK(mem_size));
 
-		// Check DMA capabilities
-		if (ioread32(dev, PT_NCHUNK_MAX_REG) == 0) {
-			printf("  -> scatter-gather DMA is disabled. Abort.\n");
-			return 0;
-		}
+	/* TODO: Restore full test once ESP caches are integrated */
+	coherence = ACC_COH_RECALL;
 
-		if (ioread32(dev, PT_NCHUNK_MAX_REG) < NCHUNK(mem_size)) {
-			printf("  -> Not enough TLB entries available. Abort.\n");
-			return 0;
-		}
+	printf("  --------------------\n");
+	printf("  Generate input...\n");
+	init_buf(mem, gold);
 
-		// Allocate memory
-		gold = aligned_malloc(out_size);
-		mem = aligned_malloc(mem_size);
-		printf("  memory buffer base-address = %p\n", mem);
+	// Pass common configuration parameters
 
-		// Alocate and populate page table
-		ptable = aligned_malloc(NCHUNK(mem_size) * sizeof(unsigned *));
-		for (i = 0; i < NCHUNK(mem_size); i++)
-			ptable[i] = (unsigned *) &mem[i * (CHUNK_SIZE / sizeof(token_t))];
-
-		printf("  ptable = %p\n", ptable);
-		printf("  nchunk = %lu\n", NCHUNK(mem_size));
-
-#ifndef __riscv
-		for (coherence = ACC_COH_NONE; coherence <= ACC_COH_RECALL; coherence++) {
-#else
-		{
-			/* TODO: Restore full test once ESP caches are integrated */
-			coherence = ACC_COH_NONE;
-#endif
-			printf("  --------------------\n");
-			printf("  Generate input...\n");
-			init_buf(mem, gold);
-
-			// Pass common configuration parameters
-
-			iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
-			iowrite32(dev, COHERENCE_REG, coherence);
+	iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
+	iowrite32(dev, COHERENCE_REG, coherence);
 
 #ifndef __sparc
-			iowrite32(dev, PT_ADDRESS_REG, (unsigned long long) ptable);
+	iowrite32(dev, PT_ADDRESS_REG, (unsigned long long) ptable);
 #else
-			iowrite32(dev, PT_ADDRESS_REG, (unsigned) ptable);
+	iowrite32(dev, PT_ADDRESS_REG, (unsigned) ptable);
 #endif
-			iowrite32(dev, PT_NCHUNK_REG, NCHUNK(mem_size));
-			iowrite32(dev, PT_SHIFT_REG, CHUNK_SHIFT);
+	iowrite32(dev, PT_NCHUNK_REG, NCHUNK(mem_size));
+	iowrite32(dev, PT_SHIFT_REG, CHUNK_SHIFT);
 
-			// Use the following if input and output data are not allocated at the default offsets
-			iowrite32(dev, SRC_OFFSET_REG, 0x0);
-			iowrite32(dev, DST_OFFSET_REG, 0x0);
+	// Use the following if input and output data are not allocated at the default offsets
+	iowrite32(dev, SRC_OFFSET_REG, 0x0);
+	// TODO need to add output offset?
+	iowrite32(dev, DST_OFFSET_REG, 0x0);
 
-			// Pass accelerator-specific configuration parameters
-			/* <<--regs-config-->> */
-		iowrite32(dev, HU_AUDIODEC_CFG_REGS_31_REG, cfg_regs_31);
-		iowrite32(dev, HU_AUDIODEC_CFG_REGS_30_REG, cfg_regs_30);
-		iowrite32(dev, HU_AUDIODEC_CFG_REGS_26_REG, cfg_regs_26);
-		iowrite32(dev, HU_AUDIODEC_CFG_REGS_27_REG, cfg_regs_27);
-		iowrite32(dev, HU_AUDIODEC_CFG_REGS_24_REG, cfg_regs_24);
-		iowrite32(dev, HU_AUDIODEC_CFG_REGS_25_REG, cfg_regs_25);
-		iowrite32(dev, HU_AUDIODEC_CFG_REGS_22_REG, cfg_regs_22);
-		iowrite32(dev, HU_AUDIODEC_CFG_REGS_23_REG, cfg_regs_23);
-		iowrite32(dev, HU_AUDIODEC_CFG_REGS_8_REG, cfg_regs_8);
-		iowrite32(dev, HU_AUDIODEC_CFG_REGS_20_REG, cfg_regs_20);
-		iowrite32(dev, HU_AUDIODEC_CFG_REGS_9_REG, cfg_regs_9);
-		iowrite32(dev, HU_AUDIODEC_CFG_REGS_21_REG, cfg_regs_21);
-		iowrite32(dev, HU_AUDIODEC_CFG_REGS_6_REG, cfg_regs_6);
-		iowrite32(dev, HU_AUDIODEC_CFG_REGS_7_REG, cfg_regs_7);
-		iowrite32(dev, HU_AUDIODEC_CFG_REGS_4_REG, cfg_regs_4);
-		iowrite32(dev, HU_AUDIODEC_CFG_REGS_5_REG, cfg_regs_5);
-		iowrite32(dev, HU_AUDIODEC_CFG_REGS_2_REG, cfg_regs_2);
-		iowrite32(dev, HU_AUDIODEC_CFG_REGS_3_REG, cfg_regs_3);
-		iowrite32(dev, HU_AUDIODEC_CFG_REGS_0_REG, cfg_regs_0);
-		iowrite32(dev, HU_AUDIODEC_CFG_REGS_28_REG, cfg_regs_28);
-		iowrite32(dev, HU_AUDIODEC_CFG_REGS_1_REG, cfg_regs_1);
-		iowrite32(dev, HU_AUDIODEC_CFG_REGS_29_REG, cfg_regs_29);
-		iowrite32(dev, HU_AUDIODEC_CFG_REGS_19_REG, cfg_regs_19);
-		iowrite32(dev, HU_AUDIODEC_CFG_REGS_18_REG, cfg_regs_18);
-		iowrite32(dev, HU_AUDIODEC_CFG_REGS_17_REG, cfg_regs_17);
-		iowrite32(dev, HU_AUDIODEC_CFG_REGS_16_REG, cfg_regs_16);
-		iowrite32(dev, HU_AUDIODEC_CFG_REGS_15_REG, cfg_regs_15);
-		iowrite32(dev, HU_AUDIODEC_CFG_REGS_14_REG, cfg_regs_14);
-		iowrite32(dev, HU_AUDIODEC_CFG_REGS_13_REG, cfg_regs_13);
-		iowrite32(dev, HU_AUDIODEC_CFG_REGS_12_REG, cfg_regs_12);
-		iowrite32(dev, HU_AUDIODEC_CFG_REGS_11_REG, cfg_regs_11);
-		iowrite32(dev, HU_AUDIODEC_CFG_REGS_10_REG, cfg_regs_10);
+	// Pass accelerator-specific configuration parameters
+	/* <<--regs-config-->> */
+	iowrite32(dev, 0x40, conf_0 );
+	iowrite32(dev, 0x44, conf_1 );
+	iowrite32(dev, 0x48, conf_2 );
+	iowrite32(dev, 0x4c, conf_3 );
+	iowrite32(dev, 0x50, conf_4 );
+	iowrite32(dev, 0x54, conf_5 );
+	iowrite32(dev, 0x58, conf_6 );
+	iowrite32(dev, 0x5c, conf_7 );
+	iowrite32(dev, 0x60, conf_8 );
+	iowrite32(dev, 0x64, conf_9 );
+	iowrite32(dev, 0x68, conf_10);
+	iowrite32(dev, 0x6c, conf_11);
+	iowrite32(dev, 0x70, conf_12);
+	iowrite32(dev, 0x74, conf_13);
+	iowrite32(dev, 0x78, conf_14);
+	iowrite32(dev, 0x7c, conf_15);
+	iowrite32(dev, 0x80, conf_16);
+	iowrite32(dev, 0x84, conf_17);
+	iowrite32(dev, 0x88, conf_18);
+	iowrite32(dev, 0x8c, conf_19);
+	iowrite32(dev, 0x90, conf_20);
+	iowrite32(dev, 0x94, conf_21);
+	iowrite32(dev, 0x98, conf_22);
+	iowrite32(dev, 0x9c, conf_23);
+	iowrite32(dev, 0xa0, conf_24);
+	iowrite32(dev, 0xa4, conf_25);
+	iowrite32(dev, 0xa8, conf_26);
+	iowrite32(dev, 0xac, conf_27);
+	iowrite32(dev, 0xb0, conf_28);
+	iowrite32(dev, 0xb4, conf_29);
+	iowrite32(dev, 0xb8, conf_30);
+	iowrite32(dev, 0xbc, conf_31);
+	iowrite32(dev, 0xc0, conf_32);
+	iowrite32(dev, 0xc4, conf_33);
+	iowrite32(dev, 0xc8, conf_34);
+	iowrite32(dev, 0xcc, conf_35);
+	iowrite32(dev, 0xd0, conf_36);
+	iowrite32(dev, 0xd4, conf_37);
+	iowrite32(dev, 0xd8, conf_38);
+	iowrite32(dev, 0xdc, conf_39);
+	iowrite32(dev, 0xe0, conf_40);
+	iowrite32(dev, 0xe4, conf_41);
+	iowrite32(dev, 0xe8, conf_42);
+	iowrite32(dev, 0xec, conf_43);
+	iowrite32(dev, 0xf0, conf_44);
+	iowrite32(dev, 0xf4, conf_45);
+	iowrite32(dev, 0xf8, conf_46);
+	iowrite32(dev, 0xfc, conf_47);
 
-			// Flush (customize coherence model here)
-			esp_flush(coherence);
+	// Flush (customize coherence model here)
+	esp_flush(coherence);
 
-			// Start accelerators
-			printf("  Start...\n");
-			iowrite32(dev, CMD_REG, CMD_MASK_START);
+	// Start accelerators
+	printf("  Start...\n");
+	iowrite32(dev, CMD_REG, CMD_MASK_START);
 
-			// Wait for completion
-			done = 0;
-			while (!done) {
-				done = ioread32(dev, STATUS_REG);
-				done &= STATUS_MASK_DONE;
-			}
-			iowrite32(dev, CMD_REG, 0x0);
-
-			printf("  Done\n");
-			printf("  validating...\n");
-
-			/* Validation */
-			errors = validate_buf(&mem[out_offset], gold);
-			if (errors)
-				printf("  ... FAIL\n");
-			else
-				printf("  ... PASS\n");
-		}
-		aligned_free(ptable);
-		aligned_free(mem);
-		aligned_free(gold);
+	// Wait for completion
+	done = 0;
+	while (!done) {
+	    done = ioread32(dev, STATUS_REG);
+	    done &= STATUS_MASK_DONE;
 	}
+	iowrite32(dev, CMD_REG, 0x0);
 
-	return 0;
+	printf("  Done\n");
+	printf("  validating...\n");
+
+	/* Validation */
+	errors = validate_buf(&mem[out_offset], gold);
+	if (errors)
+	    printf("  ... FAIL\n");
+	else
+	    printf("  ... PASS\n");
+    }
+    aligned_free(ptable);
+    aligned_free(mem);
+    aligned_free(gold);
+
+    return 0;
 }
