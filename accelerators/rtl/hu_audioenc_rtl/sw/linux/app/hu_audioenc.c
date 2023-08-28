@@ -23,24 +23,17 @@ int m_nOutB;
 float m_fInteriorGain;
 float m_fExteriorGain;
 
-void audio_enc_sw(token_in_t *gold_in, float *gold_out)
+void audio_enc_sw(float *gold_in, float *gold_out)
 {
 	unsigned sample_length = BLOCK_SIZE;
 	unsigned sample_channels = NUM_CHANNELS;
-	float SAMPLE_DIV = (2 << 14) - 1;
-    float fSrcSample = 0;
 
 	for (unsigned i = 0; i < sample_length; i++) {
-        fSrcSample = (float) gold_in[i];
-        fSrcSample /= SAMPLE_DIV;
-        fSrcSample *= cfg_src_coeff[0];
+       gold_out[kW*sample_length+i] = gold_in[i] * m_fInteriorGain * cfg_chan_coeff[kW];
 
-        gold_out[kW*sample_length+i] = fSrcSample * m_fInteriorGain * cfg_chan_coeff[kW];
-
-        fSrcSample *= m_fExteriorGain;
         for(unsigned j = 1; j < sample_channels; j++)
         {
-            gold_out[j*sample_length+i] = fSrcSample * cfg_chan_coeff[j];
+            gold_out[j*sample_length+i] = gold_in[i] * m_fExteriorGain * cfg_chan_coeff[j];
         }
     }
 }
@@ -70,15 +63,14 @@ static int validate_buffer(token_out_t *out, float *gold_out)
 }
 
 /* User-defined code */
-static void init_buffer(token_in_t *in, token_in_t *gold_in, float* gold_out)
+static void init_buffer(token_in_t *in, float *gold_in, float* gold_out)
 {
 	unsigned init_length = BLOCK_SIZE;
 	unsigned init_channel = NUM_CHANNELS;
 	unsigned init_sources = NUM_SRCS;
-	const float LO_SHORT = -32768.0;
-	const float HI_SHORT = 32768.0;
-	const float LO = -2.0;
-	const float HI = 2.0;
+	const float LO = -1.0;
+	const float HI = 1.0;
+	float SAMPLE_DIV = (2 << 14) - 1;
 
 	srand((unsigned int) time(NULL));
 
@@ -87,19 +79,22 @@ static void init_buffer(token_in_t *in, token_in_t *gold_in, float* gold_out)
 	// Initializing random input data for test
 	for (unsigned i = 0; i < init_length; i++) {
 		scaling_factor = (float) (rand () % 1024) / (float) 1024;
-		gold_in[i] = (token_in_t) (LO_SHORT + scaling_factor * (HI_SHORT - LO_SHORT));
+		gold_in[i] = (LO + scaling_factor * (HI - LO));
 	}
 
+	// Initializing gains which are part of the channel coefficients.
 	scaling_factor = (float) (rand () % 1024) / (float) 1024;
 	m_fInteriorGain = LO + scaling_factor * (HI - LO);
 	scaling_factor = (float) (rand () % 1024) / (float) 1024;
 	m_fExteriorGain = LO + scaling_factor * (HI - LO);
 
+	// Initializing source coefficients. Here, we assume one source,
+	// and intiialize to 1 to prevent overflow of short precision.
 	for (unsigned i = 0; i < init_sources; i++) {
-		scaling_factor = (float) (rand () % 1024) / (float) 1024;
-		cfg_src_coeff[i] = LO + scaling_factor * (HI - LO);
+		cfg_src_coeff[i] = 1;
 	}
 
+	// Initializing channel coefficients.
 	for (unsigned i = 0; i < init_channel; i++) {
 		scaling_factor = (float) (rand () % 1024) / (float) 1024;
 		cfg_chan_coeff[i] = LO + scaling_factor * (HI - LO);
@@ -108,16 +103,24 @@ static void init_buffer(token_in_t *in, token_in_t *gold_in, float* gold_out)
 	struct timespec th_start;
 	struct timespec th_end;
 
-	// Copying input data to accelerator buffer - transposed
-	for (unsigned i = 0; i < init_length; i++) {
-		in[i] = gold_in[i];
-	}
-
+	// Run software baseline
 	gettime(&th_start);
 	audio_enc_sw(gold_in, gold_out);
 	gettime(&th_end);
 
 	printf("  > Software time: %llu ns\n", ts_subtract(&th_start, &th_end));
+
+	// Copying input data to accelerator buffer - scaled to offset initial
+	// accelerator operations.
+	float fSrcSample;
+
+	for (unsigned i = 0; i < init_length; i++) {
+        fSrcSample = gold_in[i];
+        fSrcSample *= SAMPLE_DIV;
+        fSrcSample /= cfg_src_coeff[0];
+ 
+		in[i] = (token_in_t) fSrcSample;
+	}
 }
 
 
@@ -149,7 +152,7 @@ int main(int argc, char **argv)
 {
 	int errors;
 
-	token_in_t *gold_in;
+	float *gold_in;
 	float *gold_out;
 	token_out_t *buf;
 
@@ -158,7 +161,7 @@ int main(int argc, char **argv)
 	buf = (token_out_t *) esp_alloc(size);
 	cfg_000[0].hw_buf = buf;
     
-	gold_in = malloc(in_size);
+	gold_in = malloc(2 * in_size);
 	gold_out = malloc(out_size);
 	
 	init_buffer((token_in_t *) buf, gold_in, gold_out);
