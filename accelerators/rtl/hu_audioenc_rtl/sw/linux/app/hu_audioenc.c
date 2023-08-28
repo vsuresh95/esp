@@ -23,7 +23,7 @@ int m_nOutB;
 float m_fInteriorGain;
 float m_fExteriorGain;
 
-void audio_enc_sw(float *gold_in, float *gold_out, float *delay_buffer)
+void audio_enc_sw(token_in_t *gold_in, float *gold_out, float *delay_buffer)
 {
 	unsigned sample_length = BLOCK_SIZE;
 	unsigned sample_channels = NUM_CHANNELS;
@@ -31,52 +31,53 @@ void audio_enc_sw(float *gold_in, float *gold_out, float *delay_buffer)
     float fSrcSample = 0;
 
 	for (unsigned i = 0; i < sample_length; i++) {
-        // gold_out[i] = cfg_src_coeff[0] * (gold_in[i] / SAMPLE_DIV);
-        gold_out[i] = cfg_src_coeff[0] * gold_in[i];
+        fSrcSample = (float) gold_in[i];
+        fSrcSample /= SAMPLE_DIV;
+        fSrcSample *= cfg_src_coeff[0];
 
-		//Store
-		delay_buffer[m_nIn] = gold_out[i];
+		// //Store
+		// delay_buffer[m_nIn] = gold_out[i];
 
-		//Read
-		fSrcSample = delay_buffer[m_nOutA] * (1.f - m_fDelay)
-					+ delay_buffer[m_nOutB] * m_fDelay;
+		// //Read
+		// fSrcSample = delay_buffer[m_nOutA] * (1.f - m_fDelay)
+		// 			+ delay_buffer[m_nOutB] * m_fDelay;
 
         gold_out[kW*sample_length+i] = fSrcSample * m_fInteriorGain * cfg_chan_coeff[kW];
 
         fSrcSample *= m_fExteriorGain;
         for(unsigned j = 1; j < sample_channels; j++)
         {
-            gold_out[j*sample_length+i] = fSrcSample * m_fExteriorGain * cfg_chan_coeff[j];
+            gold_out[j*sample_length+i] = fSrcSample * cfg_chan_coeff[j];
         }
 
-        m_nIn = (m_nIn + 1) % m_nDelayBufferLength;
-        m_nOutA = (m_nOutA + 1) % m_nDelayBufferLength;
-        m_nOutB = (m_nOutB + 1) % m_nDelayBufferLength;
+        // m_nIn = (m_nIn + 1) % m_nDelayBufferLength;
+        // m_nOutA = (m_nOutA + 1) % m_nDelayBufferLength;
+        // m_nOutB = (m_nOutB + 1) % m_nDelayBufferLength;
     }
 }
 
-void audio_sw_workaround(float *gold_in, float *workaround_in, float *delay_buffer)
-{
-	float SAMPLE_DIV = (2 << 14) - 1;
+// void audio_sw_workaround(float *gold_in, float *workaround_in, float *delay_buffer)
+// {
+// 	float SAMPLE_DIV = (2 << 14) - 1;
 
-    for (unsigned i = 0; i < BLOCK_SIZE; i++) {
-		//Store
-		delay_buffer[m_nIn] = cfg_src_coeff[0] * (gold_in[i] / SAMPLE_DIV);
+//     for (unsigned i = 0; i < BLOCK_SIZE; i++) {
+// 		//Store
+// 		delay_buffer[m_nIn] = cfg_src_coeff[0] * (gold_in[i] / SAMPLE_DIV);
 
-		//Read
-		workaround_in[i] = delay_buffer[m_nOutA] * (1.f - m_fDelay)
-					+ delay_buffer[m_nOutB] * m_fDelay;
+// 		//Read
+// 		workaround_in[i] = delay_buffer[m_nOutA] * (1.f - m_fDelay)
+// 					+ delay_buffer[m_nOutB] * m_fDelay;
 
-        m_nIn = (m_nIn + 1) % m_nDelayBufferLength;
-        m_nOutA = (m_nOutA + 1) % m_nDelayBufferLength;
-        m_nOutB = (m_nOutB + 1) % m_nDelayBufferLength;
+//         m_nIn = (m_nIn + 1) % m_nDelayBufferLength;
+//         m_nOutA = (m_nOutA + 1) % m_nDelayBufferLength;
+//         m_nOutB = (m_nOutB + 1) % m_nDelayBufferLength;
 
-        workaround_in[i] = (workaround_in[i] * SAMPLE_DIV * SAMPLE_DIV) / cfg_src_coeff[0];
-    }
-}
+//         workaround_in[i] = (workaround_in[i] * SAMPLE_DIV * SAMPLE_DIV) / cfg_src_coeff[0];
+//     }
+// }
 
 /* User-defined code */
-static int validate_buffer(token_t *out, float *gold_out)
+static int validate_buffer(token_out_t *out, float *gold_out)
 {
 	unsigned init_length = BLOCK_SIZE;
 	unsigned init_channel = NUM_CHANNELS;
@@ -88,9 +89,9 @@ static int validate_buffer(token_t *out, float *gold_out)
 			native_t val = fixed32_to_float(out[i*init_channel + j], FX_IL);
 
 			if ((fabs(gold_out[j*init_length + i] - val) / fabs(gold_out[j*init_length + i])) > ERR_TH) {
-				// if (errors < 2) {
+				if (errors < 2) {
 					printf(" GOLD_OUT[%u] = %f vs %f = out[%u]\n", j*init_length + i, gold_out[j*init_length + i], val, j*init_length + i);
-				// }
+				}
 				errors++;
 			}
 		}
@@ -100,11 +101,13 @@ static int validate_buffer(token_t *out, float *gold_out)
 }
 
 /* User-defined code */
-static void init_buffer(token_t *in, float *gold_in, float* gold_out, float *workaround_in, float *delay_buffer)
+static void init_buffer(token_in_t *in, token_in_t *gold_in, float* gold_out, float *workaround_in, float *delay_buffer)
 {
 	unsigned init_length = BLOCK_SIZE;
 	unsigned init_channel = NUM_CHANNELS;
 	unsigned init_sources = NUM_SRCS;
+	const float LO_SHORT = -32768.0;
+	const float HI_SHORT = 32768.0;
 	const float LO = -2.0;
 	const float HI = 2.0;
 
@@ -114,63 +117,61 @@ static void init_buffer(token_t *in, float *gold_in, float* gold_out, float *wor
 
 	// Initializing random input data for test
 	for (unsigned i = 0; i < init_length; i++) {
-		scaling_factor = (float) rand () / (float) RAND_MAX;
-		gold_in[i] = LO + scaling_factor * (HI - LO);
+		scaling_factor = (float) (rand () % 1024) / (float) 1024;
+		gold_in[i] = (token_in_t) (LO_SHORT + scaling_factor * (HI_SHORT - LO_SHORT));
 	}
 
-	scaling_factor = (float) rand () / (float) RAND_MAX;
+	scaling_factor = (float) (rand () % 1024) / (float) 1024;
 	m_fInteriorGain = LO + scaling_factor * (HI - LO);
-	scaling_factor = (float) rand () / (float) RAND_MAX;
+	scaling_factor = (float) (rand () % 1024) / (float) 1024;
 	m_fExteriorGain = LO + scaling_factor * (HI - LO);
 
 	for (unsigned i = 0; i < init_sources; i++) {
-		scaling_factor = (float) rand () / (float) RAND_MAX;
+		scaling_factor = (float) (rand () % 1024) / (float) 1024;
 		cfg_src_coeff[i] = LO + scaling_factor * (HI - LO);
 	}
 
 	for (unsigned i = 0; i < init_channel; i++) {
-		scaling_factor = (float) rand () / (float) RAND_MAX;
+		scaling_factor = (float) (rand () % 1024) / (float) 1024;
 		cfg_chan_coeff[i] = LO + scaling_factor * (HI - LO);
 	}
 
-	// SW workaround parameters
-    m_fDelay = (rand () / RAND_MAX) / 344 * 48000 + 0.5f;
-    m_nDelay = (int) m_fDelay;
-    m_fDelay -= m_nDelay;
-    m_nIn = 0;
-    m_nOutA = (m_nIn - m_nDelay + m_nDelayBufferLength) % m_nDelayBufferLength;
-    m_nOutB = (m_nOutA + 1) % m_nDelayBufferLength;
+	// // SW workaround parameters
+    // m_fDelay = (rand () / RAND_MAX) / 344 * 48000 + 0.5f;
+    // m_nDelay = (int) m_fDelay;
+    // m_fDelay -= m_nDelay;
+    // m_nIn = 0;
+    // m_nOutA = (m_nIn - m_nDelay + m_nDelayBufferLength) % m_nDelayBufferLength;
+    // m_nOutB = (m_nOutA + 1) % m_nDelayBufferLength;
 
-	for (unsigned i = 0; i < m_nDelayBufferLength; i++) {
-		delay_buffer[i] = 0;
-	}
+	// for (unsigned i = 0; i < m_nDelayBufferLength; i++) {
+	// 	delay_buffer[i] = 0;
+	// }
 
 	struct timespec th_start;
 	struct timespec th_end;
 
-	gettime(&th_start);
-	audio_sw_workaround(gold_in, workaround_in, delay_buffer);
-	gettime(&th_end);
+	// gettime(&th_start);
+	// audio_sw_workaround(gold_in, workaround_in, delay_buffer);
+	// gettime(&th_end);
 
-	printf("  > Software workaround time: %llu ns\n", ts_subtract(&th_start, &th_end));
+	// printf("  > Software workaround time: %llu ns\n", ts_subtract(&th_start, &th_end));
 
 	// Copying input data to accelerator buffer - transposed
-	for (unsigned j = 0; j < init_channel; j++) {
-		for (unsigned i = 0; i < init_length; i++) {
-			in[j*init_length+i] = float_to_fixed32(workaround_in[i], FX_IL);
-		}
+	for (unsigned i = 0; i < init_length; i++) {
+		in[i] = gold_in[i];
 	}
 	
-    m_fDelay = (rand () / RAND_MAX) / 344 * 48000 + 0.5f;
-    m_nDelay = (int) m_fDelay;
-    m_fDelay -= m_nDelay;
-    m_nIn = 0;
-    m_nOutA = (m_nIn - m_nDelay + m_nDelayBufferLength) % m_nDelayBufferLength;
-    m_nOutB = (m_nOutA + 1) % m_nDelayBufferLength;
+    // m_fDelay = (rand () / RAND_MAX) / 344 * 48000 + 0.5f;
+    // m_nDelay = (int) m_fDelay;
+    // m_fDelay -= m_nDelay;
+    // m_nIn = 0;
+    // m_nOutA = (m_nIn - m_nDelay + m_nDelayBufferLength) % m_nDelayBufferLength;
+    // m_nOutB = (m_nOutA + 1) % m_nDelayBufferLength;
 
-	for (unsigned i = 0; i < m_nDelayBufferLength; i++) {
-		delay_buffer[i] = 0;
-	}
+	// for (unsigned i = 0; i < m_nDelayBufferLength; i++) {
+	// 	delay_buffer[i] = 0;
+	// }
 
 	gettime(&th_start);
 	audio_enc_sw(gold_in, gold_out, delay_buffer);
@@ -183,19 +184,23 @@ static void init_buffer(token_t *in, float *gold_in, float* gold_out, float *wor
 /* User-defined code */
 static void init_parameters()
 {
-	if (DMA_WORD_PER_BEAT(sizeof(token_t)) == 0) {
-		in_words_adj = BLOCK_SIZE * NUM_CHANNELS;
+	if (DMA_WORD_PER_BEAT(sizeof(token_in_t)) == 0) {
+		in_words_adj = BLOCK_SIZE;
+	} else {
+		in_words_adj = round_up(BLOCK_SIZE, DMA_WORD_PER_BEAT(sizeof(token_in_t)));
+	}
+	if (DMA_WORD_PER_BEAT(sizeof(token_out_t)) == 0) {
 		out_words_adj = BLOCK_SIZE * NUM_CHANNELS;
 	} else {
-		in_words_adj = round_up(BLOCK_SIZE * NUM_CHANNELS, DMA_WORD_PER_BEAT(sizeof(token_t)));
-		out_words_adj = round_up(BLOCK_SIZE * NUM_CHANNELS, DMA_WORD_PER_BEAT(sizeof(token_t)));
+		out_words_adj = round_up(BLOCK_SIZE * NUM_CHANNELS, DMA_WORD_PER_BEAT(sizeof(token_out_t)));
 	}
+
 	in_len = in_words_adj * (1);
 	out_len =  out_words_adj * (1);
-	in_size = in_len * sizeof(token_t);
-	out_size = out_len * sizeof(token_t);
+	in_size = in_len * sizeof(token_in_t);
+	out_size = out_len * sizeof(token_out_t);
 	out_offset = in_len;
-	size = (out_offset * sizeof(token_t)) + out_size;
+	size = (out_offset * sizeof(token_in_t)) + out_size;
 	m_nDelayBufferLength = (unsigned)((float) 150 * 48000 / 344 + 0.5f);
 }
 
@@ -204,15 +209,15 @@ int main(int argc, char **argv)
 {
 	int errors;
 
-	float *gold_in;
+	token_in_t *gold_in;
 	float *gold_out;
-	token_t *buf;
+	token_out_t *buf;
 	float *workaround_in;
 	float *delay_buffer;
 
 	init_parameters();
 
-	buf = (token_t *) esp_alloc(size);
+	buf = (token_out_t *) esp_alloc(size);
 	cfg_000[0].hw_buf = buf;
     
 	gold_in = malloc(in_size);
@@ -221,9 +226,7 @@ int main(int argc, char **argv)
 	workaround_in = malloc(in_size);
 	delay_buffer = malloc(m_nDelayBufferLength * sizeof(native_t));
 	
-	init_buffer(buf, gold_in, gold_out, workaround_in, delay_buffer);
-
-	free(gold_in);
+	init_buffer((token_in_t *) buf, gold_in, gold_out, workaround_in, delay_buffer);
 
 	printf("\n====== %s ======\n\n", cfg_000[0].devname);
 	printf("\n  ** START **\n");
@@ -247,14 +250,15 @@ int main(int argc, char **argv)
 	hu_audioenc_cfg_000[0].cfg_regs_47 = float_to_fixed32(m_fExteriorGain * cfg_chan_coeff[15], FX_IL);
 
 	hu_audioenc_cfg_000[0].src_offset = 0;
-	hu_audioenc_cfg_000[0].dst_offset = (NUM_CHANNELS * BLOCK_SIZE) * sizeof(token_t);
+	hu_audioenc_cfg_000[0].dst_offset = BLOCK_SIZE * sizeof(token_in_t);
 
 	esp_run(cfg_000, NACC);
 
 	printf("\n  ** DONE **\n");
 
-	errors = validate_buffer(&buf[out_offset], gold_out);
+	errors = validate_buffer(&buf[out_offset/2], gold_out);
 
+	free(gold_in);
 	free(gold_out);
 	esp_free(buf);
 
@@ -264,7 +268,7 @@ int main(int argc, char **argv)
 	if (!errors)
 		printf("+ Test PASSED\n");
 	else
-		printf("+ Test FAILED\n");
+		printf("+ Test FAILED, ERRORS = %d\n", errors);
 
 	printf("\n====== %s ======\n\n", cfg_000[0].devname);
 
