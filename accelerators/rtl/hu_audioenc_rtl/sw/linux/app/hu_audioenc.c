@@ -23,7 +23,7 @@ int m_nOutB;
 float m_fInteriorGain;
 float m_fExteriorGain;
 
-void audio_enc_sw(token_in_t *gold_in, float *gold_out, float *delay_buffer)
+void audio_enc_sw(token_in_t *gold_in, float *gold_out)
 {
 	unsigned sample_length = BLOCK_SIZE;
 	unsigned sample_channels = NUM_CHANNELS;
@@ -35,13 +35,6 @@ void audio_enc_sw(token_in_t *gold_in, float *gold_out, float *delay_buffer)
         fSrcSample /= SAMPLE_DIV;
         fSrcSample *= cfg_src_coeff[0];
 
-		// //Store
-		// delay_buffer[m_nIn] = gold_out[i];
-
-		// //Read
-		// fSrcSample = delay_buffer[m_nOutA] * (1.f - m_fDelay)
-		// 			+ delay_buffer[m_nOutB] * m_fDelay;
-
         gold_out[kW*sample_length+i] = fSrcSample * m_fInteriorGain * cfg_chan_coeff[kW];
 
         fSrcSample *= m_fExteriorGain;
@@ -49,32 +42,8 @@ void audio_enc_sw(token_in_t *gold_in, float *gold_out, float *delay_buffer)
         {
             gold_out[j*sample_length+i] = fSrcSample * cfg_chan_coeff[j];
         }
-
-        // m_nIn = (m_nIn + 1) % m_nDelayBufferLength;
-        // m_nOutA = (m_nOutA + 1) % m_nDelayBufferLength;
-        // m_nOutB = (m_nOutB + 1) % m_nDelayBufferLength;
     }
 }
-
-// void audio_sw_workaround(float *gold_in, float *workaround_in, float *delay_buffer)
-// {
-// 	float SAMPLE_DIV = (2 << 14) - 1;
-
-//     for (unsigned i = 0; i < BLOCK_SIZE; i++) {
-// 		//Store
-// 		delay_buffer[m_nIn] = cfg_src_coeff[0] * (gold_in[i] / SAMPLE_DIV);
-
-// 		//Read
-// 		workaround_in[i] = delay_buffer[m_nOutA] * (1.f - m_fDelay)
-// 					+ delay_buffer[m_nOutB] * m_fDelay;
-
-//         m_nIn = (m_nIn + 1) % m_nDelayBufferLength;
-//         m_nOutA = (m_nOutA + 1) % m_nDelayBufferLength;
-//         m_nOutB = (m_nOutB + 1) % m_nDelayBufferLength;
-
-//         workaround_in[i] = (workaround_in[i] * SAMPLE_DIV * SAMPLE_DIV) / cfg_src_coeff[0];
-//     }
-// }
 
 /* User-defined code */
 static int validate_buffer(token_out_t *out, float *gold_out)
@@ -101,7 +70,7 @@ static int validate_buffer(token_out_t *out, float *gold_out)
 }
 
 /* User-defined code */
-static void init_buffer(token_in_t *in, token_in_t *gold_in, float* gold_out, float *workaround_in, float *delay_buffer)
+static void init_buffer(token_in_t *in, token_in_t *gold_in, float* gold_out)
 {
 	unsigned init_length = BLOCK_SIZE;
 	unsigned init_channel = NUM_CHANNELS;
@@ -136,45 +105,16 @@ static void init_buffer(token_in_t *in, token_in_t *gold_in, float* gold_out, fl
 		cfg_chan_coeff[i] = LO + scaling_factor * (HI - LO);
 	}
 
-	// // SW workaround parameters
-    // m_fDelay = (rand () / RAND_MAX) / 344 * 48000 + 0.5f;
-    // m_nDelay = (int) m_fDelay;
-    // m_fDelay -= m_nDelay;
-    // m_nIn = 0;
-    // m_nOutA = (m_nIn - m_nDelay + m_nDelayBufferLength) % m_nDelayBufferLength;
-    // m_nOutB = (m_nOutA + 1) % m_nDelayBufferLength;
-
-	// for (unsigned i = 0; i < m_nDelayBufferLength; i++) {
-	// 	delay_buffer[i] = 0;
-	// }
-
 	struct timespec th_start;
 	struct timespec th_end;
-
-	// gettime(&th_start);
-	// audio_sw_workaround(gold_in, workaround_in, delay_buffer);
-	// gettime(&th_end);
-
-	// printf("  > Software workaround time: %llu ns\n", ts_subtract(&th_start, &th_end));
 
 	// Copying input data to accelerator buffer - transposed
 	for (unsigned i = 0; i < init_length; i++) {
 		in[i] = gold_in[i];
 	}
-	
-    // m_fDelay = (rand () / RAND_MAX) / 344 * 48000 + 0.5f;
-    // m_nDelay = (int) m_fDelay;
-    // m_fDelay -= m_nDelay;
-    // m_nIn = 0;
-    // m_nOutA = (m_nIn - m_nDelay + m_nDelayBufferLength) % m_nDelayBufferLength;
-    // m_nOutB = (m_nOutA + 1) % m_nDelayBufferLength;
-
-	// for (unsigned i = 0; i < m_nDelayBufferLength; i++) {
-	// 	delay_buffer[i] = 0;
-	// }
 
 	gettime(&th_start);
-	audio_enc_sw(gold_in, gold_out, delay_buffer);
+	audio_enc_sw(gold_in, gold_out);
 	gettime(&th_end);
 
 	printf("  > Software time: %llu ns\n", ts_subtract(&th_start, &th_end));
@@ -212,8 +152,6 @@ int main(int argc, char **argv)
 	token_in_t *gold_in;
 	float *gold_out;
 	token_out_t *buf;
-	float *workaround_in;
-	float *delay_buffer;
 
 	init_parameters();
 
@@ -222,11 +160,8 @@ int main(int argc, char **argv)
     
 	gold_in = malloc(in_size);
 	gold_out = malloc(out_size);
-
-	workaround_in = malloc(in_size);
-	delay_buffer = malloc(m_nDelayBufferLength * sizeof(native_t));
 	
-	init_buffer((token_in_t *) buf, gold_in, gold_out, workaround_in, delay_buffer);
+	init_buffer((token_in_t *) buf, gold_in, gold_out);
 
 	printf("\n====== %s ======\n\n", cfg_000[0].devname);
 	printf("\n  ** START **\n");
@@ -261,9 +196,6 @@ int main(int argc, char **argv)
 	free(gold_in);
 	free(gold_out);
 	esp_free(buf);
-
-	free(workaround_in);
-	free(delay_buffer);
 
 	if (!errors)
 		printf("+ Test PASSED\n");
