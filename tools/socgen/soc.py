@@ -105,6 +105,11 @@ class SoC_Config():
     elif self.cache_impl.get() == "ESP HLS":
       self.cache_rtl.set(0)
       self.cache_spandex.set(0)
+    elif self.cache_impl.get() == "SPANDEX RTL":
+      self.acc_l2_ways.set(self.l2_ways.get())
+      self.acc_l2_sets.set(self.l2_sets.get())
+      self.cache_rtl.set(1)
+      self.cache_spandex.set(1)      
     else:
       self.cache_rtl.set(0)
       self.cache_spandex.set(1)
@@ -168,12 +173,14 @@ class SoC_Config():
       self.cache_en.set(0)
     line = fp.readline()
     if line.find("CONFIG_CACHE_RTL = y") != -1:
-      self.cache_spandex.set(0)
       self.cache_rtl.set(1)
-      self.cache_impl.set("ESP RTL")
       line = fp.readline()
       if line.find("CONFIG_CACHE_SPANDEX = y") != -1:
-        print("WARNING: Spandex RTL implementation is not available yet. Reverting to ESP RTL caches")
+        self.cache_spandex.set(1)
+        self.cache_impl.set("SPANDEX RTL")
+      else:
+        self.cache_spandex.set(0)
+        self.cache_impl.set("ESP RTL")
     else:
       self.cache_rtl.set(0)
       line = fp.readline()

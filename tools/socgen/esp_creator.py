@@ -88,7 +88,7 @@ class CacheFrame(Frame):
     sets_choices = [32, 64, 128, 256, 512, 1024, 2048, 4096, 8192]
     l2_ways_choices = [2, 4, 8]
     llc_ways_choices = [4, 8, 16]
-    cache_choices = ["ESP RTL", "SPANDEX HLS", "ESP HLS"]
+    cache_choices = ["ESP RTL", "SPANDEX RTL", "SPANDEX HLS", "ESP HLS"]
 
     Label(cache_config_frame, text = "Use Caches: ", font="TkDefaultFont 9 bold").grid(row=1, column=1)
     Checkbutton(cache_config_frame, text="", variable=soc.cache_en,
