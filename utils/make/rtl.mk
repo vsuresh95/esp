@@ -8,6 +8,7 @@ INCDIR += $(DESIGN_PATH)/$(GRLIB_CFG_BUILD)
 INCDIR += $(DESIGN_PATH)/$(ESP_CFG_BUILD)
 INCDIR += $(THIRDPARTY_INCDIR)
 INCDIR += $(ESP_ROOT)/rtl/caches/esp-caches/common/defs
+INCDIR += $(ESP_ROOT)/rtl/caches/spandex-caches/utils/defs
 
 ## VHDL Packages
 SIM_VHDL_PKGS += $(SOCKETGEN_VHDL_RTL_PKGS)
@@ -39,7 +40,11 @@ SIM_VHDL_SRCS += $(TOP_VHDL_SIM_SRCS)
 ## Verilog Source
 RTL_TECH_FOLDERS = $(shell ls -d $(ESP_ROOT)/tech/$(TECHLIB)/*/)
 
+ifeq ("$(CONFIG_CACHE_SPANDEX)", "y")
+VLOG_SRCS += $(foreach f, $(shell strings $(FLISTS)/vlog_spx.flist), $(ESP_ROOT)/rtl/$(f))
+else
 VLOG_SRCS += $(foreach f, $(shell strings $(FLISTS)/vlog.flist), $(ESP_ROOT)/rtl/$(f))
+endif
 VLOG_SRCS += $(foreach f, $(shell strings $(FLISTS)/cores_vlog.flist), $(if $(findstring cores/$(CPU_ARCH), $(f)), $(ESP_ROOT)/rtl/$(f),))
 VLOG_SRCS += $(foreach f, $(shell strings $(FLISTS)/techmap_vlog.flist), $(if $(findstring techmap/$(TECHLIB), $(f)), $(ESP_ROOT)/rtl/$(f),))
 VLOG_SRCS += $(foreach f, $(RTL_TECH_FOLDERS), $(shell (find $(f) -name "*.v")))

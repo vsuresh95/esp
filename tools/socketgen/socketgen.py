@@ -1153,7 +1153,7 @@ def write_cache_port_map(f, cac, is_llc):
     f.write("      l2_bresp_ready            => l2_bresp_ready,\n")
     f.write("      l2_req_out_ready          => l2_req_out_ready,\n")
     f.write("      l2_rsp_out_ready          => l2_rsp_out_ready,\n")
-    f.write("      l2_fwd_out_ready          => l2_rsp_out_ready,\n")
+    f.write("      l2_fwd_out_ready          => l2_fwd_out_ready,\n")
     f.write("      l2_stats_ready            => l2_stats_ready,\n")
     f.write("      flush_done                => flush_done,\n")
     f.write("      acc_flush_done            => acc_flush_done,\n")
@@ -1578,13 +1578,10 @@ def gen_tech_indep_impl(accelerator_list, cache_list, dma_width, template_dir, o
         f.write("\n")
         f.write("architecture mapping of " + cac.name + " is\n\n")
         f.write("begin  -- mapping\n\n")
-        if 'spandex' in cac.name:
-          pass
-        else:
-          f.write("  rtl_gen: if use_rtl /= 0 generate\n")
-          f.write("    " + cac.name + "_rtl_top_i: " + cac.name + "_rtl_top\n")
-          write_cache_port_map(f, cac, is_llc)
-          f.write("  end generate rtl_gen;\n\n")
+        f.write("  rtl_gen: if use_rtl /= 0 generate\n")
+        f.write("    " + cac.name + "_rtl_top_i: " + cac.name + "_rtl_top\n")
+        write_cache_port_map(f, cac, is_llc)
+        f.write("  end generate rtl_gen;\n\n")
         f.write("\n")
         f.write("  hls_gen: if use_rtl = 0 generate\n")
         for impl in cac.hlscfg:
