@@ -59,6 +59,21 @@ void release_lock (volatile unsigned *handshake) {
     asm volatile ("fence w, w");
 }
 
+void acquire_lock_lr_sc (volatile unsigned *handshake) {
+    // acquire the lock
+    asm volatile (
+        "try_lr_%=:     li t1, 1;"
+        "               mv t2, %0;"
+        "               lr.w.aq t0, (t2);"
+        "               beq t0, t1, try_lr_%=;"
+        "               sc.w.rl t0, t1, (t2);"
+        "               bnez t0, try_lr_%="
+        :
+        : "r" (handshake)
+        : "t0", "t1", "t2", "memory"
+        );
+}
+
 void multicore_print(const char *fmt, ...) {
     // Lock to acquire before printing
 	volatile unsigned* print_lock = (volatile unsigned*) 0x90010000;
