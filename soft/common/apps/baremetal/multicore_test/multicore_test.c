@@ -198,6 +198,106 @@ int main(int argc, char * argv[])
 			*checkpoint = 0;			
 		}
 		break;
+		// Each core executes multiple critical sections guarded by different LR-SC synchronizations and AMO.
+		case 3:
+		{
+			const unsigned llc_way_bits = 10;
+			const unsigned llc_way_offset = (1 << llc_way_bits);
+			const unsigned llc_way_word_offset = llc_way_offset/sizeof(unsigned);
+
+			const unsigned buffer1_size = 8 * n_threads;
+			const unsigned num_iters = 8;
+			const unsigned num_tests = 8;
+
+			// Create an array of locks
+			volatile unsigned** lock_array = (volatile unsigned**) 0x90010050;
+
+			for (unsigned i = 0; i < num_tests; i++) {
+				void* ptr = (void*) (0x90011000 + (i * 0x10));
+				lock_array[i] = (volatile unsigned*) (ptr);
+			}
+
+			// Create an array of buffers
+			volatile unsigned** buffer_array = (volatile unsigned**) 0x90020000;
+
+			for (unsigned i = 0; i < num_tests; i++) {
+				void* ptr = (void*) (0x91020000 + (i * 0x1000000));
+				buffer_array[i] = (volatile unsigned*) (ptr);
+			}
+
+			// CP 1 : Each core write to alternating elements of an array - with AMO.
+			errors = 0;
+
+			// Core 0 writes to 0th way, core 1st way, and so on.
+			for (unsigned k = 0; k < num_tests; k++) {
+				for (unsigned i = 0; i < num_iters; i++) {
+					acquire_lock(lock_array[k]);
+					for (unsigned j = hartid; j < buffer1_size; j+=n_threads) {
+						buffer_array[k][j * llc_way_word_offset + i] = (hartid + 1) * j;
+					}
+					release_lock(lock_array[k]);
+				}
+			}
+
+			amo_add(checkpoint, 1);
+			while(*checkpoint != n_threads);
+			*checkpoint = 0;
+
+			// CP 2 : All cores will test the values of the array - with AMO.
+			for (unsigned k = 0; k < num_tests; k++) {
+				for (unsigned i = 0; i < num_iters; i++) {
+					acquire_lock(lock_array[k]);
+					for (unsigned j = ((hartid + 1) % n_threads); j < buffer1_size; j+=n_threads) {
+						if (buffer_array[k][j * llc_way_word_offset + i] != ((j % n_threads + 1) * j)) {
+							printf("[HART %d] %d %d %d E = %d A = %d\n", hartid, k, i, j, ((j % n_threads + 1) * j), buffer_array[k][j * llc_way_word_offset + i]);
+							errors++;
+						}
+					}
+					release_lock(lock_array[k]);
+				}
+			}
+
+			multicore_print("[HART %d] Errors = %d\n", hartid, errors);
+
+			// CP 3 : Each core write to alternating elements of an array - with LR/SC.
+			errors = 0;
+
+			// Core 0 writes to 0th way, core 1st way, and so on.
+			for (unsigned k = 0; k < num_tests; k++) {
+				for (unsigned i = 0; i < num_iters; i++) {
+					acquire_lock_lr_sc(lock_array[k]);
+					for (unsigned j = hartid; j < buffer1_size; j+=n_threads) {
+						buffer_array[k][j * llc_way_word_offset + i] = (hartid + 1) * j;
+					}
+					release_lock(lock_array[k]);
+				}
+			}
+
+			amo_add(checkpoint, 1);
+			while(*checkpoint != n_threads);
+			*checkpoint = 0;
+
+			// CP 4 : All cores will test the values of the array - with LR/SC.
+			for (unsigned k = 0; k < num_tests; k++) {
+				for (unsigned i = 0; i < num_iters; i++) {
+					acquire_lock_lr_sc(lock_array[k]);
+					for (unsigned j = ((hartid + 1) % n_threads); j < buffer1_size; j+=n_threads) {
+						if (buffer_array[k][j * llc_way_word_offset + i] != ((j % n_threads + 1) * j)) {
+							printf("[HART %d] %d $d %d E = %d A = %d\n", hartid, k, i, j, ((j % n_threads + 1) * j), buffer_array[k][j * llc_way_word_offset + i]);
+							errors++;
+						}
+					}
+					release_lock(lock_array[k]);
+				}
+			}
+
+			multicore_print("[HART %d] Errors = %d\n", hartid, errors);
+
+			amo_add(checkpoint, 1);
+			while(*checkpoint != n_threads);
+			*checkpoint = 0;			
+		}
+		break;
 		default:
 		break;
 	}
