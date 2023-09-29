@@ -3,6 +3,8 @@
 
 #include <helper.h>
 
+static unsigned first = 0;
+
 int main(int argc, char * argv[])
 {
 	const unsigned n_threads = NUM_THREADS;
@@ -16,13 +18,12 @@ int main(int argc, char * argv[])
 	
 	volatile unsigned* lock = (volatile unsigned*) 0x90010020;
 	volatile unsigned* checkpoint = (volatile unsigned*) 0x90010030;
-	volatile unsigned* first = (volatile unsigned*) 0x90010040;
 
 	unsigned errors = 0;
 
 	multicore_print("[HART %d TEST %d] Hello from ESP!\n", hartid, t_id);
 
-	if (amo_swap(first, 1) == 1) {
+	if (amo_swap(&first, 1) == 1) {
 		amo_add(checkpoint, 1);
 	} else {
 		*checkpoint = 1;
@@ -213,6 +214,7 @@ int main(int argc, char * argv[])
             const unsigned LOAD = 0;
             const unsigned STORE = 1;
             const unsigned AMO = 2;
+            const unsigned LRSC = 3;
 
             unsigned op_count = 0;
 
@@ -234,7 +236,7 @@ int main(int argc, char * argv[])
                 if (*test_fail == 1) break;
 
                 // Randomly perform load/store/AMO
-                unsigned op = rand(hartid) % 3;
+                unsigned op = rand(hartid) % 4;
 
                 if (op == LOAD) {
                     unsigned ld_offset = rand(hartid);
@@ -276,6 +278,19 @@ int main(int argc, char * argv[])
                     }
 
                     op_count++;					
+                } else if (op == LRSC) {
+                    unsigned lrsc_offset = rand(hartid);
+                    unsigned lrsc_value = rand(hartid);
+
+                    // Update test and reference value acquiring lock with LR-SC
+                    acquire_lock_lr_sc(lock);
+                    t_buffer[lrsc_offset] = lrsc_value;
+                    release_lock(lock);
+                    acquire_lock_lr_sc(lock);
+                    r_buffer[lrsc_offset] = lrsc_value;
+                    release_lock(lock);
+
+                    op_count++;							
                 }
 
                 if (op_count % 100 == 0) {
