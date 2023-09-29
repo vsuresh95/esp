@@ -212,6 +212,7 @@ int main(int argc, char * argv[])
 
             const unsigned LOAD = 0;
             const unsigned STORE = 1;
+            const unsigned AMO = 2;
 
             unsigned op_count = 0;
 
@@ -232,8 +233,8 @@ int main(int argc, char * argv[])
                 // Exit if test has failed.
                 if (*test_fail == 1) break;
 
-                // Randomly perform load/store
-                unsigned op = rand(hartid) % 2;
+                // Randomly perform load/store/AMO
+                unsigned op = rand(hartid) % 3;
 
                 if (op == LOAD) {
                     unsigned ld_offset = rand(hartid);
@@ -260,6 +261,21 @@ int main(int argc, char * argv[])
                     release_lock(lock);
 
                     op_count++;
+                } else if (op == AMO) {
+                    unsigned amo_offset = rand(hartid);
+                    unsigned amo_value = rand(hartid);
+
+                    // Atomic update test and reference value
+                    unsigned t_value = amo_swap(&t_buffer[amo_offset], amo_value);
+                    unsigned r_value = amo_swap(&r_buffer[amo_offset], amo_value);
+
+                    // Test if the old values are equal
+                    if (t_value != r_value) {
+                        *test_fail = 1;
+                        printf("[HART %d OP %d] T = 0x%x R = 0x%x\n", hartid, op_count, t_value, r_value);
+                    }
+
+                    op_count++;					
                 }
 
                 if (op_count % 100 == 0) {
