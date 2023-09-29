@@ -235,7 +235,7 @@ int main(int argc, char * argv[])
                 // Exit if test has failed.
                 if (*test_fail == 1) break;
 
-                // Randomly perform load/store/AMO
+                // Randomly perform load/store/AMO/LR-SC
                 unsigned op = rand(hartid) % 4;
 
                 if (op == LOAD) {
@@ -268,8 +268,10 @@ int main(int argc, char * argv[])
                     unsigned amo_value = rand(hartid);
 
                     // Atomic update test and reference value
+                    acquire_lock(lock);
                     unsigned t_value = amo_swap(&t_buffer[amo_offset], amo_value);
                     unsigned r_value = amo_swap(&r_buffer[amo_offset], amo_value);
+                    release_lock(lock);
 
                     // Test if the old values are equal
                     if (t_value != r_value) {
@@ -285,8 +287,6 @@ int main(int argc, char * argv[])
                     // Update test and reference value acquiring lock with LR-SC
                     acquire_lock_lr_sc(lock);
                     t_buffer[lrsc_offset] = lrsc_value;
-                    release_lock(lock);
-                    acquire_lock_lr_sc(lock);
                     r_buffer[lrsc_offset] = lrsc_value;
                     release_lock(lock);
 

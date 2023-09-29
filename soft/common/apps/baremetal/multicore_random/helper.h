@@ -58,7 +58,7 @@ void acquire_lock (volatile unsigned *handshake) {
 
 void release_lock (volatile unsigned *handshake) {
     *handshake = 0;
-    asm volatile ("fence w, w");
+    asm volatile ("fence");
 }
 
 void acquire_lock_lr_sc (volatile unsigned *handshake) {
