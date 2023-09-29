@@ -198,6 +198,84 @@ int main(int argc, char * argv[])
 			*checkpoint = 0;			
 		}
 		break;
+		case 3:
+		{
+            // Reference buffer
+            volatile unsigned* r_buffer = (volatile unsigned*) 0x91000000;
+
+            // Test buffer
+            volatile unsigned* t_buffer = (volatile unsigned*) 0x92000000;
+
+	        volatile unsigned* test_fail = (volatile unsigned*) 0x90010120;
+
+            const unsigned n_elem = RAND_MAX;
+
+            const unsigned LOAD = 0;
+            const unsigned STORE = 1;
+
+            unsigned op_count = 0;
+
+			// Zero initialize the buffers.
+			for (unsigned i = 0; i < n_elem/n_threads; i++) {
+				r_buffer[(hartid*n_elem/n_threads) + i] = 0;
+				t_buffer[(hartid*n_elem/n_threads) + i] = 0;
+			}
+
+            *test_fail = 0;
+            *lock = 0;
+
+			amo_add(checkpoint, 1);
+			while(*checkpoint != n_threads);
+			*checkpoint = 0;
+
+            while (1) {
+                // Exit if test has failed.
+                if (*test_fail == 1) break;
+
+                // Randomly perform load/store
+                unsigned op = rand(hartid) % 2;
+
+                if (op == LOAD) {
+                    unsigned ld_offset = rand(hartid);
+
+                    // Read test and reference value
+                    unsigned t_value = t_buffer[ld_offset];
+                    unsigned r_value = r_buffer[ld_offset];
+
+                    // Test if they are equal
+                    if (t_value != r_value) {
+                        *test_fail = 1;
+                        printf("[HART %d OP %d] T = 0x%x R = 0x%x\n", hartid, op_count, t_value, r_value);
+                    }
+
+                    op_count++;
+                } else if (op == STORE) {
+                    unsigned st_offset = rand(hartid);
+                    unsigned st_value = rand(hartid);
+
+                    // Update test and reference value
+                    acquire_lock(lock);
+                    t_buffer[st_offset] = st_value;
+                    r_buffer[st_offset] = st_value;
+                    release_lock(lock);
+
+                    op_count++;
+                }
+
+                if (op_count % 100 == 0) {
+                    if (hartid == 0) {
+                        printf("[HART 0] %d OP DONE!\n", op_count);
+                    }
+
+                    amo_add(checkpoint, 1);
+                    while(*checkpoint != n_threads);
+                    *checkpoint = 0;
+                }
+            }
+
+            while(1);
+        }
+        break; 
 		default:
 		break;
 	}

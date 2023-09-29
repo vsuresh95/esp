@@ -1,5 +1,7 @@
 #include <stdio.h>
 
+#define RAND_MAX 128 * 1024 * 2
+
 void thread_entry (int cid, int nc) {
     return;
 }
@@ -85,4 +87,13 @@ void multicore_print(const char *fmt, ...) {
 
     // release the lock
     release_lock (print_lock);
+}
+
+static unsigned long int next = 42;
+unsigned rand(unsigned hartid)
+{
+	unsigned rand_tmp;
+	next = next * 1103515245 + (hartid * 12343);
+	rand_tmp = (unsigned) (next / 65536) % RAND_MAX;
+	return rand_tmp;
 }
