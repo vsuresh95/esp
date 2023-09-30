@@ -207,6 +207,9 @@ int main(int argc, char * argv[])
             // Test buffer
             volatile unsigned* t_buffer = (volatile unsigned*) 0x92000000;
 
+			// Buffer lock
+			volatile unsigned* buf_lock = (volatile unsigned*) 0x93000000;
+
 	        volatile unsigned* test_fail = (volatile unsigned*) 0x90010120;
 
             const unsigned n_elem = RAND_MAX;
@@ -218,14 +221,20 @@ int main(int argc, char * argv[])
 
             unsigned op_count = 0;
 
+            const unsigned elem_per_lock = 16;
+
 			// Zero initialize the buffers.
 			for (unsigned i = 0; i < n_elem/n_threads; i++) {
 				r_buffer[(hartid*n_elem/n_threads) + i] = 0;
 				t_buffer[(hartid*n_elem/n_threads) + i] = 0;
 			}
 
+			// Zero initialize the locks
+			for (unsigned i = 0; i < (n_elem/n_threads)/elem_per_lock; i++) {
+				buf_lock[((hartid*n_elem/n_threads)/elem_per_lock) + i] = 0;
+			}
+
             *test_fail = 0;
-            *lock = 0;
 
 			amo_add(checkpoint, 1);
 			while(*checkpoint != n_threads);
@@ -240,10 +249,13 @@ int main(int argc, char * argv[])
 
                 if (op == LOAD) {
                     unsigned ld_offset = rand(hartid);
+                    unsigned ld_lock_offset = ld_offset/elem_per_lock;
 
                     // Read test and reference value
+                    acquire_lock(&buf_lock[ld_lock_offset]);
                     unsigned t_value = t_buffer[ld_offset];
                     unsigned r_value = r_buffer[ld_offset];
+                    release_lock(&buf_lock[ld_lock_offset]);
 
                     // Test if they are equal
                     if (t_value != r_value) {
@@ -255,23 +267,25 @@ int main(int argc, char * argv[])
                 } else if (op == STORE) {
                     unsigned st_offset = rand(hartid);
                     unsigned st_value = rand(hartid);
+                    unsigned st_lock_offset = st_offset/elem_per_lock;
 
                     // Update test and reference value
-                    acquire_lock(lock);
+                    acquire_lock(&buf_lock[st_lock_offset]);
                     t_buffer[st_offset] = st_value;
                     r_buffer[st_offset] = st_value;
-                    release_lock(lock);
+                    release_lock(&buf_lock[st_lock_offset]);
 
                     op_count++;
                 } else if (op == AMO) {
                     unsigned amo_offset = rand(hartid);
                     unsigned amo_value = rand(hartid);
+                    unsigned amo_lock_offset = amo_offset/elem_per_lock;
 
                     // Atomic update test and reference value
-                    acquire_lock(lock);
+                    acquire_lock(&buf_lock[amo_lock_offset]);
                     unsigned t_value = amo_swap(&t_buffer[amo_offset], amo_value);
                     unsigned r_value = amo_swap(&r_buffer[amo_offset], amo_value);
-                    release_lock(lock);
+                    release_lock(&buf_lock[amo_lock_offset]);
 
                     // Test if the old values are equal
                     if (t_value != r_value) {
@@ -283,12 +297,13 @@ int main(int argc, char * argv[])
                 } else if (op == LRSC) {
                     unsigned lrsc_offset = rand(hartid);
                     unsigned lrsc_value = rand(hartid);
+                    unsigned lrsc_lock_offset = lrsc_offset/elem_per_lock;
 
                     // Update test and reference value acquiring lock with LR-SC
-                    acquire_lock_lr_sc(lock);
+                    acquire_lock_lr_sc(&buf_lock[lrsc_lock_offset]);
                     t_buffer[lrsc_offset] = lrsc_value;
                     r_buffer[lrsc_offset] = lrsc_value;
-                    release_lock(lock);
+                    release_lock(&buf_lock[lrsc_lock_offset]);
 
                     op_count++;							
                 }
