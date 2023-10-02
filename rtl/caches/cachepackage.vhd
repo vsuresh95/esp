@@ -208,7 +208,9 @@ package cachepackage is
       flush_l1 : out std_ulogic;
 
       -- fence to L2
-      fence_l2 : in std_logic_vector(1 downto 0);
+      cpu_fence_data  : in std_logic_vector(1 downto 0);
+      cpu_fence_valid : in std_ulogic;
+      cpu_fence_ready : out std_ulogic;
 
       -- backend (cache - NoC)
       -- tile->NoC1
@@ -276,6 +278,12 @@ package cachepackage is
       rl                        : in  std_ulogic;
       spandex_conf              : in  std_logic_vector(31 downto 0);
       acc_flush_done            : out std_ulogic;
+
+      -- fence to L2
+      acc_fence_valid           : in std_ulogic;
+      acc_fence_ready           : out std_ulogic;
+      acc_fence_data            : in std_logic_vector(1 downto 0);
+
       -- backend (cache - NoC)
       -- tile->NoC1
       coherence_req_wrreq        : out std_ulogic;

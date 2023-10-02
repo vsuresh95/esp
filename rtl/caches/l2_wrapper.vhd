@@ -70,7 +70,9 @@ entity l2_wrapper is
     flush_l1 : out std_ulogic;
 
     -- fence to L2
-    fence_l2 : in std_logic_vector(1 downto 0);
+    cpu_fence_data : in std_logic_vector(1 downto 0);
+    cpu_fence_valid : in std_ulogic;
+    cpu_fence_ready : out std_ulogic;
 
     -- backend (cache - NoC)
     -- tile->NoC1
@@ -174,7 +176,6 @@ architecture rtl of l2_wrapper is
   --signal bookmark               : bookmark_t;
   --signal custom_dbg             : custom_dbg_t;
   signal flush_done             : std_ulogic;
-  signal acc_flush_done         : std_ulogic;
   -- statistics
   signal stats_ready            : std_ulogic;
   signal stats_valid            : std_ulogic;
@@ -185,10 +186,12 @@ architecture rtl of l2_wrapper is
   signal fence_l2_valid         : std_logic;
   signal fence_l2_data          : std_logic_vector(1 downto 0);
 
-  type fence_state_t is (idle, valid_fence);
+  type fence_state_t is (idle, wait_for_cpu_ready, valid_fence, wait_for_fence_done, dummy_fence_state);
   signal fence_state, fence_next : fence_state_t;
   signal fence_reg : std_logic_vector(1 downto 0);
   signal sample_fence : std_logic;
+  signal pending_fence : std_logic;
+  signal flush_done_sync : std_logic;
 
 ----------------------------------------------------------------------------
 -- APB slave signals
@@ -759,7 +762,7 @@ begin  -- architecture rtl of l2_wrapper
       l2_rsp_in_data_word_mask  => rsp_in_data_word_mask,
       l2_rsp_in_data_invack_cnt => rsp_in_data_invack_cnt,
       flush_done                => flush_done,
-      acc_flush_done            => acc_flush_done,
+      acc_flush_done            => flush_done_sync,
       l2_stats_ready            => stats_ready,
       l2_stats_valid            => stats_valid,
       l2_stats_data             => stats_data,
@@ -795,7 +798,7 @@ begin  -- architecture rtl of l2_wrapper
   ----------------------------------------------------------------------------
   -- Fence signal state
   -----------------------------------------------------------------------------
-  fence_update : process (clk, rst) is
+  fence_update : process (clk, rst, sample_fence) is
   begin
     if rst = '0' then
       fence_state <= idle;
@@ -808,30 +811,48 @@ begin  -- architecture rtl of l2_wrapper
     end if;
   end process fence_update;
 
-  fence_state_fsm : process (fence_l2, fence_l2_ready, fence_state, fence_reg) is
+  fence_state_fsm : process (flush_done_sync, cpu_fence_data, cpu_fence_valid, cpu_req_ready, fence_l2_ready, fence_state, fence_reg) is
   begin
     fence_next     <= fence_state;
     fence_l2_valid <= '0';
     fence_l2_data  <= (others => '0');
     sample_fence   <= '0';
+    cpu_fence_ready <= '0';
+    pending_fence  <= '0';
 
     case fence_state is
       when idle =>
-        fence_l2_data <= fence_l2;
-        if fence_l2 /= "00" and USE_SPANDEX /= 0 then
+        cpu_fence_ready <= '1';
+        if cpu_fence_valid = '1' and USE_SPANDEX /= 0 then
+          fence_l2_data <= cpu_fence_data;
+          sample_fence <= '1';
+          fence_next <= wait_for_cpu_ready;
+        elsif cpu_fence_valid = '1' and USE_SPANDEX = 0 then
+          fence_next <= dummy_fence_state;
+        end if;
+
+      when wait_for_cpu_ready =>
+        fence_l2_data <= fence_reg;
+        pending_fence <= '1';
+        if cpu_req_ready = '1' and fence_l2_ready = '1' then
           fence_l2_valid <= '1';
-          if fence_l2_ready = '0' then
-            fence_next   <= valid_fence;
-            sample_fence <= '1';
-          end if;
+          fence_next <= valid_fence;
         end if;
 
       when valid_fence =>
-        fence_l2_data  <= fence_reg;
-        fence_l2_valid <= '1';
+        pending_fence <= '1';
         if fence_l2_ready = '1' then
+          fence_next <= wait_for_fence_done;
+        end if;
+
+      when wait_for_fence_done =>
+        pending_fence <= '1';
+        if flush_done_sync = '1' then
           fence_next <= idle;
         end if;
+
+      when dummy_fence_state =>
+        fence_next <= idle;
 
       when others =>
         fence_next <= idle;
