@@ -5,6 +5,15 @@
 
 static unsigned first = 0;
 
+static void checkpoint_update(volatile unsigned* checkpoint, unsigned n_threads) {
+	unsigned checkpoint_val = amo_add(checkpoint, 1);
+
+	while(*checkpoint != n_threads);
+	if (checkpoint_val == n_threads - 1) {
+		*checkpoint = 0;
+	}
+}
+
 int main(int argc, char * argv[])
 {
 	const unsigned n_threads = NUM_THREADS;
@@ -24,13 +33,12 @@ int main(int argc, char * argv[])
 	multicore_print("[HART %d TEST %d] Hello from ESP!\n", hartid, t_id);
 
 	if (amo_swap(&first, 1) == 1) {
-		amo_add(checkpoint, 1);
+		checkpoint_update(checkpoint, n_threads);
 	} else {
 		*checkpoint = 1;
+		while(*checkpoint != n_threads);
+		*checkpoint = 0;
 	}
-
-	while(*checkpoint != n_threads);
-	*checkpoint = 0;
 
 	switch (t_id) {
 		// Each core writes to alternating elements of an array, and each
@@ -48,9 +56,7 @@ int main(int argc, char * argv[])
 				buffer1[i] = (hartid + 1) * i;
 			}
 
-			amo_add(checkpoint, 1);
-			while(*checkpoint != n_threads);
-			*checkpoint = 0;
+			checkpoint_update(checkpoint, n_threads);
 
 			// CP 2 : All cores will test the values of the array
 			for (unsigned i = ((hartid + 1) % n_threads); i < buffer1_size; i+=n_threads) {
@@ -62,18 +68,14 @@ int main(int argc, char * argv[])
 			
 			multicore_print("[HART %d] Errors = %d\n", hartid, errors);
 
-			amo_add(checkpoint, 1);
-			while(*checkpoint != n_threads);
-			*checkpoint = 0;
+			checkpoint_update(checkpoint, n_threads);
 
 			// CP 3 : Each core amo_add a value to alternating elements of an array.
 			for (unsigned i = hartid; i < buffer1_size; i+=n_threads) {
 				amo_add(buffer1+i, (hartid + 1) * i);
 			}
 
-			amo_add(checkpoint, 1);
-			while(*checkpoint != n_threads);
-			*checkpoint = 0;
+			checkpoint_update(checkpoint, n_threads);
 
 			// CP 4 : All cores will test the values of the array
 			errors = 0;
@@ -87,9 +89,7 @@ int main(int argc, char * argv[])
 
 			multicore_print("[HART %d] Errors = %d\n", hartid, errors);
 
-			amo_add(checkpoint, 1);
-			while(*checkpoint != n_threads);
-			*checkpoint = 0;
+			checkpoint_update(checkpoint, n_threads);
 		}
 		break;
 		// Each core writes to a different line in the LLC set - eventually causing eviction.
@@ -111,9 +111,7 @@ int main(int argc, char * argv[])
 				buffer1[i * llc_way_word_offset] = (hartid + 1) * i;
 			}
 
-			amo_add(checkpoint, 1);
-			while(*checkpoint != n_threads);
-			*checkpoint = 0;
+			checkpoint_update(checkpoint, n_threads);
 
 			// CP 2 : All cores will test the values of the array
 			for (unsigned i = ((hartid + 1) % n_threads); i < buffer1_size; i+=n_threads) {
@@ -125,18 +123,14 @@ int main(int argc, char * argv[])
 
 			multicore_print("[HART %d] Errors = %d\n", hartid, errors);
 
-			amo_add(checkpoint, 1);
-			while(*checkpoint != n_threads);
-			*checkpoint = 0;
+			checkpoint_update(checkpoint, n_threads);
 
 			// CP 3 : Each core amo_add a value to alternating elements of an array.
 			for (unsigned i = hartid; i < buffer1_size; i+=n_threads) {
 				amo_add(buffer1 + (i * llc_way_word_offset), (hartid + 1) * i);
 			}
 
-			amo_add(checkpoint, 1);
-			while(*checkpoint != n_threads);
-			*checkpoint = 0;
+			checkpoint_update(checkpoint, n_threads);
 
 			// CP 4 : All cores will test the values of the array
 			for (unsigned i = ((hartid + 1) % n_threads); i < buffer1_size; i+=n_threads) {
@@ -148,9 +142,7 @@ int main(int argc, char * argv[])
 
 			multicore_print("[HART %d] Errors = %d\n", hartid, errors);
 
-			amo_add(checkpoint, 1);
-			while(*checkpoint != n_threads);
-			*checkpoint = 0;			
+			checkpoint_update(checkpoint, n_threads);
 		}
 		break;
 		// Each core executes a critical section guarded by LR-SC synchronizations.
@@ -176,9 +168,7 @@ int main(int argc, char * argv[])
 				release_lock(lock);
 			}
 
-			amo_add(checkpoint, 1);
-			while(*checkpoint != n_threads);
-			*checkpoint = 0;
+			checkpoint_update(checkpoint, n_threads);
 
 			// CP 2 : All cores will test the values of the array
 			for (unsigned i = 0; i < num_iters; i++) {
@@ -194,21 +184,19 @@ int main(int argc, char * argv[])
 
 			multicore_print("[HART %d] Errors = %d\n", hartid, errors);
 
-			amo_add(checkpoint, 1);
-			while(*checkpoint != n_threads);
-			*checkpoint = 0;			
+			checkpoint_update(checkpoint, n_threads);
 		}
 		break;
 		case 3:
 		{
             // Reference buffer
-            volatile unsigned* r_buffer = (volatile unsigned*) 0x91000000;
+            volatile unsigned* r_buffer = (volatile unsigned*) 0x91020000;
 
             // Test buffer
-            volatile unsigned* t_buffer = (volatile unsigned*) 0x92000000;
+            volatile unsigned* t_buffer = (volatile unsigned*) 0x91040000;
 
 			// Buffer lock
-			volatile unsigned* buf_lock = (volatile unsigned*) 0x93000000;
+			volatile unsigned* buf_lock = (volatile unsigned*) 0x91060000;
 
 	        volatile unsigned* test_fail = (volatile unsigned*) 0x90010120;
 
@@ -221,24 +209,26 @@ int main(int argc, char * argv[])
 
             unsigned op_count = 0;
 
-            const unsigned elem_per_lock = 16;
+            const unsigned elem_per_lock = 4;
+
+			const unsigned llc_set_offset = 8;
 
 			// Zero initialize the buffers.
 			for (unsigned i = 0; i < n_elem/n_threads; i++) {
-				r_buffer[(hartid*n_elem/n_threads) + i] = 0;
-				t_buffer[(hartid*n_elem/n_threads) + i] = 0;
+				unsigned init_offset = (hartid*n_elem/n_threads) + i;
+				r_buffer[init_offset << llc_set_offset] = 0;
+				t_buffer[init_offset << llc_set_offset] = 0;
 			}
 
 			// Zero initialize the locks
 			for (unsigned i = 0; i < (n_elem/n_threads)/elem_per_lock; i++) {
-				buf_lock[((hartid*n_elem/n_threads)/elem_per_lock) + i] = 0;
+				unsigned init_offset = ((hartid*n_elem/n_threads)/elem_per_lock) + i;
+				buf_lock[init_offset] = 0;
 			}
 
             *test_fail = 0;
 
-			amo_add(checkpoint, 1);
-			while(*checkpoint != n_threads);
-			*checkpoint = 0;
+			checkpoint_update(checkpoint, n_threads);
 
             while (1) {
                 // Exit if test has failed.
@@ -253,8 +243,8 @@ int main(int argc, char * argv[])
 
                     // Read test and reference value
                     acquire_lock(&buf_lock[ld_lock_offset]);
-                    unsigned t_value = t_buffer[ld_offset];
-                    unsigned r_value = r_buffer[ld_offset];
+                    unsigned t_value = t_buffer[ld_offset << llc_set_offset];
+                    unsigned r_value = r_buffer[ld_offset << llc_set_offset];
                     release_lock(&buf_lock[ld_lock_offset]);
 
                     // Test if they are equal
@@ -271,8 +261,8 @@ int main(int argc, char * argv[])
 
                     // Update test and reference value
                     acquire_lock(&buf_lock[st_lock_offset]);
-                    t_buffer[st_offset] = st_value;
-                    r_buffer[st_offset] = st_value;
+                    t_buffer[st_offset << llc_set_offset] = st_value;
+                    r_buffer[st_offset << llc_set_offset] = st_value;
                     release_lock(&buf_lock[st_lock_offset]);
 
                     op_count++;
@@ -283,8 +273,8 @@ int main(int argc, char * argv[])
 
                     // Atomic update test and reference value
                     acquire_lock(&buf_lock[amo_lock_offset]);
-                    unsigned t_value = amo_swap(&t_buffer[amo_offset], amo_value);
-                    unsigned r_value = amo_swap(&r_buffer[amo_offset], amo_value);
+                    unsigned t_value = amo_swap(&t_buffer[amo_offset << llc_set_offset], amo_value);
+                    unsigned r_value = amo_swap(&r_buffer[amo_offset << llc_set_offset], amo_value);
                     release_lock(&buf_lock[amo_lock_offset]);
 
                     // Test if the old values are equal
@@ -301,8 +291,8 @@ int main(int argc, char * argv[])
 
                     // Update test and reference value acquiring lock with LR-SC
                     acquire_lock_lr_sc(&buf_lock[lrsc_lock_offset]);
-                    t_buffer[lrsc_offset] = lrsc_value;
-                    r_buffer[lrsc_offset] = lrsc_value;
+                    t_buffer[lrsc_offset << llc_set_offset] = lrsc_value;
+                    r_buffer[lrsc_offset << llc_set_offset] = lrsc_value;
                     release_lock(&buf_lock[lrsc_lock_offset]);
 
                     op_count++;							
@@ -313,9 +303,7 @@ int main(int argc, char * argv[])
                         printf("[HART 0] %d OP DONE!\n", op_count);
                     }
 
-                    amo_add(checkpoint, 1);
-                    while(*checkpoint != n_threads);
-                    *checkpoint = 0;
+					checkpoint_update(checkpoint, n_threads);
                 }
             }
 

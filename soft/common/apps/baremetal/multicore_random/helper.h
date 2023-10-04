@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-#define RAND_MAX 128 * 1024 * 2
+#define RAND_MAX 64
 
 void thread_entry (int cid, int nc) {
     return;
