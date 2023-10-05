@@ -25,8 +25,8 @@ int main(int argc, char * argv[])
  		: "=r" (hartid)
  	);
 	
-	volatile unsigned* lock = (volatile unsigned*) 0x90010020;
-	volatile unsigned* checkpoint = (volatile unsigned*) 0x90010030;
+	volatile unsigned* lock = (volatile unsigned*) 0x80020010;
+	volatile unsigned* checkpoint = (volatile unsigned*) 0x80020020;
 
 	unsigned errors = 0;
 
@@ -46,7 +46,7 @@ int main(int argc, char * argv[])
 		// with AMO add for write.
 		case 0:
 		{
-			volatile unsigned* buffer1 = (volatile unsigned*) 0x90020000;
+			volatile unsigned* buffer1 = (volatile unsigned*) 0x80020100;
 			const unsigned buffer1_size = 64 * n_threads;
 
 			// CP 1 : Each core write to alternating elements of an array.
@@ -100,7 +100,7 @@ int main(int argc, char * argv[])
 			const unsigned llc_way_offset = (1 << llc_way_bits);
 			const unsigned llc_way_word_offset = llc_way_offset/sizeof(unsigned);
 
-			volatile unsigned* buffer1 = (volatile unsigned*) 0x90020000;
+			volatile unsigned* buffer1 = (volatile unsigned*) 0x80020100;
 			const unsigned buffer1_size = 64 * n_threads;
 
 			// CP 1 : Each core write to alternating elements of an array.
@@ -152,7 +152,7 @@ int main(int argc, char * argv[])
 			const unsigned llc_way_offset = (1 << llc_way_bits);
 			const unsigned llc_way_word_offset = llc_way_offset/sizeof(unsigned);
 
-			volatile unsigned* buffer1 = (volatile unsigned*) 0x90020000;
+			volatile unsigned* buffer1 = (volatile unsigned*) 0x80020100;
 			const unsigned buffer1_size = 8 * n_threads;
 			const unsigned num_iters = 64;
 
@@ -190,15 +190,15 @@ int main(int argc, char * argv[])
 		case 3:
 		{
             // Reference buffer
-            volatile unsigned* r_buffer = (volatile unsigned*) 0x91020000;
+            volatile unsigned* r_buffer = (volatile unsigned*) 0x80020100;
 
             // Test buffer
-            volatile unsigned* t_buffer = (volatile unsigned*) 0x91040000;
+            volatile unsigned* t_buffer = (volatile unsigned*) 0x80040100;
 
 			// Buffer lock
-			volatile unsigned* buf_lock = (volatile unsigned*) 0x91060000;
+			volatile unsigned* buf_lock = (volatile unsigned*) 0x80060100;
 
-	        volatile unsigned* test_fail = (volatile unsigned*) 0x90010120;
+	        volatile unsigned* test_fail = (volatile unsigned*) 0x80020030;
 
             const unsigned n_elem = RAND_MAX;
 
@@ -235,7 +235,7 @@ int main(int argc, char * argv[])
                 if (*test_fail == 1) break;
 
                 // Randomly perform load/store/AMO/LR-SC
-                unsigned op = rand(hartid) % 4;
+                unsigned op = rand(hartid) % 3;
 
                 if (op == LOAD) {
                     unsigned ld_offset = rand(hartid);

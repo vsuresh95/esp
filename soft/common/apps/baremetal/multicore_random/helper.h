@@ -78,7 +78,7 @@ void acquire_lock_lr_sc (volatile unsigned *handshake) {
 
 void multicore_print(const char *fmt, ...) {
     // Lock to acquire before printing
-	volatile unsigned* print_lock = (volatile unsigned*) 0x90010000;
+	volatile unsigned* print_lock = (volatile unsigned*) 0x80020000;
 	
     // acquire the lock
     acquire_lock (print_lock);
