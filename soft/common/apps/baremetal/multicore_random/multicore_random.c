@@ -253,6 +253,16 @@ int main(int argc, char * argv[])
                         printf("[HART %d OP %d] T = 0x%x R = 0x%x\n", hartid, op_count, t_value, r_value);
                     }
 
+					// With a 50% probability write a diff. value to same address
+					if (rand(hartid) % 2 == 1) {
+                    	unsigned st_value = rand(hartid);
+
+                    	acquire_lock(&buf_lock[ld_lock_offset]);
+                    	t_buffer[ld_offset << llc_set_offset] = st_value;
+                    	r_buffer[ld_offset << llc_set_offset] = st_value;
+                    	release_lock(&buf_lock[ld_lock_offset]);
+					}
+
                     op_count++;
                 } else if (op == STORE) {
                     unsigned st_offset = rand(hartid);
