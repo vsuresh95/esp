@@ -1,9 +1,13 @@
 /* Copyright (c) 2011-2019 Columbia University, System Level Design Group */
 /* SPDX-License-Identifier: Apache-2.0 */
 
+// Lock to acquire before printing
+static unsigned print_lock = 0;
+	
 #include <helper.h>
 
 static unsigned first = 0;
+static unsigned test_fail = 0;
 
 static void checkpoint_update(volatile unsigned* checkpoint, unsigned n_threads) {
 	unsigned checkpoint_val = amo_add(checkpoint, 1);
@@ -198,8 +202,6 @@ int main(int argc, char * argv[])
 			// Buffer lock
 			volatile unsigned* buf_lock = (volatile unsigned*) 0x80060100;
 
-	        volatile unsigned* test_fail = (volatile unsigned*) 0x80020030;
-
             const unsigned n_elem = RAND_MAX;
 
             const unsigned LOAD = 0;
@@ -226,16 +228,14 @@ int main(int argc, char * argv[])
 				buf_lock[init_offset] = 0;
 			}
 
-            *test_fail = 0;
-
 			checkpoint_update(checkpoint, n_threads);
 
             while (1) {
                 // Exit if test has failed.
-                if (*test_fail == 1) break;
+                if (test_fail == 1) break;
 
                 // Randomly perform load/store/AMO/LR-SC
-                unsigned op = rand(hartid) % 3;
+                unsigned op = rand(hartid) % 4;
 
                 if (op == LOAD) {
                     unsigned ld_offset = rand(hartid);
@@ -249,7 +249,7 @@ int main(int argc, char * argv[])
 
                     // Test if they are equal
                     if (t_value != r_value) {
-                        *test_fail = 1;
+                        test_fail = 1;
                         printf("[HART %d OP %d] T = 0x%x R = 0x%x\n", hartid, op_count, t_value, r_value);
                     }
 
@@ -289,7 +289,7 @@ int main(int argc, char * argv[])
 
                     // Test if the old values are equal
                     if (t_value != r_value) {
-                        *test_fail = 1;
+                        test_fail = 1;
                         printf("[HART %d OP %d] T = 0x%x R = 0x%x\n", hartid, op_count, t_value, r_value);
                     }
 
