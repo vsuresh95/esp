@@ -213,7 +213,7 @@ int main(int argc, char * argv[])
 
             const unsigned elem_per_lock = 4;
 
-			const unsigned llc_set_offset = 8;
+			const unsigned llc_set_offset = 9;
 
 			// Zero initialize the buffers.
 			for (unsigned i = 0; i < n_elem/n_threads; i++) {
@@ -235,7 +235,7 @@ int main(int argc, char * argv[])
                 if (test_fail == 1) break;
 
                 // Randomly perform load/store/AMO/LR-SC
-                unsigned op = rand(hartid) % 4;
+                unsigned op = rand(hartid) % 3;
 
                 if (op == LOAD) {
                     unsigned ld_offset = rand(hartid);

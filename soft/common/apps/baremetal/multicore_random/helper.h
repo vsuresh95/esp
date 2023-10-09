@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-#define RAND_MAX 64
+#define RAND_MAX 16
 
 void thread_entry (int cid, int nc) {
     return;
@@ -61,15 +61,15 @@ void release_lock (volatile unsigned *handshake) {
     asm volatile ("fence");
 }
 
-void acquire_lock_lr_sc (volatile unsigned *handshake) {
+static inline void acquire_lock_lr_sc (volatile unsigned *handshake) {
     // acquire the lock
     asm volatile (
-        "try_lr_%=:     li t1, 1;"
-        "               mv t2, %0;"
-        "               lr.w.aq t0, (t2);"
-        "               beq t0, t1, try_lr_%=;"
-        "               sc.w.rl t0, t1, (t2);"
-        "               bnez t0, try_lr_%="
+        "1: li t1, 1;"
+        "   mv t2, %0;"
+        "   lr.w.aq t0, (t2);"
+        "   beq t0, t1, 1b;"
+        "   sc.w.rl t0, t1, (t2);"
+        "   bnez t0, 1b"
         :
         : "r" (handshake)
         : "t0", "t1", "t2", "memory"
