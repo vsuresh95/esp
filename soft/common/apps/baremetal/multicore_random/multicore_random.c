@@ -9,6 +9,8 @@ static unsigned print_lock = 0;
 static unsigned first = 0;
 static unsigned test_fail = 0;
 
+static unsigned test4_update_var = 0;
+
 static void checkpoint_update(volatile unsigned* checkpoint, unsigned n_threads) {
 	unsigned checkpoint_val = amo_add(checkpoint, 1);
 
@@ -319,7 +321,42 @@ int main(int argc, char * argv[])
 
             while(1);
         }
-        break; 
+        break;
+		// Each core increments the same variable with its (hartid+1) using LR/SC.
+		case 4:
+		{
+			const unsigned num_iterations = 16;
+
+			for (unsigned i = 0; i < num_iterations; i++) {
+				unsigned old_value, ret_value;
+
+				__asm__ __volatile__ (
+					"1: lr.w.aq %[old], %[addr]\n"
+					"   add %[rval], %[old], %[val]\n"
+					"   sc.w.rl %[rval], %[rval], %[addr]\n"
+					"   bnez %[rval], 1b"
+					: [old] "=&r" (old_value), [rval] "=&r" (ret_value), [addr] "+A" (test4_update_var)
+					: [val] "r" (hartid+1)
+					: "t0", "memory"
+				);			
+			}
+
+			checkpoint_update(checkpoint, n_threads);
+
+			if (hartid == 0) {
+				unsigned actual_val = test4_update_var;
+				unsigned golden_val = num_iterations * (n_threads == 4 ? 10 : (n_threads == 2 ? 3 : 1));
+
+				if (actual_val != golden_val) {
+					printf("[HART 0] FAIL A = %d E = %d!\n", actual_val, golden_val);
+				} else {
+					printf("[HART 0] PASS!\n");
+				}
+			} else {
+				while(1);
+			}
+		}
+		break;		 
 		default:
 		break;
 	}
