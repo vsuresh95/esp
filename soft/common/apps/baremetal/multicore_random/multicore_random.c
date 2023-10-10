@@ -31,8 +31,8 @@ int main(int argc, char * argv[])
  		: "=r" (hartid)
  	);
 	
-	volatile unsigned* lock = (volatile unsigned*) 0x80020010;
-	volatile unsigned* checkpoint = (volatile unsigned*) 0x80020020;
+	volatile unsigned* lock = (volatile unsigned*) 0x80030010;
+	volatile unsigned* checkpoint = (volatile unsigned*) 0x80030020;
 
 	unsigned errors = 0;
 
@@ -52,7 +52,7 @@ int main(int argc, char * argv[])
 		// with AMO add for write.
 		case 0:
 		{
-			volatile unsigned* buffer1 = (volatile unsigned*) 0x80020100;
+			volatile unsigned* buffer1 = (volatile unsigned*) 0x80030100;
 			const unsigned buffer1_size = 64 * n_threads;
 
 			// CP 1 : Each core write to alternating elements of an array.
@@ -106,7 +106,7 @@ int main(int argc, char * argv[])
 			const unsigned llc_way_offset = (1 << llc_way_bits);
 			const unsigned llc_way_word_offset = llc_way_offset/sizeof(unsigned);
 
-			volatile unsigned* buffer1 = (volatile unsigned*) 0x80020100;
+			volatile unsigned* buffer1 = (volatile unsigned*) 0x80030100;
 			const unsigned buffer1_size = 64 * n_threads;
 
 			// CP 1 : Each core write to alternating elements of an array.
@@ -158,7 +158,7 @@ int main(int argc, char * argv[])
 			const unsigned llc_way_offset = (1 << llc_way_bits);
 			const unsigned llc_way_word_offset = llc_way_offset/sizeof(unsigned);
 
-			volatile unsigned* buffer1 = (volatile unsigned*) 0x80020100;
+			volatile unsigned* buffer1 = (volatile unsigned*) 0x80030100;
 			const unsigned buffer1_size = 8 * n_threads;
 			const unsigned num_iters = 64;
 
@@ -196,13 +196,13 @@ int main(int argc, char * argv[])
 		case 3:
 		{
             // Reference buffer
-            volatile unsigned* r_buffer = (volatile unsigned*) 0x80020100;
+            volatile unsigned* r_buffer = (volatile unsigned*) 0x80030100;
 
             // Test buffer
-            volatile unsigned* t_buffer = (volatile unsigned*) 0x80040100;
+            volatile unsigned* t_buffer = (volatile unsigned*) 0x80050100;
 
 			// Buffer lock
-			volatile unsigned* buf_lock = (volatile unsigned*) 0x80060100;
+			volatile unsigned* buf_lock = (volatile unsigned*) 0x80070100;
 
             const unsigned n_elem = RAND_MAX;
 
@@ -237,7 +237,7 @@ int main(int argc, char * argv[])
                 if (test_fail == 1) break;
 
                 // Randomly perform load/store/AMO/LR-SC
-                unsigned op = rand(hartid) % 3;
+                unsigned op = rand(hartid) % 4;
 
                 if (op == LOAD) {
                     unsigned ld_offset = rand(hartid);
@@ -300,11 +300,36 @@ int main(int argc, char * argv[])
                     unsigned lrsc_offset = rand(hartid);
                     unsigned lrsc_value = rand(hartid);
                     unsigned lrsc_lock_offset = lrsc_offset/elem_per_lock;
+					unsigned old_value, ret_value;
 
                     // Update test and reference value acquiring lock with LR-SC
-                    acquire_lock_lr_sc(&buf_lock[lrsc_lock_offset]);
-                    t_buffer[lrsc_offset << llc_set_offset] = lrsc_value;
-                    r_buffer[lrsc_offset << llc_set_offset] = lrsc_value;
+                    acquire_lock(&buf_lock[lrsc_lock_offset]);
+
+					old_value = 0;
+					ret_value = 0;
+
+					__asm__ __volatile__ (
+						"1: lr.w.aq %[old], %[addr]\n"
+						"   add %[rval], %[old], %[val]\n"
+						"   sc.w.rl %[rval], %[rval], %[addr]\n"
+						"   bnez %[rval], 1b"
+						: [old] "=&r" (old_value), [rval] "=&r" (ret_value), [addr] "+A" (t_buffer[lrsc_offset << llc_set_offset])
+						: [val] "r" (lrsc_value)
+						: "t0", "memory"
+					);
+
+					old_value = 0;
+					ret_value = 0;
+
+					__asm__ __volatile__ (
+						"1: lr.w.aq %[old], %[addr]\n"
+						"   add %[rval], %[old], %[val]\n"
+						"   sc.w.rl %[rval], %[rval], %[addr]\n"
+						"   bnez %[rval], 1b"
+						: [old] "=&r" (old_value), [rval] "=&r" (ret_value), [addr] "+A" (r_buffer[lrsc_offset << llc_set_offset])
+						: [val] "r" (lrsc_value)
+						: "t0", "memory"
+					);											
                     release_lock(&buf_lock[lrsc_lock_offset]);
 
                     op_count++;							
