@@ -251,7 +251,7 @@ int main(int argc, char * argv[])
                     // Test if they are equal
                     if (t_value != r_value) {
                         test_fail = 1;
-                        printf("[HART %d OP %d] T = 0x%x R = 0x%x\n", hartid, op_count, t_value, r_value);
+                        printf("[HART %d LD OP %d] T = 0x%x R = 0x%x\n", hartid, op_count, t_value, r_value);
                     }
 
 					// With a 50% probability write a diff. value to same address
@@ -274,7 +274,17 @@ int main(int argc, char * argv[])
                     acquire_lock(&buf_lock[st_lock_offset]);
                     t_buffer[st_offset << llc_set_offset] = st_value;
                     r_buffer[st_offset << llc_set_offset] = st_value;
+
+                    // Read back same test and reference value
+                    unsigned t_value = t_buffer[st_offset << llc_set_offset];
+                    unsigned r_value = r_buffer[st_offset << llc_set_offset];
                     release_lock(&buf_lock[st_lock_offset]);
+
+                    // Test if they are equal
+                    if (t_value != r_value) {
+                        test_fail = 1;
+                        printf("[HART %d ST OP %d] T = 0x%x R = 0x%x\n", hartid, op_count, t_value, r_value);
+                    }
 
                     op_count++;
                 } else if (op == AMO) {
@@ -291,7 +301,19 @@ int main(int argc, char * argv[])
                     // Test if the old values are equal
                     if (t_value != r_value) {
                         test_fail = 1;
-                        printf("[HART %d OP %d] T = 0x%x R = 0x%x\n", hartid, op_count, t_value, r_value);
+                        printf("[HART %d AMO OP %d] T = 0x%x R = 0x%x\n", hartid, op_count, t_value, r_value);
+                    }
+
+                    // Read back same test and reference value
+                    acquire_lock(&buf_lock[amo_lock_offset]);
+                    t_value = t_buffer[amo_offset << llc_set_offset];
+                    r_value = r_buffer[amo_offset << llc_set_offset];
+                    release_lock(&buf_lock[amo_lock_offset]);
+
+                    // Test if they are equal
+                    if (t_value != r_value) {
+                        test_fail = 1;
+                        printf("[HART %d AMO LD OP %d] T = 0x%x R = 0x%x\n", hartid, op_count, t_value, r_value);
                     }
 
                     op_count++;					
@@ -329,7 +351,17 @@ int main(int argc, char * argv[])
 						: [val] "r" (lrsc_value)
 						: "t0", "memory"
 					);											
+
+                    // Read back same test and reference value
+                    unsigned t_value = t_buffer[lrsc_offset << llc_set_offset];
+                    unsigned r_value = r_buffer[lrsc_offset << llc_set_offset];
                     release_lock(&buf_lock[lrsc_lock_offset]);
+
+                    // Test if they are equal
+                    if (t_value != r_value) {
+                        test_fail = 1;
+                        printf("[HART %d LRSC OP %d] T = 0x%x R = 0x%x\n", hartid, op_count, t_value, r_value);
+                    }
 
                     op_count++;							
                 }
