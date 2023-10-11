@@ -43,7 +43,6 @@ int main(int argc, char * argv[])
 	} else {
 		*checkpoint = 1;
 		while(*checkpoint != n_threads);
-		*checkpoint = 0;
 	}
 
 	switch (t_id) {
