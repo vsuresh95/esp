@@ -366,7 +366,20 @@ int main(int argc, char * argv[])
                     op_count++;							
                 }
 
-                if (op_count % 100 == 0) {
+				// With 10% probability, do a random burst
+				if (rand(hartid) % 10 == 1) {
+					unsigned burst_offset = (rand(hartid) % (RAND_MAX/4)) + 0x4;
+
+					// Zero initialize the random buffer.
+					for (unsigned i = 0; i < n_elem/n_threads; i++) {
+						unsigned init_offset = (hartid*n_elem/n_threads) + i;
+
+						r_buffer[(init_offset << llc_set_offset) + burst_offset] = 0;
+						t_buffer[(init_offset << llc_set_offset) + burst_offset] = 0;
+					}
+				}
+
+                if (op_count % 1000 == 0) {
                     if (hartid == 0) {
                         printf("[HART 0] %d OP DONE!\n", op_count);
                     }
