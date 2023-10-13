@@ -426,6 +426,68 @@ int main(int argc, char * argv[])
 			}
 		}
 		break;		 
+		// Each core performs an AMO add on an array of shared variables.
+		case 5:
+		{
+            // Reference buffer
+            volatile unsigned* r_buffer = (volatile unsigned*) 0x80030100;
+
+            // Test buffer
+            volatile unsigned* t_buffer = (volatile unsigned*) 0x80050100;
+
+            const unsigned n_elem = RAND_MAX;
+			const unsigned llc_set_offset = 9;
+            unsigned op_count = 0;
+
+			// Zero initialize the shared buffer.
+			for (unsigned i = 0; i < n_elem/n_threads; i++) {
+				unsigned init_offset = (hartid*n_elem/n_threads) + i;
+				r_buffer[init_offset << llc_set_offset] = 0;
+				t_buffer[init_offset << llc_set_offset] = 0;
+			}
+
+			checkpoint_update(checkpoint, n_threads);
+
+			// Atomic add
+			while (1) {
+                // Exit if test has failed.
+                if (test_fail == 1) break;
+
+				unsigned amo_offset = rand(hartid);
+				unsigned amo_value = rand(hartid);
+
+				amo_add(&r_buffer[amo_offset << llc_set_offset], amo_value);
+				amo_add(&t_buffer[amo_offset << llc_set_offset], amo_value);
+
+				op_count++;
+
+                if (op_count % 100 == 0) {
+					if(hartid == 0) {
+						while(*checkpoint != n_threads - 1);
+
+						for (unsigned i = 0; i < n_elem; i++) {
+							unsigned t_value = t_buffer[i << llc_set_offset];
+							unsigned r_value = r_buffer[i << llc_set_offset];
+
+							if (t_value != r_value) {
+								test_fail = 1;
+								printf("[HART 0 %d] T = 0x%x R = 0x%x\n", i, t_value, r_value);
+								break;
+							}
+						}
+
+						if (op_count % 100 == 0) {
+							printf("[HART 0] %d OP DONE!\n", op_count);
+						}
+					}
+
+					checkpoint_update(checkpoint, n_threads);
+                }				
+			}
+
+            while(1);
+		}
+		break;		
 		default:
 		break;
 	}
