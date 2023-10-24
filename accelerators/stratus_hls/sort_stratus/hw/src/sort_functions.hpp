@@ -37,3 +37,76 @@ inline bool lt_float(const unsigned in0, const unsigned in1)
 		((!discordant && exp0_eq_exp1 && man0_gt_man1) && s0)
 		);
 }
+
+inline void sort::compute_load_ready_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("compute-load-ready-handshake");
+
+        load_ready.req.req();
+    }
+}
+
+inline void sort::load_compute_ready_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("load-compute-ready-handshake");
+
+        load_ready.ack.ack();
+    }
+}
+
+inline void sort::compute_2_store_ready_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("compute-store-ready-handshake");
+
+        store_ready.req.req();
+    }
+}
+
+inline void sort::store_compute_2_ready_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("store-compute-ready-handshake");
+
+        store_ready.ack.ack();
+    }
+}
+
+inline void sort::compute_load_done_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("compute-load-done-handshake");
+
+        load_done.ack.ack();
+    }
+}
+
+inline void sort::load_compute_done_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("load-compute-done-handshake");
+
+        load_done.req.req();
+    }
+}
+
+inline void sort::compute_2_store_done_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("compute-store-done-handshake");
+
+        store_done.ack.ack();
+    }
+}
+
+inline void sort::store_compute_2_done_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("store-compute-done-handshake");
+
+        store_done.req.req();
+    }
+}
+

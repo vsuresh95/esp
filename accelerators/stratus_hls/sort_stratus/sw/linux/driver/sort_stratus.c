@@ -18,6 +18,13 @@
 #define SORT_LEN_MAX_REG	0x4c
 #define SORT_BATCH_MAX_REG	0x50
 
+#define SORT_PROD_VALID_OFFSET 0x54
+#define SORT_PROD_READY_OFFSET 0x58
+#define SORT_CONS_VALID_OFFSET 0x5c
+#define SORT_CONS_READY_OFFSET 0x60
+#define SORT_INPUT_OFFSET 0x64
+#define SORT_OUTPUT_OFFSET 0x68
+
 struct sort_stratus_device {
 	struct esp_device esp;
 	size_t max_size; /* Maximum buffer size to be DMA'd to/from in bytes */
@@ -54,6 +61,15 @@ static void sort_prep_xfer(struct esp_device *esp, void *arg)
 
 	iowrite32be(a->size, esp->iomem + SORT_LEN_REG);
 	iowrite32be(a->batch, esp->iomem + SORT_BATCH_REG);
+	iowrite32be(a->prod_valid_offset, esp->iomem + SORT_PROD_VALID_OFFSET);
+	iowrite32be(a->prod_ready_offset, esp->iomem + SORT_PROD_READY_OFFSET);
+	iowrite32be(a->cons_valid_offset, esp->iomem + SORT_CONS_VALID_OFFSET);
+	iowrite32be(a->cons_ready_offset, esp->iomem + SORT_CONS_READY_OFFSET);
+	iowrite32be(a->input_offset, esp->iomem + SORT_INPUT_OFFSET);
+	iowrite32be(a->output_offset, esp->iomem + SORT_OUTPUT_OFFSET);
+	iowrite32be(a->spandex_conf, esp->iomem + SPANDEX_REG);
+	iowrite32be(a->src_offset, esp->iomem + SRC_OFFSET_REG);
+	iowrite32be(a->dst_offset, esp->iomem + DST_OFFSET_REG);
 }
 
 static bool sort_xfer_input_ok(struct esp_device *esp, void *arg)

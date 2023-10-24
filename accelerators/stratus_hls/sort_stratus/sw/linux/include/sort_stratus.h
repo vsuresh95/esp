@@ -21,6 +21,16 @@ struct sort_stratus_access {
 	struct esp_access esp;
 	unsigned int size;
 	unsigned int batch;
+
+	unsigned prod_valid_offset;
+    unsigned prod_ready_offset;
+	unsigned cons_valid_offset;
+    unsigned cons_ready_offset;
+    unsigned input_offset;
+    unsigned output_offset;
+	unsigned spandex_conf;
+	unsigned src_offset;
+	unsigned dst_offset;
 };
 
 #define SORT_STRATUS_IOC_ACCESS	_IOW ('S', 0, struct sort_stratus_access)

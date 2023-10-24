@@ -4,6 +4,8 @@
 #ifndef __SORT_DIRECTIVES_HPP__
 #define __SORT_DIRECTIVES_HPP__
 
+#define DMA_BEAT_PER_WORD 1
+#define DMA_WORD_PER_BEAT 2
 // Local memory size: number of elements
 #define lgLEN 10
 #define LEN (1<<lgLEN)
@@ -16,6 +18,24 @@
 #endif
 
 #if defined(STRATUS)
+
+#define HLS_MAP_plm(_mem, _plm_block_name)      \
+    HLS_MAP_TO_MEMORY(_mem, _plm_block_name)
+
+#define HLS_PROTO(_s)                           \
+    HLS_DEFINE_PROTOCOL(_s)
+
+#define HLS_FLAT(_a)                            \
+    HLS_FLATTEN_ARRAY(_a);
+
+#define HLS_BREAK_DEP(_a)                       \
+    HLS_BREAK_ARRAY_DEPENDENCY(_a)
+
+#define HLS_UNROLL_SIMPLE                       \
+    HLS_UNROLL_LOOP(ON)
+
+#define HLS_UNROLL_N(_n, _name)                 \
+    HLS_UNROLL_LOOP(AGGRESSIVE, _n, _name)
 
 // Memory allocation
 
@@ -59,8 +79,7 @@
 	HLS_UNROLL_LOOP(OFF)
 #define HLS_LOAD_INPUT_PLM_WRITE					\
 	HLS_CONSTRAIN_LATENCY(1, 1, "constraint-load-mem-access");	\
-	HLS_BREAK_ARRAY_DEPENDENCY(A0);					\
-	HLS_BREAK_ARRAY_DEPENDENCY(A1)
+	HLS_BREAK_ARRAY_DEPENDENCY(A0)
 
 #define HLS_STORE_RESET				\
 	HLS_DEFINE_PROTOCOL("store-reset")
@@ -74,9 +93,7 @@
 	HLS_UNROLL_LOOP(OFF)
 #define HLS_STORE_OUTPUT_PLM_READ					\
 	HLS_CONSTRAIN_LATENCY(1, 1, "constraint-store-mem-access");	\
-	HLS_BREAK_ARRAY_DEPENDENCY(B0);					\
-	HLS_BREAK_ARRAY_DEPENDENCY(B1)
-
+	HLS_BREAK_ARRAY_DEPENDENCY(B0)
 #define HLS_RB_RESET				\
 	HLS_DEFINE_PROTOCOL("rb-reset")
 #define HLS_RB_CONFIG				\
@@ -100,11 +117,9 @@
 	HLS_UNROLL_LOOP(OFF)
 #define HLS_RB_RW_CHUNK							\
 	HLS_UNROLL_LOOP(OFF);						\
-	HLS_CONSTRAIN_LATENCY(1, 1, "constraint-RB_RW_CHUNK-mem-access"); \
+	HLS_CONSTRAIN_LATENCY(1, 1, "constraint-RB_RW_CHUNK-mem-access");	\
 	HLS_BREAK_ARRAY_DEPENDENCY(A0);					\
-	HLS_BREAK_ARRAY_DEPENDENCY(A1);					\
-	HLS_BREAK_ARRAY_DEPENDENCY(C0);					\
-	HLS_BREAK_ARRAY_DEPENDENCY(C1)
+	HLS_BREAK_ARRAY_DEPENDENCY(C0)
 #define HLS_RB_INSERTION_OUTER			\
 	HLS_UNROLL_LOOP(OFF)
 #define HLS_RB_INSERTION_EVEN						\
@@ -117,15 +132,14 @@
 #define HLS_RB_W_LAST_CHUNKS_INNER					\
 	HLS_UNROLL_LOOP(OFF);						\
 	HLS_CONSTRAIN_LATENCY(1, 1, "constraint-RB_W_LAST_CHUNKS_INNER-mem-access"); \
-	HLS_BREAK_ARRAY_DEPENDENCY(C0);					\
-	HLS_BREAK_ARRAY_DEPENDENCY(C1)
+	HLS_BREAK_ARRAY_DEPENDENCY(C0)
 
 #define HLS_MERGE_SORT_LOOP			\
 	HLS_UNROLL_LOOP(OFF)
 #define HLS_MERGE_SORT_MAP_REGS			\
 	HLS_FLATTEN_ARRAY(head);		\
 	HLS_FLATTEN_ARRAY(fidx);		\
-	HLS_FLATTEN_ARRAY(regs);		\
+	HLS_FLATTEN_ARRAY(regs2);		\
 	HLS_FLATTEN_ARRAY(regs_in);		\
 	HLS_FLATTEN_ARRAY(shift_array);		\
 	HLS_FLATTEN_ARRAY(pop_array)
@@ -134,13 +148,10 @@
 #define HLS_MERGE_RD_FIRST_ELEMENTS					\
 	HLS_UNROLL_LOOP(OFF);						\
 	HLS_CONSTRAIN_LATENCY(1, 1, "constraint-MERGE_RD_FIRST_ELEMENTS-mem-access"); \
-	HLS_BREAK_ARRAY_DEPENDENCY(C0);					\
-	HLS_BREAK_ARRAY_DEPENDENCY(C1)
+	HLS_BREAK_ARRAY_DEPENDENCY(C0)
 #define HLS_MERGE_RD_NEXT_ELEMENT		\
-	HLS_BREAK_ARRAY_DEPENDENCY(C0);		\
-	HLS_BREAK_ARRAY_DEPENDENCY(C1)
+	HLS_BREAK_ARRAY_DEPENDENCY(C0)
 #define HLS_MERGE_MAIN				\
-	HLS_CONSTRAIN_LATENCY(2, 8, "constraint-MERGE_MAIN"); \
 	HLS_UNROLL_LOOP(OFF)
 #define HLS_MERGE_COMPARE			\
 	HLS_UNROLL_LOOP(ON)
@@ -157,11 +168,9 @@
 #define HLS_MERGE_SEQ				\
 	HLS_UNROLL_LOOP(ON)
 #define HLS_MERGE_WR_LAST_ELEMENTS					\
-	HLS_BREAK_ARRAY_DEPENDENCY(B0);					\
-	HLS_BREAK_ARRAY_DEPENDENCY(B1)
+	HLS_BREAK_ARRAY_DEPENDENCY(B0)
 #define HLS_MERGE_DO_POP						\
-	HLS_BREAK_ARRAY_DEPENDENCY(C0);					\
-	HLS_BREAK_ARRAY_DEPENDENCY(C1)
+	HLS_BREAK_ARRAY_DEPENDENCY(C0)
 #define HLS_MERGE_ZERO			\
 	HLS_UNROLL_LOOP(ON)
 #define HLS_MERGE_NO_MERGE_OUTER					\
@@ -169,9 +178,7 @@
 #define HLS_MERGE_NO_MERGE_INNER					\
 	HLS_PIPELINE_LOOP(HARD_STALL);					\
 	HLS_BREAK_ARRAY_DEPENDENCY(C0);					\
-	HLS_BREAK_ARRAY_DEPENDENCY(C1);					\
-	HLS_BREAK_ARRAY_DEPENDENCY(B0);					\
-	HLS_BREAK_ARRAY_DEPENDENCY(B1)
+	HLS_BREAK_ARRAY_DEPENDENCY(B0)
 
 #endif /* HLS_DIRECTIVES_BASIC */
 
@@ -181,21 +188,21 @@
 #ifndef HLS_MAP_A0
 #define HLS_MAP_A0
 #endif
-#ifndef HLS_MAP_A1
-#define HLS_MAP_A1
-#endif
+// #ifndef HLS_MAP_A1
+// #define HLS_MAP_A1
+// #endif
 #ifndef HLS_MAP_B0
 #define HLS_MAP_B0
 #endif
-#ifndef HLS_MAP_B1
-#define HLS_MAP_B1
-#endif
+// #ifndef HLS_MAP_B1
+// #define HLS_MAP_B1
+// #endif
 #ifndef HLS_MAP_C0
 #define HLS_MAP_C0
 #endif
-#ifndef HLS_MAP_C1
-#define HLS_MAP_C1
-#endif
+// #ifndef HLS_MAP_C1
+// #define HLS_MAP_C1
+// #endif
 
 
 #ifndef HLS_LOAD_RESET
