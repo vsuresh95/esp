@@ -6,7 +6,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-// #define ENABLE_SM
+#define ENABLE_SM
 #define SPX
 
 #ifdef SPX
@@ -57,33 +57,33 @@ uint64_t end_counter() {
 	return (t_end - t_start);
 }
 
-static inline void write_mem (void* dst, int64_t value_64)
-{
-	asm volatile (
-		"mv t0, %0;"
-		"mv t1, %1;"
-		".word " QU(WRITE_CODE)
-		:
-		: "r" (dst), "r" (value_64)
-		: "t0", "t1", "memory"
-	);
-}
+// static inline void write_mem (void* dst, int64_t value_64)
+// {
+// 	asm volatile (
+// 		"mv t0, %0;"
+// 		"mv t1, %1;"
+// 		".word " QU(WRITE_CODE)
+// 		:
+// 		: "r" (dst), "r" (value_64)
+// 		: "t0", "t1", "memory"
+// 	);
+// }
 
-static inline int64_t read_mem (void* dst)
-{
-	int64_t value_64;
+// static inline int64_t read_mem (void* dst)
+// {
+// 	int64_t value_64;
 
-	asm volatile (
-		"mv t0, %1;"
-		".word " QU(READ_CODE) ";"
-		"mv %0, t1"
-		: "=r" (value_64)
-		: "r" (dst)
-		: "t0", "t1", "memory"
-	);
+// 	asm volatile (
+// 		"mv t0, %1;"
+// 		".word " QU(READ_CODE) ";"
+// 		"mv %0, t1"
+// 		: "=r" (value_64)
+// 		: "r" (dst)
+// 		: "t0", "t1", "memory"
+// 	);
 
-	return value_64;
-}
+// 	return value_64;
+// }
 
 // static const char usage_str[] = "usage: sort coherence cmd [n_elems] [n_batches] [-v]\n"
 // 	"  coherence: none|llc-coh-dma|coh-dma|coh\n"
@@ -114,7 +114,7 @@ static int check_gold (float *gold, float *array, int len, bool verbose)
 
 	dst = (void*) array;
 	for (i = 0; i < len; i += 2, dst += 8) {
-		out_data.value_64 = read_mem(dst);
+		out_data.value_64 = read_mem_reqodata(dst);
 
 		if (out_data.value_32_1 != gold[i]) {
 			rtn += 1;
@@ -161,7 +161,7 @@ static void init_buf (float *buf, float* gold, unsigned sort_size, unsigned sort
 			in_data.value_32_1 = gold[i];
 			in_data.value_32_2 = gold[i + 1];
 
-			write_mem(dst, in_data.value_64);
+			write_mem_wtfwd(dst, in_data.value_64);
 		}
 }
 
@@ -320,18 +320,21 @@ int main(int argc, char *argv[])
 	printf("	.size = %u\n", sort_cfg_000[0].size);
 	printf("	.batch = %u\n", sort_cfg_000[0].batch);
 	printf("	Coherence = %s\n", CohPrintHeader);
+	printf("	ITERATIONS = %u\n", ITERATIONS);
 
 #ifdef ENABLE_SM
 	sort_cfg_000[0].esp.start_stop = 1;
 	esp_run(cfg_000, NACC);
+
+	// Reset all sync variables to default values.
+	UpdateSync((void*) &buf[VALID_FLAG_OFFSET], 0);
+	UpdateSync((void*) &buf[READY_FLAG_OFFSET], 1);
+	UpdateSync((void*) &buf[END_FLAG_OFFSET], 0);
+	UpdateSync((void*) &buf[SYNC_VAR_SIZE + LEN + VALID_FLAG_OFFSET], 0);
+	UpdateSync((void*) &buf[SYNC_VAR_SIZE + LEN + READY_FLAG_OFFSET], 1);
+	UpdateSync((void*) &buf[SYNC_VAR_SIZE + LEN + END_FLAG_OFFSET], 0);
+
 	for (i = 0; i < ITERATIONS; ++i) {
-		// Reset all sync variables to default values.
-		UpdateSync((void*) &buf[VALID_FLAG_OFFSET], 0);
-		UpdateSync((void*) &buf[READY_FLAG_OFFSET], 1);
-		UpdateSync((void*) &buf[END_FLAG_OFFSET], 0);
-		UpdateSync((void*) &buf[SYNC_VAR_SIZE + LEN + VALID_FLAG_OFFSET], 0);
-		UpdateSync((void*) &buf[SYNC_VAR_SIZE + LEN + READY_FLAG_OFFSET], 1);
-		UpdateSync((void*) &buf[SYNC_VAR_SIZE + LEN + END_FLAG_OFFSET], 0);
 		// printf("SM Enabled\n");
 
 		srand(time(NULL));
@@ -340,11 +343,6 @@ int main(int argc, char *argv[])
 			// gold[j] = (1.0 / (float) j + 1);
 		}
 		// printf("Gold Initialized\n");
-
-		start_counter();
-		quicksort(gold, LEN);
-		t_sw_sort += end_counter();
-		// printf("SW Computed\n");
 
 		start_counter();
 		// Wait for the accelerator to be ready
@@ -371,6 +369,11 @@ int main(int argc, char *argv[])
 		UpdateSync((void*) &buf[SYNC_VAR_SIZE + LEN + VALID_FLAG_OFFSET], 0);
 		t_sort += end_counter();
 		// printf("Acc done\n");
+
+		start_counter();
+		quicksort(gold, LEN);
+		t_sw_sort += end_counter();
+		// printf("SW Computed\n");
 
 		start_counter();
 		errors += check_gold(gold, &buf[SYNC_VAR_SIZE + LEN + SYNC_VAR_SIZE], LEN, true);

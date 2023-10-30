@@ -11,23 +11,23 @@
 #include <esp_accelerator.h>
 #include <esp_probe.h>
 
-// #define ENABLE_SM
-// #define SPX
+#define ENABLE_SM
+#define SPX
 
 #ifdef SPX
-	#define COH_MODE 0
+	#define COH_MODE 2
 #else
 	#define IS_ESP 1
-	#define COH_MODE 1
+	#define COH_MODE 0
 #endif
 
 #include "sm.h"
-#define ITERATIONS 10
+#define ITERATIONS 100
 
 #define SLD_SORT   0x0B
 #define DEV_NAME "sld,sort_stratus"
 
-#define SORT_LEN 64
+#define SORT_LEN 512
 #define SORT_BATCH 1
 
 #define SYNC_VAR_SIZE 6
@@ -39,7 +39,7 @@
 #define SORT_BUF_SIZE (2 * SORT_LEN * SORT_BATCH * sizeof(unsigned) + 2 * SYNC_VAR_SIZE * sizeof(unsigned))
 
 /* Size of the contiguous chunks for scatter/gather */
-#define CHUNK_SHIFT 11
+#define CHUNK_SHIFT 12
 #define CHUNK_SIZE BIT(CHUNK_SHIFT)
 #define NCHUNK ((SORT_BUF_SIZE % CHUNK_SIZE == 0) ?			\
 			(SORT_BUF_SIZE / CHUNK_SIZE) :			\
@@ -59,6 +59,40 @@
 #define SORT_INPUT_OFFSET 0x64
 #define SORT_OUTPUT_OFFSET 0x68
 
+uint64_t t_sw_sort;
+uint64_t t_cpu_write;
+uint64_t t_sort;
+uint64_t t_cpu_read;
+
+static uint64_t t_start = 0;
+static uint64_t t_end = 0;
+
+// static inline
+void start_counter() {
+    asm volatile (
+		"li t0, 0;"
+		"csrr t0, mcycle;"
+		"mv %0, t0"
+		: "=r" (t_start)
+		:
+		: "t0"
+	);
+}
+
+// static inline
+uint64_t end_counter() {
+	asm volatile (
+		"li t0, 0;"
+		"csrr t0, mcycle;"
+		"mv %0, t0"
+		: "=r" (t_end)
+		:
+		: "t0"
+	);
+
+	return (t_end - t_start);
+}
+
 static int validate_sorted(float *array, int len)
 {
 	int i;
@@ -70,7 +104,7 @@ static int validate_sorted(float *array, int len)
 			printf("	mem[%d] = %llx\n", i - 1, array[i-1]);
 			rtn++;
 		}
-		printf("A[%d]: array=%llx\n", i, array[i]);
+		// printf("A[%d]: array=%llx\n", i, array[i]);
 	}
 	return rtn;
 }
@@ -82,7 +116,7 @@ static void init_buf (float *buf, unsigned sort_size, unsigned sort_batch)
 	float A[SORT_LEN];
 	#include "debug.h"
 
-	printf("  Generate random input...\n");
+	// printf("  Generate random input...\n");
 
 	/* srand(time(NULL)); */
 	for (j = 0; j < sort_batch; j++)
@@ -91,15 +125,15 @@ static void init_buf (float *buf, unsigned sort_size, unsigned sort_batch)
 #ifndef __riscv
 			buf[sort_size * j + i] = ((float) rand () / (float) RAND_MAX);
 #else
-			// buf[sort_size * j + i] = 1.0 / ((float) i + 1);
-			if (sort_size == 32) {
-				buf[sort_size * j + i] = A[i];
-			}
-			else {
-				for (k = 0; k < sort_size / 64; ++k) {
-					buf[sort_size * j + i] = A[i - 64 * k];
-				}
-			}
+			buf[sort_size * j + i] = 1.0 / ((float) i + 1);
+			// if (sort_size == 32) {
+			// 	buf[sort_size * j + i] = A[i];
+			// }
+			// else {
+			// 	for (k = 0; k < sort_size / 64; ++k) {
+			// 		buf[sort_size * j + i] = A[i - 64 * k];
+			// 	}
+			// }
 			
 #endif
 			// printf("A[%d]: array=%llx\n", i, buf[sort_size * j + i]);
@@ -231,34 +265,46 @@ int main(int argc, char * argv[])
 			// Flush for non-coherent DMA
 			esp_flush(coherence);
 
+			t_sw_sort = 0;
+			t_cpu_write = 0;
+			t_sort = 0;
+			t_cpu_read = 0;
+
 #ifndef ENABLE_SM
 			for (i = 0; i < ITERATIONS; ++i) {
 			// Initialize input: write floating point hex values (simpler to debug)
+			start_counter();
 			init_buf((float *) &mem[SYNC_VAR_SIZE], SORT_LEN, SORT_BATCH);
+			t_cpu_write += end_counter();
+
+			/* For acc running */
+			start_counter();
 #endif
 
 			// Start accelerator
-			printf("  Start..\n");
+			// printf("  Start..\n");
 			iowrite32(dev, CMD_REG, CMD_MASK_START);
 
 #ifdef ENABLE_SM
 			for (i = 0; i < ITERATIONS; ++i) {
 
-			printf("SM Enabled\n");
+			// printf("SM Enabled\n");
 
 			// Initialize input: write floating point hex values (simpler to debug)
-			WriteScratchReg(0x100);
+			// WriteScratchReg(0x100);
+			start_counter();
 			// Wait for the accelerator to be ready
 			SpinSync((void*) &mem[READY_FLAG_OFFSET], 1);
 			// Reset flag for the next iteration
 			UpdateSync((void*) &mem[READY_FLAG_OFFSET], 0);
+
 			// When the accelerator is ready, we write the input data to it
 			init_buf((float *) &mem[SYNC_VAR_SIZE], SORT_LEN, SORT_BATCH);
-			WriteScratchReg(0);
+			// WriteScratchReg(0);
 
-			WriteScratchReg(0x200);
+			// WriteScratchReg(0x200);
 			if (i == ITERATIONS - 1) {
-				WriteScratchReg(0x500);
+				// WriteScratchReg(0x500);
 				UpdateSync((void*) &mem[END_FLAG_OFFSET], 1);
 				UpdateSync((void*) &mem[SYNC_VAR_SIZE + SORT_LEN + END_FLAG_OFFSET], 1);
 				
@@ -269,24 +315,30 @@ int main(int argc, char * argv[])
 				// SpinSync((void*) &mem[SYNC_VAR_SIZE + SORT_LEN + VALID_FLAG_OFFSET], 1);
 				// UpdateSync((void*) &mem[SYNC_VAR_SIZE + SORT_LEN + VALID_FLAG_OFFSET], 0);
 				// UpdateSync((void*) &mem[SYNC_VAR_SIZE + SORT_LEN + READY_FLAG_OFFSET], 1);
-				WriteScratchReg(0);
+				// WriteScratchReg(0);
 			}
 			// Inform the accelerator to start.
 			UpdateSync((void*) &mem[VALID_FLAG_OFFSET], 1);
-			WriteScratchReg(0);
+			t_cpu_write += end_counter();
+			// WriteScratchReg(0);
 
-			WriteScratchReg(0x300);
+			start_counter();
+			// WriteScratchReg(0x300);
 			// Wait for the accelerator to send output.
 			SpinSync((void*) &mem[SYNC_VAR_SIZE + SORT_LEN + VALID_FLAG_OFFSET], 1);
 			// Reset flag for next iteration.
 			UpdateSync((void*) &mem[SYNC_VAR_SIZE + SORT_LEN + VALID_FLAG_OFFSET], 0);
-			WriteScratchReg(0);
+			// WriteScratchReg(0);
 
-			WriteScratchReg(0x400);
+			t_sort += end_counter();
+			
+			start_counter();
+			// WriteScratchReg(0x400);
 			errors += validate_sorted((float *) &mem[SYNC_VAR_SIZE + SORT_LEN + SYNC_VAR_SIZE], SORT_LEN);
 			// Inform the accelerator - ready for next iteration.
 			UpdateSync((void*) &mem[SYNC_VAR_SIZE + SORT_LEN + READY_FLAG_OFFSET], 1);
-			WriteScratchReg(0);
+			// WriteScratchReg(0);
+			t_cpu_read += end_counter();
 			}
 #endif
 
@@ -297,7 +349,7 @@ int main(int argc, char * argv[])
 				done &= STATUS_MASK_DONE;
 			}
 			iowrite32(dev, CMD_REG, 0x0);
-			printf("  Done\n");
+			// printf("  Done\n");
 
 			/* /\* Print output *\/ */
 			/* printf("  output:\n"); */
@@ -306,15 +358,20 @@ int main(int argc, char * argv[])
 			/* 		printf("    mem[%d][%d] = %08x\n", j, i, mem[j*SORT_LEN + i]); */
 
 			/* Validation */
-			printf("  validating...\n");
+			// printf("  validating...\n");
 
 #ifndef ENABLE_SM
+			/* For acc running */
+			t_sort += end_counter();
+
+			start_counter();
 			for (j = 0; j < SORT_BATCH; j++) {
 				int err = validate_sorted((float *) &mem[j * SORT_BUF_SIZE + SYNC_VAR_SIZE + SORT_LEN + SYNC_VAR_SIZE], SORT_LEN);
 				/* if (err != 0) */
 				/* 	printf("  Error: %s.%d mismatch on batch %d\n", DEV_NAME, n, j); */
 				errors += err;
 			}
+			t_cpu_read += end_counter();
 			}
 #endif
 			if (errors)
@@ -323,6 +380,11 @@ int main(int argc, char * argv[])
 				printf("  ... PASS\n");
 			printf("**************************************************\n\n");
 			printf("errors = %d\n", errors);
+
+			// printf("	SW Time = %lu\n", t_sw_sort);
+			printf("	CPU Write Time = %lu\n", t_cpu_write);
+			printf("	Sort Time = %lu\n", t_sort);
+			printf("	CPU Read Time = %lu\n", t_cpu_read);
 
 			if (scatter_gather)
 				aligned_free(ptable);
