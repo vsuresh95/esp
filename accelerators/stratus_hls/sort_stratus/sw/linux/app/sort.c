@@ -16,7 +16,7 @@
 	#define COH_MODE 1
 #endif
 
-#define ITERATIONS 100
+#define ITERATIONS 1000
 
 #include <my_stringify.h>
 
@@ -85,17 +85,6 @@ uint64_t end_counter() {
 // 	return value_64;
 // }
 
-// static const char usage_str[] = "usage: sort coherence cmd [n_elems] [n_batches] [-v]\n"
-// 	"  coherence: none|llc-coh-dma|coh-dma|coh\n"
-// 	"  cmd: config|test|run|hw|flush\n"
-// 	"\n"
-// 	"Optional arguments: n_elems and batch apply to 'config', 'hw' and 'test':\n"
-// 	"  n_elems: number of elements per batch to be sorted\n"
-// 	"  n_batches: number of batches\n"
-// 	"\n"
-// 	"The remaining option is only optional for 'test':\n"
-// 	"  -v: enable verbose output for output-to-gold comparison\n";
-
 static int check_gold (float *gold, float *array, int len, bool verbose)
 {
 	int i;
@@ -126,23 +115,6 @@ static int check_gold (float *gold, float *array, int len, bool verbose)
 	return rtn;
 }
 
-// static void init_buf (float *buf, unsigned sort_size, unsigned sort_batch)
-// {
-// 	int i, j;
-// 	printf("Generate random input...\n");
-// 	srand(time(NULL));
-// 	for (j = 0; j < sort_batch; j++)
-// 		for (i = 0; i < sort_size; i++) {
-// 			/* TAV rand between 0 and 1 */
-// 			buf[sort_size * j + i] = ((float) rand () / (float) RAND_MAX);
-// 			/* /\* More general testbench *\/ */
-// 			/* float M = 100000.0; */
-// 			/* buf[sort_size * j + i] =  M * ((float) rand() / (float) RAND_MAX) - M/2; */
-// 			/* /\* Easyto debug...! *\/ */
-// 			/* buf[sort_size * j + i] = (float) (sort_size - i);; */
-// 		}
-// }
-
 static void init_buf (float *buf, float* gold, unsigned sort_size, unsigned sort_batch)
 {
 	int i, j;
@@ -165,126 +137,8 @@ static void init_buf (float *buf, float* gold, unsigned sort_size, unsigned sort
 		}
 }
 
-// static inline size_t sort_size(struct sort_test *t)
-// {
-// 	return t->n_elems * t->n_batches * sizeof(float);
-// }
-
-// static void sort_alloc_buf(struct test_info *info)
-// {
-// 	struct sort_test *t = to_sort(info);
-
-// 	t->hbuf = malloc0_check(sort_size(t));
-// 	if (!strcmp(info->cmd, "test"))
-// 		t->sbuf = malloc0_check(sort_size(t));
-// }
-
-// static void sort_alloc_contig(struct test_info *info)
-// {
-// 	struct sort_test *t = to_sort(info);
-
-// 	printf("HW buf size: %zu\n", sort_size(t));
-// 	if (contig_alloc(sort_size(t), &info->contig) == NULL)
-// 		die_errno(__func__);
-// }
-
-// static void sort_init_bufs(struct test_info *info)
-// {
-// 	struct sort_test *t = to_sort(info);
-
-// 	init_buf(t->hbuf, t->n_elems, t->n_batches);
-// 	contig_copy_to(info->contig, 0, t->hbuf, sort_size(t));
-// 	if (!strcmp(info->cmd, "test"))
-// 		memcpy(t->sbuf, t->hbuf, sort_size(t));
-// }
-
-// static void sort_set_access(struct test_info *info)
-// {
-// 	struct sort_test *t = to_sort(info);
-
-// 	t->desc.size = t->n_elems;
-// 	t->desc.batch = t->n_batches;
-// }
-
-// static bool sort_diff_ok(struct test_info *info)
-// {
-// 	struct sort_test *t = to_sort(info);
-// 	int total_err = 0;
-// 	int i;
-
-// 	contig_copy_from(t->hbuf, info->contig, 0, sort_size(t));
-// 	for (i = 0; i < t->n_batches; i++) {
-// 		int err;
-
-// 		err = check_gold(t->sbuf, t->hbuf, t->n_elems, t->verbose);
-// 		if (err)
-// 			printf("Batch %d: %d mismatches\n", i, err);
-// 		total_err += err;
-// 	}
-// 	if (t->verbose) {
-// 		for (i = 0; i < t->n_batches; i++) {
-// 			int j;
-
-// 			printf("BATCH %d\n", i);
-// 			for (j = 0; j < t->n_elems; j++) {
-// 				printf("      \t%d : %.15g\n",
-// 					i, t->hbuf[t->n_elems * i + j]);
-// 			}
-// 			printf("\n");
-// 		}
-// 	}
-// 	if (total_err)
-// 		printf("%d mismatches in total\n", total_err);
-// 	return !total_err;
-// }
-
-// static struct sort_test sort_test = {
-// 	.info = {
-// 		.name		= NAME,
-// 		.devname	= DEVNAME,
-// 		.alloc_buf	= sort_alloc_buf,
-// 		.alloc_contig	= sort_alloc_contig,
-// 		.init_bufs	= sort_init_bufs,
-// 		.set_access	= sort_set_access,
-// 		.comp		= sort_comp,
-// 		.diff_ok	= sort_diff_ok,
-// 		.esp		= &sort_test.desc.esp,
-// 		.cm		= SORT_STRATUS_IOC_ACCESS,
-// 	},
-// };
-
-// static void NORETURN usage(void)
-// {
-// 	fprintf(stderr, "%s", usage_str);
-// 	exit(1);
-// }
-
 int main(int argc, char *argv[])
 {
-	// int n_argc;
-
-	// if (argc < 3)
-	// 	usage();
-
-	// if (!strcmp(argv[2], "run") || !strcmp(argv[2], "flush"))
-	// 	n_argc = 3;
-	// else
-	// 	n_argc = 5;
-
-	// if (argc < n_argc)
-	// 	usage();
-
-	// if (n_argc > 3) {
-	// 	sort_test.n_elems = strtoul(argv[3], NULL, 0);
-	// 	sort_test.n_batches = strtoul(argv[4], NULL, 0);
-	// 	if (argc == 6) {
-	// 		if (strcmp(argv[5], "-v"))
-	// 			usage();
-	// 		sort_test.verbose = true;
-	// 	}
-	// }
-	// return test_main(&sort_test.info, argv[1], argv[2]);
-
 	int errors, i, j;
 
 	errors = 0;
@@ -322,6 +176,18 @@ int main(int argc, char *argv[])
 	printf("	Coherence = %s\n", CohPrintHeader);
 	printf("	ITERATIONS = %u\n", ITERATIONS);
 
+	for (i = 0; i < ITERATIONS / 10; ++i) {
+		// srand(time(NULL));
+		for (j = 0; j < LEN; ++j) {
+			// gold[j] = ((float) rand () / (float) RAND_MAX);
+			gold[j] = (1.0 / (float) j + 1);
+		}
+
+		start_counter();
+		quicksort(gold, LEN);
+		t_sw_sort += end_counter();
+	}
+
 #ifdef ENABLE_SM
 	sort_cfg_000[0].esp.start_stop = 1;
 	esp_run(cfg_000, NACC);
@@ -336,14 +202,6 @@ int main(int argc, char *argv[])
 
 	for (i = 0; i < ITERATIONS; ++i) {
 		// printf("SM Enabled\n");
-
-		srand(time(NULL));
-		for (j = 0; j < LEN; ++j) {
-			gold[j] = ((float) rand () / (float) RAND_MAX);
-			// gold[j] = (1.0 / (float) j + 1);
-		}
-		// printf("Gold Initialized\n");
-
 		start_counter();
 		// Wait for the accelerator to be ready
 		SpinSync((void*) &buf[READY_FLAG_OFFSET], 1);
@@ -369,12 +227,7 @@ int main(int argc, char *argv[])
 		UpdateSync((void*) &buf[SYNC_VAR_SIZE + LEN + VALID_FLAG_OFFSET], 0);
 		t_sort += end_counter();
 		// printf("Acc done\n");
-
-		start_counter();
-		quicksort(gold, LEN);
-		t_sw_sort += end_counter();
-		// printf("SW Computed\n");
-
+		
 		start_counter();
 		errors += check_gold(gold, &buf[SYNC_VAR_SIZE + LEN + SYNC_VAR_SIZE], LEN, true);
 		// Inform the accelerator - ready for next iteration.
@@ -384,12 +237,6 @@ int main(int argc, char *argv[])
 	}
 #else
 	for (i = 0; i < ITERATIONS; ++i) {
-		srand(time(NULL));
-		for (j = 0; j < LEN; ++j) {
-			gold[j] = ((float) rand () / (float) RAND_MAX);
-			// gold[j] = (1.0 / (float) j + 1);
-		}
-
 		start_counter();
 		init_buf(&buf[SYNC_VAR_SIZE], gold, LEN, 1);
 		t_cpu_write += end_counter();
@@ -398,14 +245,14 @@ int main(int argc, char *argv[])
 		// 	// printf("A[%d]: array=%.15g; gold=%.15g\n", j, buf[SYNC_VAR_SIZE + j], gold[j]);
 		// 	printf("A[%d] = %.15g;\n", j, gold[j]);
 		// }
+
+		start_counter();
+		esp_run(cfg_000, NACC);
+		t_sort += end_counter();
 		
 		start_counter();
 		quicksort(gold, LEN);
 		t_sw_sort += end_counter();
-		
-		start_counter();
-		esp_run(cfg_000, NACC);
-		t_sort += end_counter();
 
 		start_counter();
 		errors += check_gold(gold, &buf[SYNC_VAR_SIZE + LEN + SYNC_VAR_SIZE], LEN, true);

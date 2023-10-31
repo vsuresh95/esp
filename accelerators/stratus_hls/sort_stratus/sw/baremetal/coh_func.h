@@ -25,8 +25,8 @@ typedef union
 {
   struct
   {
-    int32_t value_32_1;
-    int32_t value_32_2;
+    float value_32_1;
+    float value_32_2;
   };
   int64_t value_64;
 } spandex_token_t;
@@ -99,15 +99,19 @@ typedef union
 #if (COH_MODE == ESP_NON_COHERENT_DMA)
 unsigned coherence = ACC_COH_NONE;
 const char CohPrintHeader[] = "ESP Non-Coherent DMA";
+spandex_config_t spandex_config;
 #elif (COH_MODE == ESP_LLC_COHERENT_DMA)
 unsigned coherence = ACC_COH_LLC;
 const char CohPrintHeader[] = "ESP LLC-Coherent DMA";
+spandex_config_t spandex_config;
 #elif (COH_MODE == ESP_COHERENT_DMA)
 unsigned coherence = ACC_COH_RECALL;
 const char CohPrintHeader[] = "ESP Coherent DMA";
+spandex_config_t spandex_config;
 #else
 unsigned coherence = ACC_COH_FULL;
 const char CohPrintHeader[] = "ESP Baseline MESI";
+spandex_config_t spandex_config;
 #endif
 #else
 unsigned coherence = ACC_COH_FULL;

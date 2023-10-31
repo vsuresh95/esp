@@ -15,19 +15,20 @@
 #define SPX
 
 #ifdef SPX
-	#define COH_MODE 2
+	#define COH_MODE 0
 #else
 	#define IS_ESP 1
 	#define COH_MODE 0
 #endif
 
 #include "sm.h"
+#include "sw_func.h"
 #define ITERATIONS 100
 
 #define SLD_SORT   0x0B
 #define DEV_NAME "sld,sort_stratus"
 
-#define SORT_LEN 512
+#define SORT_LEN 32
 #define SORT_BATCH 1
 
 #define SYNC_VAR_SIZE 6
@@ -93,47 +94,57 @@ uint64_t end_counter() {
 	return (t_end - t_start);
 }
 
-static int validate_sorted(float *array, int len)
+static int validate_sorted(float *array, float* gold, int len)
 {
 	int i;
 	int rtn = 0;
-	for (i = 0; i < len; i++) {
-		if (i > 0 && array[i] < array[i-1]){
-			printf("	Error at %d\n", i);
-			printf("	mem[%d] = %llx\n", i, array[i]);
-			printf("	mem[%d] = %llx\n", i - 1, array[i-1]);
+
+	spandex_token_t out_data;
+	void* dst;
+	dst = (void*) array;
+
+	for (i = 0; i < len; i += 2, dst += 8) {
+		out_data.value_64 = read_mem_reqodata(dst);
+		if (out_data.value_32_1 != gold[i]) {
 			rtn++;
 		}
+		if (out_data.value_32_2 != gold[i + 1]) {
+			rtn++;
+		}
+		// if (i > 0 && array[i] < array[i-1]){
+		// 	printf("	Error at %d\n", i);
+		// 	printf("	mem[%d] = %llx\n", i, array[i]);
+		// 	printf("	mem[%d] = %llx\n", i - 1, array[i-1]);
+		// 	rtn++;
+		// }
 		// printf("A[%d]: array=%llx\n", i, array[i]);
 	}
 	return rtn;
 }
 
-static void init_buf (float *buf, unsigned sort_size, unsigned sort_batch)
+static void init_buf (float *buf, float* gold, unsigned sort_size, unsigned sort_batch)
 {
 	int i, j, k;
 
-	float A[SORT_LEN];
-	#include "debug.h"
+	spandex_token_t in_data;
+	void* dst;
+
+	dst = (void*) buf;
 
 	// printf("  Generate random input...\n");
 
 	/* srand(time(NULL)); */
 	for (j = 0; j < sort_batch; j++)
-		for (i = 0; i < sort_size; i++) {
+		for (i = 0; i < sort_size; i += 2, dst += 8) {
 			/* TAV rand between 0 and 1 */
 #ifndef __riscv
 			buf[sort_size * j + i] = ((float) rand () / (float) RAND_MAX);
 #else
-			buf[sort_size * j + i] = 1.0 / ((float) i + 1);
-			// if (sort_size == 32) {
-			// 	buf[sort_size * j + i] = A[i];
-			// }
-			// else {
-			// 	for (k = 0; k < sort_size / 64; ++k) {
-			// 		buf[sort_size * j + i] = A[i - 64 * k];
-			// 	}
-			// }
+			// buf[sort_size * j + i] = 1.0 / ((float) i + 1);
+			in_data.value_32_1 = gold[i];
+			in_data.value_32_2 = gold[i + 1];
+			
+			write_mem_wtfwd(dst, in_data.value_64);
 			
 #endif
 			// printf("A[%d]: array=%llx\n", i, buf[sort_size * j + i]);
@@ -177,11 +188,15 @@ int main(int argc, char * argv[])
 			unsigned sort_len_max;
 			unsigned sort_len_min;
 			unsigned done;
-			int i, j;
+			int i, j, k;
 			unsigned **ptable = NULL;
 			unsigned *mem;
+			float* gold;
 			unsigned errors = 0;
 			int scatter_gather = 1;
+			
+			// float A[64];
+			// #include "debug.h"
 
 			sort_batch_max = ioread32(dev, SORT_BATCH_MAX_REG);
 			sort_len_min = ioread32(dev, SORT_LEN_MIN_REG);
@@ -212,6 +227,7 @@ int main(int argc, char * argv[])
 				}
 
 			// Allocate memory (will be contigous anyway in baremetal)
+			gold = aligned_malloc(SORT_LEN * sizeof(float));
 			mem = aligned_malloc(SORT_BUF_SIZE);
 
 			printf("  memory buffer base-address = %p\n", mem);
@@ -229,6 +245,7 @@ int main(int argc, char * argv[])
 			}
 
 			// Configure device
+			iowrite32(dev, SPANDEX_REG, spandex_config.spandex_reg);
 			iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
 			iowrite32(dev, COHERENCE_REG, coherence);
 
@@ -270,15 +287,26 @@ int main(int argc, char * argv[])
 			t_sort = 0;
 			t_cpu_read = 0;
 
+			for (i = 0; i < ITERATIONS; ++i) {
+				for (j = 0; j < SORT_LEN; ++j) {
+					gold[j] = (1.0 / (float) j + 1);
+				}
+
+				start_counter();
+				quicksort(gold, SORT_LEN);
+				t_sw_sort += end_counter();
+			}
+
 #ifndef ENABLE_SM
 			for (i = 0; i < ITERATIONS; ++i) {
-			// Initialize input: write floating point hex values (simpler to debug)
-			start_counter();
-			init_buf((float *) &mem[SYNC_VAR_SIZE], SORT_LEN, SORT_BATCH);
-			t_cpu_write += end_counter();
 
-			/* For acc running */
-			start_counter();
+				// Initialize input: write floating point hex values (simpler to debug)
+				start_counter();
+				init_buf((float *) &mem[SYNC_VAR_SIZE], gold, SORT_LEN, SORT_BATCH);
+				t_cpu_write += end_counter();
+
+				/* For acc running */
+				start_counter();
 #endif
 
 			// Start accelerator
@@ -288,57 +316,46 @@ int main(int argc, char * argv[])
 #ifdef ENABLE_SM
 			for (i = 0; i < ITERATIONS; ++i) {
 
-			// printf("SM Enabled\n");
+				// Initialize input: write floating point hex values (simpler to debug)
+				// WriteScratchReg(0x100);
+				start_counter();
+				// Wait for the accelerator to be ready
+				SpinSync((void*) &mem[READY_FLAG_OFFSET], 1);
+				// Reset flag for the next iteration
+				UpdateSync((void*) &mem[READY_FLAG_OFFSET], 0);
 
-			// Initialize input: write floating point hex values (simpler to debug)
-			// WriteScratchReg(0x100);
-			start_counter();
-			// Wait for the accelerator to be ready
-			SpinSync((void*) &mem[READY_FLAG_OFFSET], 1);
-			// Reset flag for the next iteration
-			UpdateSync((void*) &mem[READY_FLAG_OFFSET], 0);
-
-			// When the accelerator is ready, we write the input data to it
-			init_buf((float *) &mem[SYNC_VAR_SIZE], SORT_LEN, SORT_BATCH);
-			// WriteScratchReg(0);
-
-			// WriteScratchReg(0x200);
-			if (i == ITERATIONS - 1) {
-				// WriteScratchReg(0x500);
-				UpdateSync((void*) &mem[END_FLAG_OFFSET], 1);
-				UpdateSync((void*) &mem[SYNC_VAR_SIZE + SORT_LEN + END_FLAG_OFFSET], 1);
-				
-				// SpinSync((void*) &mem[READY_FLAG_OFFSET], 1);
-				// UpdateSync((void*) &mem[READY_FLAG_OFFSET], 0);
-				// UpdateSync((void*) &mem[VALID_FLAG_OFFSET], 1);
-
-				// SpinSync((void*) &mem[SYNC_VAR_SIZE + SORT_LEN + VALID_FLAG_OFFSET], 1);
-				// UpdateSync((void*) &mem[SYNC_VAR_SIZE + SORT_LEN + VALID_FLAG_OFFSET], 0);
-				// UpdateSync((void*) &mem[SYNC_VAR_SIZE + SORT_LEN + READY_FLAG_OFFSET], 1);
+				// When the accelerator is ready, we write the input data to it
+				init_buf((float *) &mem[SYNC_VAR_SIZE], gold, SORT_LEN, SORT_BATCH);
 				// WriteScratchReg(0);
-			}
-			// Inform the accelerator to start.
-			UpdateSync((void*) &mem[VALID_FLAG_OFFSET], 1);
-			t_cpu_write += end_counter();
-			// WriteScratchReg(0);
 
-			start_counter();
-			// WriteScratchReg(0x300);
-			// Wait for the accelerator to send output.
-			SpinSync((void*) &mem[SYNC_VAR_SIZE + SORT_LEN + VALID_FLAG_OFFSET], 1);
-			// Reset flag for next iteration.
-			UpdateSync((void*) &mem[SYNC_VAR_SIZE + SORT_LEN + VALID_FLAG_OFFSET], 0);
-			// WriteScratchReg(0);
+				// WriteScratchReg(0x200);
+				if (i == ITERATIONS - 1) {
+					// WriteScratchReg(0x500);
+					UpdateSync((void*) &mem[END_FLAG_OFFSET], 1);
+					UpdateSync((void*) &mem[SYNC_VAR_SIZE + SORT_LEN + END_FLAG_OFFSET], 1);
+					// WriteScratchReg(0);
+				}
+				// Inform the accelerator to start.
+				UpdateSync((void*) &mem[VALID_FLAG_OFFSET], 1);
+				t_cpu_write += end_counter();
+				// WriteScratchReg(0);
 
-			t_sort += end_counter();
-			
-			start_counter();
-			// WriteScratchReg(0x400);
-			errors += validate_sorted((float *) &mem[SYNC_VAR_SIZE + SORT_LEN + SYNC_VAR_SIZE], SORT_LEN);
-			// Inform the accelerator - ready for next iteration.
-			UpdateSync((void*) &mem[SYNC_VAR_SIZE + SORT_LEN + READY_FLAG_OFFSET], 1);
-			// WriteScratchReg(0);
-			t_cpu_read += end_counter();
+				start_counter();
+				// WriteScratchReg(0x300);
+				// Wait for the accelerator to send output.
+				SpinSync((void*) &mem[SYNC_VAR_SIZE + SORT_LEN + VALID_FLAG_OFFSET], 1);
+				// Reset flag for next iteration.
+				UpdateSync((void*) &mem[SYNC_VAR_SIZE + SORT_LEN + VALID_FLAG_OFFSET], 0);
+				// WriteScratchReg(0);
+				t_sort += end_counter();
+				
+				start_counter();
+				// WriteScratchReg(0x400);
+				errors += validate_sorted((float *) &mem[SYNC_VAR_SIZE + SORT_LEN + SYNC_VAR_SIZE], gold, SORT_LEN);
+				// Inform the accelerator - ready for next iteration.
+				UpdateSync((void*) &mem[SYNC_VAR_SIZE + SORT_LEN + READY_FLAG_OFFSET], 1);
+				// WriteScratchReg(0);
+				t_cpu_read += end_counter();
 			}
 #endif
 
@@ -361,17 +378,17 @@ int main(int argc, char * argv[])
 			// printf("  validating...\n");
 
 #ifndef ENABLE_SM
-			/* For acc running */
-			t_sort += end_counter();
+				/* For acc running */
+				t_sort += end_counter();
 
-			start_counter();
-			for (j = 0; j < SORT_BATCH; j++) {
-				int err = validate_sorted((float *) &mem[j * SORT_BUF_SIZE + SYNC_VAR_SIZE + SORT_LEN + SYNC_VAR_SIZE], SORT_LEN);
-				/* if (err != 0) */
-				/* 	printf("  Error: %s.%d mismatch on batch %d\n", DEV_NAME, n, j); */
-				errors += err;
-			}
-			t_cpu_read += end_counter();
+				start_counter();
+				for (j = 0; j < SORT_BATCH; j++) {
+					int err = validate_sorted((float *) &mem[j * SORT_BUF_SIZE + SYNC_VAR_SIZE + SORT_LEN + SYNC_VAR_SIZE], gold, SORT_LEN);
+					/* if (err != 0) */
+					/* 	printf("  Error: %s.%d mismatch on batch %d\n", DEV_NAME, n, j); */
+					errors += err;
+				}
+				t_cpu_read += end_counter();
 			}
 #endif
 			if (errors)
@@ -381,7 +398,7 @@ int main(int argc, char * argv[])
 			printf("**************************************************\n\n");
 			printf("errors = %d\n", errors);
 
-			// printf("	SW Time = %lu\n", t_sw_sort);
+			printf("	SW Time = %lu\n", t_sw_sort);
 			printf("	CPU Write Time = %lu\n", t_cpu_write);
 			printf("	Sort Time = %lu\n", t_sort);
 			printf("	CPU Read Time = %lu\n", t_cpu_read);
@@ -389,6 +406,7 @@ int main(int argc, char * argv[])
 			if (scatter_gather)
 				aligned_free(ptable);
 			aligned_free(mem);
+			aligned_free(gold);
 
 		// }
 	}

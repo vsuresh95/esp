@@ -15,7 +15,7 @@
 #define END_FLAG_OFFSET 2
 #define READY_FLAG_OFFSET 4
 
-#define LEN 32
+#define LEN 1024
 
 #define NACC 1
 #define NUM_DEVICES 1
