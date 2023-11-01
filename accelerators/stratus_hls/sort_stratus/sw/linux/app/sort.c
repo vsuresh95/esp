@@ -7,7 +7,7 @@
 #include <fcntl.h>
 
 #define ENABLE_SM
-#define SPX
+// #define SPX
 
 #ifdef SPX
 	#define COH_MODE 2
@@ -176,11 +176,11 @@ int main(int argc, char *argv[])
 	printf("	Coherence = %s\n", CohPrintHeader);
 	printf("	ITERATIONS = %u\n", ITERATIONS);
 
-	for (i = 0; i < ITERATIONS / 10; ++i) {
-		// srand(time(NULL));
+	for (i = 0; i < ITERATIONS; ++i) {
+		srand(time(NULL));
 		for (j = 0; j < LEN; ++j) {
-			// gold[j] = ((float) rand () / (float) RAND_MAX);
-			gold[j] = (1.0 / (float) j + 1);
+			gold[j] = ((float) rand () / (float) RAND_MAX);
+			// gold[j] = (1.0 / (float) j + 1);
 		}
 
 		start_counter();
@@ -249,10 +249,6 @@ int main(int argc, char *argv[])
 		start_counter();
 		esp_run(cfg_000, NACC);
 		t_sort += end_counter();
-		
-		start_counter();
-		quicksort(gold, LEN);
-		t_sw_sort += end_counter();
 
 		start_counter();
 		errors += check_gold(gold, &buf[SYNC_VAR_SIZE + LEN + SYNC_VAR_SIZE], LEN, true);

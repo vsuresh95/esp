@@ -99,19 +99,19 @@ typedef union
 #if (COH_MODE == ESP_NON_COHERENT_DMA)
 unsigned coherence = ACC_COH_NONE;
 const char CohPrintHeader[] = "ESP Non-Coherent DMA";
-spandex_config_t spandex_config;
+spandex_config_t spandex_config = {.spandex_reg = 0};
 #elif (COH_MODE == ESP_LLC_COHERENT_DMA)
 unsigned coherence = ACC_COH_LLC;
 const char CohPrintHeader[] = "ESP LLC-Coherent DMA";
-spandex_config_t spandex_config;
+spandex_config_t spandex_config = {.spandex_reg = 0};
 #elif (COH_MODE == ESP_COHERENT_DMA)
 unsigned coherence = ACC_COH_RECALL;
 const char CohPrintHeader[] = "ESP Coherent DMA";
-spandex_config_t spandex_config;
+spandex_config_t spandex_config = {.spandex_reg = 0};
 #else
 unsigned coherence = ACC_COH_FULL;
 const char CohPrintHeader[] = "ESP Baseline MESI";
-spandex_config_t spandex_config;
+spandex_config_t spandex_config = {.spandex_reg = 0};
 #endif
 #else
 unsigned coherence = ACC_COH_FULL;
@@ -126,7 +126,7 @@ const char CohPrintHeader[] = "SPX Baseline Spandex (ReqV)";
 spandex_config_t spandex_config = {.spandex_reg = 0, .r_en = 1, .r_type = 1};
 #else
 const char CohPrintHeader[] = "SPX Baseline Spandex";
-spandex_config_t spandex_config;
+spandex_config_t spandex_config = {.spandex_reg = 0};
 #endif
 #endif
 

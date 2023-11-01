@@ -245,6 +245,7 @@ int main(int argc, char * argv[])
 			}
 
 			// Configure device
+			// spandex_config.spandex_reg = 0;
 			iowrite32(dev, SPANDEX_REG, spandex_config.spandex_reg);
 			iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
 			iowrite32(dev, COHERENCE_REG, coherence);
