@@ -210,6 +210,9 @@ int main(int argc, char * argv[])
             const unsigned AMO = 2;
             const unsigned LRSC = 3;
 
+            const unsigned FCS_REQ_ODATA = 1;
+            const unsigned FCS_REQ_WTFWD = 1;
+
             unsigned op_count = 0;
 
             const unsigned elem_per_lock = 4;
@@ -242,10 +245,19 @@ int main(int argc, char * argv[])
                     unsigned ld_offset = rand(hartid);
                     unsigned ld_lock_offset = ld_offset/elem_per_lock;
 
+                    unsigned fcs = rand(hartid) % 2;
+
+                    unsigned t_value, r_value;
+
                     // Read test and reference value
                     acquire_lock(&buf_lock[ld_lock_offset]);
-                    unsigned t_value = t_buffer[ld_offset << llc_set_offset];
-                    unsigned r_value = r_buffer[ld_offset << llc_set_offset];
+                    if (fcs == FCS_REQ_ODATA) {
+                        t_value = (unsigned) reqodata((void *) &t_buffer[ld_offset << llc_set_offset]);
+                        r_value = (unsigned) reqodata((void *) &r_buffer[ld_offset << llc_set_offset]);
+                    } else {
+                        t_value = t_buffer[ld_offset << llc_set_offset];
+                        r_value = r_buffer[ld_offset << llc_set_offset];
+                    }
                     release_lock(&buf_lock[ld_lock_offset]);
 
                     // Test if they are equal
@@ -270,10 +282,17 @@ int main(int argc, char * argv[])
                     unsigned st_value = rand(hartid);
                     unsigned st_lock_offset = st_offset/elem_per_lock;
 
+                    unsigned fcs = rand(hartid) % 2;
+
                     // Update test and reference value
                     acquire_lock(&buf_lock[st_lock_offset]);
-                    t_buffer[st_offset << llc_set_offset] = st_value;
-                    r_buffer[st_offset << llc_set_offset] = st_value;
+                    if (fcs == FCS_REQ_WTFWD) {
+                        wtfwd((void *) &t_buffer[st_offset << llc_set_offset], st_value);
+                        wtfwd((void *) &r_buffer[st_offset << llc_set_offset], st_value);
+                    } else {
+                        t_buffer[st_offset << llc_set_offset] = st_value;
+                        r_buffer[st_offset << llc_set_offset] = st_value;
+                    }
 
                     // Read back same test and reference value
                     unsigned t_value = t_buffer[st_offset << llc_set_offset];

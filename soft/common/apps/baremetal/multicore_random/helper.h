@@ -94,3 +94,33 @@ unsigned rand(unsigned hartid)
 	rand_tmp = (unsigned) (next / 65536) % RAND_MAX;
 	return rand_tmp;
 }
+
+// Helper function to perform memory write using Spandex request types.
+// By default, the writes are regular stores.
+static inline void wtfwd (void* dst, int64_t value_64)
+{
+	asm volatile (
+		"mv t0, %0;"
+		"mv t1, %1;"
+		".word 0x2062B02B"
+		:
+		: "r" (dst), "r" (value_64)
+		: "t0", "t1", "memory"
+	);
+}
+
+static inline int64_t reqodata (void* dst)
+{
+	int64_t value_64;
+
+	asm volatile (
+		"mv t0, %1;"
+		".word 0x4002B30B;"
+		"mv %0, t1"
+		: "=r" (value_64)
+		: "r" (dst)
+		: "t0", "t1", "memory"
+	);
+
+	return value_64;
+}
