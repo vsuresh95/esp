@@ -1,0 +1,4 @@
+tiled_app_plm_block_in_dma32 1024 64 1w:0r 0w:1r
+tiled_app_plm_block_out_dma32 1024 64 1w:0r 0w:1r
+tiled_app_plm_block_in_dma64 1024 64 1w:0r 0w:1r
+tiled_app_plm_block_out_dma64 1024 64 1w:0r 0w:1r
