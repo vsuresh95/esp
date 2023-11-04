@@ -5,6 +5,8 @@
 static unsigned print_lock = 0;
 
 #include <helper.h>
+#include <esp_accelerator.h>
+#include <esp_probe.h>
 
 static unsigned first = 0;
 static unsigned test_fail = 0;
@@ -43,6 +45,9 @@ int main(int argc, char * argv[])
     } else {
         *checkpoint = 1;
         while(*checkpoint != n_threads);
+        if (n_threads == 1) {
+            *checkpoint = 0;
+        }
     }
 
     switch (t_id) {
@@ -398,7 +403,11 @@ int main(int argc, char * argv[])
                     }
                 }
 
-                if (op_count % 1000 == 0) {
+                if (op_count % 100 == 0) {
+                    if (n_threads == 1) {
+                        esp_flush(ACC_COH_NONE);
+                    }
+
                     if (hartid == 0) {
                         printf("[HART 0] %d OP DONE!\n", op_count);
                     }
