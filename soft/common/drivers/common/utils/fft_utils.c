@@ -25,6 +25,24 @@ double sin(double x)
 	return cur;
 
 }
+
+double cos(double x)
+{
+	int i = 1;
+    double t, s ;
+    int p;
+    p = 0;
+    s = 1.0;
+    t = 1.0;
+    while(fabs(t/s) > .00000001 &&   i < 100)
+    {
+        p++;
+        t = (-t * x * x) / ((2 * p - 1) * (2 * p));
+        s += t;
+		i++;
+    }
+    return s;
+}
 #ifdef __riscv
 /* simple not quite random implementation of rand() when stdlib is not available */
 static unsigned long int next = 42;

@@ -91,12 +91,12 @@ void esp_flush(int coherence)
 	int nl2 = 0;
 	int pid = get_pid();
 
-	switch (coherence) {
-	case ACC_COH_NONE	: printf("	-> Non-coherent DMA\n"); break;
-	case ACC_COH_LLC	: printf("	-> LLC-coherent DMA\n"); break;
-	case ACC_COH_RECALL : printf("	-> Coherent DMA\n"); break;
-	case ACC_COH_FULL	: printf("	-> Fully-coherent cache access\n"); break;
-	}
+	// switch (coherence) {
+	// case ACC_COH_NONE	: printf("	-> Non-coherent DMA\n"); break;
+	// case ACC_COH_LLC	: printf("	-> LLC-coherent DMA\n"); break;
+	// case ACC_COH_RECALL : printf("	-> Coherent DMA\n"); break;
+	// case ACC_COH_FULL	: printf("	-> Fully-coherent cache access\n"); break;
+	// }
 
 
 	if (coherence == ACC_COH_NONE)
@@ -233,9 +233,9 @@ static void esp_done(const struct fdt_scan_node *node, void *extra)
 	const char *name = (*espdevs)[0].name;
 
 	if ((*espdevs)[ndev].compat != 0) {
-		printf("[probe] %s.%d registered\n", name, ndev);
-		printf("		Address   : 0x%08x\n", (unsigned) (*espdevs)[ndev].addr);
-		printf("		Interrupt : %d\n", (*espdevs)[ndev].irq);
+		// printf("[probe] %s.%d registered\n", name, ndev);
+		// printf("		Address   : 0x%08x\n", (unsigned) (*espdevs)[ndev].addr);
+		// printf("		Interrupt : %d\n", (*espdevs)[ndev].irq);
 		ndev++;
 
 		// Initialize new entry (may not be discovered!)

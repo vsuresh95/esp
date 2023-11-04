@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sld>
+  <accelerator name="audio_fft" desc="Accelerator AUDIO_FFT" data_size="4" device_id="055" hls_tool="stratus_hls">
+    <param name="do_shift" desc="do_shift" />
+    <param name="logn_samples" desc="logn_samples" />
+    <param name="do_inverse" desc="do_inverse" />
+    <param name="prod_valid_offset" desc="prod_valid_offset" />
+    <param name="prod_ready_offset" desc="prod_ready_offset" />
+    <param name="cons_valid_offset" desc="cons_valid_offset" />
+    <param name="cons_ready_offset" desc="cons_ready_offset" />
+    <param name="input_offset" desc="input_offset" />
+    <param name="output_offset" desc="output_offset" />
+  </accelerator>
+</sld>
