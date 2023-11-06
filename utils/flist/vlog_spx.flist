@@ -11,6 +11,7 @@ caches/spandex-caches/l2_spandex/rtl/l2_regs.sv
 caches/spandex-caches/l2_spandex/rtl/l2_mshr.sv
 caches/spandex-caches/l2_spandex/rtl/l2_core.sv
 caches/spandex-caches/l2_spandex/rtl/l2_input_decoder.sv
+caches/spandex-caches/l2_spandex/rtl/l2_write_buffer.sv
 caches/spandex-caches/llc_spandex/rtl/llc_bufs.sv
 caches/spandex-caches/llc_spandex/rtl/llc_regs.sv
 caches/spandex-caches/llc_spandex/rtl/llc_interfaces.sv
