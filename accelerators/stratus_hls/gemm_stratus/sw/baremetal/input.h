@@ -17,31 +17,15 @@
 // input[15] = 16.0;
 // }
 // else if(ninputs==2){
-native_t input[24];
-input[0] = 1.5;
+native_t input[8];
+input[0] = 1.0;
 input[1] = 2.0;
 input[2] = 3.0;
 input[3] = 4.0;
-input[4] = 1.5;
-input[5] = 2.0;
-input[6] = 3.0;
-input[7] = 4.0;
-input[8] = 5.0;
-input[9] = 6.0;
-input[10] = 7.0;
-input[11] = 8.0;
-input[12] = 9.0;
-input[13] = 10.2;
-input[14] = 11.0;
-input[15] = 12.0;
-input[16] = 5.0;
-input[17] = 6.0;
-input[18] = 7.0;
-input[19] = 8.0;
-input[20] = 9.0;
-input[21] = 10.2;
-input[22] = 11.0;
-input[23] = 12.0;
+input[4] = 5.0;
+input[5] = 7.0;
+input[6] = 6.0;
+input[7] = 8.0;
 
 // }
 

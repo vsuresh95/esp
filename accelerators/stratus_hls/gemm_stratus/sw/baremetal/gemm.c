@@ -12,6 +12,18 @@
 #include <math.h>
 #include "matmul.h"
 #include "fcn_input.h"
+
+#define SYNC_VAR_SIZE 4
+
+#define NINPUTS_OFFSET 0
+#define MAT_D1_OFFSET 1
+#define MAT_D2_OFFSET 2
+#define MAT_D3_OFFSET 3
+#define LD_OFFSET 4
+#define ST_OFFSET 5
+#define TRANSPOSE_OFFSET 6
+#define DO_RELU_OFFSET 7
+
 // static uint64_t get_counter() {
 //   uint64_t counter;
 //   asm volatile (
@@ -26,19 +38,19 @@
 //   return counter;
 // }
 
-static uint64_t get_counter() {
-  uint64_t counter;
-  asm volatile (
-    "li t0, 0;"
-    "csrr t0, mcycle;"
-    "mv %0, t0"
-    : "=r" ( counter )
-    :
-    : "t0"
-  );
+// static uint64_t get_counter() {
+//   uint64_t counter;
+//   asm volatile (
+//     "li t0, 0;"
+//     "csrr t0, mcycle;"
+//     "mv %0, t0"
+//     : "=r" ( counter )
+//     :
+//     : "t0"
+//   );
 
-  return counter;
-}
+//   return counter;
+// }
 
 #define ITERATIONS 1000
 
@@ -108,6 +120,28 @@ typedef double token_t;
 #endif
 #endif
 
+token_t *mem;
+const int num_devices = 1;
+int32_t tile_size;
+int32_t rel_accel_prod_ready_offset;
+int32_t rel_accel_prod_valid_offset;
+int32_t rel_accel_prod_last_offset;
+int32_t rel_input_buffer_offset;
+int32_t rel_accel_cons_ready_offset;
+int32_t rel_accel_cons_valid_offset;
+int32_t rel_accel_con_last_offset;
+int32_t rel_output_buffer_offset;
+
+
+int32_t* cpu_prod_ready_offset;
+int32_t* cpu_prod_valid_offset;
+int32_t* cpu_cons_ready_offset;
+int32_t* cpu_cons_valid_offset;
+
+
+#include "../linux/app/coh_func.h"
+#include "../linux/app/gemm.h"
+
 const float ERR_TH = 0.05;
 
 typedef float native_t;
@@ -129,16 +163,19 @@ const int32_t transpose = 0;
 const int32_t ninputs = 1;
 // const int32_t d3 = 3;
 // const int32_t d3 = 16;
-const int32_t d3 = 256;
+const int32_t d3 = 2;
 // const int32_t d2 = 3;
-const int32_t d2 = 256;
-const int32_t d1 = 1;
+const int32_t d2 = 2;
+const int32_t d1 = 2;
 // const int32_t d3 = 4;
 // const int32_t d2 = 2;
 // const int32_t d1 = 2;
 int32_t st_offset;
 const int32_t ld_offset1 = 0;
 int32_t ld_offset2;
+
+
+// int32_t tile_size;
 
 static unsigned in_words_adj;
 static unsigned out_words_adj;
@@ -158,6 +195,11 @@ static unsigned mem_size;
 
 /* User defined registers */
 /* <<--regs-->> */
+#define GEMM_PROD_VALID_REG 0x70
+#define GEMM_CONS_READY_REG 0x6C
+#define GEMM_PROD_READY_REG 0x68
+#define GEMM_CONS_VALID_REG 0x64
+#define GEMM_INPUT_OFFSET_REG 0x60
 #define GEMM_TRANSPOSE_REG 0x60
 #define GEMM_DO_RELU_REG 0x5c
 #define GEMM_ST_OFFSET_REG 0x58
@@ -238,7 +280,7 @@ static int validate_buf(token_t *out, native_t *gold)
 static void init_buf (token_t *in, native_t *sw_buf)
 {
     int i;
-
+	
 // #include "input.h"
 // #include "fcn_input.h"
 
@@ -304,7 +346,6 @@ int main(int argc, char * argv[])
 	struct esp_device *dev;
 	unsigned done;
 	unsigned **ptable;
-	token_t *mem;
 	native_t *gold;
 	native_t *sw_buf;
 	unsigned errors = 0;
@@ -379,6 +420,7 @@ int main(int argc, char * argv[])
 		
 			printf("  Generate input...\n");
 
+			reset_sync();
 			// init_buf(mem, gold);
 			init_buf(mem, sw_buf);
 
@@ -391,6 +433,15 @@ int main(int argc, char * argv[])
 
 			iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
 			iowrite32(dev, COHERENCE_REG, coherence);
+			// If Spandex Caches
+			#ifndef ESP
+			// set_spandex_config_reg();
+			// #if(COH_MODE==3)
+			// 	spandex_config.w_cid = (n+2)%(NUM_DEVICES+1);
+			// #endif
+			printf("Writing spandex :%d\n", spandex_config.spandex_reg);
+			iowrite32(dev, SPANDEX_REG, spandex_config.spandex_reg);
+			#endif
 
 			iowrite32(dev, PT_ADDRESS_REG, (unsigned long) ptable);
 
@@ -413,6 +464,26 @@ int main(int argc, char * argv[])
 			iowrite32(dev, GEMM_LD_OFFSET1_REG, ld_offset1);
 			iowrite32(dev, GEMM_LD_OFFSET2_REG, ld_offset2);
 
+			tile_size = d1*d2 + d2*d3;
+			rel_accel_prod_ready_offset = 0;
+			rel_accel_prod_valid_offset = rel_accel_prod_ready_offset+2;
+			rel_accel_prod_last_offset = rel_accel_prod_valid_offset+1;
+			rel_input_buffer_offset = SYNC_VAR_SIZE;
+			rel_accel_cons_ready_offset = tile_size + SYNC_VAR_SIZE;
+			rel_accel_cons_valid_offset = rel_accel_cons_ready_offset+2;
+			rel_accel_con_last_offset = rel_accel_cons_valid_offset+1;
+			rel_output_buffer_offset = tile_size + 2*SYNC_VAR_SIZE;
+
+			cpu_prod_ready_offset = &rel_accel_cons_ready_offset;
+			cpu_cons_ready_offset = &rel_accel_prod_ready_offset;
+			cpu_cons_valid_offset = &rel_accel_prod_valid_offset;
+			cpu_prod_valid_offset = &rel_accel_cons_valid_offset;
+
+			iowrite32(dev, GEMM_PROD_VALID_REG, rel_accel_prod_valid_offset);
+			iowrite32(dev, GEMM_CONS_READY_REG, rel_accel_cons_ready_offset);
+			iowrite32(dev, GEMM_PROD_READY_REG, rel_accel_prod_ready_offset);
+			iowrite32(dev, GEMM_CONS_VALID_REG, rel_accel_cons_valid_offset);
+			iowrite32(dev, GEMM_INPUT_OFFSET_REG, rel_input_buffer_offset);
 
 			printf(" GEMM_DO_RELU_REG: %d\n", do_relu);
 			printf(" GEMM_TRANSPOSE_REG: %d\n", transpose);
@@ -448,14 +519,29 @@ int main(int argc, char * argv[])
     		hw_comp_start = get_counter();
 			iowrite32(dev, CMD_REG, CMD_MASK_START);
 
-			// Wait for completion
-			done = 0;
-			while (!done) {
-				done = ioread32(dev, STATUS_REG);
-				done &= STATUS_MASK_DONE;
-			}
-			iowrite32(dev, CMD_REG, 0x0);
+			// // Wait for completion
+			// done = 0;
+			// while (!done) {
+			// 	done = ioread32(dev, STATUS_REG);
+			// 	done &= STATUS_MASK_DONE;
+			// }
+			// iowrite32(dev, CMD_REG, 0x0);
 
+
+			update_prod_rdy();
+			while(!poll_cons_rdy()); // wait for cons ready
+			mem[rel_input_buffer_offset+NINPUTS_OFFSET] = ninputs;
+			mem[rel_input_buffer_offset+MAT_D1_OFFSET] = d1;
+			mem[rel_input_buffer_offset+MAT_D2_OFFSET] = d2;
+			mem[rel_input_buffer_offset+MAT_D3_OFFSET] = d3;
+			mem[rel_input_buffer_offset+LD_OFFSET] = rel_input_buffer_offset;
+			mem[rel_input_buffer_offset+ST_OFFSET] = rel_output_buffer_offset;
+			mem[rel_input_buffer_offset+TRANSPOSE_OFFSET] = transpose;
+			mem[rel_input_buffer_offset+DO_RELU_OFFSET] = do_relu;
+			update_cons_rdy();
+			update_cons_valid(1);
+
+			while(!poll_prod_valid()); //wait for prod 
     		hw_comp_end = get_counter();
 
 			printf("  Done\n");
@@ -468,7 +554,7 @@ int main(int argc, char * argv[])
 			// 	if(iter==out_offset) printf("OUTPUTS:\n");
 			// 	printf("mem[%d]: %d\n", iter, mem[iter]);
 			// }
-			errors = validate_buf(&mem[out_offset], gold);
+			errors = validate_buf(&mem[rel_output_buffer_offset], gold);
 
 			if (errors)
 				printf("  ... FAIL (%d errors)\n", errors);

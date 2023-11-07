@@ -6,6 +6,24 @@
 #include "libesp.h"
 #include "gemm_stratus.h"
 
+
+/* <<--params-def-->> */
+// Comp Mode 0: Reg Inv
+// Comp Mode 1: Chaining
+// Comp Mode 2: Pipelining
+#define MODE_REG_INV 0
+#define MODE_CHAIN 1
+#define MODE_PIPE 2
+
+#define COMP_MODE MODE_PIPE
+#define NUM_TILES 1024
+#define TILE_SIZE 1024
+#define RD_WR_ENABLE 0
+#define COMPUTE_INTENSITY (1000)
+#define COMPUTE_SIZE (TILE_SIZE)
+// #define TIMERS 1
+#define ITERATIONS 1
+
 /* User defined */
 
 // Define data type (decomment the one needed)
@@ -65,19 +83,19 @@ typedef double token_t;
 
 typedef float native_t;
 
-static uint64_t get_counter() {
-  uint64_t counter;
-  asm volatile (
-    "li t0, 0;"
-    "csrr t0, cycle;"
-    "mv %0, t0"
-    : "=r" ( counter )
-    :
-    : "t0"
-  );
+// static uint64_t get_counter() {
+//   uint64_t counter;
+//   asm volatile (
+//     "li t0, 0;"
+//     "csrr t0, cycle;"
+//     "mv %0, t0"
+//     : "=r" ( counter )
+//     :
+//     : "t0"
+//   );
 
-  return counter;
-}
+//   return counter;
+// }
 
 #define MAX_PRINTED_ERRORS 512
 

@@ -650,8 +650,8 @@ void gemm::compute_kernel()
 					{
 					plm_offset_m2 = d2i * matrix_d2;
 
-				// reset accumulator register
-				accumulator = 0;
+					// reset accumulator register
+					accumulator = 0;
 
 					for (uint24_t chk = 0; chk < matrix_chk_in; ++chk)
 					{

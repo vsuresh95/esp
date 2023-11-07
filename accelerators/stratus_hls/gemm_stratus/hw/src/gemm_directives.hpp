@@ -346,11 +346,14 @@
 #define COMPUTE 4
 
 #define NINPUTS_OFFSET 0
-#define MAT_D1_OFFSET 2
-#define MAT_d2_OFFSET 4
-#define MAT_D3_OFFSET 6
-#define TRANSPOSE_OFFSET 8
-#define DO_RELU_OFFSET 9
+#define MAT_D1_OFFSET 1
+#define MAT_D2_OFFSET 2
+#define MAT_D3_OFFSET 3
+#define LD_OFFSET 4
+#define ST_OFFSET 5
+#define TRANSPOSE_OFFSET 6
+#define DO_RELU_OFFSET 7
+
 
 
 #endif /* __GEMM_DIRECTIVES_HPP_ */

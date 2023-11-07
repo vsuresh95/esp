@@ -51,6 +51,17 @@ public:
             SC_CTHREAD(output_asi_controller, this->clk.pos());
             this->reset_signal_is(this->rst, false);
 
+
+            HLS_PRESERVE_SIGNAL(input_state_req_dbg);
+            HLS_PRESERVE_SIGNAL(output_state_req_dbg);
+            HLS_PRESERVE_SIGNAL(asi_state_dbg);
+            HLS_PRESERVE_SIGNAL(load_iter_dbg);
+            HLS_PRESERVE_SIGNAL(store_iter_dbg);
+            HLS_PRESERVE_SIGNAL(load_state_dbg);
+            HLS_PRESERVE_SIGNAL(store_state_dbg);
+            HLS_PRESERVE_SIGNAL(load_unit_sp_write_dbg);
+            HLS_PRESERVE_SIGNAL(store_unit_sp_read_dbg);
+
             // Flatten arrays
             HLS_FLATTEN_ARRAY(mult_out);
             HLS_FLATTEN_ARRAY(row);
@@ -278,15 +289,6 @@ public:
     sc_signal<uint8_t> transpose_sig;
     sc_signal<uint8_t> do_relu_sig;
 
-    // HLS_PRESERVE_SIGNAL(input_state_req_dbg);
-    // HLS_PRESERVE_SIGNAL(output_state_req_dbg);
-    // HLS_PRESERVE_SIGNAL(asi_state_dbg);
-    // HLS_PRESERVE_SIGNAL(load_iter_dbg);
-    // HLS_PRESERVE_SIGNAL(store_iter_dbg);
-    // HLS_PRESERVE_SIGNAL(load_state_dbg);
-    // HLS_PRESERVE_SIGNAL(store_state_dbg);
-    // HLS_PRESERVE_SIGNAL(load_unit_sp_write_dbg);
-    // HLS_PRESERVE_SIGNAL(store_unit_sp_read_dbg);
     
 };
 
