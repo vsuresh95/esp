@@ -27,6 +27,11 @@ public:
     uint32_t st_offset;  // Output offset
     uint32_t do_relu; // Do ReLU stage
     uint32_t transpose; // True if matrix 2 is transposed
+    uint32_t input_offset;
+    uint32_t cons_valid_offset;
+    uint32_t prod_rdy_offset;
+    uint32_t cons_rdy_offset;
+    uint32_t prod_valid_offset;
 
     //
     // constructors
@@ -42,7 +47,13 @@ public:
             , st_offset(0)
 	    , do_relu(0)
 	    , transpose(0)
-	{}
+	{
+        this->input_offset  = 0;
+        this->cons_valid_offset  = 0;
+        this->prod_rdy_offset   = 0;
+        this->cons_rdy_offset    = 0;
+        this->prod_valid_offset     = 0;
+    }
 
     // equals operator
     inline bool operator==(const conf_info_t &rhs) const
@@ -55,7 +66,13 @@ public:
                 && (rhs.ld_offset2 == ld_offset2)
                 && (rhs.st_offset == st_offset)
 		&& (rhs.do_relu == do_relu)
-		&& (rhs.transpose == transpose);
+		&& (rhs.transpose == transpose)
+        && (rhs.input_offset == input_offset)
+        && (rhs.cons_valid_offset == cons_valid_offset)
+        && (rhs.prod_rdy_offset==prod_rdy_offset)
+        && (rhs.cons_rdy_offset==cons_rdy_offset)
+        && (rhs.prod_valid_offset==prod_valid_offset)
+        ;
 	}
 
     // assignment operator
@@ -69,7 +86,12 @@ public:
             ld_offset2 = other.ld_offset2;
             st_offset = other.st_offset;
             do_relu = other.do_relu;
-	    transpose = other.transpose;
+	        transpose = other.transpose;
+            input_offset = other.input_offset;
+            cons_valid_offset = other.cons_valid_offset;
+            prod_rdy_offset=other.prod_rdy_offset;
+            cons_rdy_offset=other.cons_rdy_offset;
+            prod_valid_offset=other.prod_valid_offset;
             return *this;
 	}
 

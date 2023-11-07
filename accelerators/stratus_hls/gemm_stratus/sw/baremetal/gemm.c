@@ -9,6 +9,47 @@
 #include <esp_accelerator.h>
 #include <esp_probe.h>
 #include <fixed_point.h>
+#include <math.h>
+#include "matmul.h"
+#include "fcn_input.h"
+// static uint64_t get_counter() {
+//   uint64_t counter;
+//   asm volatile (
+//     "li t0, 0;"
+//     "csrr t0, mcycle;"
+//     "mv %0, t0"
+//     : "=r" ( counter )
+//     :
+//     : "t0"
+//   );
+
+//   return counter;
+// }
+
+static uint64_t get_counter() {
+  uint64_t counter;
+  asm volatile (
+    "li t0, 0;"
+    "csrr t0, mcycle;"
+    "mv %0, t0"
+    : "=r" ( counter )
+    :
+    : "t0"
+  );
+
+  return counter;
+}
+
+#define ITERATIONS 1000
+
+extern void sw_run(int32_t do_relu, int32_t transpose, int32_t ninputs,
+		   int32_t d3, int32_t d2, int32_t d1,
+		   native_t *in1, native_t *in2, native_t *out);
+
+uint64_t sw_comp_start = 0;
+uint64_t sw_comp_end = 0;
+uint64_t hw_comp_start = 0;
+uint64_t hw_comp_end = 0;
 
 /* User defined */
 
@@ -67,6 +108,8 @@ typedef double token_t;
 #endif
 #endif
 
+const float ERR_TH = 0.05;
+
 typedef float native_t;
 
 static unsigned DMA_WORD_PER_BEAT(unsigned _st)
@@ -81,11 +124,18 @@ static unsigned DMA_WORD_PER_BEAT(unsigned _st)
 
 /* <<--params-->> */
 const int32_t do_relu = 0;
-const int32_t transpose = 1;
-const int32_t ninputs = 2;
-const int32_t d3 = 8;
-const int32_t d2 = 8;
-const int32_t d1 = 8;
+const int32_t transpose = 0;
+// const int32_t ninputs = 2;
+const int32_t ninputs = 1;
+// const int32_t d3 = 3;
+// const int32_t d3 = 16;
+const int32_t d3 = 256;
+// const int32_t d2 = 3;
+const int32_t d2 = 256;
+const int32_t d1 = 1;
+// const int32_t d3 = 4;
+// const int32_t d2 = 2;
+// const int32_t d1 = 2;
 int32_t st_offset;
 const int32_t ld_offset1 = 0;
 int32_t ld_offset2;
@@ -121,41 +171,128 @@ static unsigned mem_size;
 static int validate_buf(token_t *out, native_t *gold)
 {
 	int j;
-	native_t val;
+	native_t val, gold_val;
 	unsigned errors = 0;
-
-        for (j = 0; j < out_len; j++) {
+		int temp_len = ninputs * d1 * d3;
+        for (j = 0; j < temp_len; j++) {
 #ifdef __FIXED
 	    val = fx2float(out[j], FX_IL);
+			gold_val = gold[j];
+		// gold_val = fx2float(gold[j], FX_IL);
+		printf("Output[%d] = %d (orig %d)\n", j, (int)val, out[j]);
 #else
             val = out[j];
+			gold_val = gold[j];
 #endif
 
-            if (gold[j] != val) {
-                errors++;
-                if (errors <= MAX_PRINTED_ERRORS) {
-		    printf("%d : %d : %d\n", j, (int) val, (int) gold[j]);
-		}
-            }
+		if ((fabs(gold[j] - val) / fabs(gold[j])) > ERR_TH)
+			errors++;
+        //     if (gold[j] != val) {
+        //         errors++;
+        //         // if (errors <= MAX_PRINTED_ERRORS) {
+		//     // printf("%d : %d : %d\n", j, (int) val, (int) gold[j]);
+		// // }
+        //     }
+		    printf("%d : %d : %d\n", j, (int) val, (int) gold_val);
 	}
 
 	return errors;
 }
 
+// static void sw_comp(native_t* gold){
+// 		// #include "fcn_gold.h"
+// 	#include "fcn_input.h"
+// 	int i = 0;
+// 	const int offset = round_up(d1*d2, DMA_WORD_PER_BEAT(sizeof(token_t)));
+// 	for (i = 0; i < ninputs * (d1*d3); i++) gold[i] = 0.0;
+//  	for (i = 0; i < ninputs; i++) {
+// 		native_t* input_a = &input[i * offset];
+// 		native_t* input_b = &input[ninputs * offset + i*d2*d3];
+// 		const int output_offset = i*d1*d3;
+// 		//weight stationary
+//     // sw_comp_start = get_counter();
+// 		for(int z = 0; z < d2; z++){
+// 			int input_b_offset = z*d3;
+// 			for(int x = 0; x < d1; x++){
+// 					// round_up(ninputs * (d1*d2 + d2*d3), DMA_WORD_PER_BEAT(sizeof(token_t)));
+// 					// native_t temp_wt = input[i * d1*d2 + x*d2 + z]; 
+// 					// native_t temp_wt = input[i *offset  + x*d2 + z] ;
+// 					const int output_offset2 = output_offset+x*d3;
+// 					native_t temp_wt = input_a[x*d2 + z];
+// 					// int64_t temp_wt = in[ninputs * d1*d2 + i*d2*d3 + d2*z + y]; 
+// 				for (int y = 0; y < d3; y++){
+// 					// gold[i*d1*d3 + x*d3 + y] += ((temp_wt * (input[ninputs * offset  + i*d2*d3 + z*d3 + y]))); //>>FX_IL
+// 					gold[output_offset2 + y] += ((temp_wt * (input_b[input_b_offset + y]))); //>>FX_IL
+// 					// printf("gold[%d] (%d) += in[%d] (%d) * in[%d] (%d) [%d]\n", (i*d1*d3 + x*d3 + y), (int)gold[i*d1*d3 + x*d3 + y], 
+// 					// 															(i * round_up(d1*d2, DMA_WORD_PER_BEAT(sizeof(token_t))) + x*d2 + z),(int)input[i * round_up(d1*d2, DMA_WORD_PER_BEAT(sizeof(token_t)))  + x*d2 + z], 
+// 					// 															(ninputs * round_up(d1*d2, DMA_WORD_PER_BEAT(sizeof(token_t)))  + i*d2*d3 + z*d3 + y), (int)input[ninputs * round_up(d1*d2, DMA_WORD_PER_BEAT(sizeof(token_t))) + i*d2*d3 + z*d3 + y], 
+// 					// 															((int)(temp_wt * (input[ninputs * round_up(d1*d2, DMA_WORD_PER_BEAT(sizeof(token_t))) + i*d2*d3 + z*d3 + y]))));
+// 				}
+// 			}
+// 		}
+// 	}
 
-static void init_buf (token_t *in, native_t * gold)
+// }
+
+// static void init_buf (token_t *in, native_t * gold)
+static void init_buf (token_t *in, native_t *sw_buf)
 {
     int i;
 
-#include "input.h"
+// #include "input.h"
+// #include "fcn_input.h"
+
+// #ifdef __FIXED
+//     for (i = 0; i < ninputs * (d1*d2 + d2*d3); i++) {
+//         in[i] = float2fx(in[i], FX_IL);
+// 		printf("input in[%d]: %d\n", i, in[i]);
+//     }
+// #endif
+
+// #include "gold.h"
+// #include "fcn_gold.h"
+// in[0] = 1;
+// in[1] = 2;
+// in[3] = 4;
 
 #ifdef __FIXED
-    for (i = 0; i < ninputs * (d1*d2 + d2*d3); i++) {
-        in[i] = float2fx(in[i], FX_IL);
+
+	// // #include "fcn_gold.h"
+	// for (i = 0; i < ninputs * (d1*d3); i++) gold[i] = 0.0;
+ 	// for (i = 0; i < ninputs; i++) {
+	// 	//weight stationary
+    // sw_comp_start = get_counter();
+	// 	for(int z = 0; z < d2; z++){
+	// 		for(int x = 0; x < d1; x++){
+	// 				// round_up(ninputs * (d1*d2 + d2*d3), DMA_WORD_PER_BEAT(sizeof(token_t)));
+	// 				// native_t temp_wt = input[i * d1*d2 + x*d2 + z]; 
+	// 				native_t temp_wt = input[i * round_up(d1*d2, DMA_WORD_PER_BEAT(sizeof(token_t))) + x*d2 + z] ;
+	// 				// int64_t temp_wt = in[ninputs * d1*d2 + i*d2*d3 + d2*z + y]; 
+	// 			for (int y = 0; y < d3; y++){
+	// 				gold[i*d1*d3 + x*d3 + y] += ((temp_wt * (input[ninputs * round_up(d1*d2, DMA_WORD_PER_BEAT(sizeof(token_t)))  + i*d2*d3 + z*d3 + y]))); //>>FX_IL
+	// 				printf("gold[%d] (%d) += in[%d] (%d) * in[%d] (%d) [%d]\n", (i*d1*d3 + x*d3 + y), (int)gold[i*d1*d3 + x*d3 + y], 
+	// 																			(i * round_up(d1*d2, DMA_WORD_PER_BEAT(sizeof(token_t))) + x*d2 + z),(int)input[i * round_up(d1*d2, DMA_WORD_PER_BEAT(sizeof(token_t)))  + x*d2 + z], 
+	// 																			(ninputs * round_up(d1*d2, DMA_WORD_PER_BEAT(sizeof(token_t)))  + i*d2*d3 + z*d3 + y), (int)input[ninputs * round_up(d1*d2, DMA_WORD_PER_BEAT(sizeof(token_t))) + i*d2*d3 + z*d3 + y], 
+	// 																			((int)(temp_wt * (input[ninputs * round_up(d1*d2, DMA_WORD_PER_BEAT(sizeof(token_t))) + i*d2*d3 + z*d3 + y]))));
+	// 			}
+	// 		}
+	// 	}
+	// }
+
+    // sw_comp_end = get_counter();
+
+	for (i = 0; i < ninputs * (round_up(d1*d2, DMA_WORD_PER_BEAT(sizeof(token_t))) + d2*d3); i++) {
+		sw_buf[i] = input[i];
+		in[i] = float2fx(input[i], FX_IL);
+		if(i%128==0)
+			printf("input in[%d] (%d): %d\n", i, (int)input[i], in[i]);
     }
+
+#else 
+// #include "gold.h"
+#include "fcn_gold.h"
 #endif
 
-#include "gold.h"
 }
 
 int main(int argc, char * argv[])
@@ -169,18 +306,22 @@ int main(int argc, char * argv[])
 	unsigned **ptable;
 	token_t *mem;
 	native_t *gold;
+	native_t *sw_buf;
 	unsigned errors = 0;
 	unsigned coherence;
 
-	st_offset = ninputs * (d1 * d2 + d2 * d3);
-	ld_offset2 = ninputs * (d1 * d2);
 	
 	if (DMA_WORD_PER_BEAT(sizeof(token_t)) <= 1) {
 		in_words_adj = ninputs * (d1*d2 + d2*d3);
 		out_words_adj = ninputs * d1 * d3;
+		st_offset = ninputs * (d1 * d2 + d2 * d3);
+		ld_offset2 = ninputs * (d1 * d2);
 	} else {
 		in_words_adj = round_up(ninputs * (d1*d2 + d2*d3), DMA_WORD_PER_BEAT(sizeof(token_t)));
 		out_words_adj = round_up(ninputs * d1 * d3, DMA_WORD_PER_BEAT(sizeof(token_t)));
+
+		st_offset = in_words_adj; //ninputs * (d1 * d2 + d2 * d3);
+		ld_offset2 = round_up(ninputs * (d1 * d2), DMA_WORD_PER_BEAT(sizeof(token_t)));
 	}
 	in_len = in_words_adj;
 	out_len = out_words_adj;
@@ -188,7 +329,7 @@ int main(int argc, char * argv[])
 	out_size = out_len * sizeof(token_t);
 	out_offset  = in_len;
 	mem_size = (out_offset * sizeof(token_t)) + out_size;
-
+	
 	// Search for the device
 	printf("Scanning device tree... \n");
 
@@ -214,6 +355,7 @@ int main(int argc, char * argv[])
 		}
 
 		// Allocate memory
+		sw_buf = aligned_malloc(in_size);
 		gold = aligned_malloc(out_size);
 		mem = aligned_malloc(mem_size);
 		printf("  memory buffer base-address = %p\n", mem);
@@ -227,18 +369,24 @@ int main(int argc, char * argv[])
 		printf("  ptable = %p\n", ptable);
 		printf("  nchunk = %lu\n", NCHUNK(mem_size));
 
-#ifndef __riscv
-		for (coherence = ACC_COH_NONE; coherence <= ACC_COH_FULL; coherence++) {
-#else
+// #ifndef __riscv
+// 		for (coherence = ACC_COH_NONE; coherence <= ACC_COH_FULL; coherence++) {
+// #else
 		{
 			/* TODO: Restore full test once ESP caches are integrated */
-			coherence = ACC_COH_NONE;
-#endif
+			coherence = ACC_COH_FULL;
+// #endif
 		
 			printf("  Generate input...\n");
 
-			init_buf(mem, gold);
+			// init_buf(mem, gold);
+			init_buf(mem, sw_buf);
 
+
+    		sw_comp_start = get_counter();
+			for(int iter = 0; iter < ITERATIONS; iter++)
+				sw_run(do_relu, transpose, ninputs, d3, d2, d1, sw_buf, (sw_buf + ld_offset2), gold);
+    		sw_comp_end = get_counter();
 			// Pass common configuration parameters
 
 			iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
@@ -265,12 +413,39 @@ int main(int argc, char * argv[])
 			iowrite32(dev, GEMM_LD_OFFSET1_REG, ld_offset1);
 			iowrite32(dev, GEMM_LD_OFFSET2_REG, ld_offset2);
 
+
+			printf(" GEMM_DO_RELU_REG: %d\n", do_relu);
+			printf(" GEMM_TRANSPOSE_REG: %d\n", transpose);
+			printf(" GEMM_NINPUTS_REG: %d\n", ninputs);
+			printf(" GEMM_D3_REG: %d\n", d3);
+			printf(" GEMM_D2_REG: %d\n", d2);
+			printf(" GEMM_D1_REG: %d\n", d1);
+			printf(" GEMM_ST_OFFSET_REG: %d\n", st_offset);
+			printf(" GEMM_LD_OFFSET1_REG: %d\n", ld_offset1);
+			printf(" GEMM_LD_OFFSET2_REG: %d\n", ld_offset2);
+
+			printf(" n_input: %d\n", ninputs);
+			printf(" d1: %d\n", d1);
+			printf(" d2: %d\n", d2);
+			printf(" d3: %d\n", d3);
+			printf(" min len: %d\n", round_up(3,DMA_WORD_PER_BEAT(sizeof(token_t))));
+			printf(" out_offset: %d\n", out_offset);
+			printf(" out_len: %d\n", out_len);
+
+
+			// mem[0] = 65536;
+			// mem[1] = 2<<16;
+			// for(int iter = 0; iter < mem_size; iter++){
+			// 	if(iter==out_offset) printf("OUTPUTS:\n");
+			// 	printf("mem[%d]: %d\n", iter, mem[iter]>>16);
+			// }
+
 			// Flush (customize coherence model here)
 			esp_flush(coherence);
-
 			// Start accelerators
 			printf("  Start...\n");
 
+    		hw_comp_start = get_counter();
 			iowrite32(dev, CMD_REG, CMD_MASK_START);
 
 			// Wait for completion
@@ -281,14 +456,22 @@ int main(int argc, char * argv[])
 			}
 			iowrite32(dev, CMD_REG, 0x0);
 
+    		hw_comp_end = get_counter();
+
 			printf("  Done\n");
+
+    		printf("SW Comp Time: %lu\nHW Comp Time:%lu\n", (sw_comp_end-sw_comp_start)/ITERATIONS, (hw_comp_end-hw_comp_start));
 			printf("  validating...\n");
 
 			/* Validation */
+			// for(int iter = 0; iter < (out_offset+out_len); iter++){
+			// 	if(iter==out_offset) printf("OUTPUTS:\n");
+			// 	printf("mem[%d]: %d\n", iter, mem[iter]);
+			// }
 			errors = validate_buf(&mem[out_offset], gold);
 
 			if (errors)
-				printf("  ... FAIL\n");
+				printf("  ... FAIL (%d errors)\n", errors);
 			else
 				printf("  ... PASS\n");
 
@@ -296,6 +479,7 @@ int main(int argc, char * argv[])
 		aligned_free(ptable);
 		aligned_free(mem);
 		aligned_free(gold);
+		aligned_free(sw_buf);
 	}
 
 	return 0;

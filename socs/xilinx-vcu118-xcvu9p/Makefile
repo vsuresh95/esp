@@ -44,6 +44,7 @@ TOP_VLOG_SIM_SRCS +=
 
 ### Xilinx Vivado hw_server ###
 FPGA_HOST ?= localhost
+#FPGA_HOST ?= bigbend.cs.illinois.edu
 XIL_HW_SERVER_PORT ?= 3121
 
 

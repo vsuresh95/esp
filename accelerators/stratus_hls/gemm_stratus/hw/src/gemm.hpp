@@ -24,28 +24,45 @@ public:
     gemm(const sc_module_name& name)
 	: esp_accelerator_3P<DMA_WIDTH>(name)
 	, cfg("config")
-	, output_done("output_done")
-	, load_compute_cfg_done("load_compute_cfg_done")
-	, load_store_cfg_done("load_store_cfg_done")
+        , load_done("load_done")
+        , store_done("store_done")
+        , compute_done("compute_done")
+        , output_done("output_done")
+        , load_compute_cfg_done("load_compute_cfg_done")
+        , load_store_cfg_done("load_store_cfg_done")
+        , load_next_tile("load_next_tile")
+        , output_load_start("output_load_start")
+        , output_store_start("output_store_start")
+        , load_output_done("load_output_done")
+        , store_output_done("store_output_done")
         {
             // Signal binding
             cfg.bind_with(*this);
-	    output_done.bind_with<DMA_WIDTH>(*this);
-	    load_compute_cfg_done.bind_with<DMA_WIDTH>(*this);
-	    load_store_cfg_done.bind_with<DMA_WIDTH>(*this);
+            output_done.bind_with<DMA_WIDTH>(*this);
+            load_compute_cfg_done.bind_with<DMA_WIDTH>(*this);
+            load_store_cfg_done.bind_with<DMA_WIDTH>(*this);
+            load_done.bind_with<DMA_WIDTH>(*this);
+            store_done.bind_with<DMA_WIDTH>(*this);
+            compute_done.bind_with<DMA_WIDTH>(*this);
+            load_next_tile.bind_with<DMA_WIDTH>(*this);
+            
+            SC_CTHREAD(input_asi_controller, this->clk.pos());
+            this->reset_signal_is(this->rst, false);
+            SC_CTHREAD(output_asi_controller, this->clk.pos());
+            this->reset_signal_is(this->rst, false);
 
-	    // Flatten arrays
-	    HLS_FLATTEN_ARRAY(mult_out);
-	    HLS_FLATTEN_ARRAY(row);
-	    HLS_FLATTEN_ARRAY(col);
+            // Flatten arrays
+            HLS_FLATTEN_ARRAY(mult_out);
+            HLS_FLATTEN_ARRAY(row);
+            HLS_FLATTEN_ARRAY(col);
 
-	    // Map memories
-	    HLS_MAP_plm(input0, IN_PLM_NAME);
-	    HLS_MAP_plm(input1, IN_PLM_NAME);
-	    HLS_MAP_plm(input2, IN_PLM_NAME);
-	    HLS_MAP_plm(input3, IN_PLM_NAME);
-	    HLS_MAP_plm(output0, OUT_PLM_NAME);
-	    HLS_MAP_plm(output1, OUT_PLM_NAME);
+            // Map memories
+            HLS_MAP_plm(input0, IN_PLM_NAME);
+            HLS_MAP_plm(input1, IN_PLM_NAME);
+            HLS_MAP_plm(input2, IN_PLM_NAME);
+            HLS_MAP_plm(input3, IN_PLM_NAME);
+            HLS_MAP_plm(output0, OUT_PLM_NAME);
+            HLS_MAP_plm(output1, OUT_PLM_NAME);
         }
 
     // Processes
@@ -66,6 +83,20 @@ public:
     handshake_t output_done;
     handshake_t load_compute_cfg_done;
     handshake_t load_store_cfg_done;
+
+    sc_signal< sc_int<64> > asi_state_dbg;
+    sc_signal< sc_int<64> > compute_state_dbg;
+    sc_signal< sc_int<64> > load_iter_dbg;
+    sc_signal< sc_int<64> > store_iter_dbg;
+    sc_signal< sc_int<64> > load_state_dbg;
+    sc_signal< sc_int<64> > store_state_dbg;
+    sc_signal< sc_int<64> > load_unit_sp_write_dbg;
+    sc_signal< sc_int<64> > store_unit_sp_read_dbg;
+
+
+    sc_int<32> load_state;
+    sc_int<32> store_state;
+    sc_int<32> last_task;
 
     // Functions
 
@@ -97,6 +128,76 @@ public:
 				   uint8_t load_cfg, uint16_t loadable_rows,
 				   bool &pingpong);
 
+
+
+    // sc_int<32> load_state;
+    // sc_int<32> store_state;
+
+    sc_signal< sc_int<32> > load_state_req_dbg;
+    sc_signal< sc_int<32> > store_state_req_dbg;
+    sc_signal< sc_int<32> > input_state_req_dbg;
+    sc_signal< sc_int<32> > output_state_req_dbg;
+    sc_int<32> prod_valid;
+    sc_int<32> flt_valid;
+    sc_int<32> cons_ready;
+    sc_int<32> end_acc;
+    // sc_int<32> last_task;
+
+    sc_int<32> load_state_req_module;
+    sc_int<32> store_state_req_module;
+
+
+
+    sc_int<32> input_load_req;
+    sc_int<32> output_load_req;
+    sc_signal<bool> input_load_req_valid;
+    sc_signal<bool> output_load_req_valid;
+    sc_int<32> input_store_req;
+    sc_int<32> output_store_req;
+    sc_signal<bool> input_store_req_valid;
+    sc_signal<bool> output_store_req_valid;
+
+
+    // BM Load utility functions
+    inline void calc_load_len(uint16_t & length1, uint16_t & length2, uint16_t load_cfg, uint16_t chk, 
+                                uint16_t loadable_rows, uint16_t d1, uint16_t d2,
+                                uint16_t matrix_rem_in1, uint16_t matrix_rem_in2,uint24_t  matrix_chk_in,
+                                uint24_t matrix_d1, uint24_t matrix_d3 );
+    inline void load_input_1(bool &pingpong, uint32_t offset, uint16_t length, PLM_WORD (&ping_sp)[DMA_CHUNK], PLM_WORD (&pong_sp)[DMA_CHUNK], int16_t load_cfg);
+    inline void load_config(int32_t offset, 
+								uint24_t &ninputs,
+								uint24_t& matrix_d1,
+								uint24_t& matrix_d2,
+								uint24_t& matrix_d3,
+								uint32_t& ld_offset1,
+								// uint32_t ld_offset2;
+								uint32_t& st_offset,
+								bool &transpose,
+								bool &do_relu,
+								sc_dt::sc_bv<DMA_WIDTH>& dataBvin
+							);
+    inline void store_output_body(uint24_t st_offset, uint24_t length, bool& pingpong, PLM_WORD (&ping_sp)[OUT_DMA_CHUNK], PLM_WORD (&pong_sp)[OUT_DMA_CHUNK]);
+
+    //ASI Functions
+    inline void poll_flag(sc_dt::sc_bv<DMA_WIDTH> &dataBvin, int sync_offset, int sync_len, sc_int<32> &var);
+    inline void chk_last_task(sc_dt::sc_bv<DMA_WIDTH> &dataBvin);
+    inline void update_flag(int32_t sync_offset, int32_t sync_len, bool sync_flag, sc_dt::sc_bv<DMA_WIDTH>& dataBv);
+    inline void update_last_task(sc_dt::sc_bv<DMA_WIDTH> &dataBvin);
+    inline void propagate_flag();
+
+     // ASI submodule for input
+    void input_asi_controller();
+
+    // ASI submodule for output
+    void output_asi_controller();
+
+    //ASI FSM <-> Modules
+    inline void arbitrate_load_state(bool &task_arbiter, bool &continue_arb);
+    inline void arbitrate_store_state();
+    inline void input_asi_flag_update(int16_t update_stage);
+    inline void output_asi_flag_update(int16_t update_stage);
+    inline void input_asi_flag_poll(int16_t poll_stage);
+
     // Handshake callable from compute_kernel
     inline void compute_store_2_handshake();
 
@@ -108,6 +209,40 @@ public:
     inline void compute_load_cfg_handshake();
     inline void load_store_cfg_handshake();
     inline void store_load_cfg_handshake();
+
+    handshake_t load_next_tile;  
+    // Load -> Input ASI
+    handshake_t load_done;
+    // Output ASI -> Load
+    handshake_t output_load_start;
+    // Output ASI -> Store
+    handshake_t output_store_start;
+    // Store -> Input ASI
+    handshake_t store_done;
+    // Load -> Output ASI
+    handshake_t load_output_done;
+    // Store -> Output ASI
+    handshake_t store_output_done;
+
+    handshake_t compute_done;
+
+    inline void compute_done_req();
+    inline void compute_done_ack();
+    inline void load_done_req();
+    inline void load_done_ack();
+    inline void store_done_req();
+    inline void store_done_ack();
+    inline void load_next_tile_req(); 
+    inline void load_next_tile_ack();
+    inline void load_output_done_handshake();
+    inline void output_load_done_handshake();
+    inline void store_output_done_handshake();
+    inline void output_store_done_handshake(); 
+    inline void output_load_start_handshake();
+    inline void load_output_start_handshake();
+    inline void output_store_start_handshake();
+    inline void store_output_start_handshake();
+
 
     // Private local memories
     PLM_WORD input0[DMA_CHUNK];
@@ -134,6 +269,25 @@ public:
     sc_signal<uint16_t> loadable_rows_sig;
     sc_signal<uint16_t> loadable_chunk_sig;
     sc_signal<uint16_t> index_d1_incr_sig;
+    sc_signal<uint32_t> gemm_st_offset;
+
+	sc_signal<uint24_t> ninputs_sig;
+    sc_signal<uint24_t> d1_sig;
+    sc_signal<uint24_t> d2_sig;
+    sc_signal<uint24_t> d3_sig;
+    sc_signal<uint8_t> transpose_sig;
+    sc_signal<uint8_t> do_relu_sig;
+
+    // HLS_PRESERVE_SIGNAL(input_state_req_dbg);
+    // HLS_PRESERVE_SIGNAL(output_state_req_dbg);
+    // HLS_PRESERVE_SIGNAL(asi_state_dbg);
+    // HLS_PRESERVE_SIGNAL(load_iter_dbg);
+    // HLS_PRESERVE_SIGNAL(store_iter_dbg);
+    // HLS_PRESERVE_SIGNAL(load_state_dbg);
+    // HLS_PRESERVE_SIGNAL(store_state_dbg);
+    // HLS_PRESERVE_SIGNAL(load_unit_sp_write_dbg);
+    // HLS_PRESERVE_SIGNAL(store_unit_sp_read_dbg);
+    
 };
 
 #endif /* __GEMM_HPP__ */

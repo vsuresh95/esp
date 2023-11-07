@@ -65,6 +65,20 @@ typedef double token_t;
 
 typedef float native_t;
 
+static uint64_t get_counter() {
+  uint64_t counter;
+  asm volatile (
+    "li t0, 0;"
+    "csrr t0, cycle;"
+    "mv %0, t0"
+    : "=r" ( counter )
+    :
+    : "t0"
+  );
+
+  return counter;
+}
+
 #define MAX_PRINTED_ERRORS 512
 
 /* <<--params-def-->> */
@@ -98,7 +112,7 @@ struct gemm_stratus_access gemm_cfg_000[] = {
 		.ld_offset2 = LD_OFFSET2,
 		.src_offset = 0,
 		.dst_offset = 0,
-		.esp.coherence = ACC_COH_NONE,
+		.esp.coherence = ACC_COH_FULL,
 		.esp.p2p_store = 0,
 		.esp.p2p_nsrcs = 0,
 		.esp.p2p_srcs = {"", "", "", ""},

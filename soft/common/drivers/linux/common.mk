@@ -27,7 +27,8 @@ EXE := $(BUILD_PATH)/$(APPNAME).exe
 endif
 
 CFLAGS += $(EXTRA_CFLAGS)
-CFLAGS += -O3
+# CFLAGS += -O3
+CFLAGS += -O2
 CFLAGS += -Wall
 CFLAGS += -DLINUX
 CFLAGS += -I$(DRIVERS)/include -I$(DRIVERS)/../common/include -I../include -I$(DESIGN_PATH)/socgen/esp

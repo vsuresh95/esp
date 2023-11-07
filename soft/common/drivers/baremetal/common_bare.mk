@@ -58,6 +58,7 @@ CFLAGS += $(EXTRA_CFLAGS)
 CFLAGS += -I$(DRIVERS)/include -I$(DRIVERS)/../common/include -I$(DESIGN_PATH)
 CFLAGS +=-std=gnu99
 CFLAGS +=-O2
+# CFLAGS +=-O3
 CFLAGS += -L$(BUILD_PATH)/../../monitors
 LDFLAGS += -lm
 LDFLAGS += -lmonitors
