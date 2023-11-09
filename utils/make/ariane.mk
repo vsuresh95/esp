@@ -226,3 +226,5 @@ endif
 THIRDPARTY_VLOG += $(VERILOG_ARIANE)
 endif
 
+include $(ESP_ROOT)/utils/make/mini_era.mk
+include $(ESP_ROOT)/utils/make/audio_pipeline.mk

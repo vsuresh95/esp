@@ -289,19 +289,23 @@ int main(int argc, char * argv[])
 
                     unsigned fcs = rand(hartid) % 2;
 
+                    unsigned t_value = 0;
+                    unsigned r_value = 0;
+
                     // Update test and reference value
                     acquire_lock(&buf_lock[st_lock_offset]);
                     if (fcs == FCS_REQ_WTFWD) {
                         wtfwd((void *) &t_buffer[st_offset << llc_set_offset], st_value);
                         wtfwd((void *) &r_buffer[st_offset << llc_set_offset], st_value);
+                        asm volatile ("fence");
                     } else {
                         t_buffer[st_offset << llc_set_offset] = st_value;
                         r_buffer[st_offset << llc_set_offset] = st_value;
-                    }
 
-                    // Read back same test and reference value
-                    unsigned t_value = t_buffer[st_offset << llc_set_offset];
-                    unsigned r_value = r_buffer[st_offset << llc_set_offset];
+                        // Read back same test and reference value
+                        t_value = t_buffer[st_offset << llc_set_offset];
+                        r_value = r_buffer[st_offset << llc_set_offset];
+                    }
                     release_lock(&buf_lock[st_lock_offset]);
 
                     // Test if they are equal
