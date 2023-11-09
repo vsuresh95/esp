@@ -54,6 +54,8 @@ public:
 
             HLS_PRESERVE_SIGNAL(input_state_req_dbg);
             HLS_PRESERVE_SIGNAL(output_state_req_dbg);
+            HLS_PRESERVE_SIGNAL(op_asi_state_dbg);
+            HLS_PRESERVE_SIGNAL(compute_state_dbg);
             HLS_PRESERVE_SIGNAL(asi_state_dbg);
             HLS_PRESERVE_SIGNAL(load_iter_dbg);
             HLS_PRESERVE_SIGNAL(store_iter_dbg);
@@ -61,6 +63,49 @@ public:
             HLS_PRESERVE_SIGNAL(store_state_dbg);
             HLS_PRESERVE_SIGNAL(load_unit_sp_write_dbg);
             HLS_PRESERVE_SIGNAL(store_unit_sp_read_dbg);
+
+
+            HLS_PRESERVE_SIGNAL(size_matrix_out_sig);
+            HLS_PRESERVE_SIGNAL(size_matrix1_sig);
+            HLS_PRESERVE_SIGNAL(size_matrix2_sig);
+            HLS_PRESERVE_SIGNAL(matrix_chk_in_sig);
+            HLS_PRESERVE_SIGNAL(matrix_rem_in1_sig);
+            HLS_PRESERVE_SIGNAL(matrix_rem_in2_sig);
+            HLS_PRESERVE_SIGNAL(matrix_chk_out_sig);
+            HLS_PRESERVE_SIGNAL(matrix_rem_out_sig);
+            HLS_PRESERVE_SIGNAL(load_cfg_sig);
+            HLS_PRESERVE_SIGNAL(loadable_rows_sig);
+            HLS_PRESERVE_SIGNAL(loadable_chunk_sig);
+            HLS_PRESERVE_SIGNAL(index_d1_incr_sig);
+            HLS_PRESERVE_SIGNAL(gemm_st_offset);
+            HLS_PRESERVE_SIGNAL(ninputs_sig);
+            HLS_PRESERVE_SIGNAL(d1_sig);
+            HLS_PRESERVE_SIGNAL(d2_sig);
+            HLS_PRESERVE_SIGNAL(d3_sig);
+            HLS_PRESERVE_SIGNAL(transpose_sig);
+            HLS_PRESERVE_SIGNAL(do_relu_sig);
+
+            HLS_PRESERVE_SIGNAL(pingpong_m1_sig);
+            HLS_PRESERVE_SIGNAL(pingpong_m2_sig);
+
+            #if (PARALLELISM >= 8)
+            HLS_PRESERVE_SIGNAL(row_0);
+            HLS_PRESERVE_SIGNAL(row_1);
+            HLS_PRESERVE_SIGNAL(row_2);
+            HLS_PRESERVE_SIGNAL(row_3);
+            HLS_PRESERVE_SIGNAL(row_4);
+            HLS_PRESERVE_SIGNAL(row_5);
+            HLS_PRESERVE_SIGNAL(row_6);
+            HLS_PRESERVE_SIGNAL(row_7);
+            HLS_PRESERVE_SIGNAL(col_0);
+            HLS_PRESERVE_SIGNAL(col_1);
+            HLS_PRESERVE_SIGNAL(col_2);
+            HLS_PRESERVE_SIGNAL(col_3);
+            HLS_PRESERVE_SIGNAL(col_4);
+            HLS_PRESERVE_SIGNAL(col_5);
+            HLS_PRESERVE_SIGNAL(col_6);
+            HLS_PRESERVE_SIGNAL(col_7);
+            #endif
 
             // Flatten arrays
             HLS_FLATTEN_ARRAY(mult_out);
@@ -97,6 +142,7 @@ public:
 
     sc_signal< sc_int<64> > asi_state_dbg;
     sc_signal< sc_int<64> > compute_state_dbg;
+    sc_signal< sc_int<64> > op_asi_state_dbg;
     sc_signal< sc_int<64> > load_iter_dbg;
     sc_signal< sc_int<64> > store_iter_dbg;
     sc_signal< sc_int<64> > load_state_dbg;
@@ -104,6 +150,26 @@ public:
     sc_signal< sc_int<64> > load_unit_sp_write_dbg;
     sc_signal< sc_int<64> > store_unit_sp_read_dbg;
 
+    sc_signal< sc_int<1> > pingpong_m1_sig;
+    sc_signal< sc_int<1> > pingpong_m2_sig;
+    #if (PARALLELISM >= 8)
+    sc_signal< sc_int<32> > row_0;
+    sc_signal< sc_int<32> > row_1;
+    sc_signal< sc_int<32> > row_2;
+    sc_signal< sc_int<32> > row_3;
+    sc_signal< sc_int<32> > row_4;
+    sc_signal< sc_int<32> > row_5;
+    sc_signal< sc_int<32> > row_6;
+    sc_signal< sc_int<32> > row_7;
+    sc_signal< sc_int<32> > col_0;
+    sc_signal< sc_int<32> > col_1;
+    sc_signal< sc_int<32> > col_2;
+    sc_signal< sc_int<32> > col_3;
+    sc_signal< sc_int<32> > col_4;
+    sc_signal< sc_int<32> > col_5;
+    sc_signal< sc_int<32> > col_6;
+    sc_signal< sc_int<32> > col_7;
+    #endif
 
     sc_int<32> load_state;
     sc_int<32> store_state;
@@ -191,7 +257,7 @@ public:
 
     //ASI Functions
     inline void poll_flag(sc_dt::sc_bv<DMA_WIDTH> &dataBvin, int sync_offset, int sync_len, sc_int<32> &var);
-    inline void chk_last_task(sc_dt::sc_bv<DMA_WIDTH> &dataBvin);
+    // inline void chk_last_task(sc_dt::sc_bv<DMA_WIDTH> &dataBvin);
     inline void update_flag(int32_t sync_offset, int32_t sync_len, bool sync_flag, sc_dt::sc_bv<DMA_WIDTH>& dataBv);
     inline void update_last_task(sc_dt::sc_bv<DMA_WIDTH> &dataBvin);
     inline void propagate_flag();
@@ -203,7 +269,7 @@ public:
     void output_asi_controller();
 
     //ASI FSM <-> Modules
-    inline void arbitrate_load_state(bool &task_arbiter, bool &continue_arb);
+    inline void arbitrate_load_state(int8_t &task_arbiter, bool &continue_arb);
     inline void arbitrate_store_state();
     inline void input_asi_flag_update(int16_t update_stage);
     inline void output_asi_flag_update(int16_t update_stage);

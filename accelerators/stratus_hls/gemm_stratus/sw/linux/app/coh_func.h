@@ -4,8 +4,8 @@
 #ifndef __COH_FUNC__
 #define __COH_FUNC__
 
-// #define ESP
-#define COH_MODE 2
+#define ESP
+#define COH_MODE 0
 
 
 typedef union

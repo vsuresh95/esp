@@ -13,7 +13,15 @@
 #include "matmul.h"
 #include "fcn_input.h"
 
-#define SYNC_VAR_SIZE 4
+#define PRINT_DEBUG
+
+#ifdef PRINT_DEBUG
+#define DBG_PRINT(x) printf(#x)
+#else
+#define DBG_PRINT(x)
+#endif
+
+#define SYNC_VAR_SIZE 10
 
 #define NINPUTS_OFFSET 0
 #define MAT_D1_OFFSET 1
@@ -195,11 +203,11 @@ static unsigned mem_size;
 
 /* User defined registers */
 /* <<--regs-->> */
-#define GEMM_PROD_VALID_REG 0x70
-#define GEMM_CONS_READY_REG 0x6C
-#define GEMM_PROD_READY_REG 0x68
-#define GEMM_CONS_VALID_REG 0x64
-#define GEMM_INPUT_OFFSET_REG 0x60
+#define GEMM_PROD_VALID_REG 0x74
+#define GEMM_CONS_READY_REG 0x70
+#define GEMM_PROD_READY_REG 0x6C
+#define GEMM_CONS_VALID_REG 0x68
+#define GEMM_INPUT_OFFSET_REG 0x64
 #define GEMM_TRANSPOSE_REG 0x60
 #define GEMM_DO_RELU_REG 0x5c
 #define GEMM_ST_OFFSET_REG 0x58
@@ -299,6 +307,7 @@ static void init_buf (token_t *in, native_t *sw_buf)
 
 #ifdef __FIXED
 
+	#include "input.h"
 	// // #include "fcn_gold.h"
 	// for (i = 0; i < ninputs * (d1*d3); i++) gold[i] = 0.0;
  	// for (i = 0; i < ninputs; i++) {
@@ -331,8 +340,8 @@ static void init_buf (token_t *in, native_t *sw_buf)
     }
 
 #else 
-// #include "gold.h"
-#include "fcn_gold.h"
+#include "gold.h"
+// #include "fcn_gold.h"
 #endif
 
 }
@@ -364,11 +373,11 @@ int main(int argc, char * argv[])
 		st_offset = in_words_adj; //ninputs * (d1 * d2 + d2 * d3);
 		ld_offset2 = round_up(ninputs * (d1 * d2), DMA_WORD_PER_BEAT(sizeof(token_t)));
 	}
-	in_len = in_words_adj;
+	in_len = SYNC_VAR_SIZE + in_words_adj;
 	out_len = out_words_adj;
 	in_size = in_len * sizeof(token_t);
 	out_size = out_len * sizeof(token_t);
-	out_offset  = in_len;
+	out_offset  = in_len + SYNC_VAR_SIZE;
 	mem_size = (out_offset * sizeof(token_t)) + out_size;
 	
 	// Search for the device
@@ -418,17 +427,10 @@ int main(int argc, char * argv[])
 			coherence = ACC_COH_FULL;
 // #endif
 		
-			printf("  Generate input...\n");
-
-			reset_sync();
 			// init_buf(mem, gold);
-			init_buf(mem, sw_buf);
 
+			// init_buf(mem, sw_buf);
 
-    		sw_comp_start = get_counter();
-			for(int iter = 0; iter < ITERATIONS; iter++)
-				sw_run(do_relu, transpose, ninputs, d3, d2, d1, sw_buf, (sw_buf + ld_offset2), gold);
-    		sw_comp_end = get_counter();
 			// Pass common configuration parameters
 
 			iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
@@ -464,15 +466,15 @@ int main(int argc, char * argv[])
 			iowrite32(dev, GEMM_LD_OFFSET1_REG, ld_offset1);
 			iowrite32(dev, GEMM_LD_OFFSET2_REG, ld_offset2);
 
-			tile_size = d1*d2 + d2*d3;
+			tile_size = in_len; //d1*d2 + d2*d3;
 			rel_accel_prod_ready_offset = 0;
 			rel_accel_prod_valid_offset = rel_accel_prod_ready_offset+2;
 			rel_accel_prod_last_offset = rel_accel_prod_valid_offset+1;
 			rel_input_buffer_offset = SYNC_VAR_SIZE;
-			rel_accel_cons_ready_offset = tile_size + SYNC_VAR_SIZE;
+			rel_accel_cons_ready_offset = tile_size;
 			rel_accel_cons_valid_offset = rel_accel_cons_ready_offset+2;
 			rel_accel_con_last_offset = rel_accel_cons_valid_offset+1;
-			rel_output_buffer_offset = tile_size + 2*SYNC_VAR_SIZE;
+			rel_output_buffer_offset = out_offset;
 
 			cpu_prod_ready_offset = &rel_accel_cons_ready_offset;
 			cpu_cons_ready_offset = &rel_accel_prod_ready_offset;
@@ -494,6 +496,15 @@ int main(int argc, char * argv[])
 			printf(" GEMM_ST_OFFSET_REG: %d\n", st_offset);
 			printf(" GEMM_LD_OFFSET1_REG: %d\n", ld_offset1);
 			printf(" GEMM_LD_OFFSET2_REG: %d\n", ld_offset2);
+			// printf(" GEMM_LD_OFFSET2_REG: %d\n", ld_offset2);
+
+
+			printf(" rel_input_buffer_offset: %d\n", rel_input_buffer_offset);
+			printf(" rel_output_buffer_offset: %d\n", rel_output_buffer_offset);
+			printf(" rel_accel_prod_valid_offset: %d\n", rel_accel_prod_valid_offset);
+			printf(" rel_accel_cons_ready_offset: %d\n", rel_accel_cons_ready_offset);
+			printf(" rel_accel_prod_ready_offset: %d\n", rel_accel_prod_ready_offset);
+			printf(" rel_accel_cons_valid_offset: %d\n", rel_accel_cons_valid_offset);
 
 			printf(" n_input: %d\n", ninputs);
 			printf(" d1: %d\n", d1);
@@ -504,6 +515,20 @@ int main(int argc, char * argv[])
 			printf(" out_len: %d\n", out_len);
 
 
+
+			// reset_sync();
+			mem[rel_accel_prod_ready_offset] = 1;//BM
+			printf("reset accel_prod_ready mem[%d]: %d\n", rel_accel_prod_ready_offset, *(mem + rel_accel_prod_ready_offset));
+			mem[rel_accel_cons_valid_offset] = 0;
+			printf("reset accel_cons_valid mem[%d]: %d\n", rel_accel_cons_valid_offset, *(mem + rel_accel_cons_valid_offset));
+			mem[rel_accel_con_last_offset] =0;
+			printf("reset accel_con_last mem[%d]: %d\n", rel_accel_con_last_offset, *(mem + rel_accel_con_last_offset));
+			mem[rel_accel_prod_valid_offset] =0;
+			printf("reset accel_prod_valid mem[%d]: %d\n", rel_accel_prod_valid_offset, *(mem + rel_accel_prod_valid_offset));
+			mem[rel_accel_cons_ready_offset] = 0; 
+			printf("reset accel_cons_ready mem[%d]: %d\n", rel_accel_cons_ready_offset, *(mem + rel_accel_cons_ready_offset));
+	
+			asm volatile ("fence w, w");	
 			// mem[0] = 65536;
 			// mem[1] = 2<<16;
 			// for(int iter = 0; iter < mem_size; iter++){
@@ -526,10 +551,14 @@ int main(int argc, char * argv[])
 			// 	done &= STATUS_MASK_DONE;
 			// }
 			// iowrite32(dev, CMD_REG, 0x0);
-
-
+			
+			printf("  Update Prod Rdy...\n");
 			update_prod_rdy();
+			printf("  Poll Cons Rdy...\n");
 			while(!poll_cons_rdy()); // wait for cons ready
+			printf("  Found Cons Rdy...\n");
+
+			asm volatile ("fence w, w");	//release semantics
 			mem[rel_input_buffer_offset+NINPUTS_OFFSET] = ninputs;
 			mem[rel_input_buffer_offset+MAT_D1_OFFSET] = d1;
 			mem[rel_input_buffer_offset+MAT_D2_OFFSET] = d2;
@@ -538,13 +567,39 @@ int main(int argc, char * argv[])
 			mem[rel_input_buffer_offset+ST_OFFSET] = rel_output_buffer_offset;
 			mem[rel_input_buffer_offset+TRANSPOSE_OFFSET] = transpose;
 			mem[rel_input_buffer_offset+DO_RELU_OFFSET] = do_relu;
-			update_cons_rdy();
-			update_cons_valid(1);
+			printf("  Provided config. Update Cons Rdy and last...\n");
 
+			asm volatile ("fence w, w");	//release semantics
+			update_cons_rdy();
+			update_cons_valid(0);
+
+
+			printf("  Poll Cons Rdy...\n");
+			while(!poll_cons_rdy()); // wait for cons ready
+			printf("  Found Cons Rdy...\n");
+
+			printf("  Generate input...\n");
+			init_buf(mem+rel_input_buffer_offset, sw_buf);
+
+			printf("  Update Cons Rdy and last...\n");
+			update_cons_rdy();
+			update_cons_valid(0);
+
+			printf("  Poll Prod Valid...\n");
 			while(!poll_prod_valid()); //wait for prod 
+			printf("  Found Prod Valid...\n");
     		hw_comp_end = get_counter();
 
 			printf("  Done\n");
+
+
+			printf("SW Comp:\n");		
+			
+    		sw_comp_start = get_counter();
+			for(int iter = 0; iter < ITERATIONS; iter++)
+				sw_run(do_relu, transpose, ninputs, d3, d2, d1, sw_buf, (sw_buf + ld_offset2), gold);
+    		sw_comp_end = get_counter();
+
 
     		printf("SW Comp Time: %lu\nHW Comp Time:%lu\n", (sw_comp_end-sw_comp_start)/ITERATIONS, (hw_comp_end-hw_comp_start));
 			printf("  validating...\n");

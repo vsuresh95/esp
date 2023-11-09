@@ -62,10 +62,15 @@ static inline void reset_sync(){
     printf("Inside reset sync\n");
 	for(n = 0; n< num_devices; n++){
 		write_mem(((void*)(mem + rel_accel_prod_ready_offset)), 1);//BM
+		printf("reset accel_prod_ready mem[%d]: %d\n", rel_accel_prod_ready_offset, *(mem + rel_accel_prod_ready_offset));
 		write_mem(((void*)(mem + rel_accel_cons_valid_offset)), 0);
+		printf("reset accel_cons_valid mem[%d]: %d\n", rel_accel_cons_valid_offset, *(mem + rel_accel_cons_valid_offset));
 		write_mem(((void*)(mem + rel_accel_con_last_offset)), 0);
+		printf("reset accel_con_last mem[%d]: %d\n", rel_accel_con_last_offset, *(mem + rel_accel_con_last_offset));
 		write_mem(((void*)(mem + rel_accel_prod_valid_offset)), 0);
+		printf("reset accel_prod_valid mem[%d]: %d\n", rel_accel_prod_valid_offset, *(mem + rel_accel_prod_valid_offset));
 		write_mem(((void*)(mem + rel_accel_cons_ready_offset)), 0); 
+		printf("reset accel_cons_ready mem[%d]: %d\n", rel_accel_cons_ready_offset, *(mem + rel_accel_cons_ready_offset));
 	}
 	asm volatile ("fence w, w");	
 }
@@ -74,6 +79,7 @@ static inline uint32_t poll_cons_rdy(){
 	int64_t value_64 = 0;
 	void* dst = (void*)(mem + (*cpu_cons_ready_offset));
 	value_64 = read_mem(dst);
+	printf("Polling cons rdy mem[%d]: %d\n", *cpu_cons_ready_offset, value_64);
 	return (value_64 == 1);
 }
 
@@ -98,51 +104,59 @@ static inline void update_cons_valid(int64_t last){
 	#ifndef ESP
 	asm volatile ("fence w, w");	//release semantics
 	#endif
-	void* dst = (void*)(mem+(*cpu_cons_valid_offset)+1);
-	write_mem(dst, last);
+	// void* dst = (void*)(mem+(*cpu_cons_valid_offset)+1);
+	// write_mem(dst, last);
 
-	#ifdef ESP
-	asm volatile ("fence w, w");	//release semantics
-	#endif
+	// #ifdef ESP
+	// asm volatile ("fence w, w");	//release semantics
+	// #endif
 
-	dst = (void*)(mem+(*cpu_cons_valid_offset));
-	int64_t value_64 = 1;
-	write_mem(dst, value_64);
+	// dst = (void*)(mem+(*cpu_cons_valid_offset));
+	// int64_t value_64 = 1;
+	// write_mem(dst, value_64);
 
 
-	int time_var = 0;
-	while(time_var<100) time_var++;
+	// int time_var = 0;
+	// while(time_var<100) time_var++;
+
+	mem[*cpu_cons_valid_offset+1] = last;
+	mem[*cpu_cons_valid_offset] = 1;
 	asm volatile ("fence w, w");	
 }
 
 
 static inline void update_cons_rdy(){
 	asm volatile ("fence w, w");	//acquire semantics
-	void* dst = (void*)(mem+(*cpu_cons_ready_offset));
-	int64_t value_64 = 0;
-	write_mem(dst, value_64);
-	int time_var = 0;
-	while(time_var<100) time_var++;
+	// void* dst = (void*)(mem+(*cpu_cons_ready_offset));
+	// int64_t value_64 = 0;
+	// write_mem(dst, value_64);
+	// int time_var = 0;
+	// while(time_var<100) time_var++;
+	mem[*cpu_cons_ready_offset] = 0;
 	asm volatile ("fence w, w");	
 }
 
 static inline void update_prod_rdy(){
 	asm volatile ("fence w, w");	//acquire semantics
-	void* dst = (void*)(mem+(*cpu_prod_ready_offset));
-	int64_t value_64 = 1; 
-	write_mem(dst, value_64);
-	int time_var = 0;
-	while(time_var<100) time_var++;
+	// void* dst = (void*)(mem+(*cpu_prod_ready_offset));
+	// int64_t value_64 = 1; 
+	// write_mem(dst, value_64);
+	// int time_var = 0;
+	// while(time_var<100) time_var++;
+
+	mem[*cpu_prod_ready_offset] = 1;
 	asm volatile ("fence w, w");	
 }
 
 static inline void update_prod_valid(){
 	asm volatile ("fence w, w");	//release semantics
-	void* dst = (void*)(mem+(*cpu_prod_valid_offset));
-	int64_t value_64 = 0; 
-	write_mem(dst, value_64);
-	int time_var = 0;
-	while(time_var<100) time_var++;
+	// void* dst = (void*)(mem+(*cpu_prod_valid_offset));
+	// int64_t value_64 = 0; 
+	// write_mem(dst, value_64);
+	// int time_var = 0;
+	// while(time_var<100) time_var++;
+
+	mem[*cpu_prod_valid_offset] = 0;
 	asm volatile ("fence w, w");	//acquire semantics
 }
 

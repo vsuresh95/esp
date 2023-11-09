@@ -250,7 +250,7 @@ inline void gemm::store_output_body(uint24_t st_offset, uint24_t length, bool& p
 }
 
 
-inline void gemm::arbitrate_load_state(bool &task_arbiter, bool &continue_arb){
+inline void gemm::arbitrate_load_state(int8_t &task_arbiter, bool &continue_arb){
 	{
             HLS_DEFINE_PROTOCOL("load-next-tile");
 
@@ -289,40 +289,53 @@ inline void gemm::arbitrate_load_state(bool &task_arbiter, bool &continue_arb){
 
 inline void gemm::arbitrate_store_state()//int32_t &store_state, int32_t &store_state_req_module
 {
- 	while (!(input_store_req_valid ||  output_store_req_valid)) wait();
+	{
+		HLS_DEFINE_PROTOCOL("arbitrate_store_state");
+		while (!(input_store_req_valid ||  output_store_req_valid)) wait();
 
-	if (input_store_req_valid) {
-		this->store_compute_handshake();
-		store_state = input_store_req;
-		store_state_req_module = INPUT_ASI;
-	} else {
-		this->store_output_start_handshake();
-		store_state = output_store_req;
-		store_state_req_module = OUTPUT_ASI;
+		if (input_store_req_valid) {
+			this->store_compute_handshake();
+			store_state = input_store_req;
+			store_state_req_module = INPUT_ASI;
+		} else {
+			this->store_output_start_handshake();
+			store_state = output_store_req;
+			store_state_req_module = OUTPUT_ASI;
+		}
+		// this->store_compute_handshake();
+		store_state_dbg.write(store_state);
+		// store_iter_dbg.write(curr_tile);
 	}
-	// this->store_compute_handshake();
-	store_state_dbg.write(store_state);
-	// store_iter_dbg.write(curr_tile);
 }
 
 inline void gemm::update_flag(int32_t sync_offset, int32_t sync_len, bool sync_flag, sc_dt::sc_bv<DMA_WIDTH>& dataBv)
 {
 	// HLS_DEFINE_PROTOCOL("store-dma-flag");
-
-	dma_info_t dma_info(sync_offset / WORDS_PER_DMA, 
-	round_up(sync_len, WORDS_PER_DMA) >> WORDS_PER_DMA_LOG, SIZE_WORD);
-	// sc_dt::sc_bv<DMA_WIDTH> dataBv;
-	dataBv.range(DMA_WIDTH - 1, 0) = sync_flag;
-	this->dma_write_ctrl.put(dma_info);
-	wait();
-	this->dma_write_chnl.put(dataBv);
-	wait();
-	if(store_state == UPDATE_CONS_VALID_REQ){
-		dataBv.range(DMA_WIDTH - 1, 0) = last_task;
-		this->dma_write_chnl.put(dataBv);
+	{
+		HLS_DEFINE_PROTOCOL("update_flag");
+		dma_info_t dma_info(sync_offset / WORDS_PER_DMA, 
+		round_up(sync_len, WORDS_PER_DMA) >> WORDS_PER_DMA_LOG, SIZE_WORD);
+		// sc_dt::sc_bv<DMA_WIDTH> dataBv;
+		// dataBv.range(DMA_WIDTH - 1, 0) = sync_flag;
+		this->dma_write_ctrl.put(dma_info);
 		wait();
+		#if (WORDS_PER_DMA == 2)
+			dataBv.range(31, 0) = sync_flag;
+			if(store_state == UPDATE_CONS_VALID_REQ)
+				dataBv.range(63,32) = last_task;
+			this->dma_write_chnl.put(dataBv);
+			wait();
+		#else
+			dataBv.range(DMA_WIDTH - 1, 0) = sync_flag;
+			this->dma_write_chnl.put(dataBv);
+			wait();
+			if(store_state == UPDATE_CONS_VALID_REQ){
+				dataBv.range(DMA_WIDTH - 1, 0) = last_task;
+				this->dma_write_chnl.put(dataBv);
+				wait();
+			}
+		#endif
 	}
-
 }
       
 inline void gemm::update_last_task(sc_dt::sc_bv<DMA_WIDTH> &dataBv){
@@ -333,41 +346,68 @@ inline void gemm::update_last_task(sc_dt::sc_bv<DMA_WIDTH> &dataBv){
 
 inline void gemm::propagate_flag()
 {
-	// Wait till the write is accepted at the cache (and previous fences)
-	while (!(this->dma_write_chnl.ready)) wait();
-	wait();
+	{
+		HLS_DEFINE_PROTOCOL("propagate_flag");
+		// Wait till the write is accepted at the cache (and previous fences)
+		while (!(this->dma_write_chnl.ready)) wait();
+		wait();
 
-	//FENCE
-	this->acc_fence.put(0x2);
-	wait();
-	while (!(this->acc_fence.ready)) wait();
-	wait();
+		//FENCE
+		this->acc_fence.put(0x2);
+		wait();
+		while (!(this->acc_fence.ready)) wait();
+		wait();
+	}
 }
 
 inline void gemm::poll_flag(sc_dt::sc_bv<DMA_WIDTH> &dataBvin, int sync_offset, int sync_len, sc_int<32> &var)
 {
-	dma_info_t dma_info2(sync_offset>> WORDS_PER_DMA_LOG, sync_len>> WORDS_PER_DMA_LOG, SIZE_WORD);
-	this->dma_read_ctrl.put(dma_info2);
-	wait();
-	load_unit_sp_write_dbg.write(1); 
-	dataBvin.range(DMA_WIDTH - 1, 0) = this->dma_read_chnl.get();
-	wait();
-	load_unit_sp_write_dbg.write(2); 
-	var = dataBvin.range(DMA_WIDTH - 1, 0).to_int64();
-	wait();
-	load_unit_sp_write_dbg.write(3); 
+	{
+		HLS_DEFINE_PROTOCOL("poll_flag");
+		dma_info_t dma_info2(sync_offset>> WORDS_PER_DMA_LOG, round_up(sync_len, WORDS_PER_DMA) >> WORDS_PER_DMA_LOG, SIZE_WORD);
+		this->dma_read_ctrl.put(dma_info2);
+		wait();
+		load_unit_sp_write_dbg.write(1); 
+		dataBvin.range(DMA_WIDTH - 1, 0) = this->dma_read_chnl.get();
+		wait();
+		load_unit_sp_write_dbg.write(2); 
+		var = dataBvin.range(31, 0).to_uint();
+		wait();
+		load_unit_sp_write_dbg.write(3); 
+
+		if(sync_len == 2){
+			#if (WORDS_PER_DMA == 2)
+			last_task = dataBvin.range(63,32).to_uint();
+			#else
+				dataBvin.range(DMA_WIDTH - 1, 0) = this->dma_read_chnl.get();
+				wait();
+				last_task = dataBvin.range(31, 0).to_uint();
+			#endif
+			// dataBvin.range(DMA_WIDTH - 1, 0) = this->dma_read_chnl.get();
+			// last_task = dataBvin.range(31, 0).to_int64();
+			// wait();
+			// load_unit_sp_write_dbg.write(4); 
+			// wait();
+		}
+	}
 }
 
-inline void gemm::chk_last_task(sc_dt::sc_bv<DMA_WIDTH> &dataBvin){
-	dataBvin.range(DMA_WIDTH - 1, 0) = this->dma_read_chnl.get();
-	last_task = dataBvin.range(31, 0).to_int64();
-	wait();
-	load_unit_sp_write_dbg.write(4); 
-	wait();
-}
+// inline void gemm::chk_last_task(sc_dt::sc_bv<DMA_WIDTH> &dataBvin)
+// {
+// 	{
+// 		HLS_DEFINE_PROTOCOL("chk_last_task");
+// 		dataBvin.range(DMA_WIDTH - 1, 0) = this->dma_read_chnl.get();
+// 		last_task = dataBvin.range(31, 0).to_int64();
+// 		wait();
+// 		load_unit_sp_write_dbg.write(4); 
+// 		wait();
+// 	}
+// }
 
 inline void gemm::input_asi_flag_update(int16_t update_stage)
 {
+	{
+		HLS_DEFINE_PROTOCOL("input_asi_flag_update");
 
 		input_store_req = update_stage; //UPDATE_CONFIG;
 		input_store_req_valid = true;
@@ -380,6 +420,7 @@ inline void gemm::input_asi_flag_update(int16_t update_stage)
 		wait();
 		this->store_done_ack();
 		wait();
+	}
 }
 
 inline void gemm::load_config(int32_t offset, 
@@ -395,84 +436,95 @@ inline void gemm::load_config(int32_t offset,
 								sc_dt::sc_bv<DMA_WIDTH>& dataBvin
 							)
 {
-	dma_info_t dma_info2(offset>> WORDS_PER_DMA_LOG, 6>>WORDS_PER_DMA_LOG, SIZE_WORD);
-	this->dma_read_ctrl.put(dma_info2);
-	wait();
-	load_unit_sp_write_dbg.write(LOAD_CONFIG); 
-	dataBvin.range(DMA_WIDTH - 1, 0) = this->dma_read_chnl.get();
-	wait();
-	ninputs = dataBvin.range(31, 0).to_uint();
-	#if (WORDS_PER_DMA == 2)
-		matrix_d1 = dataBvin.range(63,32).to_uint();
-	#else
+	{
+		HLS_DEFINE_PROTOCOL("load_config");
+		dma_info_t dma_info2(offset>> WORDS_PER_DMA_LOG, 8>>WORDS_PER_DMA_LOG, SIZE_WORD);
+		this->dma_read_ctrl.put(dma_info2);
+		wait();
+		load_unit_sp_write_dbg.write(LOAD_CONFIG); 
 		dataBvin.range(DMA_WIDTH - 1, 0) = this->dma_read_chnl.get();
 		wait();
-		matrix_d1 = dataBvin.range(31, 0).to_uint();
-	#endif
-	dataBvin.range(DMA_WIDTH - 1, 0) = this->dma_read_chnl.get();
-	wait();
-	matrix_d2 = dataBvin.range(31, 0).to_uint();
-	#if (WORDS_PER_DMA == 2)
-		matrix_d3 = dataBvin.range(63,32).to_uint();
-	#else
+		ninputs = dataBvin.range(31, 0).to_uint();
+		#if (WORDS_PER_DMA == 2)
+			matrix_d1 = dataBvin.range(63,32).to_uint();
+		#else
+			dataBvin.range(DMA_WIDTH - 1, 0) = this->dma_read_chnl.get();
+			wait();
+			matrix_d1 = dataBvin.range(31, 0).to_uint();
+		#endif
+		wait();
 		dataBvin.range(DMA_WIDTH - 1, 0) = this->dma_read_chnl.get();
 		wait();
-		matrix_d3 = dataBvin.range(31, 0).to_uint();
-	#endif
+		matrix_d2 = dataBvin.range(31, 0).to_uint();
+		#if (WORDS_PER_DMA == 2)
+			matrix_d3 = dataBvin.range(63,32).to_uint();
+		#else
+			dataBvin.range(DMA_WIDTH - 1, 0) = this->dma_read_chnl.get();
+			wait();
+			matrix_d3 = dataBvin.range(31, 0).to_uint();
+		#endif
+		wait();
+		dataBvin.range(DMA_WIDTH - 1, 0) = this->dma_read_chnl.get();
+		wait();
+		ld_offset1 = dataBvin.range(31, 0).to_uint();
+		#if (WORDS_PER_DMA == 2)
+			st_offset = dataBvin.range(63,32).to_uint();
+		#else
+			dataBvin.range(DMA_WIDTH - 1, 0) = this->dma_read_chnl.get();
+			wait();
+			st_offset = dataBvin.range(31, 0).to_uint();
+		#endif
 
-	dataBvin.range(DMA_WIDTH - 1, 0) = this->dma_read_chnl.get();
-	wait();
-	ld_offset1 = dataBvin.range(31, 0).to_uint();
-	#if (WORDS_PER_DMA == 2)
-		st_offset = dataBvin.range(63,32).to_uint();
-	#else
+		wait();
+
 		dataBvin.range(DMA_WIDTH - 1, 0) = this->dma_read_chnl.get();
 		wait();
-		st_offset = dataBvin.range(31, 0).to_uint();
-	#endif
-
-
-	dataBvin.range(DMA_WIDTH - 1, 0) = this->dma_read_chnl.get();
-	wait();
-	transpose = dataBvin.range(31, 0).to_uint();
-	#if (WORDS_PER_DMA == 2)
-		do_relu = dataBvin.range(63,32).to_uint();
-	#else
-		dataBvin.range(DMA_WIDTH - 1, 0) = this->dma_read_chnl.get();
-		wait();
-		do_relu = dataBvin.range(31, 0).to_uint();
-	#endif
+		transpose = dataBvin.range(31, 0).to_uint();
+		#if (WORDS_PER_DMA == 2)
+			do_relu = dataBvin.range(63,32).to_uint();
+		#else
+			dataBvin.range(DMA_WIDTH - 1, 0) = this->dma_read_chnl.get();
+			wait();
+			do_relu = dataBvin.range(31, 0).to_uint();
+		#endif
+	}
 }
 
 
 inline void gemm::output_asi_flag_update(int16_t update_stage)
 {
-	output_store_req = update_stage; //UPDATE_CONS_READY_REQ;
-	output_store_req_valid = true;
+	{
+		HLS_DEFINE_PROTOCOL("output_asi_flag_update");
+		output_store_req = update_stage; //UPDATE_CONS_READY_REQ;
+		output_store_req_valid = true;
 
-	output_state_req_dbg.write(update_stage);
+		output_state_req_dbg.write(update_stage);
 
-	this->output_store_start_handshake();
-	wait();
-	output_store_req_valid = false;
-	wait();
-	this->output_store_done_handshake();
-	wait();
+		this->output_store_start_handshake();
+		wait();
+		output_store_req_valid = false;
+		wait();
+		this->output_store_done_handshake();
+		wait();
+	}
 }
 
 inline void gemm::input_asi_flag_poll(int16_t poll_stage)
 {
-	input_load_req = poll_stage;
-	input_load_req_valid = true;
+	{
+		HLS_DEFINE_PROTOCOL("input_asi_flag_poll");
+		input_load_req = poll_stage;
+		input_load_req_valid = true;
 
-	input_state_req_dbg.write(poll_stage);
+		input_state_req_dbg.write(poll_stage);
 
-	this->load_next_tile_req();
-	wait();
-	input_load_req_valid = false;
-	wait();
-	this->load_done_ack();
-	wait();
+		this->load_next_tile_req();
+		wait();
+		input_load_req_valid = false;
+		wait();
+		this->load_done_ack();
+		wait();
+	}
 }
 
 
