@@ -715,7 +715,7 @@ void gemm::compute_kernel()
 			matrix_d3 = d3_sig.read();
 			do_relu = do_relu_sig.read();
 			wait();
-			length = matrix_d1*matrix_d2;
+			length = matrix_d2;
 			wait();
 		}
 		// Compute
@@ -1030,6 +1030,8 @@ void gemm::compute_kernel()
 							FPDATA add_tmp12 = add_tmp8 + add_tmp9;
 							FPDATA add_tmp13 = add_tmp10 + add_tmp11;
 							accumulator += add_tmp12 + add_tmp13;
+							#else
+							accumulator +=  mult_out[0];
 							#endif
 						}
 
