@@ -7,6 +7,7 @@ caches/spandex-caches/l2_spandex/rtl/l2_spandex_rtl_top.sv
 caches/spandex-caches/l2_spandex/rtl/l2_interfaces.sv
 caches/spandex-caches/l2_spandex/rtl/l2_lookup.sv
 caches/spandex-caches/l2_spandex/rtl/l2_localmem.sv
+caches/spandex-caches/l2_spandex/rtl/l2_localmem_asic.sv
 caches/spandex-caches/l2_spandex/rtl/l2_regs.sv
 caches/spandex-caches/l2_spandex/rtl/l2_mshr.sv
 caches/spandex-caches/l2_spandex/rtl/l2_core.sv
@@ -19,6 +20,7 @@ caches/spandex-caches/llc_spandex/rtl/llc_interface_defs.sv
 caches/spandex-caches/llc_spandex/rtl/llc_lookup.sv
 caches/spandex-caches/llc_spandex/rtl/llc_mshr.sv
 caches/spandex-caches/llc_spandex/rtl/llc_localmem.sv
+caches/spandex-caches/llc_spandex/rtl/llc_localmem_asic.sv
 caches/spandex-caches/llc_spandex/rtl/llc_spandex_rtl_top.sv
 caches/spandex-caches/llc_spandex/rtl/llc_fsm.sv
 caches/spandex-caches/llc_spandex/rtl/llc_core.sv
