@@ -8,14 +8,14 @@
 	branch = restructuring
 [submodule "accelerators/stratus_hls/common/inc"]
 	path = accelerators/stratus_hls/common/inc
-	url = https://github.com/sld-columbia/esp-accelerator-templates.git
+	url = https://github.com/vsuresh95/esp-accelerator-templates.git
 [submodule "soft/ariane/linux"]
 	path = soft/ariane/linux
 	url = https://github.com/sld-columbia/linux.git
 	branch = ariane
 [submodule "rtl/cores/ariane/ariane"]
 	path = rtl/cores/ariane/ariane
-	url = https://github.com/sld-columbia/ariane.git
+	url = https://github.com/vsuresh95/ariane.git
 [submodule "soft/ariane/riscv-pk"]
 	path = soft/ariane/riscv-pk
 	url = https://github.com/sld-columbia/riscv-pk.git
