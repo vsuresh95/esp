@@ -203,7 +203,8 @@ public:
     // Synchronize compute_kernel and store_output processes
     inline void sync_compute_store(uint16_t &count, uint16_t loaded_rows,
 				   uint8_t load_cfg, uint16_t loadable_rows,
-				   bool &pingpong);
+				   bool &pingpong
+                   , bool &pingpong_m1, bool &pingpong_m2, sc_signal< sc_int<64> >& compute_state_dbg);
 
 
 
@@ -274,6 +275,7 @@ public:
     inline void input_asi_flag_update(int16_t update_stage);
     inline void output_asi_flag_update(int16_t update_stage);
     inline void input_asi_flag_poll(int16_t poll_stage);
+    inline void release_outputs(sc_signal< sc_int<64> >& compute_state_dbg);
 
     // Handshake callable from compute_kernel
     inline void compute_store_2_handshake();

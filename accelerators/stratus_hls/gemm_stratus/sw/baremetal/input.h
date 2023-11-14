@@ -17,50 +17,67 @@
 // input[15] = 16.0;
 // }
 // else if(ninputs==2){
-native_t input[8];
-input[0] = 1.0;
-input[1] = 2.0;
-input[2] = 3.0;
-input[3] = 4.0;
-input[4] = 5.0;
-input[5] = 7.0;
-input[6] = 6.0;
-input[7] = 8.0;
+native_t input[48];
+// input[0] = 1.0;
+// input[1] = 2.0;
+// input[2] = 3.0;
+// input[3] = 4.0;
+// input[4] = 5.0;
+// input[5] = -7.0;
+// // input[6] = 6.0;
+// // input[7] = 8.0;
 
-// }
+// // }
 
-// input[0] = 1;
-// input[1] = 2;
-// input[2] = 3;
-// input[3] = 4;
-// input[4] = 5;
-// input[5] = 6;
-// input[6] = 7;
-// input[7] = 8;
-// input[8] = 1;
-// input[9] = 2;
-// input[10] = 3;
-// input[11] = 4;
-// input[12] = 5;
-// input[13] = 6;
-// input[14] = 7;
-// input[15] = 8;
-// input[16] = 9;
-// input[17] = 10;
-// input[18] = -5;
-// input[19] = 12;
-// input[20] = 13;
-// input[21] = 14;
-// input[22] = 15;
-// input[23] = 16;
-// input[24] = 9;
-// input[25] = 10;
-// input[26] = -5;
-// input[27] = 12;
-// input[28] = 13;
-// input[29] = 14;
-// input[30] = 15;
-// input[31] = 16;
+input[0] = 1;
+input[1] = 2;
+input[2] = 3;
+input[3] = 4;
+input[4] = 5;
+input[5] = 6;
+input[6] = 7;
+input[7] = 8;
+input[8]  = 1;
+input[9]  = 2;
+input[10] = 3;
+input[11] = 4;
+input[12] = 5;
+input[13] = 6;
+input[14] = 7;
+input[15] = 8;
+input[16] = 1;
+input[17] = 2;
+input[18] = 3;
+input[19] = 4;
+input[20] = 5;
+input[21] = 6;
+input[22] = 7;
+input[23] = 8;
+
+input[24] = 9;
+input[25] = 10;
+input[26] = -5;
+input[27] = 12;
+input[28] = 13;
+input[29] = 14;
+input[30] = 15;
+input[31] = 16;
+input[32] = 9;
+input[33] = 10;
+input[34] = -5;
+input[35] = 12;
+input[36] = 13;
+input[37] = 14;
+input[38] = 15;
+input[39] = 16;
+input[40] = 9;
+input[41] = 10;
+input[42] = -5;
+input[43] = 12;
+input[44] = 13;
+input[45] = 14;
+input[46] = 15;
+input[47] = 16;
 
 // }
 

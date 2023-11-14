@@ -2,29 +2,30 @@
 #define __GEMM__
 
 
-static inline uint64_t get_counter() {
-    uint64_t t_end = 0;
-#ifndef __linux__
-	asm volatile (
-		"li t0, 0;"
-		"csrr t0, mcycle;"
-		"mv %0, t0"
-		: "=r" (t_end)
-		:
-		: "t0"
-	);
-#else
-	asm volatile (
-		"li t0, 0;"
-		"csrr t0, cycle;"
-		"mv %0, t0"
-		: "=r" (t_end)
-		:
-		: "t0"
-	);
-#endif
-	return t_end;
-}
+
+// static inline uint64_t get_counter() {
+//     uint64_t t_end = 0;
+// #ifndef __linux__
+// 	asm volatile (
+// 		"li t0, 0;"
+// 		"csrr t0, mcycle;"
+// 		"mv %0, t0"
+// 		: "=r" (t_end)
+// 		:
+// 		: "t0"
+// 	);
+// #else
+// 	asm volatile (
+// 		"li t0, 0;"
+// 		"csrr t0, cycle;"
+// 		"mv %0, t0"
+// 		: "=r" (t_end)
+// 		:
+// 		: "t0"
+// 	);
+// #endif
+// 	return t_end;
+// }
 
 
 /* Write to the memory*/
@@ -64,13 +65,13 @@ static inline void reset_sync(){
 		write_mem(((void*)(mem + rel_accel_prod_ready_offset)), 1);//BM
 		printf("reset accel_prod_ready mem[%d]: %d\n", rel_accel_prod_ready_offset, *(mem + rel_accel_prod_ready_offset));
 		write_mem(((void*)(mem + rel_accel_cons_valid_offset)), 0);
-		printf("reset accel_cons_valid mem[%d]: %d\n", rel_accel_cons_valid_offset, *(mem + rel_accel_cons_valid_offset));
+		// DBG_PRINT("reset accel_cons_valid mem[%d]: %d\n", rel_accel_cons_valid_offset, *(mem + rel_accel_cons_valid_offset));
 		write_mem(((void*)(mem + rel_accel_con_last_offset)), 0);
-		printf("reset accel_con_last mem[%d]: %d\n", rel_accel_con_last_offset, *(mem + rel_accel_con_last_offset));
+		// DBG_PRINT("reset accel_con_last mem[%d]: %d\n", rel_accel_con_last_offset, *(mem + rel_accel_con_last_offset));
 		write_mem(((void*)(mem + rel_accel_prod_valid_offset)), 0);
-		printf("reset accel_prod_valid mem[%d]: %d\n", rel_accel_prod_valid_offset, *(mem + rel_accel_prod_valid_offset));
+		// DBG_PRINT("reset accel_prod_valid mem[%d]: %d\n", rel_accel_prod_valid_offset, *(mem + rel_accel_prod_valid_offset));
 		write_mem(((void*)(mem + rel_accel_cons_ready_offset)), 0); 
-		printf("reset accel_cons_ready mem[%d]: %d\n", rel_accel_cons_ready_offset, *(mem + rel_accel_cons_ready_offset));
+		// DBG_PRINT("reset accel_cons_ready mem[%d]: %d\n", rel_accel_cons_ready_offset, *(mem + rel_accel_cons_ready_offset));
 	}
 	asm volatile ("fence w, w");	
 }
@@ -79,15 +80,15 @@ static inline uint32_t poll_cons_rdy(){
 	int64_t value_64 = 0;
 	void* dst = (void*)(mem + (*cpu_cons_ready_offset));
 	value_64 = read_mem(dst);
-	printf("Polling cons rdy mem[%d]: %d\n", *cpu_cons_ready_offset, value_64);
-	return (value_64 == 1);
+	// printf("Polling cons rdy mem[%d]: %d\n", *cpu_cons_ready_offset, value_64);
+	return ((value_64&0x1) == 1);
 }
 
 static inline uint32_t poll_prod_valid(){
 	void* dst = (void*)(mem+(*cpu_prod_valid_offset));
 	int64_t value_64 = 0;
 	value_64 = read_mem(dst);
-	return (value_64 == 1);
+	return ((value_64&0x1) == 1);
 }
 
 static inline uint32_t accel_rdy(int toggle){

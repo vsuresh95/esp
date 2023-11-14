@@ -108,7 +108,7 @@ inline void gemm::calculate_chunks(uint24_t  &matrix_chk,
 
 inline void gemm::sync_compute_store(uint16_t &count, uint16_t loaded_rows,
 				     uint8_t load_cfg, uint16_t loadable_rows,
-				     bool &pingpong)
+				     bool &pingpong, bool &pingpong_m1, bool &pingpong_m2, sc_signal< sc_int<64> > &compute_state_dbg)
 {
     count++;
     if (load_cfg == LESS_THAN_MATRIX2 && loadable_rows != 1) {
@@ -116,20 +116,45 @@ inline void gemm::sync_compute_store(uint16_t &count, uint16_t loaded_rows,
             count = 0;
 	    // ESP_REPORT_INFO("COMPUTE2: before store hs %u", (unsigned) count);
             // Call the store_output process
-            compute_store_handshake();
+            // compute_store_handshake();
+			release_outputs(compute_state_dbg);
 	    // ESP_REPORT_INFO("COMPUTE2: after store hs %u", (unsigned) count);
-	    pingpong = !pingpong;
+	    // pingpong = !pingpong;
+		// pingpong_m1 = !pingpong_m1;
+		// pingpong_m2 = !pingpong_m2;
+		pingpong = !pingpong;
 	}
     } else {
         if (count == OUT_DMA_CHUNK) {
             count = 0;
 	    // ESP_REPORT_INFO("COMPUTE: before store hs");
             // Call the store_output process
-            compute_store_handshake();
+            // compute_store_handshake();
+			release_outputs(compute_state_dbg);
 	    // ESP_REPORT_INFO("COMPUTE: after store hs");
-	    pingpong = !pingpong;
+	    // pingpong = !pingpong;
+		// pingpong_m1 = !pingpong_m1;
+		// pingpong_m2 = !pingpong_m2;
+		pingpong = !pingpong;
         }
     }
+}
+
+inline void gemm::release_outputs(sc_signal< sc_int<64> >& compute_state_dbg)
+{
+	{
+		HLS_DEFINE_PROTOCOL("compute-block-output-handshake");
+		compute_state_dbg.write(2);
+		wait();
+		// ping = !ping;
+		// pingpong_m1 = !pingpong_m1;
+		// pingpong_m2 = !pingpong_m2;
+		// pingpong_out = !pingpong_out;
+		compute_done_req();
+		wait();
+		compute_state_dbg.write(3);
+		wait();
+	}
 }
 
 
