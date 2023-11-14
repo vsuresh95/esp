@@ -410,8 +410,8 @@ void gemm::load_input()
 			}
 			case LOAD_DATA_REQ: {
 
-				length1 = matrix_d1*matrix_d2;
-				length2 = matrix_d2*matrix_d3;
+				length1 = loadable_chunk; //matrix_d1*matrix_d2;
+				length2 = loadable_chunk; //matrix_d2*matrix_d3;
 				load_input_1(pingpong_m1, ld_offset1, length1, input0, input1,  load_cfg);
 				load_input_1(pingpong_m2, ld_offset1 + length1, length2, input2, input3,  load_cfg);
 				// load_compute_handshake();
@@ -577,7 +577,7 @@ void gemm::store_output()
 				break;
 			}
 			case STORE_DATA_REQ:{
-				int32_t length = matrix_d1*matrix_d3; //TODO
+				int32_t length = OUT_DMA_CHUNK; //matrix_d1*matrix_d3; //TODO
 				store_output_body(st_offset, length, pingpong, output0, output1);
 			}
 			

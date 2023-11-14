@@ -292,18 +292,18 @@ void calculate_tiles(uint32_t ninputs,
 				   uint32_t matrix_d2,
 				   uint32_t matrix_d3,
 				   uint32_t transpose,
-				   uint32_t size_matrix1,
-				   uint32_t size_matrix2,
-				   uint32_t size_matrix_out,
-				   uint32_t matrix_chk_in,
-				   uint16_t matrix_rem_in1,
-				   uint16_t matrix_rem_in2,
-				   uint32_t matrix_chk_out,
-				   uint16_t matrix_rem_out,
-				   uint16_t load_cfg,
-				   uint16_t loadable_rows,
-				   uint16_t loadable_chunk,
-				   uint16_t index_d1_incrr);
+				   uint32_t* size_matrix1,
+				   uint32_t* size_matrix2,
+				   uint32_t* size_matrix_out,
+				   uint32_t* matrix_chk_in,
+				   uint16_t* matrix_rem_in1,
+				   uint16_t* matrix_rem_in2,
+				   uint32_t* matrix_chk_out,
+				   uint16_t* matrix_rem_out,
+				   uint16_t* load_cfg,
+				   uint16_t* loadable_rows,
+				   uint16_t* loadable_chunk,
+				   uint16_t* index_d1_incrr);
 
 // static void sw_comp(native_t* gold){
 // 		// #include "fcn_gold.h"
@@ -630,8 +630,8 @@ int main(int argc, char * argv[])
 
 			uint32_t size_mat1, size_mat2, size_mat_out, mat_chk_in,  mat_chk_out;
 			uint16_t load_cfg, mat_rem_in1, mat_rem_in2,mat_rem_out, loadable_rows, loadable_chunk, index_d1_incr;
-			calculate_tiles(ninputs, d1,d2,d3,transpose,size_mat1, size_mat2, size_mat_out, mat_chk_in, mat_rem_in1,
-			mat_rem_in2, mat_chk_out, mat_rem_out, load_cfg, loadable_rows, loadable_chunk, index_d1_incr);
+			calculate_tiles(ninputs, d1,d2,d3,transpose,&size_mat1, &size_mat2, &size_mat_out, &mat_chk_in, &mat_rem_in1,
+			&mat_rem_in2, &mat_chk_out, &mat_rem_out, &load_cfg, &loadable_rows, &loadable_chunk, &index_d1_incr);
 
 			// reset_sync();
 			mem[rel_accel_prod_ready_offset] = 1;//BM
@@ -749,7 +749,7 @@ int main(int argc, char * argv[])
 			// 	if(iter==out_offset) printf("OUTPUTS:\n");
 			// 	printf("mem[%d]: %d\n", iter, mem[iter]);
 			// }
-			
+
 			// errors = validate_buf(&mem[rel_output_buffer_offset], gold, out_arr);
 
 			if (errors)
@@ -773,86 +773,89 @@ void calculate_tiles(uint32_t ninputs,
 				   uint32_t matrix_d2,
 				   uint32_t matrix_d3,
 				   uint32_t transpose,
-				   uint32_t size_matrix1,
-				   uint32_t size_matrix2,
-				   uint32_t size_matrix_out,
-				   uint32_t matrix_chk_in,
-				   uint16_t matrix_rem_in1,
-				   uint16_t matrix_rem_in2,
-				   uint32_t matrix_chk_out,
-				   uint16_t matrix_rem_out,
-				   uint16_t load_cfg,
-				   uint16_t loadable_rows,
-				   uint16_t loadable_chunk,
-				   uint16_t index_d1_incr){
+				   uint32_t* size_matrix1,
+				   uint32_t* size_matrix2,
+				   uint32_t* size_matrix_out,
+				   uint32_t* matrix_chk_in,
+				   uint16_t* matrix_rem_in1,
+				   uint16_t* matrix_rem_in2,
+				   uint32_t* matrix_chk_out,
+				   uint16_t* matrix_rem_out,
+				   uint16_t* load_cfg,
+				   uint16_t* loadable_rows,
+				   uint16_t* loadable_chunk,
+				   uint16_t* index_d1_incr)
+{
 				// 	,
 				//    uint16_t& m2_loop_iters,
 				//    uint16_t& m2_plm_incr){
-	size_matrix1 = matrix_d1 * matrix_d2;
-    size_matrix2 = matrix_d2 * matrix_d3;
-    size_matrix_out = matrix_d1 * matrix_d3 * ninputs;
+	*size_matrix1 = matrix_d1 * matrix_d2;
+    *size_matrix2 = matrix_d2 * matrix_d3;
+    *size_matrix_out = matrix_d1 * matrix_d3 * ninputs;
 
-	printf("sizem1:%d sizem2:%d sizeout:%d \n", size_matrix1, size_matrix2, size_matrix_out);
+	printf("sizem1:%d sizem2:%d sizeout:%d \n", *size_matrix1, *size_matrix2, *size_matrix_out);
 
     // m2_loop_iters = 1;
     // m2_plm_incr = 1;
 
     uint8_t d3_odd = matrix_d3 % 2;
-    uint8_t is_less_than_matrix2 = (size_matrix2 > DMA_CHUNK || !transpose);
+    uint8_t is_less_than_matrix2 = (*size_matrix2 > DMA_CHUNK || !transpose);
 
     if ((matrix_d2 > DMA_CHUNK) || (is_less_than_matrix2 && d3_odd)) {
-	load_cfg = LESS_THAN_ROW;
-	loadable_rows = 1;
-	loadable_chunk = DMA_CHUNK;
-	  uint32_t matrix_mul;
-	// calculate_chunks(matrix_chk_in, matrix_rem_in1, matrix_d2, 0);
-	matrix_chk_in = matrix_d2 >> DMA_CHUNK_LOG;
-	    // calculating the number of cols (covered the by the chunks)
-	    matrix_mul = matrix_chk_in << DMA_CHUNK_LOG;
-	 matrix_rem_in1 = matrix_d2 - matrix_mul;
+		*load_cfg = LESS_THAN_ROW;
+		*loadable_rows = 1;
+		*loadable_chunk = DMA_CHUNK;
+		uint32_t matrix_mul;
+		// calculate_chunks(matrix_chk_in, matrix_rem_in1, matrix_d2, 0);
+		*matrix_chk_in = matrix_d2 >> DMA_CHUNK_LOG;
+		// calculating the number of cols (covered the by the chunks)
+		matrix_mul = *matrix_chk_in << DMA_CHUNK_LOG;
+		*matrix_rem_in1 = matrix_d2 - matrix_mul;
 
-        // adding the last chunk if it is necessary
-        if (matrix_rem_in1 != 0) { ++matrix_chk_in; }
+		// adding the last chunk if it is necessary
+		if (*matrix_rem_in1 != 0) { ++(*matrix_chk_in); }
 
-	matrix_rem_in2 = matrix_rem_in1;
-	index_d1_incr = matrix_d2;
+		*matrix_rem_in2 = *matrix_rem_in1;
+		*index_d1_incr = matrix_d2;
     } else if (is_less_than_matrix2) {
-	load_cfg = LESS_THAN_MATRIX2;
-	if (size_matrix2 > DMA_CHUNK) {
-	    loadable_rows = DMA_CHUNK / matrix_d2;
-	    if (loadable_rows != 1)
-		loadable_rows = (loadable_rows >> 1) << 1;
-	} else {
-	    loadable_rows = matrix_d3;
-	}
-	loadable_chunk = loadable_rows * matrix_d2;
-	matrix_chk_in = 1;
-	matrix_rem_in1 = size_matrix1 % loadable_chunk;
-	matrix_rem_in2 = size_matrix2 % loadable_chunk;
-	index_d1_incr = loadable_chunk;
-	if (!transpose) {
-	    // m2_loop_iters = matrix_d2;
-	    // m2_plm_incr = matrix_d2;
-	}
-    } else {
-	load_cfg = MORE_THAN_MATRIX2;
-	loadable_rows = matrix_d3;
-	loadable_chunk = size_matrix2;
-	matrix_chk_in = 1;
-	matrix_rem_in1 = size_matrix1 % loadable_chunk;
-	matrix_rem_in2 = size_matrix2;
-	index_d1_incr = loadable_chunk;
-    }
+		*load_cfg = LESS_THAN_MATRIX2;
+		if (*size_matrix2 > DMA_CHUNK) {
+			*loadable_rows = DMA_CHUNK / matrix_d2;
+			if (*loadable_rows != 1)
+			*loadable_rows = ((*loadable_rows) >> 1) << 1;
+		} else {
+			*loadable_rows = matrix_d3;
+		}
+		*loadable_chunk = *loadable_rows * matrix_d2;
+		*matrix_chk_in = 1;
+		*matrix_rem_in1 = *size_matrix1 % *loadable_chunk;
+		*matrix_rem_in2 = *size_matrix2 % *loadable_chunk;
+		*index_d1_incr = *loadable_chunk;
+	// 	if (!transpose) {
+	// 		// m2_loop_iters = matrix_d2;
+	// 		// m2_plm_incr = matrix_d2;
+	// 	}
+    } else 
+		{
+		*load_cfg = MORE_THAN_MATRIX2;
+		*loadable_rows = matrix_d3;
+		*loadable_chunk = *size_matrix2;
+		*matrix_chk_in = 1;
+		*matrix_rem_in1 = *size_matrix1 % *loadable_chunk;
+		*matrix_rem_in2 = *size_matrix2;
+		*index_d1_incr = *loadable_chunk;
+		}
 	// calculate_chunks(matrix_chk_out, matrix_rem_out, size_matrix_out, 1);
 // calculating the number of chunks (ceil)
-	    matrix_chk_out = size_matrix_out >> OUT_DMA_CHUNK_LOG;
+	    *matrix_chk_out = (*size_matrix_out) >> OUT_DMA_CHUNK_LOG;
 	    // calculating the number of cols (covered the by the chunks)
-	    uint32_t matrix_mul = matrix_chk_out << OUT_DMA_CHUNK_LOG; 
-		matrix_rem_out = size_matrix_out - matrix_mul;
+	    uint32_t matrix_mul = (*matrix_chk_out) << OUT_DMA_CHUNK_LOG; 
+		*matrix_rem_out = *(size_matrix_out) - matrix_mul;
         // adding the last chunk if it is necessary
-        if (matrix_rem_out != 0) { ++matrix_chk_out; }
+        if (*matrix_rem_out != 0) { ++(*matrix_chk_out); 
+		}
   
 	
-	printf("loadable rows: %d\nloadable chunk:%d\nmatrix rem in2:%d\nmatrix rem in1:%d\nmatrix rem out:%d\nmatrix chnk in:%d\nmatrix chnk out:%d\n", loadable_rows, loadable_chunk
-	, matrix_rem_in1, matrix_rem_in2, matrix_rem_out, matrix_chk_in, matrix_chk_out);
+	printf("loadable rows: %d\nloadable chunk:%d\nmatrix rem in2:%d\nmatrix rem in1:%d\nmatrix rem out:%d\nmatrix chnk in:%d\nmatrix chnk out:%d\n", *loadable_rows, *loadable_chunk
+	, *matrix_rem_in1, *matrix_rem_in2, *matrix_rem_out, *matrix_chk_in, *matrix_chk_out);
 }
