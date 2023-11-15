@@ -375,8 +375,8 @@ void gemm::load_input()
 					load_unit_sp_write_dbg.write(0xd8add8ad); 
 					wait();
 					size_matrix_out_sig.write(size_matrix_out);
-					size_matrix1_sig.write(matrix_d1);
-					size_matrix2_sig.write(matrix_d2);
+					size_matrix1_sig.write(size_matrix1);
+					size_matrix2_sig.write(size_matrix2);
 					matrix_chk_in_sig.write(matrix_chk_in);
 					matrix_rem_in1_sig.write(matrix_rem_in1);
 					matrix_rem_in2_sig.write(matrix_rem_in2);
