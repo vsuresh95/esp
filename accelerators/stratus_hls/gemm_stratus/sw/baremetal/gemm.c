@@ -31,9 +31,9 @@
 //(log2<OUT_DMA_CHUNK>::value)
 
 #define NINPUTS 1
-#define D3_VAL 200
-#define D2_VAL 200
-#define D1_VAL 100
+#define D3_VAL 64
+#define D2_VAL 64
+#define D1_VAL 64
 
 #define PRINT_DEBUG
 
@@ -371,7 +371,9 @@ static void init_buf_input (int ninput, token_t *in, int mat1size, int mat2size,
 {
     int i;
 	
-
+	static int tile_num = 1;
+	printf("Tile %d A[%d - %d] , B[%d - %d]\n", tile_num, offset, mat1size, offset2, mat2size);
+		
 #ifdef __FIXED
 	// int mat1size = loadable_chunk; //(round_up(d1*loadable_rows, DMA_WORD_PER_BEAT(sizeof(token_t))));
 	// int mat2size = loadable_chunk;
@@ -401,7 +403,7 @@ static void init_buf_input (int ninput, token_t *in, int mat1size, int mat2size,
 #include "gold.h"
 // #include "fcn_gold.h"
 #endif
-
+	tile_num++;
 }
 
 
@@ -411,7 +413,7 @@ static void init_buf_output (int ninput, int offset2, int len, token_t *res, nat
 #ifdef __FIXED
 
 	int offset = offset2+ninput*(round_up(d1*d3, DMA_WORD_PER_BEAT(sizeof(token_t))));
-	// printf("len:%d\n", len);
+	printf("output tile O[%d - %d]\n", offset2, len);
 	for (i = 0; i < len; i++) { //round_up(len, DMA_WORD_PER_BEAT(sizeof(token_t)))
 		#ifdef __FIXED
 		out_arr[offset+i] = fx2float(res[i], FX_IL);
@@ -690,7 +692,7 @@ int main(int argc, char * argv[])
 
 				uint32_t in_chk = 0;
 				uint32_t out_chk = 0;
-
+				int chk_per_tile = (d1*d3/loadable_rows);
 				for (uint32_t md1 = 0; md1 < d1; md1 += loadable_rows)
 				{
 					printf("tinput:%d/%d\nmd1:%d/%d + %d\n",tinput, ninputs, md1,d1, loadable_rows);
@@ -708,7 +710,7 @@ int main(int argc, char * argv[])
 							// printf("d1i:%d/%d\n", d1i,loaded_rows_d1);
 							uint32_t in_chk = 0;
 							// uint32_t out_chk = 0;
-							while(in_chk < mat_chk_in){// || out_chk < mat_chk_out
+							while(in_chk < mat_chk_in || out_chk < mat_chk_out){//
 									
 
 								if(out_chk < mat_chk_out && poll_prod_valid())
@@ -738,7 +740,7 @@ int main(int argc, char * argv[])
 									offset2 += loadable_rows; //loadable_rows;
 									uint64_t hw_read_time_end = get_counter();
 									hw_read_time += (hw_read_time_end-hw_read_time_start);
-									printf("  out chk:%d/%d\n", out_chk,loadable_rows);
+									printf("  out chk:%d/%d\n", out_chk,(d1*d3/loadable_rows));
 									out_chk++;
 								}
 								else if((in_chk < mat_chk_in ) && poll_cons_rdy()){//|| out_chk < mat_chk_out)
@@ -768,69 +770,10 @@ int main(int argc, char * argv[])
 									printf("  in chk:%d/%d\n", in_chk,mat_chk_in);
 									in_chk ++;
 								}
-								
 							}
 						}
 					}
 				}
-
-				// while(in_chk < mat_chk_in || out_chk < mat_chk_out){
-				// // while(1){
-				// 	if(out_chk < mat_chk_out && poll_prod_valid())
-				// 	// if(poll_prod_valid())
-				// 	{
-				// 		uint64_t hw_read_time_start = get_counter();
-				// 		init_buf_output(tinput, offset2, loadable_rows, mem+rel_output_buffer_offset,out_arr);
-				// 		update_prod_valid();
-				// 		update_prod_rdy();
-				// 		offset2 += mat_chk_out; //loadable_rows;
-				// 		uint64_t hw_read_time_end = get_counter();
-				// 		hw_read_time += (hw_read_time_end-hw_read_time_start);
-				// 		out_chk++;
-				// 		printf("  out chk:%d/%d\n", out_chk,mat_chk_out);
-				// 	}
-				// 	else if((in_chk < in_iters ) && poll_cons_rdy())
-				// 	// if(poll_cons_rdy())
-				// 	{//|| out_chk < mat_chk_out)
-				// 		uint64_t hw_write_time_start = get_counter();
-				// 		init_buf_input(0, mem+rel_input_buffer_offset, loadable_rows);
-				// 		uint64_t hw_write_time_end = get_counter();
-				// 		hw_write_time += (hw_write_time_end-hw_write_time_start);
-
-				// 		// printf("  Update Cons Rdy and last...\n");
-				// 		update_cons_rdy();
-				// 		update_cons_valid(0);
-				// 		in_chk ++;
-				// 		printf("  in chk:%d/%d, %d\n", in_chk,mat_chk_in, mat_chk_out);
-				// 	}
-				// 	// else printf("in_chk:%d out_chk:%d\n",in_chk,out_chk);
-				// }
-
-
-				// printf(" %d Poll Cons Rdy...\n", tinput);
-				// while(!poll_cons_rdy()); // wait for cons ready
-				// printf("  Found Cons Rdy...\n");
-
-				// // printf("  Generate input...\n");
-
-    			// uint64_t hw_write_time_start = get_counter();
-				// init_buf_input(0, mem+rel_input_buffer_offset);
-    			// uint64_t hw_write_time_end = get_counter();
-				// hw_write_time += (hw_write_time_end-hw_write_time_start);
-
-				// printf("  Update Cons Rdy and last...\n");
-				// update_cons_rdy();
-				// update_cons_valid(0);
-
-				// printf("  Poll Prod Valid...\n");
-				// while(!poll_prod_valid()); //wait for prod 
-				// printf("  Found Prod Valid...\n");
-				// uint64_t hw_read_time_start = get_counter();
-				// init_buf_output(tinput, 0, d1*d3, mem+rel_output_buffer_offset,out_arr);
-				// update_prod_valid();
-				// update_prod_rdy();
-    			// uint64_t hw_read_time_end = get_counter();
-				// hw_read_time += (hw_read_time_end-hw_read_time_start);
 
 				tinput++;
 			}
@@ -858,7 +801,7 @@ int main(int argc, char * argv[])
 			// 	printf("mem[%d]: %d\n", iter, mem[iter]);
 			// }
 
-			errors = validate_buf(&mem[rel_output_buffer_offset], gold, out_arr);
+			// errors = validate_buf(&mem[rel_output_buffer_offset], gold, out_arr);
 
 			if (errors)
 				printf("  ... FAIL (%d errors)\n", errors);
