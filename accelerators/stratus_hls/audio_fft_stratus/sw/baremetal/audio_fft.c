@@ -18,7 +18,7 @@ static unsigned DMA_WORD_PER_BEAT(unsigned _st)
 }
 
 
-#define SLD_AUDIO_FFT 0x055
+#define SLD_AUDIO_FFT 0x063
 #define DEV_NAME "sld,audio_fft_stratus"
 
 /* <<--params-->> */

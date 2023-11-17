@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <sld>
-  <accelerator name="audio_dma" desc="Accelerator SM_SENSOR" data_size="4" device_id="051" hls_tool="stratus_hls">
+  <accelerator name="audio_dma" desc="Accelerator SM_SENSOR" data_size="4" device_id="066" hls_tool="stratus_hls">
     <param name="start_offset" desc="start_offset" />
   </accelerator>
 </sld>

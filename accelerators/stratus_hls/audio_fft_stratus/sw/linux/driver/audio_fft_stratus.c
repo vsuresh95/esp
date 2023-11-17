@@ -35,7 +35,7 @@ static struct of_device_id audio_fft_device_ids[] = {
 		.name = "SLD_AUDIO_FFT_STRATUS",
 	},
 	{
-		.name = "eb_055",
+		.name = "eb_063",
 	},
 	{
 		.compatible = "sld,audio_fft_stratus",

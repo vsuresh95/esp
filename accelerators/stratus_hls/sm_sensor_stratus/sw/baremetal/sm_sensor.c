@@ -68,7 +68,7 @@ uint64_t intvl_acc_read;
 /* 3 - Owner Prediction, 2 - Write-through forwarding, 1 - Baseline Spandex (ReqV), 0 - Baseline Spandex (MESI) */
 /* 3 - Non-Coherent DMA, 2 - LLC Coherent DMA, 1 - Coherent DMA, 0 - Fully Coherent MESI */
 
-#define SLD_SM_SENSOR 0x051
+#define SLD_SM_SENSOR 0x067
 #define DEV_NAME "sld,sm_sensor_stratus"
 
 /* Size of the contiguous chunks for scatter/gather */
