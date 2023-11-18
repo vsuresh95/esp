@@ -30,10 +30,11 @@
 #define OUT_DMA_CHUNK_LOG 8
 //(log2<OUT_DMA_CHUNK>::value)
 
-#define NINPUTS 1
-#define D3_VAL 256
-#define D2_VAL 256
-#define D1_VAL 256
+#define D_COMMON 16
+#define D3_VAL D_COMMON
+#define D2_VAL D_COMMON
+#define D1_VAL D_COMMON
+#define NINPUTS (1000/D_COMMON)
 
 #define PRINT_DEBUG
 
@@ -151,7 +152,7 @@ static uint64_t get_counter() {
 //   return counter;
 // }
 
-// #define ITERATIONS 1000
+// #define ITERATIONS (1000/D2_VAL)
 #define ITERATIONS 1
 
 extern void sw_run(int32_t do_relu, int32_t transpose, int32_t ninputs,
@@ -275,7 +276,7 @@ static int validate_buf(token_t *out, native_t *gold, native_t* out_arr)
 #endif
 
 		if ((fabs(gold[j] - val) / fabs(gold[j])) > ERR_TH)
-		// {
+		{
 			errors++;
         //     if (gold[j] != val) {
         //         errors++;
@@ -285,7 +286,7 @@ static int validate_buf(token_t *out, native_t *gold, native_t* out_arr)
         //     }
 		// if(errors <= 256)
 		    // printf("%d : %d : %d\n", j, (int) val, (int) gold_val);
-		// }
+		}
 		
 	}
 
@@ -670,7 +671,7 @@ int main(int argc, char * argv[])
 			
 			int tinput = 0;
 			// while(tinput<ninputs){
-			printf("  Poll Cons Rdy...\n");
+			// printf("  Poll Cons Rdy...\n");
 			while(!poll_cons_rdy()); // wait for cons ready
 			// printf("  Found Cons Rdy...\n");
 
@@ -683,7 +684,7 @@ int main(int argc, char * argv[])
 			mem[rel_input_buffer_offset+ST_OFFSET] = rel_output_buffer_offset;
 			mem[rel_input_buffer_offset+TRANSPOSE_OFFSET] = transpose;
 			mem[rel_input_buffer_offset+DO_RELU_OFFSET] = do_relu;
-			printf("  Provided config. Update Cons Rdy and last...\n");
+			// printf("  Provided config. Update Cons Rdy and last...\n");
 
 			asm volatile ("fence w, w");	//release semantics
 			update_cons_rdy();
@@ -725,25 +726,27 @@ int main(int argc, char * argv[])
 						update_prod_valid();
 						update_prod_rdy();
 						// offset2 += mat_chk_out; //loadable_rows; //loadable_rows;
-						out_row++;
-						if(out_row == loadable_rows){
-							out_row = 0;
-							if(load_cfg == LESS_THAN_MATRIX2){
+						uint64_t hw_read_time_end = get_counter();
+						hw_read_time += (hw_read_time_end-hw_read_time_start);
+						// out_row++;
+						if(load_cfg == LESS_THAN_MATRIX2){
+							out_row ++;
+							if(out_row == loadable_rows){
+								out_row = 0;
 								offset2 += loadable_rows;
 								if(offset2 >= d3){
 									offset2 = 0;
 									out_tile += loadable_rows*d3;
 								}
-							} else {
-								offset2 += OUT_DMA_CHUNK;
-								if(offset2 >= d3){
-									offset2 = 0;
-									out_tile += loadable_rows*d3;
-								}
+							}
+						} else {
+							offset2 += OUT_DMA_CHUNK;
+							if(offset2 >= size_mat2){
+								offset2 = 0;
+								// out_tile += loadable_rows*d3;
 							}
 						}
-						uint64_t hw_read_time_end = get_counter();
-						hw_read_time += (hw_read_time_end-hw_read_time_start);
+					
 						// printf("  out chk:%d/%d\n", out_chk,mat_chk_out);//(d1*d3/loadable_rows));
 						out_chk++;
 					}
@@ -909,8 +912,8 @@ int main(int argc, char * argv[])
     		sw_comp_end = get_counter();
 
 
-    		printf("SW Comp Time: %lu\nHW Comp Time:%lu\n", (sw_comp_end-sw_comp_start)/ITERATIONS, (hw_comp_end-hw_comp_start));
-			printf("HW Write Time: %lu\nHW Read Time: %lu\n", hw_write_time, hw_read_time);
+    		printf("SW Comp Time: %lu\nHW Comp Time:%lu\n", (sw_comp_end-sw_comp_start)/(ITERATIONS*NINPUTS), (hw_comp_end-hw_comp_start)/NINPUTS);
+			printf("HW Write Time: %lu\nHW Read Time: %lu\n", hw_write_time/NINPUTS, hw_read_time/NINPUTS);
 			printf("  validating...\n");
 
 			/* Validation */
