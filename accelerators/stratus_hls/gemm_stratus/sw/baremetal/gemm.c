@@ -20,20 +20,20 @@
 
 #define DMA_WIDTH 64
 #define DMA_CHUNK 2048
-#define OUT_DMA_CHUNK 512
+#define OUT_DMA_CHUNK 256
 #define WORD_SIZE 32
 #define PARALLELISM 8
 
 // log of chunk size
 #define DMA_CHUNK_LOG 11
 //(log2<DMA_CHUNK>::value)
-#define OUT_DMA_CHUNK_LOG 9
+#define OUT_DMA_CHUNK_LOG 8
 //(log2<OUT_DMA_CHUNK>::value)
 
 #define NINPUTS 1
-#define D3_VAL 64
-#define D2_VAL 64
-#define D1_VAL 64
+#define D3_VAL 256
+#define D2_VAL 256
+#define D1_VAL 256
 
 #define PRINT_DEBUG
 
@@ -203,7 +203,7 @@ static unsigned DMA_WORD_PER_BEAT(unsigned _st)
 #define DEV_NAME "sld,gemm_stratus"
 
 /* <<--params-->> */
-const int32_t do_relu = 1;
+const int32_t do_relu = 0;
 const int32_t transpose = 1;
 const int32_t ninputs = NINPUTS;
 // const int32_t ninputs = 1;
@@ -275,6 +275,7 @@ static int validate_buf(token_t *out, native_t *gold, native_t* out_arr)
 #endif
 
 		if ((fabs(gold[j] - val) / fabs(gold[j])) > ERR_TH)
+		// {
 			errors++;
         //     if (gold[j] != val) {
         //         errors++;
@@ -282,7 +283,10 @@ static int validate_buf(token_t *out, native_t *gold, native_t* out_arr)
 		//     // printf("%d : %d : %d\n", j, (int) val, (int) gold[j]);
 		// // }
         //     }
-		    printf("%d : %d : %d\n", j, (int) val, (int) gold_val);
+		// if(errors <= 256)
+		    // printf("%d : %d : %d\n", j, (int) val, (int) gold_val);
+		// }
+		
 	}
 
 	return errors;
@@ -348,15 +352,18 @@ static void init_buf (native_t *sw_buf,native_t *sw_buf2)
 #ifdef __FIXED
 	for( int ni = 0; ni < ninputs; ni++){
 		for (i = 0; i < (round_up(d1*d2, DMA_WORD_PER_BEAT(sizeof(token_t)))); i++) {
-			sw_buf[ni*(round_up(d1*d2, DMA_WORD_PER_BEAT(sizeof(token_t)))) + i] = 3.0*i;//input[i];
-			// printf("sw[%d] = %d\n", (ni*(round_up(d1*d2, DMA_WORD_PER_BEAT(sizeof(token_t)))) + i), (int)sw_buf[ni*(round_up(d1*d2, DMA_WORD_PER_BEAT(sizeof(token_t)))) + i]);
+			sw_buf[ni*(round_up(d1*d2, DMA_WORD_PER_BEAT(sizeof(token_t)))) + i] = i%17-8;//input[i];
+			if(i%64==0)
+			 printf("sw[%d] = %d\n", (ni*(round_up(d1*d2, DMA_WORD_PER_BEAT(sizeof(token_t)))) + i), (int)sw_buf[ni*(round_up(d1*d2, DMA_WORD_PER_BEAT(sizeof(token_t)))) + i]);
 		}
 	}
 
 	for( int ni = 0; ni < ninputs; ni++){
 		for (i = 0; i < d2*d3; i++) {
-			sw_buf2[ni*d2*d3 + i] = 2.0*i; //input[3*(round_up(d1*d2, DMA_WORD_PER_BEAT(sizeof(token_t)))) + i];
-			// printf("sw2[%d] = %d\n", (ni*d2*d3 + i), (int)sw_buf2[ni*d2*d3 + i]);
+			sw_buf2[ni*d2*d3 + i] = i%17-5; //input[3*(round_up(d1*d2, DMA_WORD_PER_BEAT(sizeof(token_t)))) + i];
+
+			if(i%64==0)
+			printf("sw2[%d] = %d\n", (ni*d2*d3 + i), (int)sw_buf2[ni*d2*d3 + i]);
 		}
 	}
 
@@ -367,32 +374,36 @@ static void init_buf (native_t *sw_buf,native_t *sw_buf2)
 
 }
 
-static void init_buf_input (int ninput, token_t *in, int mat1size, int mat2size, native_t* sw_buf, native_t* sw_buf2, int32_t offset, int32_t offset2)
+static void init_buf_input1 (int ninput, token_t *in, int mat1size, int mat2size, native_t* sw_buf, native_t* sw_buf2, int32_t offset, int32_t offset2)
 {
     int i;
 	
 	static int tile_num = 1;
-	printf("Tile %d A[%d - %d] , B[%d - %d]\n", tile_num, offset, mat1size, offset2, mat2size);
+	// printf("init_buf_input1 Tile %d A[%d - %d]\n", tile_num, offset, mat1size);
 		
 #ifdef __FIXED
-	// int mat1size = loadable_chunk; //(round_up(d1*loadable_rows, DMA_WORD_PER_BEAT(sizeof(token_t))));
-	// int mat2size = loadable_chunk;
-	// if (load_cfg == LESS_THAN_ROW && chk == matrix_chk_in - 1 && matrix_rem_in2 != 0) {
-	// 	mat1size = matrix_rem_in1;
-	// 	mat2size = matrix_rem_in2;
-	// } else if (load_cfg != LESS_THAN_ROW) {
-	// 	if (d1 + loadable_rows > matrix_d1)
-	// 		mat1size = matrix_rem_in1;
-	// 	if (d2 + loadable_rows > matrix_d3)
-	// 		mat2size = matrix_rem_in2;
-	// }
-
-	for (i = 0; i < mat1size; i++) {
-		in[i] = float2fx(sw_buf[(round_up(ninput*d1*d2, DMA_WORD_PER_BEAT(sizeof(token_t)))) + offset + i], FX_IL);
-    	// printf("in[%d] = %d, sw[%d] = %d\n", i, in[i], (round_up(ninput*d1*d2, DMA_WORD_PER_BEAT(sizeof(token_t)))) + offset + i, (int)sw_buf[(round_up(ninput*d1*d2, DMA_WORD_PER_BEAT(sizeof(token_t)))) + offset + i]);
-		
-	}
 	// *offset_n = offset + mat1size; 
+	for (i = 0; i < mat2size; i++) {
+		in[i] = float2fx(sw_buf[ninput*d2*d1 + offset+ i], FX_IL); 
+    	// printf("in2[%d] = %d, sw[%d] = %d\n", mat1size+i, in[mat1size+i], ninput*d2*d3 + offset2+ i, (int)sw_buf2[ninput*d2*d3 + offset2+ i]);
+    }
+	// *offset_n2 = offset2 + mat1size; 
+
+#else 
+#include "gold.h"
+// #include "fcn_gold.h"
+#endif
+	tile_num++;
+}
+
+static void init_buf_input2 (int ninput, token_t *in, int mat1size, int mat2size, native_t* sw_buf, native_t* sw_buf2, int32_t offset, int32_t offset2)
+{
+    int i;
+	
+	static int tile_num = 1;
+	// printf("init_buf_input2 Tile %d B[%d - %d]\n", tile_num, offset2, mat2size);
+		
+#ifdef __FIXED
 	for (i = 0; i < mat2size; i++) {
 		in[mat1size+i] = float2fx(sw_buf2[ninput*d2*d3 + offset2+ i], FX_IL); 
     	// printf("in2[%d] = %d, sw[%d] = %d\n", mat1size+i, in[mat1size+i], ninput*d2*d3 + offset2+ i, (int)sw_buf2[ninput*d2*d3 + offset2+ i]);
@@ -413,11 +424,11 @@ static void init_buf_output (int ninput, int offset2, int len, token_t *res, nat
 #ifdef __FIXED
 
 	int offset = offset2+ninput*(round_up(d1*d3, DMA_WORD_PER_BEAT(sizeof(token_t))));
-	printf("output tile O[%d - %d]\n", offset2, len);
+	// printf("output tile O[%d - %d]\n", offset2, len);
 	for (i = 0; i < len; i++) { //round_up(len, DMA_WORD_PER_BEAT(sizeof(token_t)))
 		#ifdef __FIXED
 		out_arr[offset+i] = fx2float(res[i], FX_IL);
-		// printf("res[%d] = %d\n", i, (int)res[i]);
+		// printf("res[%d] = %u (%d)\n", i, res[i], (int)out_arr[offset+i]);
 		#else
 		out_arr[offset+i] = res[i], FX_IL;
 		#endif
@@ -689,91 +700,198 @@ int main(int argc, char * argv[])
 				int offset2 = 0;
 				int offset_n = 0;
 				int offset_n2 = 0;
-
+				int8_t load_a = 1;
 				uint32_t in_chk = 0;
 				uint32_t out_chk = 0;
-				int chk_per_tile = (d1*d3/loadable_rows);
-				for (uint32_t md1 = 0; md1 < d1; md1 += loadable_rows)
-				{
-					printf("tinput:%d/%d\nmd1:%d/%d + %d\n",tinput, ninputs, md1,d1, loadable_rows);
-					uint16_t loaded_rows_d1 = (loadable_rows< d1 - md1)?loadable_rows:d1 - md1;
-					// uint32_t index_d2 = index_d1;
-					for (uint32_t md2 = 0; md2 < d3; md2 += loadable_rows)
+				uint32_t out_row = 0;
+				uint32_t out_tile = 0;
+				int chk_per_tile = mat_chk_out; //(d1*d3/loadable_rows);
+				uint32_t md1 = 0, md2 = 0;
+				while(in_chk < mat_chk_in || out_chk < chk_per_tile){//
+					if(out_chk < chk_per_tile && poll_prod_valid())
 					{
-						printf("md2:%d/%d + %d\n", md2, d3, loadable_rows);
-						// uint16_t loaded_rows_d3 = min(loadable_rows, matrix_d3 - d2);
-						// uint32_t index_d1i = index_d2;
-						// for (uint16_t d1i = 0; d1i < loaded_rows_d1; d1i++)
-						{
-							// for (uint24_t chk = 0; chk < matrix_chk_out; ++chk)
-							// {
-							// printf("d1i:%d/%d\n", d1i,loaded_rows_d1);
-							uint32_t in_chk = 0;
-							// uint32_t out_chk = 0;
-							while(in_chk < mat_chk_in || out_chk < mat_chk_out){//
-									
+						int mat1size = OUT_DMA_CHUNK;
+						
+						// If true the next is the last (smaller) chunk
+						if (load_cfg == LESS_THAN_MATRIX2 && loadable_rows != 1) {
+							mat1size = loadable_rows;
+						} else {
+							if (out_chk == mat_chk_out - 1 && mat_rem_out != 0)
+							mat1size = mat_rem_out;
+						}
 
-								if(out_chk < mat_chk_out && poll_prod_valid())
-								{
-									int mat1size = OUT_DMA_CHUNK;
-									
-									// If true the next is the last (smaller) chunk
-									if (load_cfg == LESS_THAN_MATRIX2 && loadable_rows != 1) {
-										mat1size = loadable_rows;
-									} else {
-										if (out_chk == mat_chk_out - 1 && mat_rem_out != 0)
-										mat1size = mat_rem_out;
-									}
-
-									// if (load_cfg == LESS_THAN_ROW && out_chk == mat_chk_out - 1 && mat_rem_out != 0) {
-									// 	mat1size = mat_rem_out;
-									// } else if (load_cfg != LESS_THAN_ROW) {
-									// 	if (md1 + loadable_rows > d1)
-									// 		mat1size = mat_rem_out;
-									// 	if (md2 + loadable_rows > d3)
-									// 		mat1size = mat_rem_out;
-									// }
-									uint64_t hw_read_time_start = get_counter();
-									init_buf_output(tinput, offset2, mat1size, mem+rel_output_buffer_offset,out_arr);
-									update_prod_valid();
-									update_prod_rdy();
-									offset2 += loadable_rows; //loadable_rows;
-									uint64_t hw_read_time_end = get_counter();
-									hw_read_time += (hw_read_time_end-hw_read_time_start);
-									printf("  out chk:%d/%d\n", out_chk,(d1*d3/loadable_rows));
-									out_chk++;
+						uint64_t hw_read_time_start = get_counter();
+						init_buf_output(tinput, out_tile+out_row*d3+offset2, mat1size, mem+rel_output_buffer_offset,out_arr);
+						update_prod_valid();
+						update_prod_rdy();
+						// offset2 += mat_chk_out; //loadable_rows; //loadable_rows;
+						out_row++;
+						if(out_row == loadable_rows){
+							out_row = 0;
+							if(load_cfg == LESS_THAN_MATRIX2){
+								offset2 += loadable_rows;
+								if(offset2 >= d3){
+									offset2 = 0;
+									out_tile += loadable_rows*d3;
 								}
-								else if((in_chk < mat_chk_in ) && poll_cons_rdy()){//|| out_chk < mat_chk_out)
-									int mat1size = loadable_chunk; //(round_up(d1*loadable_rows, DMA_WORD_PER_BEAT(sizeof(token_t))));
-									int mat2size = loadable_chunk;
-									if (load_cfg == LESS_THAN_ROW && in_chk == mat_chk_in - 1 && mat_rem_in2 != 0) {
-										mat1size = mat_rem_in1;
-										mat2size = mat_rem_in2;
-									} else if (load_cfg != LESS_THAN_ROW) {
-										if (md1 + loadable_rows > d1)
-											mat1size = mat_rem_in1;
-										if (md2 + loadable_rows > d3)
-											mat2size = mat_rem_in2;
-									}
-
-									uint64_t hw_write_time_start = get_counter();
-									// init_buf_input(0, mem+rel_input_buffer_offset, loadable_rows);
-									init_buf_input (tinput, mem+rel_input_buffer_offset, mat1size, mat2size, sw_buf, (sw_buf + ld_offset2), offset,offseti2);
-									uint64_t hw_write_time_end = get_counter();
-									hw_write_time += (hw_write_time_end-hw_write_time_start);
-
-									offset = offset + mat1size;
-									offseti2 = offseti2+mat2size;
-									// printf("  Update Cons Rdy and last...\n");
-									update_cons_rdy();
-									update_cons_valid(0);
-									printf("  in chk:%d/%d\n", in_chk,mat_chk_in);
-									in_chk ++;
+							} else {
+								offset2 += OUT_DMA_CHUNK;
+								if(offset2 >= d3){
+									offset2 = 0;
+									out_tile += loadable_rows*d3;
 								}
 							}
 						}
+						uint64_t hw_read_time_end = get_counter();
+						hw_read_time += (hw_read_time_end-hw_read_time_start);
+						// printf("  out chk:%d/%d\n", out_chk,mat_chk_out);//(d1*d3/loadable_rows));
+						out_chk++;
+					}
+					else if((in_chk < mat_chk_in ) && poll_cons_rdy()){//|| out_chk < mat_chk_out)
+						int mat1size = loadable_chunk; //(round_up(d1*loadable_rows, DMA_WORD_PER_BEAT(sizeof(token_t))));
+						int mat2size = loadable_chunk;
+						if (load_cfg == LESS_THAN_ROW && in_chk == mat_chk_in - 1 && mat_rem_in2 != 0) {
+							mat1size = mat_rem_in1;
+							mat2size = mat_rem_in2;
+						} else if (load_cfg != LESS_THAN_ROW) {
+							if (md1 + loadable_rows > d1)
+								mat1size = mat_rem_in1;
+							if (md2 + loadable_rows > d3)
+								mat2size = mat_rem_in2;
+						}
+
+						uint64_t hw_write_time_start = get_counter();
+						// init_buf_input(0, mem+rel_input_buffer_offset, loadable_rows);
+						if(load_a)//(in_chk==0)
+						{
+							init_buf_input1 (tinput, mem+rel_input_buffer_offset, mat1size, mat2size, sw_buf, (sw_buf + ld_offset2), offset,offseti2);
+							load_a = !load_a;
+						}
+						init_buf_input2 (tinput, mem+rel_input_buffer_offset, mat1size, mat2size, sw_buf, (sw_buf + ld_offset2), offset,offseti2);
+						uint64_t hw_write_time_end = get_counter();
+						hw_write_time += (hw_write_time_end-hw_write_time_start);
+
+						// offset = offset + mat1size;
+						// offseti2 = offseti2+mat2size;
+						// printf("  Update Cons Rdy and last...\n");
+						update_cons_rdy();
+						update_cons_valid(0);
+						// printf("  in chk:%d/%d\n", in_chk,mat_chk_in);
+						// in_chk ++;
+
+						if(in_chk == mat_chk_in - 1){
+							load_a = 1;
+							if (md1 + loadable_rows >= d1 && md2 + loadable_rows >= d3){
+								md1 += loadable_rows;
+								offset+= loadable_chunk;
+								md2 += loadable_rows;
+								offseti2 += loadable_chunk;
+								in_chk++;
+							}else if(md2 + loadable_rows >= d3){
+								md2 = 0;
+								offset += loadable_chunk;
+								md1 += loadable_rows;
+								offseti2 = 0;
+								in_chk = 0;
+							} else
+							{
+								// md1 += loadable_rows;
+								// offset+= loadable_chunk;
+								// md2 = 0;
+
+								in_chk = 0;
+								md2 += loadable_rows;
+								offseti2 += loadable_chunk;
+							}
+						} else {
+							in_chk++;
+							md2 += loadable_rows;
+							offseti2 += loadable_chunk;
+						}
 					}
 				}
+
+				// for (uint32_t md1 = 0; md1 < d1; md1 += loadable_rows)
+				// {
+				// 	printf("tinput:%d/%d\nmd1:%d/%d + %d\n",tinput, ninputs, md1,d1, loadable_rows);
+				// 	uint16_t loaded_rows_d1 = (loadable_rows< d1 - md1)?loadable_rows:d1 - md1;
+				// 	// uint32_t index_d2 = index_d1;
+				// 	for (uint32_t md2 = 0; md2 < d3; )
+				// 	{
+				// 		printf("md2:%d/%d + %d\n", md2, d3, loadable_rows);
+				// 		// uint16_t loaded_rows_d3 = min(loadable_rows, matrix_d3 - d2);
+				// 		// uint32_t index_d1i = index_d2;
+				// 		// for (uint16_t d1i = 0; d1i < loaded_rows_d1; d1i++)
+				// 		{
+				// 			// for (uint24_t chk = 0; chk < matrix_chk_out; ++chk)
+				// 			// {
+				// 			// printf("d1i:%d/%d\n", d1i,loaded_rows_d1);
+				// 			uint32_t in_chk = 0;
+				// 			// uint32_t out_chk = 0;
+				// 			while(in_chk < mat_chk_in || out_chk < chk_per_tile){//
+									
+
+				// 				if(out_chk < chk_per_tile && poll_prod_valid())
+				// 				{
+				// 					int mat1size = OUT_DMA_CHUNK;
+									
+				// 					// If true the next is the last (smaller) chunk
+				// 					if (load_cfg == LESS_THAN_MATRIX2 && loadable_rows != 1) {
+				// 						mat1size = loadable_rows;
+				// 					} else {
+				// 						if (out_chk == mat_chk_out - 1 && mat_rem_out != 0)
+				// 						mat1size = mat_rem_out;
+				// 					}
+
+				// 					// if (load_cfg == LESS_THAN_ROW && out_chk == mat_chk_out - 1 && mat_rem_out != 0) {
+				// 					// 	mat1size = mat_rem_out;
+				// 					// } else if (load_cfg != LESS_THAN_ROW) {
+				// 					// 	if (md1 + loadable_rows > d1)
+				// 					// 		mat1size = mat_rem_out;
+				// 					// 	if (md2 + loadable_rows > d3)
+				// 					// 		mat1size = mat_rem_out;
+				// 					// }
+				// 					uint64_t hw_read_time_start = get_counter();
+				// 					init_buf_output(tinput, offset2, mat1size, mem+rel_output_buffer_offset,out_arr);
+				// 					update_prod_valid();
+				// 					update_prod_rdy();
+				// 					offset2 += loadable_rows; //loadable_rows;
+				// 					uint64_t hw_read_time_end = get_counter();
+				// 					hw_read_time += (hw_read_time_end-hw_read_time_start);
+				// 					printf("  out chk:%d/%d\n", out_chk,(d1*d3/loadable_rows));
+				// 					out_chk++;
+				// 				}
+				// 				else if((in_chk < mat_chk_in ) && poll_cons_rdy()){//|| out_chk < mat_chk_out)
+				// 					int mat1size = loadable_chunk; //(round_up(d1*loadable_rows, DMA_WORD_PER_BEAT(sizeof(token_t))));
+				// 					int mat2size = loadable_chunk;
+				// 					if (load_cfg == LESS_THAN_ROW && in_chk == mat_chk_in - 1 && mat_rem_in2 != 0) {
+				// 						mat1size = mat_rem_in1;
+				// 						mat2size = mat_rem_in2;
+				// 					} else if (load_cfg != LESS_THAN_ROW) {
+				// 						if (md1 + loadable_rows > d1)
+				// 							mat1size = mat_rem_in1;
+				// 						if (md2 + loadable_rows > d3)
+				// 							mat2size = mat_rem_in2;
+				// 					}
+
+				// 					uint64_t hw_write_time_start = get_counter();
+				// 					// init_buf_input(0, mem+rel_input_buffer_offset, loadable_rows);
+				// 					init_buf_input (tinput, mem+rel_input_buffer_offset, mat1size, mat2size, sw_buf, (sw_buf + ld_offset2), md1,md1+mat1size);
+				// 					uint64_t hw_write_time_end = get_counter();
+				// 					hw_write_time += (hw_write_time_end-hw_write_time_start);
+
+				// 					// offset = offset + mat1size;
+				// 					// offseti2 = offseti2+mat2size;
+				// 					// printf("  Update Cons Rdy and last...\n");
+				// 					update_cons_rdy();
+				// 					update_cons_valid(0);
+				// 					printf("  in chk:%d/%d\n", in_chk,mat_chk_in);
+				// 					in_chk ++;
+				// 				}
+				// 			}
+				// 		}
+				// 	}
+				// }
 
 				tinput++;
 			}
@@ -801,7 +919,7 @@ int main(int argc, char * argv[])
 			// 	printf("mem[%d]: %d\n", iter, mem[iter]);
 			// }
 
-			// errors = validate_buf(&mem[rel_output_buffer_offset], gold, out_arr);
+			errors = validate_buf(&mem[rel_output_buffer_offset], gold, out_arr);
 
 			if (errors)
 				printf("  ... FAIL (%d errors)\n", errors);
@@ -917,8 +1035,6 @@ void calculate_tiles(uint32_t ninputs,
 			if (*matrix_rem_out > 0) { ++(*matrix_chk_out); 
 			}
 		}
-  
-	
 	printf("cfg: %d loadable rows: %d\nloadable chunk:%d\nmatrix rem in2:%d\nmatrix rem in1:%d\nmatrix rem out:%d\nmatrix chnk in:%d\nmatrix chnk out:%d\n", (int)*load_cfg, *loadable_rows, *loadable_chunk
 	, *matrix_rem_in1, *matrix_rem_in2, *matrix_rem_out, *matrix_chk_in, *matrix_chk_out);
 }

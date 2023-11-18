@@ -105,6 +105,15 @@ public:
             HLS_PRESERVE_SIGNAL(col_5);
             HLS_PRESERVE_SIGNAL(col_6);
             HLS_PRESERVE_SIGNAL(col_7);
+
+            HLS_PRESERVE_SIGNAL(mult_out_sig_0);
+            HLS_PRESERVE_SIGNAL(mult_out_sig_1);
+            HLS_PRESERVE_SIGNAL(mult_out_sig_2);
+            HLS_PRESERVE_SIGNAL(mult_out_sig_3);
+            HLS_PRESERVE_SIGNAL(mult_out_sig_4);
+            HLS_PRESERVE_SIGNAL(mult_out_sig_5);
+            HLS_PRESERVE_SIGNAL(mult_out_sig_6);
+            HLS_PRESERVE_SIGNAL(mult_out_sig_7);
             #endif
 
             // Flatten arrays
@@ -169,6 +178,15 @@ public:
     sc_signal< sc_int<32> > col_5;
     sc_signal< sc_int<32> > col_6;
     sc_signal< sc_int<32> > col_7;
+
+    sc_signal< sc_int<32> > mult_out_sig_0;
+    sc_signal< sc_int<32> > mult_out_sig_1;
+    sc_signal< sc_int<32> > mult_out_sig_2;
+    sc_signal< sc_int<32> > mult_out_sig_3;
+    sc_signal< sc_int<32> > mult_out_sig_4;
+    sc_signal< sc_int<32> > mult_out_sig_5;
+    sc_signal< sc_int<32> > mult_out_sig_6;
+    sc_signal< sc_int<32> > mult_out_sig_7;
     #endif
 
     sc_int<32> load_state;

@@ -239,6 +239,8 @@ void gemm::load_input()
     uint16_t loadable_chunk;
     uint16_t index_d1_incr;
     uint32_t ld_offset1;
+	uint32_t int_ld_offset1;
+	uint32_t int_ld_offset2;
     uint32_t ld_offset2;
 	uint32_t st_offset;
     bool transpose;
@@ -297,6 +299,8 @@ void gemm::load_input()
 		index_d1_incr = 0;
         ld_offset1 = 0;
         ld_offset2 = 0;
+        int_ld_offset1 = 0;
+        int_ld_offset2 = 0;
 		transpose = 0;
 		pingpong_m1 = false;
 		pingpong_m2 = false;
@@ -399,6 +403,8 @@ void gemm::load_input()
 
 					index_d1_n = ld_offset1;
 					index_d2 = ld_offset2;
+					// int_ld_offset1 = 0;
+					// int_ld_offset2 = 0;
 					index_m2_incr = matrix_d3;
 					length_m2_dma = 1;
 
@@ -412,8 +418,14 @@ void gemm::load_input()
 
 				length1 = loadable_chunk; //matrix_d1*matrix_d2;
 				length2 = loadable_chunk; //matrix_d2*matrix_d3;
-				load_input_1(pingpong_m1, ld_offset1, length1, input0, input1,  load_cfg);
+				if(!int_ld_offset2)
+				{
+					load_input_1(pingpong_m1, ld_offset1, length1, input0, input1,  load_cfg);
+					int_ld_offset1 = int_ld_offset1+ loadable_chunk;
+				}
 				load_input_1(pingpong_m2, ld_offset1 + length1, length2, input2, input3,  load_cfg);
+				int_ld_offset2 = (int_ld_offset2+ loadable_chunk)>=size_matrix2 ? 0 : (int_ld_offset2+ loadable_chunk);
+
 				// load_compute_handshake();
 				break;
 			}
@@ -461,6 +473,7 @@ void gemm::store_output()
     int32_t prod_rdy_offset ;
     int32_t cons_rdy_offset;
     int32_t prod_valid_offset ;
+	int32_t chk = 0;
 
     // Reset
     {
@@ -489,6 +502,7 @@ void gemm::store_output()
 		load_cfg = 0;
 		loadable_rows = 0;
 		task_arbiter = 0;
+		chk = 0;
 
     	wait();
     }
@@ -544,6 +558,7 @@ void gemm::store_output()
 					matrix_d3 = d3_sig.read();
 					// do_relu = do_relu_sig.read();
 					st_offset = gemm_st_offset.read();
+					chk = 0;
 					wait();
 				}
 				break;
@@ -578,7 +593,16 @@ void gemm::store_output()
 			}
 			case STORE_DATA_REQ:{
 				int32_t length = OUT_DMA_CHUNK; //matrix_d1*matrix_d3; //TODO
+				if (load_cfg == LESS_THAN_MATRIX2 && loadable_rows != 1) {
+    			    length = loadable_rows; //loaded_rows_d3;
+    			    // index = index_d1i;
+    			} else {
+    			    // index = index_simple; 
+    			    if (chk == matrix_chk_out - 1 && matrix_rem_out != 0)
+    				length = matrix_rem_out;
+    			}
 				store_output_body(st_offset, length, pingpong, output0, output1);
+				chk++;
 			}
 			
 		 }
@@ -802,28 +826,39 @@ void gemm::compute_kernel()
 									}
 								}
 
+								{
+									HLS_DEFINE_PROTOCOL("compute-pingpong");
+									compute_state_dbg.write(0xcccc);
+									pingpong_m1_sig.write(d1i);
+									pingpong_m2_sig.write(d2i);
+									wait();
+									pingpong_m1_sig.write(pingpong_m1);
+									pingpong_m2_sig.write(pingpong_m2);
+									wait();
+								}
+
 								uint16_t plm_i_row = plm_offset_m1;
 								uint16_t plm_i_col = plm_offset_m2;
 								for (uint16_t k = 0; k < (length + PARALLELISM - 1) / PARALLELISM; ++k)
 								{
 									//HLS_CONSTRAIN_LATENCY(0, HLS_ACHIEVABLE, "constrain-mac");
-									#ifdef FIXED_POINT
-									HLS_PIPELINE_LOOP(HARD_STALL, 2, "pipeline-mac-fixed");
-									#else
-									HLS_PIPELINE_LOOP(HARD_STALL, 2, "pipeline-mac-float");
-									#endif
-									HLS_BREAK_ARRAY_DEPENDENCY(input0);
-									HLS_BREAK_ARRAY_DEPENDENCY(input1);
-									HLS_BREAK_ARRAY_DEPENDENCY(input2);
-									HLS_BREAK_ARRAY_DEPENDENCY(input3);
+									// #ifdef FIXED_POINT
+									// HLS_PIPELINE_LOOP(HARD_STALL, 2, "pipeline-mac-fixed");
+									// #else
+									// HLS_PIPELINE_LOOP(HARD_STALL, 2, "pipeline-mac-float");
+									// #endif
+									// HLS_BREAK_ARRAY_DEPENDENCY(input0);
+									// HLS_BREAK_ARRAY_DEPENDENCY(input1);
+									// HLS_BREAK_ARRAY_DEPENDENCY(input2);
+									// HLS_BREAK_ARRAY_DEPENDENCY(input3);
 
-									{
-										HLS_DEFINE_PROTOCOL("compute-ping");
-										compute_state_dbg.write(0xcccc);
-										pingpong_m1_sig.write(pingpong_m1);
-										pingpong_m2_sig.write(pingpong_m2);
-										wait();
-									}
+									// {
+									// 	HLS_DEFINE_PROTOCOL("compute-ping");
+									// 	compute_state_dbg.write(0xcccc);
+									// 	// pingpong_m1_sig.write(pingpong_m1);
+									// 	// pingpong_m2_sig.write(pingpong_m2);
+									// 	wait();
+									// }
 
 									if (pingpong_m1) {
 										row[0] = INT2FP(input0[plm_i_row++]);
@@ -1016,6 +1051,24 @@ void gemm::compute_kernel()
 										mult_out[15] = 0;
 									#endif
 
+									{
+										HLS_DEFINE_PROTOCOL("compute-adder-partials");
+										#if(PARALLELISM == 8)
+											compute_state_dbg.write(0xfeebbeef);
+											wait();
+											mult_out_sig_0.write(mult_out[0]);
+											mult_out_sig_1.write(mult_out[1]);
+											mult_out_sig_2.write(mult_out[2]);
+											mult_out_sig_3.write(mult_out[3]);
+											mult_out_sig_4.write(mult_out[4]);
+											mult_out_sig_5.write(mult_out[5]);
+											mult_out_sig_6.write(mult_out[6]);
+											mult_out_sig_7.write(mult_out[7]);
+											compute_state_dbg.write(accumulator);
+											wait();
+										#endif
+									}
+
 									#if (PARALLELISM == 2)
 									accumulator += mult_out[0] + mult_out[1];
 									#elif (PARALLELISM == 4)
@@ -1056,6 +1109,8 @@ void gemm::compute_kernel()
 								HLS_DEFINE_PROTOCOL("compute-relu");
 								compute_state_dbg.write(0x7e70);
 								wait();
+								compute_state_dbg.write(accumulator);
+								wait();
 							}
 							// ReLU
 							accumulator = (do_relu && accumulator < (FPDATA) 0) ? (FPDATA) 0 : accumulator;
@@ -1063,6 +1118,8 @@ void gemm::compute_kernel()
 							{
 								HLS_DEFINE_PROTOCOL("compute-relu-done");
 								compute_state_dbg.write(0x7e7d);
+								wait();
+								compute_state_dbg.write(accumulator);
 								wait();
 							}
 							// Write to output PLM
