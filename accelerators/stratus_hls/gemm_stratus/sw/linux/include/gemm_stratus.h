@@ -31,6 +31,13 @@ struct gemm_stratus_access {
 	unsigned ld_offset2;
 	unsigned src_offset;
 	unsigned dst_offset;
+
+    unsigned spandex_conf;
+    unsigned input_offset;
+    unsigned cons_valid_offset;
+    unsigned prod_rdy_offset;
+    unsigned cons_rdy_offset;
+    unsigned prod_valid_offset;
 };
 
 #define GEMM_STRATUS_IOC_ACCESS	_IOW ('S', 0, struct gemm_stratus_access)

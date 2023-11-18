@@ -11,6 +11,11 @@
 #define DRV_NAME	"gemm_stratus"
 
 /* <<--regs-->> */
+#define GEMM_PROD_VALID_REG   0x74
+#define GEMM_CONS_READY_REG   0x70
+#define GEMM_PROD_READY_REG   0x6C
+#define GEMM_CONS_VALID_REG   0x68
+#define GEMM_INPUT_OFFSET_REG 0x64
 #define GEMM_TRANSPOSE_REG 0x60
 #define GEMM_DO_RELU_REG 0x5c
 #define GEMM_ST_OFFSET_REG 0x58
@@ -52,6 +57,13 @@ static void gemm_prep_xfer(struct esp_device *esp, void *arg)
 	struct gemm_stratus_access *a = arg;
 
 	/* <<--regs-config-->> */
+	iowrite32be(a->prod_valid_offset, esp->iomem + GEMM_PROD_VALID_REG   );
+	iowrite32be(a->cons_rdy_offset, esp->iomem + GEMM_CONS_READY_REG   );
+	iowrite32be(a->prod_rdy_offset, esp->iomem + GEMM_PROD_READY_REG   );
+	iowrite32be(a->cons_valid_offset, esp->iomem + GEMM_CONS_VALID_REG   );
+	iowrite32be(a->input_offset, esp->iomem + GEMM_INPUT_OFFSET_REG );
+	iowrite32be(a->spandex_conf, esp->iomem + SPANDEX_REG);
+
 	iowrite32be(a->do_relu, esp->iomem + GEMM_DO_RELU_REG);
 	iowrite32be(a->transpose, esp->iomem + GEMM_TRANSPOSE_REG);
 	iowrite32be(a->ninputs, esp->iomem + GEMM_NINPUTS_REG);

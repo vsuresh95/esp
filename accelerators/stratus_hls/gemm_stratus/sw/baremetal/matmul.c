@@ -1,5 +1,10 @@
 #include "matmul.h"
 
+#ifndef __linux__
+#include "../linux/app/gemm_directives.h"
+#else
+#include "gemm_directives.h"
+#endif
 // static void sw_comp(native_t* gold){
 // 		// #include "fcn_gold.h"
 // 	#include "fcn_input.h"
@@ -147,4 +152,106 @@ void sw_run_tile(int32_t do_relu, int32_t transpose, int32_t ninputs,
 	}
 
     // sw_comp_end = get_counter();
+}
+
+void calculate_tiles(uint32_t ninputs,
+				   uint32_t matrix_d1,
+				   uint32_t matrix_d2,
+				   uint32_t matrix_d3,
+				   uint32_t transpose,
+				   uint32_t* size_matrix1,
+				   uint32_t* size_matrix2,
+				   uint32_t* size_matrix_out,
+				   uint32_t* matrix_chk_in,
+				   uint16_t* matrix_rem_in1,
+				   uint16_t* matrix_rem_in2,
+				   uint32_t* matrix_chk_out,
+				   uint16_t* matrix_rem_out,
+				   uint16_t* load_cfg,
+				   uint16_t* loadable_rows,
+				   uint16_t* loadable_chunk,
+				   uint16_t* index_d1_incr)
+{
+				// 	,
+				//    uint16_t& m2_loop_iters,
+				//    uint16_t& m2_plm_incr){
+	*size_matrix1 = matrix_d1 * matrix_d2;
+    *size_matrix2 = matrix_d2 * matrix_d3;
+    *size_matrix_out = matrix_d1 * matrix_d3;// * ninputs;
+
+	printf("sizem1:%d sizem2:%d sizeout:%d \n", *size_matrix1, *size_matrix2, *size_matrix_out);
+
+    // m2_loop_iters = 1;
+    // m2_plm_incr = 1;
+
+    uint8_t d3_odd = matrix_d3 % 2;
+    uint8_t is_less_than_matrix2 = (*size_matrix2 > DMA_CHUNK || !transpose);
+
+    if ((matrix_d2 > DMA_CHUNK) || (is_less_than_matrix2 && d3_odd)) {
+		*load_cfg = LESS_THAN_ROW;
+		*loadable_rows = 1;
+		*loadable_chunk = DMA_CHUNK;
+		uint32_t matrix_mul;
+		// calculate_chunks(matrix_chk_in, matrix_rem_in1, matrix_d2, 0);
+		*matrix_chk_in = matrix_d2 >> DMA_CHUNK_LOG;
+		// calculating the number of cols (covered the by the chunks)
+		matrix_mul = *matrix_chk_in << DMA_CHUNK_LOG;
+		*matrix_rem_in1 = matrix_d2 - matrix_mul;
+
+		// adding the last chunk if it is necessary
+		if (*matrix_rem_in1 != 0) { ++(*matrix_chk_in); }
+
+		*matrix_rem_in2 = *matrix_rem_in1;
+		*index_d1_incr = matrix_d2;
+    } else if (is_less_than_matrix2) {
+		*load_cfg = LESS_THAN_MATRIX2;
+		if (*size_matrix2 > DMA_CHUNK) {
+			*loadable_rows = DMA_CHUNK / matrix_d2;
+			if (*loadable_rows != 1)
+			*loadable_rows = ((*loadable_rows) >> 1) << 1;
+		} else {
+			*loadable_rows = matrix_d3;
+		}
+		*loadable_chunk = *loadable_rows * matrix_d2;
+		*matrix_chk_in = 1;
+		*matrix_rem_in1 = *size_matrix1 % *loadable_chunk;
+		*matrix_rem_in2 = *size_matrix2 % *loadable_chunk;
+		*index_d1_incr = *loadable_chunk;
+	// 	if (!transpose) {
+	// 		// m2_loop_iters = matrix_d2;
+	// 		// m2_plm_incr = matrix_d2;
+	// 	}
+    } else 
+		{
+		*load_cfg = MORE_THAN_MATRIX2;
+		*loadable_rows = matrix_d3;
+		*loadable_chunk = *size_matrix2;
+		*matrix_chk_in = 1;
+		*matrix_rem_in1 = *size_matrix1 % *loadable_chunk;
+		*matrix_rem_in2 = *size_matrix2;
+		*index_d1_incr = *loadable_chunk;
+		}
+	// calculate_chunks(matrix_chk_out, matrix_rem_out, size_matrix_out, 1);
+// calculating the number of chunks (ceil)
+ 		if (*load_cfg == LESS_THAN_MATRIX2 && *loadable_rows != 1) 
+		{
+			*matrix_chk_out = (*size_matrix_out) / *loadable_rows;
+			uint32_t matrix_mul = (*matrix_chk_out) * (*loadable_rows); 
+			*matrix_rem_out = *(size_matrix_out) - matrix_mul;
+			// adding the last chunk if it is necessary
+			if (*matrix_rem_out > 0) { ++(*matrix_chk_out); 
+			}
+		}
+		else
+		{
+			*matrix_chk_out = (*size_matrix_out) >> OUT_DMA_CHUNK_LOG;
+			// calculating the number of cols (covered the by the chunks)
+			uint32_t matrix_mul = (*matrix_chk_out) << OUT_DMA_CHUNK_LOG; 
+			*matrix_rem_out = *(size_matrix_out) - matrix_mul;
+			// adding the last chunk if it is necessary
+			if (*matrix_rem_out > 0) { ++(*matrix_chk_out); 
+			}
+		}
+	printf("cfg: %d loadable rows: %d\nloadable chunk:%d\nmatrix rem in2:%d\nmatrix rem in1:%d\nmatrix rem out:%d\nmatrix chnk in:%d\nmatrix chnk out:%d\n", (int)*load_cfg, *loadable_rows, *loadable_chunk
+	, *matrix_rem_in1, *matrix_rem_in2, *matrix_rem_out, *matrix_chk_in, *matrix_chk_out);
 }
