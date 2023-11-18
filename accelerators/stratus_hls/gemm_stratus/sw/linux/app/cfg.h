@@ -6,13 +6,19 @@
 #include "libesp.h"
 #include "gemm_stratus.h"
 
+#define SYNC_VAR_SIZE 6
+#define UPDATE_VAR_SIZE 2
+#define VALID_FLAG_OFFSET 0
+#define END_FLAG_OFFSET 2
+#define READY_FLAG_OFFSET 4
+
 /* User defined */
 
 // Define data type (decomment the one needed)
 // #define __UINT
 // #define __INT
 #define __FIXED
-//#define __FLOAT
+// #define __FLOAT
 
 // Define bit width (decomment the one needed)
 // #ifndef __riscv
@@ -70,7 +76,7 @@ typedef float native_t;
 /* <<--params-def-->> */
 #define DO_RELU 0
 #define TRANSPOSE 1
-#define NINPUTS 2
+#define NINPUTS 1
 #define D3 8
 #define D2 8
 #define D1 8
@@ -84,6 +90,9 @@ typedef float native_t;
 #define MAX_SIZE (ACC_PAGE_SIZE * ACC_TLB_ENTRIES)
 #define MAX_TESTS 30
 
+#define D 8
+#define T 1
+
 struct gemm_stratus_access gemm_cfg_000[] = {
 	{
 		/* <<--descriptor-->> */
@@ -96,9 +105,11 @@ struct gemm_stratus_access gemm_cfg_000[] = {
 		.st_offset = ST_OFFSET,
 		.ld_offset1 = LD_OFFSET1,
 		.ld_offset2 = LD_OFFSET2,
+		.input_offset = 0,
+        .output_offset = 0,
 		.src_offset = 0,
 		.dst_offset = 0,
-		.esp.coherence = ACC_COH_NONE,
+		.esp.coherence = ACC_COH_FULL,
 		.esp.p2p_store = 0,
 		.esp.p2p_nsrcs = 0,
 		.esp.p2p_srcs = {"", "", "", ""},
