@@ -32,7 +32,11 @@ extern void calculate_tiles(uint32_t ninputs,
 				   uint16_t* loadable_chunk,
 				   uint16_t* index_d1_incrr);
 
+#if(COMP_MODE == MODE_REG_INV)
 static void validate_buffer(token_t *acc_buf, native_t *sw_buf, unsigned len)
+#else
+static void validate_buffer(native_t *acc_buf, native_t *sw_buf, unsigned len)
+#endif
 {
     int i;
     native_t val;
@@ -41,12 +45,16 @@ static void validate_buffer(token_t *acc_buf, native_t *sw_buf, unsigned len)
     printf("\nPrint output\n");
 
     for (i = 0; i < len; i++) {
-
+#if(COMP_MODE == MODE_REG_INV)
 #ifdef __FIXED
 	val = fx2float(acc_buf[i], FX_IL);
 #else
 	val = acc_buf[i];
 #endif
+#else
+    val = acc_buf[i];
+#endif
+
     if ((fabs(sw_buf[i] - val) / fabs(sw_buf[i])) > ERR_TH){
 	// if (sw_buf[i] != val) {
 	    errors++;
@@ -157,7 +165,7 @@ int main(int argc, char **argv)
 				    //    1,  1,  0,    0,   1,  1,   1,   1,   1,    1,
 				    //    0,  0,  0,    0,   1,  0,   0,   1,   1,    1};
 
-    int32_t ninputs = 1000;// [MAX_TESTS] = {   1, 32,  4,    1,   8,  1,   1, 128,   1,    1,
+    int32_t ninputs = NINPUTS; //1000;// [MAX_TESTS] = {   1, 32,  4,    1,   8,  1,   1, 128,   1,    1,
 				    //    1,  2,  1,    1,   1,  1,   4,   8,   2,    2,
 				    //    2,  2,  2,    1, 128,  1,   4,   2,   2,    2};
 
@@ -239,12 +247,17 @@ int main(int argc, char **argv)
 	// initialize input data
 	init_buffer(acc_buf, sw_buf, in_len);
 
+	// #if(COMP_MODE!=MODE_REG_INV)
+	reset_sync(acc_buf, NUM_DEVICES);
+	asm volatile ("fence w, w");	
+	// #endif
+
 	// hardware execution
 	printf("  Start accelerator execution\n");
     hw_comp_start = get_counter();
-    #if(COMP_MODE==MODE_REG_INV)
+    
 	esp_run(cfg_000, NACC);
-    #else
+    #if(COMP_MODE!=MODE_REG_INV)
     in_main( ninputs,  d1,  d2,  d3,  transpose,  do_relu, in1_len, acc_buf, sw_buf, out_arr);
     #endif
     hw_comp_end  =get_counter();
@@ -263,7 +276,11 @@ int main(int argc, char **argv)
     printf("SW Comp Time: %lu\nHW Comp Time:%lu\n", (sw_comp_end-sw_comp_start)/ITERATIONS, (hw_comp_end-hw_comp_start));
 	// validation
 	// errors = print_input(buf, gold);
+    #if(COMP_MODE==MODE_REG_INV)
 	validate_buffer(&acc_buf[in_len], &sw_buf[in_len], round_up(ninputs * d1 * d3, DMA_WORD_PER_BEAT(sizeof(token_t))));
+    #else
+	validate_buffer(out_arr, &sw_buf[in_len], round_up(ninputs * d1 * d3, DMA_WORD_PER_BEAT(sizeof(token_t))));
+    #endif
     }
 
     // free

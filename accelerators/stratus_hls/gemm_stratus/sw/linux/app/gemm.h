@@ -142,7 +142,7 @@ static void init_buffer(token_t *acc_buf, native_t *sw_buf, unsigned in_len)
 
 static inline void reset_sync(token_t *buf, int num_devices){
 	int n;
-    printf("Inside reset sync %d\n", num_devices);
+    // printf("Inside reset sync %d\n", num_devices);
 	for(n = 0; n< num_devices; n++){
 		write_mem(((void*)(buf + accel_prod_ready_offset[n])), (uint64_t)1);//BM
 		// printf("reset accel_prod_ready acc_buf[%d]: %d\n", accel_prod_ready_offset, *(acc_buf + accel_prod_ready_offset));
@@ -285,7 +285,10 @@ static inline void init_buf_input1 (int ninput, token_t *in, int matsize, native
     int i;
 	
 	static int tile_num = 1;
+
+	// #ifdef __linux__
 	// printf("init_buf_input1 Tile %d mat[%d - %d]\n", tile_num, offset, matsize);
+	// #endif
 		
 #ifdef __FIXED
 	// *offset_n = offset + mat1size; 
@@ -309,7 +312,10 @@ static void init_buf_output (int ninput, int offset2, int len, token_t *res, nat
 #ifdef __FIXED
 
 	int offset = offset2+ninput*(round_up(size_mat_out, DMA_WORD_PER_BEAT(sizeof(token_t))));
-	// printf("output tile O[%d - %d]\n", offset2, len);
+
+	// #ifdef __linux__
+	// printf("output tile O[%d - %d]\n", offset, len);
+	// #endif
 	for (i = 0; i < len; i++) { //round_up(len, DMA_WORD_PER_BEAT(sizeof(token_t)))
 		#ifdef __FIXED
 		out_arr[offset+i] = fx2float(res[i], FX_IL);
@@ -331,15 +337,21 @@ uint64_t hw_comp_end = 0;
 uint64_t hw_write_time = 0;
 uint64_t hw_read_time = 0;
 
+
 static inline void in_main(int ninputs, int d1, int d2, int d3, int transpose, int do_relu, int ld_offset2, token_t* mem,native_t *sw_buf, native_t * out_arr){
 	// token_t* mem ;
 	// mem = acc_buf;
+
+	// // #if(COMP_MODE!=MODE_REG_INV)
+	// reset_sync(mem, NUM_DEVICES);
+	// asm volatile ("fence w, w");	
+	// // #endif
 	update_prod_rdy(mem);
 	int tinput = 0;
 	// while(tinput<ninputs){
-	printf("  Poll Cons Rdy...\n");
+	// printf("  Poll Cons Rdy...\n");
 	while(!poll_cons_rdy(mem)); // wait for cons ready
-	printf("  Found Cons Rdy...\n");
+	// printf("  Found Cons Rdy...\n");
 
 	asm volatile ("fence w, w");	//release semantics
 	mem[input_buffer_offset[0]+NINPUTS_OFFSET] = ninputs;
@@ -350,7 +362,7 @@ static inline void in_main(int ninputs, int d1, int d2, int d3, int transpose, i
 	mem[input_buffer_offset[0]+ST_OFFSET] = output_buffer_offset[0];
 	mem[input_buffer_offset[0]+TRANSPOSE_OFFSET] = transpose;
 	mem[input_buffer_offset[0]+DO_RELU_OFFSET] = do_relu;
-	printf("  Provided config. Update Cons Rdy and last...\n");
+	// printf("  Provided config. Update Cons Rdy and last...\n");
 
 	asm volatile ("fence w, w");	//release semantics
 	update_cons_rdy(mem);
@@ -361,6 +373,9 @@ static inline void in_main(int ninputs, int d1, int d2, int d3, int transpose, i
 	int out_iters = ((d1*d3)/mat_chk_out);
 	int in_iters = (d2*d3/(loadable_chunk));
 	while(tinput<ninputs){
+		// #ifdef __linux__
+		// printf("  input:%d/%d\n", tinput,ninputs);//(d1*d3/loadable_rows));
+		// #endif
 		uint32_t index_d1 = 0;
 		int offset = 0;
 		int offseti2 = 0;
@@ -413,7 +428,10 @@ static inline void in_main(int ninputs, int d1, int d2, int d3, int transpose, i
 					}
 				}
 			
+				// #ifdef __linux__
 				// printf("  out chk:%d/%d\n", out_chk,mat_chk_out);//(d1*d3/loadable_rows));
+				// #endif
+
 				out_chk++;
 			}
 			else if((in_chk < mat_chk_in ) && poll_cons_rdy(mem)){//|| out_chk < mat_chk_out)
@@ -433,10 +451,10 @@ static inline void in_main(int ninputs, int d1, int d2, int d3, int transpose, i
 				// init_buf_input(0, mem+rel_input_buffer_offset, loadable_rows);
 				if(load_a)//(in_chk==0)
 				{
-					init_buf_input1 (tinput*mat1size, mem+input_buffer_offset[0], mat1size, sw_buf, offset);
+					init_buf_input1 (tinput*size_mat1, mem+input_buffer_offset[0], mat1size, sw_buf, offset);
 					load_a = !load_a;
 				}
-				init_buf_input1 (tinput*mat2size, mem+input_buffer_offset[0]+mat1size, mat2size,(sw_buf + ld_offset2),offseti2);
+				init_buf_input1 (tinput*size_mat2, mem+input_buffer_offset[0]+mat1size, mat2size,(sw_buf + ld_offset2),offseti2);
 				uint64_t hw_write_time_end = get_counter();
 				hw_write_time += (hw_write_time_end-hw_write_time_start);
 
@@ -445,7 +463,10 @@ static inline void in_main(int ninputs, int d1, int d2, int d3, int transpose, i
 				// printf("  Update Cons Rdy and last...\n");
 				update_cons_rdy(mem);
 				update_cons_valid(mem,0);
+
+				// #ifdef __linux__
 				// printf("  in chk:%d/%d\n", in_chk,mat_chk_in);
+				// #endif
 				// in_chk ++;
 
 				if(in_chk == mat_chk_in - 1){

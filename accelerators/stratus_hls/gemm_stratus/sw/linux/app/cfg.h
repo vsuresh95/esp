@@ -84,18 +84,6 @@
 
 #define MAX_PRINTED_ERRORS 512
 
-/* <<--params-def-->> */
-#define DO_RELU 0
-#define TRANSPOSE 1
-#define NINPUTS 2
-// #define D_COMMON 8
-#define D3 16
-#define D2 16
-#define D1 16
-#define ST_OFFSET0 (NINPUTS * (D1 * D2 + D2 * D3))
-#define LD_OFFSET1 0
-#define LD_OFFSET2 (NINPUTS * (D1 * D2))
-
 #define NACC 1
 #define ACC_TLB_ENTRIES 128
 #define ACC_PAGE_SIZE (1 << 20)

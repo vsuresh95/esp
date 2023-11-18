@@ -17,7 +17,7 @@
 #define D3_VAL D_COMMON
 #define D2_VAL D_COMMON
 #define D1_VAL D_COMMON
-#define NINPUTS (1000/D_COMMON)
+// #define NINPUTS (1000/D_COMMON)
 
 #define PRINT_DEBUG
 
@@ -355,11 +355,6 @@ int main(int argc, char * argv[])
 			printf("  Init sw buf...\n");
 			// init_buf(sw_buf, (sw_buf + ld_offset2));
 			init_buffer(mem, sw_buf, in_len);
-
-			#if(COMP_MODE!=MODE_REG_INV)
-			reset_sync(mem, NUM_DEVICES);
-			asm volatile ("fence w, w");	
-			#endif
 
 			// Flush (customize coherence model here)
 			esp_flush(coherence);
