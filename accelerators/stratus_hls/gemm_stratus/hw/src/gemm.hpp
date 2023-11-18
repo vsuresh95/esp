@@ -85,36 +85,36 @@ public:
             HLS_PRESERVE_SIGNAL(transpose_sig);
             HLS_PRESERVE_SIGNAL(do_relu_sig);
 
-            HLS_PRESERVE_SIGNAL(pingpong_m1_sig);
-            HLS_PRESERVE_SIGNAL(pingpong_m2_sig);
+            // HLS_PRESERVE_SIGNAL(pingpong_m1_sig);
+            // HLS_PRESERVE_SIGNAL(pingpong_m2_sig);
 
-            #if (PARALLELISM >= 8)
-            HLS_PRESERVE_SIGNAL(row_0);
-            HLS_PRESERVE_SIGNAL(row_1);
-            HLS_PRESERVE_SIGNAL(row_2);
-            HLS_PRESERVE_SIGNAL(row_3);
-            HLS_PRESERVE_SIGNAL(row_4);
-            HLS_PRESERVE_SIGNAL(row_5);
-            HLS_PRESERVE_SIGNAL(row_6);
-            HLS_PRESERVE_SIGNAL(row_7);
-            HLS_PRESERVE_SIGNAL(col_0);
-            HLS_PRESERVE_SIGNAL(col_1);
-            HLS_PRESERVE_SIGNAL(col_2);
-            HLS_PRESERVE_SIGNAL(col_3);
-            HLS_PRESERVE_SIGNAL(col_4);
-            HLS_PRESERVE_SIGNAL(col_5);
-            HLS_PRESERVE_SIGNAL(col_6);
-            HLS_PRESERVE_SIGNAL(col_7);
+            // #if (PARALLELISM >= 8)
+            // HLS_PRESERVE_SIGNAL(row_0);
+            // HLS_PRESERVE_SIGNAL(row_1);
+            // HLS_PRESERVE_SIGNAL(row_2);
+            // HLS_PRESERVE_SIGNAL(row_3);
+            // HLS_PRESERVE_SIGNAL(row_4);
+            // HLS_PRESERVE_SIGNAL(row_5);
+            // HLS_PRESERVE_SIGNAL(row_6);
+            // HLS_PRESERVE_SIGNAL(row_7);
+            // HLS_PRESERVE_SIGNAL(col_0);
+            // HLS_PRESERVE_SIGNAL(col_1);
+            // HLS_PRESERVE_SIGNAL(col_2);
+            // HLS_PRESERVE_SIGNAL(col_3);
+            // HLS_PRESERVE_SIGNAL(col_4);
+            // HLS_PRESERVE_SIGNAL(col_5);
+            // HLS_PRESERVE_SIGNAL(col_6);
+            // HLS_PRESERVE_SIGNAL(col_7);
 
-            HLS_PRESERVE_SIGNAL(mult_out_sig_0);
-            HLS_PRESERVE_SIGNAL(mult_out_sig_1);
-            HLS_PRESERVE_SIGNAL(mult_out_sig_2);
-            HLS_PRESERVE_SIGNAL(mult_out_sig_3);
-            HLS_PRESERVE_SIGNAL(mult_out_sig_4);
-            HLS_PRESERVE_SIGNAL(mult_out_sig_5);
-            HLS_PRESERVE_SIGNAL(mult_out_sig_6);
-            HLS_PRESERVE_SIGNAL(mult_out_sig_7);
-            #endif
+            // HLS_PRESERVE_SIGNAL(mult_out_sig_0);
+            // HLS_PRESERVE_SIGNAL(mult_out_sig_1);
+            // HLS_PRESERVE_SIGNAL(mult_out_sig_2);
+            // HLS_PRESERVE_SIGNAL(mult_out_sig_3);
+            // HLS_PRESERVE_SIGNAL(mult_out_sig_4);
+            // HLS_PRESERVE_SIGNAL(mult_out_sig_5);
+            // HLS_PRESERVE_SIGNAL(mult_out_sig_6);
+            // HLS_PRESERVE_SIGNAL(mult_out_sig_7);
+            // #endif
 
             // Flatten arrays
             HLS_FLATTEN_ARRAY(mult_out);
@@ -159,35 +159,35 @@ public:
     sc_signal< sc_int<64> > load_unit_sp_write_dbg;
     sc_signal< sc_int<64> > store_unit_sp_read_dbg;
 
-    sc_signal< sc_int<1> > pingpong_m1_sig;
-    sc_signal< sc_int<1> > pingpong_m2_sig;
-    #if (PARALLELISM >= 8)
-    sc_signal< sc_int<32> > row_0;
-    sc_signal< sc_int<32> > row_1;
-    sc_signal< sc_int<32> > row_2;
-    sc_signal< sc_int<32> > row_3;
-    sc_signal< sc_int<32> > row_4;
-    sc_signal< sc_int<32> > row_5;
-    sc_signal< sc_int<32> > row_6;
-    sc_signal< sc_int<32> > row_7;
-    sc_signal< sc_int<32> > col_0;
-    sc_signal< sc_int<32> > col_1;
-    sc_signal< sc_int<32> > col_2;
-    sc_signal< sc_int<32> > col_3;
-    sc_signal< sc_int<32> > col_4;
-    sc_signal< sc_int<32> > col_5;
-    sc_signal< sc_int<32> > col_6;
-    sc_signal< sc_int<32> > col_7;
+    // sc_signal< sc_int<1> > pingpong_m1_sig;
+    // sc_signal< sc_int<1> > pingpong_m2_sig;
+    // #if (PARALLELISM >= 8)
+    // sc_signal< sc_int<32> > row_0;
+    // sc_signal< sc_int<32> > row_1;
+    // sc_signal< sc_int<32> > row_2;
+    // sc_signal< sc_int<32> > row_3;
+    // sc_signal< sc_int<32> > row_4;
+    // sc_signal< sc_int<32> > row_5;
+    // sc_signal< sc_int<32> > row_6;
+    // sc_signal< sc_int<32> > row_7;
+    // sc_signal< sc_int<32> > col_0;
+    // sc_signal< sc_int<32> > col_1;
+    // sc_signal< sc_int<32> > col_2;
+    // sc_signal< sc_int<32> > col_3;
+    // sc_signal< sc_int<32> > col_4;
+    // sc_signal< sc_int<32> > col_5;
+    // sc_signal< sc_int<32> > col_6;
+    // sc_signal< sc_int<32> > col_7;
 
-    sc_signal< sc_int<32> > mult_out_sig_0;
-    sc_signal< sc_int<32> > mult_out_sig_1;
-    sc_signal< sc_int<32> > mult_out_sig_2;
-    sc_signal< sc_int<32> > mult_out_sig_3;
-    sc_signal< sc_int<32> > mult_out_sig_4;
-    sc_signal< sc_int<32> > mult_out_sig_5;
-    sc_signal< sc_int<32> > mult_out_sig_6;
-    sc_signal< sc_int<32> > mult_out_sig_7;
-    #endif
+    // sc_signal< sc_int<32> > mult_out_sig_0;
+    // sc_signal< sc_int<32> > mult_out_sig_1;
+    // sc_signal< sc_int<32> > mult_out_sig_2;
+    // sc_signal< sc_int<32> > mult_out_sig_3;
+    // sc_signal< sc_int<32> > mult_out_sig_4;
+    // sc_signal< sc_int<32> > mult_out_sig_5;
+    // sc_signal< sc_int<32> > mult_out_sig_6;
+    // sc_signal< sc_int<32> > mult_out_sig_7;
+    // #endif
 
     sc_int<32> load_state;
     sc_int<32> store_state;

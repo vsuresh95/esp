@@ -353,8 +353,8 @@ static void init_buf (native_t *sw_buf,native_t *sw_buf2)
 	for( int ni = 0; ni < ninputs; ni++){
 		for (i = 0; i < (round_up(d1*d2, DMA_WORD_PER_BEAT(sizeof(token_t)))); i++) {
 			sw_buf[ni*(round_up(d1*d2, DMA_WORD_PER_BEAT(sizeof(token_t)))) + i] = i%17-8;//input[i];
-			if(i%64==0)
-			 printf("sw[%d] = %d\n", (ni*(round_up(d1*d2, DMA_WORD_PER_BEAT(sizeof(token_t)))) + i), (int)sw_buf[ni*(round_up(d1*d2, DMA_WORD_PER_BEAT(sizeof(token_t)))) + i]);
+			// if(i%64==0)
+			//  printf("sw[%d] = %d\n", (ni*(round_up(d1*d2, DMA_WORD_PER_BEAT(sizeof(token_t)))) + i), (int)sw_buf[ni*(round_up(d1*d2, DMA_WORD_PER_BEAT(sizeof(token_t)))) + i]);
 		}
 	}
 
@@ -362,8 +362,8 @@ static void init_buf (native_t *sw_buf,native_t *sw_buf2)
 		for (i = 0; i < d2*d3; i++) {
 			sw_buf2[ni*d2*d3 + i] = i%17-5; //input[3*(round_up(d1*d2, DMA_WORD_PER_BEAT(sizeof(token_t)))) + i];
 
-			if(i%64==0)
-			printf("sw2[%d] = %d\n", (ni*d2*d3 + i), (int)sw_buf2[ni*d2*d3 + i]);
+			// if(i%64==0)
+			// printf("sw2[%d] = %d\n", (ni*d2*d3 + i), (int)sw_buf2[ni*d2*d3 + i]);
 		}
 	}
 

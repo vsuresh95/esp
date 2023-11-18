@@ -670,27 +670,27 @@ void gemm::compute_kernel()
 		loadable_rows = 0;
 
 
-		pingpong_m1_sig.write(0);
-		pingpong_m2_sig.write(0);
+		// pingpong_m1_sig.write(0);
+		// pingpong_m2_sig.write(0);
 
-        #if (PARALLELISM >= 8)
-		row_0.write(0);
-		row_1.write(0);
-		row_2.write(0);
-		row_3.write(0);
-		row_4.write(0);
-		row_5.write(0);
-		row_6.write(0);
-		row_7.write(0);
-		col_0.write(0);
-		col_1.write(0);
-		col_2.write(0);
-		col_3.write(0);
-		col_4.write(0);
-		col_5.write(0);
-		col_6.write(0);
-		col_7.write(0);
-		#endif
+        // #if (PARALLELISM >= 8)
+		// row_0.write(0);
+		// row_1.write(0);
+		// row_2.write(0);
+		// row_3.write(0);
+		// row_4.write(0);
+		// row_5.write(0);
+		// row_6.write(0);
+		// row_7.write(0);
+		// col_0.write(0);
+		// col_1.write(0);
+		// col_2.write(0);
+		// col_3.write(0);
+		// col_4.write(0);
+		// col_5.write(0);
+		// col_6.write(0);
+		// col_7.write(0);
+		// #endif
 
     	wait();
     }
@@ -789,10 +789,6 @@ void gemm::compute_kernel()
 							for (uint24_t chk = 0; chk < matrix_chk_in; ++chk)
 							{
 								// If true the next is the last (smaller) chunk
-								// BM
-								// pingpong_m1 = !pingpong_m1;
-								// pingpong_m2 = !pingpong_m2;
-								// compute_load_handshake();
 
 								if (load_cfg == LESS_THAN_ROW) {
 									if (chk == matrix_chk_in - 1 && matrix_rem_in2 != 0) {
@@ -826,31 +822,31 @@ void gemm::compute_kernel()
 									}
 								}
 
-								{
-									HLS_DEFINE_PROTOCOL("compute-pingpong");
-									compute_state_dbg.write(0xcccc);
-									pingpong_m1_sig.write(d1i);
-									pingpong_m2_sig.write(d2i);
-									wait();
-									pingpong_m1_sig.write(pingpong_m1);
-									pingpong_m2_sig.write(pingpong_m2);
-									wait();
-								}
+								// {
+								// 	HLS_DEFINE_PROTOCOL("compute-pingpong");
+								// 	compute_state_dbg.write(0xcccc);
+								// 	pingpong_m1_sig.write(d1i);
+								// 	pingpong_m2_sig.write(d2i);
+								// 	wait();
+								// 	pingpong_m1_sig.write(pingpong_m1);
+								// 	pingpong_m2_sig.write(pingpong_m2);
+								// 	wait();
+								// }
 
 								uint16_t plm_i_row = plm_offset_m1;
 								uint16_t plm_i_col = plm_offset_m2;
 								for (uint16_t k = 0; k < (length + PARALLELISM - 1) / PARALLELISM; ++k)
 								{
-									//HLS_CONSTRAIN_LATENCY(0, HLS_ACHIEVABLE, "constrain-mac");
-									// #ifdef FIXED_POINT
-									// HLS_PIPELINE_LOOP(HARD_STALL, 2, "pipeline-mac-fixed");
-									// #else
-									// HLS_PIPELINE_LOOP(HARD_STALL, 2, "pipeline-mac-float");
-									// #endif
-									// HLS_BREAK_ARRAY_DEPENDENCY(input0);
-									// HLS_BREAK_ARRAY_DEPENDENCY(input1);
-									// HLS_BREAK_ARRAY_DEPENDENCY(input2);
-									// HLS_BREAK_ARRAY_DEPENDENCY(input3);
+									HLS_CONSTRAIN_LATENCY(0, HLS_ACHIEVABLE, "constrain-mac");
+									#ifdef FIXED_POINT
+									HLS_PIPELINE_LOOP(HARD_STALL, 2, "pipeline-mac-fixed");
+									#else
+									HLS_PIPELINE_LOOP(HARD_STALL, 2, "pipeline-mac-float");
+									#endif
+									HLS_BREAK_ARRAY_DEPENDENCY(input0);
+									HLS_BREAK_ARRAY_DEPENDENCY(input1);
+									HLS_BREAK_ARRAY_DEPENDENCY(input2);
+									HLS_BREAK_ARRAY_DEPENDENCY(input3);
 
 									// {
 									// 	HLS_DEFINE_PROTOCOL("compute-ping");
@@ -959,31 +955,31 @@ void gemm::compute_kernel()
 									uint16_t plm_i = k * PARALLELISM + 1;
 									mult_out[0] = row[0] * col[0];
 
-									{
-										HLS_DEFINE_PROTOCOL("compute-mult");
+									// {
+									// 	HLS_DEFINE_PROTOCOL("compute-mult");
 										
-										compute_state_dbg.write(0xdddd);
+									// 	compute_state_dbg.write(0xdddd);
 
-										#if (PARALLELISM >= 8)
-										row_0.write(row[0]);
-										row_1.write(row[1]);
-										row_2.write(row[2]);
-										row_3.write(row[3]);
-										row_4.write(row[4]);
-										row_5.write(row[5]);
-										row_6.write(row[6]);
-										row_7.write(row[7]);
-										col_0.write(col[0]);
-										col_1.write(col[1]);
-										col_2.write(col[2]);
-										col_3.write(col[3]);
-										col_4.write(col[4]);
-										col_5.write(col[5]);
-										col_6.write(col[6]);
-										col_7.write(col[7]);
-										#endif
-										wait();
-									}
+									// 	#if (PARALLELISM >= 8)
+									// 	row_0.write(row[0]);
+									// 	row_1.write(row[1]);
+									// 	row_2.write(row[2]);
+									// 	row_3.write(row[3]);
+									// 	row_4.write(row[4]);
+									// 	row_5.write(row[5]);
+									// 	row_6.write(row[6]);
+									// 	row_7.write(row[7]);
+									// 	col_0.write(col[0]);
+									// 	col_1.write(col[1]);
+									// 	col_2.write(col[2]);
+									// 	col_3.write(col[3]);
+									// 	col_4.write(col[4]);
+									// 	col_5.write(col[5]);
+									// 	col_6.write(col[6]);
+									// 	col_7.write(col[7]);
+									// 	#endif
+									// 	wait();
+									// }
 									if (plm_i < length)
 										mult_out[1] =  row[1] * col[1];
 									else
@@ -1051,23 +1047,23 @@ void gemm::compute_kernel()
 										mult_out[15] = 0;
 									#endif
 
-									{
-										HLS_DEFINE_PROTOCOL("compute-adder-partials");
-										#if(PARALLELISM == 8)
-											compute_state_dbg.write(0xfeebbeef);
-											wait();
-											mult_out_sig_0.write(mult_out[0]);
-											mult_out_sig_1.write(mult_out[1]);
-											mult_out_sig_2.write(mult_out[2]);
-											mult_out_sig_3.write(mult_out[3]);
-											mult_out_sig_4.write(mult_out[4]);
-											mult_out_sig_5.write(mult_out[5]);
-											mult_out_sig_6.write(mult_out[6]);
-											mult_out_sig_7.write(mult_out[7]);
-											compute_state_dbg.write(accumulator);
-											wait();
-										#endif
-									}
+									// {
+									// 	HLS_DEFINE_PROTOCOL("compute-adder-partials");
+									// 	#if(PARALLELISM == 8)
+									// 		compute_state_dbg.write(0xfeebbeef);
+									// 		wait();
+									// 		mult_out_sig_0.write(mult_out[0]);
+									// 		mult_out_sig_1.write(mult_out[1]);
+									// 		mult_out_sig_2.write(mult_out[2]);
+									// 		mult_out_sig_3.write(mult_out[3]);
+									// 		mult_out_sig_4.write(mult_out[4]);
+									// 		mult_out_sig_5.write(mult_out[5]);
+									// 		mult_out_sig_6.write(mult_out[6]);
+									// 		mult_out_sig_7.write(mult_out[7]);
+									// 		compute_state_dbg.write(accumulator);
+									// 		wait();
+									// 	#endif
+									// }
 
 									#if (PARALLELISM == 2)
 									accumulator += mult_out[0] + mult_out[1];
@@ -1105,23 +1101,23 @@ void gemm::compute_kernel()
 								}
 							}
 
-							{
-								HLS_DEFINE_PROTOCOL("compute-relu");
-								compute_state_dbg.write(0x7e70);
-								wait();
-								compute_state_dbg.write(accumulator);
-								wait();
-							}
+							// {
+							// 	HLS_DEFINE_PROTOCOL("compute-relu");
+							// 	compute_state_dbg.write(0x7e70);
+							// 	wait();
+							// 	compute_state_dbg.write(accumulator);
+							// 	wait();
+							// }
 							// ReLU
 							accumulator = (do_relu && accumulator < (FPDATA) 0) ? (FPDATA) 0 : accumulator;
 							
-							{
-								HLS_DEFINE_PROTOCOL("compute-relu-done");
-								compute_state_dbg.write(0x7e7d);
-								wait();
-								compute_state_dbg.write(accumulator);
-								wait();
-							}
+							// {
+							// 	HLS_DEFINE_PROTOCOL("compute-relu-done");
+							// 	compute_state_dbg.write(0x7e7d);
+							// 	wait();
+							// 	compute_state_dbg.write(accumulator);
+							// 	wait();
+							// }
 							// Write to output PLM
 							if (pingpong_out) {
 								output0[store_count] = FP2INT(accumulator);
