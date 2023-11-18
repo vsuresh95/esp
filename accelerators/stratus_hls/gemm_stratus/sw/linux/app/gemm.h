@@ -119,15 +119,36 @@ static inline void set_offsets(int num_devices, int tile_size){
 }
 
 
+/* User-defined code */
+static void init_buffer(token_t *acc_buf, native_t *sw_buf, unsigned in_len)
+{
+    int i;
+
+    printf("  Initialize inputs\n");
+
+    for (i = 0; i < in_len; i++) {
+	native_t val = i % 17 - 8;
+    #if(COMP_MODE==MODE_REG_INV)
+    	printf("  Initialize HW inputs\n");
+        #ifdef __FIXED
+                acc_buf[i] = float2fx(val, FX_IL);
+        #else
+                acc_buf[i] = val;
+        #endif
+    #endif
+	sw_buf[i] = val;
+    }
+}
+
 static inline void reset_sync(token_t *buf, int num_devices){
 	int n;
-    printf("Inside reset sync\n");
+    printf("Inside reset sync %d\n", num_devices);
 	for(n = 0; n< num_devices; n++){
-		write_mem(((void*)(buf + accel_prod_ready_offset[n])), 1);//BM
+		write_mem(((void*)(buf + accel_prod_ready_offset[n])), (uint64_t)1);//BM
 		// printf("reset accel_prod_ready acc_buf[%d]: %d\n", accel_prod_ready_offset, *(acc_buf + accel_prod_ready_offset));
-		write_mem(((void*)(buf + accel_cons_valid_offset[n])), 0);
+		write_mem(((void*)(buf + accel_cons_valid_offset[n])), (uint64_t)0);
 		// DBG_PRINT("reset accel_cons_valid acc_buf[%d]: %d\n", accel_cons_valid_offset, *(acc_buf + accel_cons_valid_offset));
-		write_mem(((void*)(buf + accel_cons_last_element[n])), 0);
+		// write_mem(((void*)(buf + accel_cons_last_element[n])), 0);
 		// DBG_PRINT("reset accel_con_last acc_buf[%d]: %d\n", accel_con_last_offset, *(acc_buf + accel_con_last_offset));
 		write_mem(((void*)(buf + accel_prod_valid_offset[n])), 0);
 		// DBG_PRINT("reset accel_prod_valid acc_buf[%d]: %d\n", accel_prod_valid_offset, *(acc_buf + accel_prod_valid_offset));
@@ -135,6 +156,8 @@ static inline void reset_sync(token_t *buf, int num_devices){
 		// DBG_PRINT("reset accel_cons_ready acc_buf[%d]: %d\n", accel_cons_ready_offset, *(acc_buf + accel_cons_ready_offset));
 	}
 	asm volatile ("fence w, w");	
+
+    // printf("end of reset sync\n");
 }
 
 static inline uint32_t poll_cons_rdy(token_t *buf){
@@ -279,27 +302,6 @@ static inline void init_buf_input1 (int ninput, token_t *in, int matsize, native
 	tile_num++;
 }
 
-// static inline void init_buf_input2 (int ninput, token_t *in, int mat1size, int mat2size, native_t* sw_buf, native_t* sw_buf2, int32_t offset, int32_t offset2)
-// {
-//     int i;
-	
-// 	static int tile_num = 1;
-// 	// printf("init_buf_input2 Tile %d B[%d - %d]\n", tile_num, offset2, mat2size);
-		
-// #ifdef __FIXED
-// 	for (i = 0; i < mat2size; i++) {
-// 		in[mat1size+i] = float2fx(sw_buf2[ninput*d2*d3 + offset2+ i], FX_IL); 
-//     	// printf("in2[%d] = %d, sw[%d] = %d\n", mat1size+i, in[mat1size+i], ninput*d2*d3 + offset2+ i, (int)sw_buf2[ninput*d2*d3 + offset2+ i]);
-//     }
-// 	// *offset_n2 = offset2 + mat1size; 
-
-// #else 
-// #include "gold.h"
-// // #include "fcn_gold.h"
-// #endif
-// 	tile_num++;
-// }
-
 
 static void init_buf_output (int ninput, int offset2, int len, token_t *res, native_t* out_arr, int size_mat_out)
 {
@@ -335,9 +337,9 @@ static inline void in_main(int ninputs, int d1, int d2, int d3, int transpose, i
 	update_prod_rdy(mem);
 	int tinput = 0;
 	// while(tinput<ninputs){
-	// printf("  Poll Cons Rdy...\n");
+	printf("  Poll Cons Rdy...\n");
 	while(!poll_cons_rdy(mem)); // wait for cons ready
-	// printf("  Found Cons Rdy...\n");
+	printf("  Found Cons Rdy...\n");
 
 	asm volatile ("fence w, w");	//release semantics
 	mem[input_buffer_offset[0]+NINPUTS_OFFSET] = ninputs;
@@ -348,7 +350,7 @@ static inline void in_main(int ninputs, int d1, int d2, int d3, int transpose, i
 	mem[input_buffer_offset[0]+ST_OFFSET] = output_buffer_offset[0];
 	mem[input_buffer_offset[0]+TRANSPOSE_OFFSET] = transpose;
 	mem[input_buffer_offset[0]+DO_RELU_OFFSET] = do_relu;
-	// printf("  Provided config. Update Cons Rdy and last...\n");
+	printf("  Provided config. Update Cons Rdy and last...\n");
 
 	asm volatile ("fence w, w");	//release semantics
 	update_cons_rdy(mem);

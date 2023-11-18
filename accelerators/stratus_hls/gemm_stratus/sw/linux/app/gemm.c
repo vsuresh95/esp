@@ -62,25 +62,6 @@ static void validate_buffer(token_t *acc_buf, native_t *sw_buf, unsigned len)
 }
 
 
-/* User-defined code */
-static void init_buffer(token_t *acc_buf, native_t *sw_buf, unsigned in_len)
-{
-    int i;
-
-    printf("  Initialize inputs\n");
-
-    for (i = 0; i < in_len; i++) {
-	native_t val = i % 17 - 8;
-    #if(COMP_MODE==MODE_REG_INV)
-        #ifdef __FIXED
-                acc_buf[i] = float2fx(val, FX_IL);
-        #else
-                acc_buf[i] = val;
-        #endif
-    #endif
-	sw_buf[i] = val;
-    }
-}
 
 
 /* User-defined code */
@@ -288,6 +269,7 @@ int main(int argc, char **argv)
     // free
     esp_free(acc_buf);
     esp_free(sw_buf);
+    esp_free(out_arr);
 
     printf("\n====== %s ======\n\n", cfg_000[0].devname);
 
