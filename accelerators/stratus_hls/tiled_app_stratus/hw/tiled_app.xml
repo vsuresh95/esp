@@ -10,5 +10,8 @@
     <param name="output_update_sync_offset" desc="output_update_sync_offset" />
     <param name="input_tile_start_offset" desc="input_tile_start_offset" />
     <param name="output_tile_start_offset" desc="output_tile_start_offset" />
+    <param name="compute_over_data" desc="compute_over_data" />
+    <param name="compute_iters" desc="compute_iters" />
+    <param name="ping_pong_en" desc="ping_pong_en" />
   </accelerator>
 </sld>

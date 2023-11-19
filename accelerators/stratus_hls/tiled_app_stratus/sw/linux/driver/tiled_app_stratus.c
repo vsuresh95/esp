@@ -23,6 +23,10 @@
 #define TILED_APP_NUM_TILES_REG 0x48
 #define TILED_APP_TILE_SIZE_REG 0x44
 #define TILED_APP_RD_WR_ENABLE_REG 0x40
+// New registers
+#define TILED_APP_PING_PONG_EN_REG 0x6C
+#define TILED_APP_COMPUTE_OVER_DATA_REG 0x68
+#define TILED_APP_COMPUTE_ITERS_REG 0x64
 
 // #define SPANDEX_REG 0x34
 
@@ -67,6 +71,10 @@ static void tiled_app_prep_xfer(struct esp_device *esp, void *arg)
 	iowrite32be(a->input_update_sync_offset, esp->iomem + TILED_APP_INPUT_UPDATE_SYNC_OFFSET_REG);
 	iowrite32be(a->output_spin_sync_offset, esp->iomem + TILED_APP_OUTPUT_SPIN_SYNC_OFFSET_REG);
 	iowrite32be(a->input_spin_sync_offset, esp->iomem + TILED_APP_INPUT_SPIN_SYNC_OFFSET_REG);
+
+	iowrite32be(a->ping_pong_en, esp->iomem + TILED_APP_PING_PONG_EN_REG);
+	iowrite32be(a->compute_over_data, esp->iomem + TILED_APP_COMPUTE_OVER_DATA_REG);
+	iowrite32be(a->compute_iters, esp->iomem + TILED_APP_COMPUTE_ITERS_REG);
 
 	// printf("In %s func %s line %d Setting spandex reg: %x\n",  __FILE__, __func__, __LINE__, a->spandex_reg);
 	iowrite32be(a->spandex_reg, esp->iomem + SPANDEX_REG);

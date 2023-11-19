@@ -19,24 +19,34 @@
 #define PLM_OUT_WORD 1024
 #define PLM_IN_WORD 1024
 
+
 class tiled_app : public esp_accelerator_3P<DMA_WIDTH>
 {
 public:
+    void asi_controller();
     // Constructor
     SC_HAS_PROCESS(tiled_app);
     tiled_app(const sc_module_name& name)
     : esp_accelerator_3P<DMA_WIDTH>(name)
         , cfg("config")
-        , load_sync_done("load_sync_done")
-        , store_sync_done("load_store_cfg_done")
+        , load_done("load_done")
+        , store_done("store_done")
+        , compute_done("compute_done")
         , load_next_tile("load_next_tile")
     {
         // Signal binding
         cfg.bind_with(*this);
-	    load_sync_done.bind_with<DMA_WIDTH>(*this);
-	    store_sync_done.bind_with<DMA_WIDTH>(*this);
+	    load_done.bind_with<DMA_WIDTH>(*this);
+	    store_done.bind_with<DMA_WIDTH>(*this);
+	    compute_done.bind_with<DMA_WIDTH>(*this);
 	    load_next_tile.bind_with<DMA_WIDTH>(*this);
 
+
+        SC_CTHREAD(asi_controller, this->clk.pos());
+        this->reset_signal_is(this->rst, false);
+
+        HLS_PRESERVE_SIGNAL(compute_state_dbg);
+        HLS_PRESERVE_SIGNAL(asi_state_dbg);
         HLS_PRESERVE_SIGNAL(load_iter_dbg);
         HLS_PRESERVE_SIGNAL(store_iter_dbg);
         HLS_PRESERVE_SIGNAL(load_state_dbg);
@@ -45,19 +55,14 @@ public:
         HLS_PRESERVE_SIGNAL(store_unit_sp_read_dbg);
         // Map arrays to memories
         /* <<--plm-bind-->> */
-        //HLS_MAP_plm(plm, PLM_OUT_NAME);
         HLS_MAP_plm(plm_in_pong, PLM_OUT_NAME);
         HLS_MAP_plm(plm_in_ping, PLM_OUT_NAME);
-        // HLS_MAP_plm(plm_in_pong, PLM_IN_NAME);
-        // HLS_MAP_plm(plm_in_ping, PLM_IN_NAME);
-        // HLS_MAP_plm(plm_out_pong, PLM_OUT_NAME);
-        // HLS_MAP_plm(plm_out_ping, PLM_OUT_NAME);
-        // HLS_MAP_plm(plm_in_pong, PLM_IN_NAME);
-        // HLS_MAP_plm(plm_in_ping, PLM_IN_NAME);
     }
 
     // Processes
 
+    sc_signal< sc_int<64> > asi_state_dbg;
+    sc_signal< sc_int<64> > compute_state_dbg;
     sc_signal< sc_int<64> > load_iter_dbg;
     sc_signal< sc_int<64> > store_iter_dbg;
     sc_signal< sc_int<64> > load_state_dbg;
@@ -77,17 +82,27 @@ public:
     esp_config_proc cfg;
 
 
+    sc_int<32> load_state;
+    sc_int<32> store_state;
+
+    sc_int<32> last_task;
+
     // Custom handshakes
     // handshake_t load_store_cfg_done;
-    handshake_t load_sync_done;
-    handshake_t store_sync_done;
+
+    handshake_t compute_done;
+    handshake_t load_done;
+    handshake_t store_done;
     handshake_t load_next_tile;
     // Functions
     
-    inline void load_sync_done_req();
-    inline void load_sync_done_ack();
-    inline void store_sync_done_req();
-    inline void store_sync_done_ack();
+    inline void compute_done_req();
+    inline void compute_done_ack();
+
+    inline void load_done_req();
+    inline void load_done_ack();
+    inline void store_done_req();
+    inline void store_done_ack();
     inline void load_next_tile_req(); 
     inline void load_next_tile_ack();
 

@@ -32,6 +32,9 @@ struct tiled_app_stratus_access {
 	unsigned output_update_sync_offset;
 	unsigned input_tile_start_offset;
 	unsigned output_tile_start_offset;
+	unsigned compute_over_data;
+	unsigned compute_iters;
+	unsigned ping_pong_en;
 	unsigned spandex_reg;
 };
 

@@ -19,6 +19,9 @@ public:
     conf_info_t()
     {
         /* <<--ctor-->> */
+        this->ping_pong_en = 0;
+        this->compute_over_data = 0;
+        this->compute_iters = 0;
         this->output_tile_start_offset = 0;
         this->input_tile_start_offset  = 0;
         this->output_update_sync_offset  = 0;
@@ -32,6 +35,9 @@ public:
 
     conf_info_t(
         /* <<--ctor-args-->> */
+        int32_t ping_pong_en,
+        int32_t compute_over_data,
+        int32_t compute_iters,
         int32_t output_tile_start_offset,
         int32_t input_tile_start_offset ,
         int32_t output_update_sync_offset,
@@ -44,6 +50,9 @@ public:
         )
     {
         /* <<--ctor-custom-->> */
+        this->ping_pong_en = ping_pong_en;
+        this->compute_over_data = compute_over_data;
+        this->compute_iters = compute_iters;
         this->output_tile_start_offset = output_tile_start_offset;
         this->input_tile_start_offset  = input_tile_start_offset ;
         this->output_update_sync_offset = output_update_sync_offset;
@@ -59,6 +68,9 @@ public:
     inline bool operator==(const conf_info_t &rhs) const
     {
         /* <<--eq-->> */
+        if(ping_pong_en != rhs.ping_pong_en) return false;
+        if (compute_over_data != rhs.compute_over_data) return false;
+        if (compute_iters != rhs.compute_iters) return false;
         if (output_tile_start_offset != rhs.output_tile_start_offset ) return false;
         if (input_tile_start_offset  != rhs.input_tile_start_offset  ) return false;       
         if (output_update_sync_offset!= rhs.output_update_sync_offset) return false;
@@ -75,6 +87,9 @@ public:
     inline conf_info_t& operator=(const conf_info_t& other)
     {
         /* <<--assign-->> */
+        ping_pong_en = other.ping_pong_en;
+        compute_over_data = other.compute_over_data;
+        compute_iters = other.compute_iters;
         output_tile_start_offset = other.output_tile_start_offset;
         input_tile_start_offset  = other.input_tile_start_offset ;
         output_update_sync_offset   = other.output_update_sync_offset;
@@ -96,6 +111,9 @@ public:
     {
         os << "{";
         /* <<--print-->> */
+        os << "ping_pong_en = "<< conf_info.ping_pong_en;
+        os << "compute_over_data = " << conf_info.compute_over_data;
+        os << "compute_iters = " << conf_info.compute_iters ;
         os << "output_tile_start_offset = " << conf_info.output_tile_start_offset;
         os << "input_tile_start_offset = " << conf_info.input_tile_start_offset ;
         os << "output_update_sync_offset = " << conf_info.output_update_sync_offset<< ", ";
@@ -110,6 +128,9 @@ public:
     }
 
         /* <<--params-->> */
+        int32_t ping_pong_en;
+        int32_t compute_over_data;
+        int32_t compute_iters;
         int32_t output_tile_start_offset;
         int32_t input_tile_start_offset;
         int32_t output_update_sync_offset;

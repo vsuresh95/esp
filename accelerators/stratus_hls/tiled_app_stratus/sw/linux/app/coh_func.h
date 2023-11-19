@@ -1,10 +1,11 @@
 ///////////////////////////////////////////////////////////////
 // Helper unions
 ///////////////////////////////////////////////////////////////
+#ifndef __COH_FUNC__
+#define __COH_FUNC__
 
-
-#define ESP
-#define COH_MODE 1
+// #define ESP
+#define COH_MODE 2
 
 
 typedef union
@@ -62,8 +63,6 @@ const char print_coh[] = "Baseline MESI";
 
 #else
 //SPANDEX COHERENCE PROTOCOLS
-//BM
-// spandex_config_t spandex_config;
 unsigned coherence = ACC_COH_FULL;
 #if (COH_MODE == 3)
 // Owner Prediction
@@ -90,4 +89,8 @@ const char print_coh[] = "Baseline Spandex (ReqV)";
 spandex_config_t spandex_config= {.spandex_reg = 0};
 const char print_coh[] = "Baseline Spandex";
 #endif
+#endif
+
+
+
 #endif
