@@ -23,7 +23,7 @@ typedef float native_t;
 	#define COH_MODE 2
 #else
 	#define IS_ESP 1
-	#define COH_MODE 1
+	#define COH_MODE 0
 #endif
 
 #include "coh_func.h"
@@ -40,7 +40,7 @@ static unsigned DMA_WORD_PER_BEAT(unsigned _st)
 #define DEV_NAME "sld,audio_fft_stratus"
 
 /* <<--params-->> */
-const int32_t logn_samples = 6;
+const int32_t logn_samples = 14;
 const int32_t num_samples = (1 << logn_samples);
 const int32_t do_inverse = 0;
 const int32_t do_shift = 0;
@@ -110,7 +110,7 @@ static inline uint64_t end_counter() {
 	return (t_end - t_start);
 }
 
-static int validate_buf(token_t *out, float *gold)
+int validate_buf(token_t *out, float *gold)
 {
 	int j;
 	unsigned errors = 0;
@@ -122,13 +122,15 @@ static int validate_buf(token_t *out, float *gold)
 	start_counter();
 	for (j = 0; j < len; j+=2, src+=8) {
         out_data.value_64 = read_mem_reqodata(src);
+		if (fx2float(out_data.value_32_1, FX_IL) == 0x11223344) errors++;
+		if (fx2float(out_data.value_32_2, FX_IL) == 0x11223344) errors++;
 	}
 	t_acc_output += end_counter();
 
 	return errors;
 }
 
-static void sw_run(float *gold)
+void sw_run_1(float *gold)
 {
 	int j;
 	unsigned len = 2 * num_samples;
@@ -145,9 +147,7 @@ static void sw_run(float *gold)
 	t_sw_input += end_counter();
 
 	// Compute golden output
-	start_counter();
 	fft2_comp(gold, 1, num_samples, logn_samples, do_inverse, do_shift);
-	t_sw += end_counter();
 
 	start_counter();
 	for (j = 0; j < len; j+=2, src+=8) {
@@ -156,7 +156,15 @@ static void sw_run(float *gold)
 	t_sw_output += end_counter();
 }
 
-static void init_buf(token_t *in, float *gold)
+void sw_run(float *gold)
+{
+	// Compute golden output
+	start_counter();
+	fft2_comp(gold, 1, num_samples, logn_samples, do_inverse, do_shift);
+	t_sw += end_counter();
+}
+
+void init_buf(token_t *in, float *gold)
 {
 	int j;
 	unsigned len = 2 * num_samples;
@@ -166,8 +174,8 @@ static void init_buf(token_t *in, float *gold)
 
 	start_counter();
 	for (j = 0; j < len; j+=2, src+=8) {
-		in_data.value_32_1 = j % 100;
-		in_data.value_32_2 = j % 100;
+		in_data.value_32_1 = float2fx((native_t) (j % 100), FX_IL);
+		in_data.value_32_2 = float2fx((native_t) (j % 100), FX_IL);
         write_mem_wtfwd(src, in_data.value_64);
 	}
 	t_acc_input += end_counter();
@@ -188,7 +196,7 @@ int main(int argc, char * argv[])
 	unsigned errors = 0;
 	unsigned coherence;
     const float ERROR_COUNT_TH = 0.001;
-	unsigned len = 2 * num_samples;
+	unsigned len = num_samples;
 
 	printf("logn %u nsmp %u nfft %u inv %u shft %u len %u\n", logn_samples, num_samples, 1, do_inverse, do_shift, len);
 	if (DMA_WORD_PER_BEAT(sizeof(token_t)) == 0) {
@@ -246,15 +254,17 @@ int main(int argc, char * argv[])
 		for (i = 0; i < NCHUNK(mem_size); i++)
 			ptable[i] = (unsigned *) &mem[i * (CHUNK_SIZE / sizeof(token_t))];
 
-		for (i = 0; i < ITERATIONS; i++)
+		sw_run_1(gold);
+
+		for (i = 0; i < ITERATIONS/10; i++)
 		{
 			sw_run(gold);
 		}
 
+		init_buf(mem, gold);
+
 		for (i = 0; i < ITERATIONS; i++)
 		{
-        	init_buf(mem, gold);
-
 			/* TODO: Restore full test once ESP caches are integrated */
 			coherence = ACC_COH_FULL;
 
@@ -300,18 +310,18 @@ int main(int argc, char * argv[])
 			}
 			iowrite32(dev, CMD_REG, 0x0);
 			t_acc += end_counter();
-
-			/* Validation */
-			errors = validate_buf(&mem[out_offset], gold);
 		}
+
+		/* Validation */
+		errors = validate_buf(&mem[out_offset], gold);
 
 		aligned_free(ptable);
 		aligned_free(mem);
 		aligned_free(gold);
 
-		printf("  Software Input = %lu\n", t_sw_input/ITERATIONS);
-		printf("  Software = %lu\n", t_sw/ITERATIONS);
-		printf("  Software Output = %lu\n", t_sw_output/ITERATIONS);
+		printf("  Software Input = %lu\n", t_sw_input/(ITERATIONS/10));
+		printf("  Software = %lu\n", t_sw/(ITERATIONS/10));
+		printf("  Software Output = %lu\n", t_sw_output/(ITERATIONS/10));
 		printf("  Accel Input = %lu\n", t_acc_input/ITERATIONS);
 		printf("  Accel = %lu\n", t_acc/ITERATIONS);
 		printf("  Accel Output = %lu\n", t_acc_output/ITERATIONS);

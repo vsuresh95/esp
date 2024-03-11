@@ -37,15 +37,31 @@ const float ERR_TH = 0.05;
 #define AUDIO_FFT_DO_INVERSE_REG 0x48
 #define AUDIO_FFT_LOGN_SAMPLES_REG 0x44
 #define AUDIO_FFT_DO_SHIFT_REG 0x40
+#define AUDIO_FFT_PROD_VALID_OFFSET 0x4C
+#define AUDIO_FFT_PROD_READY_OFFSET 0x50
+#define AUDIO_FFT_CONS_VALID_OFFSET 0x54
+#define AUDIO_FFT_CONS_READY_OFFSET 0x58
+#define AUDIO_FFT_INPUT_OFFSET 0x5C
+#define AUDIO_FFT_OUTPUT_OFFSET 0x60
 
 #define AUDIO_FIR_DO_INVERSE_REG 0x48
 #define AUDIO_FIR_LOGN_SAMPLES_REG 0x44
 #define AUDIO_FIR_DO_SHIFT_REG 0x40
+#define AUDIO_FIR_PROD_VALID_OFFSET 0x4C
+#define AUDIO_FIR_PROD_READY_OFFSET 0x50
+#define AUDIO_FIR_FLT_PROD_VALID_OFFSET 0x54
+#define AUDIO_FIR_FLT_PROD_READY_OFFSET 0x58
+#define AUDIO_FIR_CONS_VALID_OFFSET 0x5C
+#define AUDIO_FIR_CONS_READY_OFFSET 0x60
+#define AUDIO_FIR_INPUT_OFFSET 0x64
+#define AUDIO_FIR_FLT_INPUT_OFFSET 0x68
+#define AUDIO_FIR_TWD_INPUT_OFFSET 0x6C
+#define AUDIO_FIR_OUTPUT_OFFSET 0x70
 
-#define SLD_FFT2 0x056
+#define SLD_FFT2 0x063
 #define DEV_NAME "sld,audio_fft_stratus"
 
-#define SLD_FIR 0x055
+#define SLD_FIR 0x064
 #define FIR_DEV_NAME "sld,audio_fir_stratus"
 
 ///////////////////////////////////////////////////////////////
@@ -56,12 +72,12 @@ typedef struct {
     float i;
 } cpx_num;
 
-#   define S_MUL(a,b) ( (a)*(b) )
+#define S_MUL(a,b) ( (a)*(b) )
 #define C_MUL(m,a,b) \
     do{ (m).r = (a).r*(b).r - (a).i*(b).i;\
         (m).i = (a).r*(b).i + (a).i*(b).r; }while(0)
-#   define C_FIXDIV(c,div) /* NOOP */
-#   define C_MULBYSCALAR( c, s ) \
+#define C_FIXDIV(c,div) /* NOOP */
+#define C_MULBYSCALAR( c, s ) \
     do{ (c).r *= (s);\
         (c).i *= (s); }while(0)
 
@@ -74,7 +90,7 @@ typedef struct {
         (res).r=(a).r-(b).r;  (res).i=(a).i-(b).i; \
     }while(0)
 
-#  define HALF_OF(x) ((x)*.5)
+#define HALF_OF(x) ((x)*.5)
 
 // Size and parameter defines
 #define SYNC_VAR_SIZE 10
@@ -103,6 +119,7 @@ unsigned in_size;
 unsigned out_size;
 unsigned out_offset;
 unsigned mem_size;
+unsigned acc_len;
 unsigned acc_offset;
 unsigned acc_size;
 unsigned sync_size;
@@ -133,11 +150,21 @@ void init_params()
 	mem_size = (out_offset * sizeof(token_t)) + out_size + (SYNC_VAR_SIZE * sizeof(token_t));
 
     acc_size = mem_size;
-    acc_offset = out_offset + out_len + SYNC_VAR_SIZE;
+    acc_len = SYNC_VAR_SIZE + out_len;
+    acc_offset = out_offset + acc_len;
+
+	// Total size for all accelerators combined:
+	// 0*acc_size - 1*acc_size: FFT Input
+	// 1*acc_size - 2*acc_size: FIR Input
+	// 2*acc_size - 3*acc_size: IFFT Input
+	// 3*acc_size - 4*acc_size: CPU Input
+	// 4*acc_size - 5*acc_size: Unused
+	// 5*acc_size - 7*acc_size: FIR filters
+	// 7*acc_size - 7*acc_size: Twiddle factors
+	// Therefore, NUM_DEVICES+5 = 8.
     mem_size *= NUM_DEVICES+5;
 
     sync_size = SYNC_VAR_SIZE * sizeof(token_t);
-	// printf("ilen %u isize %u o_off %u olen %u osize %u msize %u\n", in_len, out_len, in_size, out_size, out_offset, mem_size);
 }
 
 ///////////////////////////////////////////////////////////////
@@ -306,14 +333,21 @@ int start_fft(struct esp_device *dev, int inverse)
 	iowrite32(dev, PT_SHIFT_REG, CHUNK_SHIFT);
 
 	// Use the following if input and output data are not allocated at the default offsets
-	iowrite32(dev, SRC_OFFSET_REG, 2 * inverse * acc_size);
-	iowrite32(dev, DST_OFFSET_REG, 2 * inverse * acc_size);
+	iowrite32(dev, SRC_OFFSET_REG, 0);
+	iowrite32(dev, DST_OFFSET_REG, 0);
 
 	// Pass accelerator-specific configuration parameters
 	/* <<--regs-config-->> */
 	iowrite32(dev, AUDIO_FFT_LOGN_SAMPLES_REG, logn_samples);
 	iowrite32(dev, AUDIO_FFT_DO_SHIFT_REG, do_shift);
 	iowrite32(dev, AUDIO_FFT_DO_INVERSE_REG, inverse);
+
+	iowrite32(dev, AUDIO_FFT_PROD_VALID_OFFSET, (2 * inverse * acc_len) + VALID_FLAG_OFFSET);
+	iowrite32(dev, AUDIO_FFT_PROD_READY_OFFSET, (2 * inverse * acc_len) + READY_FLAG_OFFSET);
+	iowrite32(dev, AUDIO_FFT_CONS_VALID_OFFSET, (2 * inverse * acc_len) + acc_len + VALID_FLAG_OFFSET);
+	iowrite32(dev, AUDIO_FFT_CONS_READY_OFFSET, (2 * inverse * acc_len) + acc_len + READY_FLAG_OFFSET);
+	iowrite32(dev, AUDIO_FFT_INPUT_OFFSET, (2 * inverse * acc_len) + SYNC_VAR_SIZE);
+	iowrite32(dev, AUDIO_FFT_OUTPUT_OFFSET, (2 * inverse * acc_len) + acc_len + SYNC_VAR_SIZE);
 
 	// Flush (customize coherence model here)
 	esp_flush(coherence);
@@ -352,12 +386,23 @@ int start_fir()
 	iowrite32(fir_dev, PT_SHIFT_REG, CHUNK_SHIFT);
 
 	// Use the following if input and output data are not allocated at the default offsets
-	iowrite32(fir_dev, SRC_OFFSET_REG, acc_size);
-	iowrite32(fir_dev, DST_OFFSET_REG, acc_size);
+	iowrite32(fir_dev, SRC_OFFSET_REG, 0);
+	iowrite32(fir_dev, DST_OFFSET_REG, 0);
 
 	// Pass accelerator-specific configuration parameters
 	/* <<--regs-config-->> */
 	iowrite32(fir_dev, AUDIO_FIR_LOGN_SAMPLES_REG, logn_samples);
+
+	iowrite32(fir_dev, AUDIO_FIR_PROD_VALID_OFFSET, acc_len + VALID_FLAG_OFFSET);
+	iowrite32(fir_dev, AUDIO_FIR_PROD_READY_OFFSET, acc_len + READY_FLAG_OFFSET);
+	iowrite32(fir_dev, AUDIO_FIR_FLT_PROD_VALID_OFFSET, acc_len + FLT_VALID_FLAG_OFFSET);
+	iowrite32(fir_dev, AUDIO_FIR_FLT_PROD_READY_OFFSET, acc_len + FLT_READY_FLAG_OFFSET);
+	iowrite32(fir_dev, AUDIO_FIR_CONS_VALID_OFFSET, (2 * acc_len) + VALID_FLAG_OFFSET);
+	iowrite32(fir_dev, AUDIO_FIR_CONS_READY_OFFSET, (2 * acc_len) + READY_FLAG_OFFSET);
+	iowrite32(fir_dev, AUDIO_FIR_INPUT_OFFSET, acc_len + SYNC_VAR_SIZE);
+	iowrite32(fir_dev, AUDIO_FIR_FLT_INPUT_OFFSET, 5 * acc_len);
+	iowrite32(fir_dev, AUDIO_FIR_TWD_INPUT_OFFSET, 7 * acc_len);
+	iowrite32(fir_dev, AUDIO_FIR_OUTPUT_OFFSET, (2 * acc_len) + SYNC_VAR_SIZE);
 
 	// Flush (customize coherence model here)
 	esp_flush(coherence);

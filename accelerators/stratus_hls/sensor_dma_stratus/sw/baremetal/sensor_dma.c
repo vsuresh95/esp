@@ -98,7 +98,7 @@ uint64_t stop_network_llc[3];
 uint64_t intvl_network_llc[3];
 
 #define ITERATIONS 1000
-// #define ESP
+#define ESP
 #define COH_MODE 0
 /* 3 - Owner Prediction, 2 - Write-through forwarding, 1 - Baseline Spandex (ReqV), 0 - Baseline Spandex (MESI) */
 /* 3 - Non-Coherent DMA, 2 - LLC Coherent DMA, 1 - Coherent DMA, 0 - Fully Coherent MESI */
@@ -223,7 +223,7 @@ int main(int argc, char * argv[])
 
 		// Pass accelerator-specific configuration parameters
 		/* <<--regs-config-->> */
-	    iowrite32(dev, SENSOR_DMA_RD_SP_OFFSET_REG, 2*mem_words);
+	    iowrite32(dev, SENSOR_DMA_RD_SP_OFFSET_REG, 0);
 	    iowrite32(dev, SENSOR_DMA_RD_WR_ENABLE_REG, 0);
 	    iowrite32(dev, SENSOR_DMA_RD_SIZE_REG, mem_words);
 	    iowrite32(dev, SENSOR_DMA_SRC_OFFSET_REG, 0);
@@ -239,7 +239,7 @@ int main(int argc, char * argv[])
 
       	start_write = get_counter();
 
-    	for (j = 0; j < mem_words; j+=2)
+    	for (j = 0; j < mem_words; j++)
     	{
 			asm volatile (
 				"mv t0, %0;"
@@ -250,7 +250,7 @@ int main(int argc, char * argv[])
 				: "t0", "t1", "memory"
 			);
 
-			dst += 16;
+			dst += 8;
     	}
 
       	stop_write = get_counter();
@@ -288,7 +288,7 @@ int main(int argc, char * argv[])
 
 	    iowrite32(dev, SENSOR_DMA_RD_WR_ENABLE_REG, 1);
 	    iowrite32(dev, SENSOR_DMA_WR_SIZE_REG, mem_words);
-	    iowrite32(dev, SENSOR_DMA_WR_SP_OFFSET_REG, 2*mem_words);
+	    iowrite32(dev, SENSOR_DMA_WR_SP_OFFSET_REG, 0);
 	    iowrite32(dev, SENSOR_DMA_DST_OFFSET_REG, mem_words);
 
 		// Start accelerators
@@ -314,7 +314,7 @@ int main(int argc, char * argv[])
 
       	start_read = get_counter();
 
- 	   	for (j = 0; j < mem_words; j+=2)
+ 	   	for (j = 0; j < mem_words; j++)
  	   	{
 			asm volatile (
 				"mv t0, %1;"
@@ -325,7 +325,7 @@ int main(int argc, char * argv[])
 				: "t0", "t1", "memory"
 			);
 
-			dst += 16;
+			dst += 8;
  	   	}
 
       	stop_read = get_counter();
@@ -390,7 +390,7 @@ int main(int argc, char * argv[])
 
 		// Pass accelerator-specific configuration parameters
 		/* <<--regs-config-->> */
-	    iowrite32(dev, SENSOR_DMA_RD_SP_OFFSET_REG, 2*mem_words);
+	    iowrite32(dev, SENSOR_DMA_RD_SP_OFFSET_REG, 0);
 	    iowrite32(dev, SENSOR_DMA_RD_WR_ENABLE_REG, 0);
 	    iowrite32(dev, SENSOR_DMA_RD_SIZE_REG, mem_words);
 	    iowrite32(dev, SENSOR_DMA_SRC_OFFSET_REG, 0);
@@ -400,7 +400,7 @@ int main(int argc, char * argv[])
 
       	start_write = get_counter();
 
-    	for (j = 0; j < mem_words; j+=2)
+    	for (j = 0; j < mem_words; j++)
     	{
 			asm volatile (
 				"mv t0, %0;"
@@ -411,7 +411,7 @@ int main(int argc, char * argv[])
 				: "t0", "t1", "memory"
 			);
 
-			dst += 16;
+			dst += 8;
     	}
 
       	stop_write = get_counter();
@@ -440,7 +440,7 @@ int main(int argc, char * argv[])
 
 	    iowrite32(dev, SENSOR_DMA_RD_WR_ENABLE_REG, 1);
 	    iowrite32(dev, SENSOR_DMA_WR_SIZE_REG, mem_words);
-	    iowrite32(dev, SENSOR_DMA_WR_SP_OFFSET_REG, 2*mem_words);
+	    iowrite32(dev, SENSOR_DMA_WR_SP_OFFSET_REG, 0);
 	    iowrite32(dev, SENSOR_DMA_DST_OFFSET_REG, mem_words);
 
 		// Start accelerators
@@ -466,7 +466,7 @@ int main(int argc, char * argv[])
 
       	start_read = get_counter();
 
- 	   	for (j = 0; j < mem_words; j+=2)
+ 	   	for (j = 0; j < mem_words; j++)
  	   	{
 			asm volatile (
 				"mv t0, %1;"
@@ -477,7 +477,7 @@ int main(int argc, char * argv[])
 				: "t0", "t1", "memory"
 			);
 
-			dst += 16;
+			dst += 8;
  	   	}
 
       	stop_read = get_counter();
@@ -527,7 +527,7 @@ int main(int argc, char * argv[])
 
 		// Pass accelerator-specific configuration parameters
 		/* <<--regs-config-->> */
-	    iowrite32(dev, SENSOR_DMA_RD_SP_OFFSET_REG, 2*mem_words);
+	    iowrite32(dev, SENSOR_DMA_RD_SP_OFFSET_REG, 0);
 	    iowrite32(dev, SENSOR_DMA_RD_WR_ENABLE_REG, 0);
 	    iowrite32(dev, SENSOR_DMA_RD_SIZE_REG, mem_words);
 	    iowrite32(dev, SENSOR_DMA_SRC_OFFSET_REG, 0);
@@ -537,7 +537,7 @@ int main(int argc, char * argv[])
 
       	start_write = get_counter();
 
-    	for (j = 0; j < mem_words; j+=2)
+    	for (j = 0; j < mem_words; j++)
     	{
 			asm volatile (
 				"mv t0, %0;"
@@ -548,7 +548,7 @@ int main(int argc, char * argv[])
 				: "t0", "t1", "memory"
 			);
 
-			dst += 16;
+			dst += 8;
     	}
 
       	stop_write = get_counter();
@@ -577,7 +577,7 @@ int main(int argc, char * argv[])
 
 	    iowrite32(dev, SENSOR_DMA_RD_WR_ENABLE_REG, 1);
 	    iowrite32(dev, SENSOR_DMA_WR_SIZE_REG, mem_words);
-	    iowrite32(dev, SENSOR_DMA_WR_SP_OFFSET_REG, 2*mem_words);
+	    iowrite32(dev, SENSOR_DMA_WR_SP_OFFSET_REG, 0);
 	    iowrite32(dev, SENSOR_DMA_DST_OFFSET_REG, mem_words);
 
 		// Start accelerators
@@ -605,7 +605,7 @@ int main(int argc, char * argv[])
 
       	start_read = get_counter();
 
- 	   	for (j = 0; j < mem_words; j+=2)
+ 	   	for (j = 0; j < mem_words; j++)
  	   	{
 			asm volatile (
 				"mv t0, %1;"
@@ -616,7 +616,7 @@ int main(int argc, char * argv[])
 				: "t0", "t1", "memory"
 			);
 
-			dst += 16;
+			dst += 8;
  	   	}
 
       	stop_read = get_counter();
@@ -664,7 +664,7 @@ int main(int argc, char * argv[])
 
 		// Pass accelerator-specific configuration parameters
 		/* <<--regs-config-->> */
-	    iowrite32(dev, SENSOR_DMA_RD_SP_OFFSET_REG, 2*mem_words);
+	    iowrite32(dev, SENSOR_DMA_RD_SP_OFFSET_REG, 0);
 	    iowrite32(dev, SENSOR_DMA_RD_WR_ENABLE_REG, 0);
 	    iowrite32(dev, SENSOR_DMA_RD_SIZE_REG, mem_words);
 	    iowrite32(dev, SENSOR_DMA_SRC_OFFSET_REG, 0);
@@ -674,7 +674,7 @@ int main(int argc, char * argv[])
 
       	start_write = get_counter();
 
-    	for (j = 0; j < mem_words; j+=2)
+    	for (j = 0; j < mem_words; j++)
     	{
 			asm volatile (
 				"mv t0, %0;"
@@ -685,7 +685,7 @@ int main(int argc, char * argv[])
 				: "t0", "t1", "memory"
 			);
 
-			dst += 16;
+			dst += 8;
     	}
 
       	stop_write = get_counter();
@@ -714,7 +714,7 @@ int main(int argc, char * argv[])
 
 	    iowrite32(dev, SENSOR_DMA_RD_WR_ENABLE_REG, 1);
 	    iowrite32(dev, SENSOR_DMA_WR_SIZE_REG, mem_words);
-	    iowrite32(dev, SENSOR_DMA_WR_SP_OFFSET_REG, 2*mem_words);
+	    iowrite32(dev, SENSOR_DMA_WR_SP_OFFSET_REG, 0);
 	    iowrite32(dev, SENSOR_DMA_DST_OFFSET_REG, mem_words);
 
 		// Start accelerators
@@ -740,7 +740,7 @@ int main(int argc, char * argv[])
 
       	start_read = get_counter();
 
- 	   	for (j = 0; j < mem_words; j+=2)
+ 	   	for (j = 0; j < mem_words; j++)
  	   	{
 			asm volatile (
 				"mv t0, %1;"
@@ -751,7 +751,7 @@ int main(int argc, char * argv[])
 				: "t0", "t1", "memory"
 			);
 
-			dst += 16;
+			dst += 8;
  	   	}
 
       	stop_read = get_counter();
@@ -797,7 +797,7 @@ int main(int argc, char * argv[])
 
 		// Pass accelerator-specific configuration parameters
 		/* <<--regs-config-->> */
-	    iowrite32(dev, SENSOR_DMA_RD_SP_OFFSET_REG, 2*mem_words);
+	    iowrite32(dev, SENSOR_DMA_RD_SP_OFFSET_REG, 0);
 	    iowrite32(dev, SENSOR_DMA_RD_WR_ENABLE_REG, 0);
 	    iowrite32(dev, SENSOR_DMA_RD_SIZE_REG, mem_words);
 	    iowrite32(dev, SENSOR_DMA_SRC_OFFSET_REG, 0);
@@ -807,7 +807,7 @@ int main(int argc, char * argv[])
 
       	start_write = get_counter();
 
-    	for (j = 0; j < mem_words; j+=2)
+    	for (j = 0; j < mem_words; j++)
     	{
 			asm volatile (
 				"mv t0, %0;"
@@ -818,7 +818,7 @@ int main(int argc, char * argv[])
 				: "t0", "t1", "memory"
 			);
 
-			dst += 16;
+			dst += 8;
     	}
 
 		esp_flush(coherence);
@@ -849,7 +849,7 @@ int main(int argc, char * argv[])
 
 	    iowrite32(dev, SENSOR_DMA_RD_WR_ENABLE_REG, 1);
 	    iowrite32(dev, SENSOR_DMA_WR_SIZE_REG, mem_words);
-	    iowrite32(dev, SENSOR_DMA_WR_SP_OFFSET_REG, 2*mem_words);
+	    iowrite32(dev, SENSOR_DMA_WR_SP_OFFSET_REG, 0);
 	    iowrite32(dev, SENSOR_DMA_DST_OFFSET_REG, mem_words);
 
 		// Start accelerators
@@ -875,7 +875,7 @@ int main(int argc, char * argv[])
 
       	start_read = get_counter();
 
- 	   	for (j = 0; j < mem_words; j+=2)
+ 	   	for (j = 0; j < mem_words; j++)
  	   	{
 			asm volatile (
 				"mv t0, %1;"
@@ -886,7 +886,7 @@ int main(int argc, char * argv[])
 				: "t0", "t1", "memory"
 			);
 
-			dst += 16;
+			dst += 8;
  	   	}
 
       	stop_read = get_counter();
@@ -930,7 +930,7 @@ int main(int argc, char * argv[])
 
 		// Pass accelerator-specific configuration parameters
 		/* <<--regs-config-->> */
-	    iowrite32(dev, SENSOR_DMA_RD_SP_OFFSET_REG, 2*mem_words);
+	    iowrite32(dev, SENSOR_DMA_RD_SP_OFFSET_REG, 0);
 	    iowrite32(dev, SENSOR_DMA_RD_WR_ENABLE_REG, 0);
 	    iowrite32(dev, SENSOR_DMA_RD_SIZE_REG, mem_words);
 	    iowrite32(dev, SENSOR_DMA_SRC_OFFSET_REG, 0);
@@ -940,7 +940,7 @@ int main(int argc, char * argv[])
 
       	start_write = get_counter();
 
-    	for (j = 0; j < mem_words; j+=2)
+    	for (j = 0; j < mem_words; j++)
     	{
 			asm volatile (
 				"mv t0, %0;"
@@ -951,7 +951,7 @@ int main(int argc, char * argv[])
 				: "t0", "t1", "memory"
 			);
 
-			dst += 16;
+			dst += 8;
     	}
 
 		esp_flush(coherence);
@@ -982,7 +982,7 @@ int main(int argc, char * argv[])
 
 	    iowrite32(dev, SENSOR_DMA_RD_WR_ENABLE_REG, 1);
 	    iowrite32(dev, SENSOR_DMA_WR_SIZE_REG, mem_words);
-	    iowrite32(dev, SENSOR_DMA_WR_SP_OFFSET_REG, 2*mem_words);
+	    iowrite32(dev, SENSOR_DMA_WR_SP_OFFSET_REG, 0);
 	    iowrite32(dev, SENSOR_DMA_DST_OFFSET_REG, mem_words);
 
 		// Start accelerators
@@ -1008,7 +1008,7 @@ int main(int argc, char * argv[])
 
       	start_read = get_counter();
 
- 	   	for (j = 0; j < mem_words; j+=2)
+ 	   	for (j = 0; j < mem_words; j++)
  	   	{
 			asm volatile (
 				"mv t0, %1;"
@@ -1019,7 +1019,7 @@ int main(int argc, char * argv[])
 				: "t0", "t1", "memory"
 			);
 
-			dst += 16;
+			dst += 8;
  	   	}
 
       	stop_read = get_counter();
@@ -1063,7 +1063,7 @@ int main(int argc, char * argv[])
 
 		// Pass accelerator-specific configuration parameters
 		/* <<--regs-config-->> */
-	    iowrite32(dev, SENSOR_DMA_RD_SP_OFFSET_REG, 2*mem_words);
+	    iowrite32(dev, SENSOR_DMA_RD_SP_OFFSET_REG, 0);
 	    iowrite32(dev, SENSOR_DMA_RD_WR_ENABLE_REG, 0);
 	    iowrite32(dev, SENSOR_DMA_RD_SIZE_REG, mem_words);
 	    iowrite32(dev, SENSOR_DMA_SRC_OFFSET_REG, 0);
@@ -1073,7 +1073,7 @@ int main(int argc, char * argv[])
 
       	start_write = get_counter();
 
-    	for (j = 0; j < mem_words; j+=2)
+    	for (j = 0; j < mem_words; j++)
     	{
 			asm volatile (
 				"mv t0, %0;"
@@ -1084,7 +1084,7 @@ int main(int argc, char * argv[])
 				: "t0", "t1", "memory"
 			);
 
-			dst += 16;
+			dst += 8;
     	}
 
       	stop_write = get_counter();
@@ -1113,7 +1113,7 @@ int main(int argc, char * argv[])
 
 	    iowrite32(dev, SENSOR_DMA_RD_WR_ENABLE_REG, 1);
 	    iowrite32(dev, SENSOR_DMA_WR_SIZE_REG, mem_words);
-	    iowrite32(dev, SENSOR_DMA_WR_SP_OFFSET_REG, 2*mem_words);
+	    iowrite32(dev, SENSOR_DMA_WR_SP_OFFSET_REG, 0);
 	    iowrite32(dev, SENSOR_DMA_DST_OFFSET_REG, mem_words);
 
 		// Start accelerators
@@ -1139,7 +1139,7 @@ int main(int argc, char * argv[])
 
       	start_read = get_counter();
 
- 	   	for (j = 0; j < mem_words; j+=2)
+ 	   	for (j = 0; j < mem_words; j++)
  	   	{
 			asm volatile (
 				"mv t0, %1;"
@@ -1150,7 +1150,7 @@ int main(int argc, char * argv[])
 				: "t0", "t1", "memory"
 			);
 
-			dst += 16;
+			dst += 8;
  	   	}
 
       	stop_read = get_counter();
@@ -1194,7 +1194,7 @@ int main(int argc, char * argv[])
 
 		// Pass accelerator-specific configuration parameters
 		/* <<--regs-config-->> */
-	    iowrite32(dev, SENSOR_DMA_RD_SP_OFFSET_REG, 2*mem_words);
+	    iowrite32(dev, SENSOR_DMA_RD_SP_OFFSET_REG, 0);
 	    iowrite32(dev, SENSOR_DMA_RD_WR_ENABLE_REG, 0);
 	    iowrite32(dev, SENSOR_DMA_RD_SIZE_REG, mem_words);
 	    iowrite32(dev, SENSOR_DMA_SRC_OFFSET_REG, 0);
@@ -1204,7 +1204,7 @@ int main(int argc, char * argv[])
 
       	start_write = get_counter();
 
-    	for (j = 0; j < mem_words; j+=2)
+    	for (j = 0; j < mem_words; j++)
     	{
 			asm volatile (
 				"mv t0, %0;"
@@ -1215,7 +1215,7 @@ int main(int argc, char * argv[])
 				: "t0", "t1", "memory"
 			);
 
-			dst += 16;
+			dst += 8;
     	}
 
       	stop_write = get_counter();
@@ -1244,7 +1244,7 @@ int main(int argc, char * argv[])
 
 	    iowrite32(dev, SENSOR_DMA_RD_WR_ENABLE_REG, 1);
 	    iowrite32(dev, SENSOR_DMA_WR_SIZE_REG, mem_words);
-	    iowrite32(dev, SENSOR_DMA_WR_SP_OFFSET_REG, 2*mem_words);
+	    iowrite32(dev, SENSOR_DMA_WR_SP_OFFSET_REG, 0);
 	    iowrite32(dev, SENSOR_DMA_DST_OFFSET_REG, mem_words);
 
 		// Start accelerators
@@ -1270,7 +1270,7 @@ int main(int argc, char * argv[])
 
       	start_read = get_counter();
 
- 	   	for (j = 0; j < mem_words; j+=2)
+ 	   	for (j = 0; j < mem_words; j++)
  	   	{
 			asm volatile (
 				"mv t0, %1;"
@@ -1281,7 +1281,7 @@ int main(int argc, char * argv[])
 				: "t0", "t1", "memory"
 			);
 
-			dst += 16;
+			dst += 8;
  	   	}
 
       	stop_read = get_counter();

@@ -14,7 +14,7 @@ typedef float native_t;
 
 /* <<--params-def-->> */
 #define DO_INVERSE 0
-#define LOGN_SAMPLES 12
+#define LOGN_SAMPLES 14
 #define DO_SHIFT 0
 
 /* <<--params-->> */
