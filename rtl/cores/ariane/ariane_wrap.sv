@@ -310,7 +310,9 @@ module ariane_wrap
     input logic 			pready,
     input logic 			pslverr,
     // fence indication to l2
-    output logic [1:0]			fence_l2,
+    output logic [1:0]          fence_l2_data,
+    output logic          			fence_l2_valid,
+    input logic          			  fence_l2_ready,
     input logic                 flush_l1,
     output logic                flush_done
     );
@@ -426,21 +428,23 @@ module ariane_wrap
        .ArianeCfg ( ArianeSocCfg )
        ) i_ariane
        (
-    .clk_i        ( clk                 ),
-    .rst_ni       ( rstn                ),
-    .boot_addr_i  ( ROMBase             ),
-    .hart_id_i    ( HART_ID             ),
-    .irq_i        ( irq                 ),
-    .ipi_i        ( ipi                 ),
-    .time_irq_i   ( timer_irq           ),
-    .debug_req_i  ( 1'b0                ),
-    .axi_req_o    ( axi_ariane_req      ),
-    .axi_resp_i   ( axi_ariane_resp     ),
-    .ace_req_i    ( ace_req             ),
-    .ace_resp_o   ( ace_resp            ),
-    .fence_l2_o   ( fence_l2            ),
-    .flush_l1_i   ( flush_l1            ),
-    .flush_done_o ( flush_done          )
+    .clk_i          ( clk                 ),
+    .rst_ni         ( rstn                ),
+    .boot_addr_i    ( ROMBase             ),
+    .hart_id_i      ( HART_ID             ),
+    .irq_i          ( irq                 ),
+    .ipi_i          ( ipi                 ),
+    .time_irq_i     ( timer_irq           ),
+    .debug_req_i    ( 1'b0                ),
+    .axi_req_o      ( axi_ariane_req      ),
+    .axi_resp_i     ( axi_ariane_resp     ),
+    .ace_req_i      ( ace_req             ),
+    .ace_resp_o     ( ace_resp            ),
+    .fence_l2_data  ( fence_l2_data       ),
+    .fence_l2_valid ( fence_l2_valid      ),
+    .fence_l2_ready ( fence_l2_ready      ),
+    .flush_l1_i     ( flush_l1            ),
+    .flush_done_o   ( flush_done          )
     );
 
    axi_master_connect i_axi_master_connect_ariane (.axi_req_i(axi_ariane_req), .axi_resp_o(axi_ariane_resp), .master(slave[0]));

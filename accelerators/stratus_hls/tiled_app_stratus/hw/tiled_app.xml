@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sld>
+  <accelerator name="tiled_app" desc="Accelerator TILED_APP" data_size="4" device_id="033" hls_tool="stratus_hls">
+    <param name="rd_wr_enable" desc="rd_wr_enable" />
+    <param name="tile_size" desc="tile_size" />
+    <param name="num_tiles" desc="num_tiles" />
+    <param name="input_spin_sync_offset" desc="input_spin_sync_offset" />
+    <param name="output_spin_sync_offset" desc="output_spin_sync_offset" />
+    <param name="input_update_sync_offset" desc="input_update_sync_offset" />
+    <param name="output_update_sync_offset" desc="output_update_sync_offset" />
+    <param name="input_tile_start_offset" desc="input_tile_start_offset" />
+    <param name="output_tile_start_offset" desc="output_tile_start_offset" />
+    <param name="compute_over_data" desc="compute_over_data" />
+    <param name="compute_iters" desc="compute_iters" />
+    <param name="ping_pong_en" desc="ping_pong_en" />
+  </accelerator>
+</sld>

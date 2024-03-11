@@ -161,7 +161,9 @@ architecture rtl of tile_cpu is
   signal core_idle : std_ulogic;
 
   -- Fence L2
-  signal fence_l2 : std_logic_vector(1 downto 0);
+  signal fence_l2_data  : std_logic_vector(1 downto 0);
+  signal fence_l2_valid : std_ulogic;
+  signal fence_l2_ready : std_ulogic;
 
   -- Queues
   signal coherence_req_wrreq        : std_ulogic;
@@ -704,31 +706,33 @@ begin
         DRAMLength       => X"0000_0000_4000_0000",
         DRAMCachedLength => conv_std_logic_vector(ariane_cacheable_len, 64))  -- TODO: length set automatically to match devtree
       port map (
-        clk         => clk_feedthru,
-        rstn        => cpurstn,
-        HART_ID     => this_cpu_id_lv,
-        irq         => irq,
-        timer_irq   => timer_irq,
-        ipi         => ipi,
-        romi        => mosi(0),
-        romo        => somi(0),
-        drami       => ariane_drami,
-        dramo       => ariane_dramo,
-        clinti      => mosi(2),
-        clinto      => somi(2),
-        slmi        => mosi(3),
-        slmo        => somi(3),
-        slmddri     => mosi(4),
-        slmddro     => somi(4),
-        ace_req     => ace_req,
-        ace_resp    => ace_resp,
-        apbi        => apbi,
-        apbo        => apbo,
-        apb_req     => apb_req,
-        apb_ack     => apb_ack,
-        fence_l2    => fence_l2,
-        flush_l1    => flush_l1,
-        flush_done  => dflush
+        clk             => clk_feedthru,
+        rstn            => cpurstn,
+        HART_ID         => this_cpu_id_lv,
+        irq             => irq,
+        timer_irq       => timer_irq,
+        ipi             => ipi,
+        romi            => mosi(0),
+        romo            => somi(0),
+        drami           => ariane_drami,
+        dramo           => ariane_dramo,
+        clinti          => mosi(2),
+        clinto          => somi(2),
+        slmi            => mosi(3),
+        slmo            => somi(3),
+        slmddri         => mosi(4),
+        slmddro         => somi(4),
+        ace_req         => ace_req,
+        ace_resp        => ace_resp,
+        apbi            => apbi,
+        apbo            => apbo,
+        apb_req         => apb_req,
+        apb_ack         => apb_ack,
+        fence_l2_data   => fence_l2_data,
+        fence_l2_valid  => fence_l2_valid,
+        fence_l2_ready  => fence_l2_ready,
+        flush_l1        => flush_l1,
+        flush_done      => dflush
       );
 
     -- exit() writes to this address right before completing the program
@@ -806,7 +810,9 @@ begin
         coherence_fwd_snd_data_in  => coherence_fwd_snd_data_in,
         coherence_fwd_snd_full     => coherence_fwd_snd_full,
         mon_cache                  => mon_cache_int,
-        fence_l2                   => fence_l2
+        cpu_fence_data              => fence_l2_data,
+        cpu_fence_valid             => fence_l2_valid,
+        cpu_fence_ready             => fence_l2_ready
         );
 
   end generate with_cache_coherence;

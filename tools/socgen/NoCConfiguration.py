@@ -635,7 +635,7 @@ class NoCFrame(Pmw.ScrolledFrame):
        (tot_cpu == 1 or self.soc.cache_en.get()) and \
        (self.soc.llc_sets.get() < 8192 or self.soc.llc_ways.get() < 16 or tot_mem > 1):
       # Spandex beta warning
-      if self.soc.cache_spandex.get() != 0 and self.soc.cache_en.get() == 1:
+      if self.soc.cache_spandex.get() != 0 and self.soc.cache_rtl.get() == 0 and self.soc.cache_en.get() == 1:
         string += "***              Spandex support is still beta                 ***\n"
         string += "    The default HLS configuration is 512x4 L2 and 1024x8 LLC\n"
         if self.soc.TECH != "gf12" and self.soc.TECH != "virtexu" and self.soc.TECH != "virtexup":

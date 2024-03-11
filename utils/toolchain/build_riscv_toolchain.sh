@@ -216,6 +216,8 @@ cd ${ESP_ROOT}
 #Riscv
 echo ""
 git checkout HEAD -- ${ESP_ROOT}/soft/ariane/sysroot/etc/init.d/S65drivers
+git checkout HEAD -- ${ESP_ROOT}/soft/ariane/sysroot/etc/init.d/S40network
+git checkout HEAD -- ${ESP_ROOT}/soft/ariane/sysroot/etc/init.d/S50dropbear
 if [[ "$python_en" -eq 1 ]]; then       # python enable
     echo 'echo root:openesp | chpasswd' >> ${ESP_ROOT}/soft/ariane/sysroot/etc/init.d/S65drivers
     echo "This build comes with Python"

@@ -412,8 +412,12 @@ static int esp_access_ioctl(struct esp_device *esp, void __user *argp)
 		esp->driver->prep_xfer(esp, arg);
 
 	if (access->run) {
-		esp_run(esp);
-		rc = esp_wait(esp);
+        if (access->start_stop) {
+           esp_run(esp);
+        } else {
+           esp_run(esp);
+           rc = esp_wait(esp);
+        }
 	}
 
     if (mutex_lock_interruptible(&esp_status.lock)) {

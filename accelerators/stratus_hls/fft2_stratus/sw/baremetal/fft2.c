@@ -36,7 +36,7 @@ static unsigned DMA_WORD_PER_BEAT(unsigned _st)
 #define DEV_NAME "sld,fft2_stratus"
 
 /* <<--params-->> */
-const int32_t logn_samples = 3;
+const int32_t logn_samples = 14;
 const int32_t num_samples = (1 << logn_samples);
 const int32_t num_ffts = 1;
 const int32_t do_inverse = 0;
@@ -68,24 +68,80 @@ static unsigned mem_size;
 #define FFT2_DO_SHIFT_REG 0x4c
 #define FFT2_SCALE_FACTOR_REG 0x50
 
+#define ITERATIONS 1000
+
+static uint64_t t_start = 0;
+static uint64_t t_end = 0;
+
+uint64_t t_cpu_write;
+uint64_t t_sw;
+uint64_t t_acc;
+uint64_t t_cpu_read;
+
+static inline void start_counter() {
+	asm volatile (
+		"li t0, 0;"
+		"csrr t0, mcycle;"
+		"mv %0, t0"
+		: "=r" (t_start)
+		:
+		: "t0"
+	);
+}
+
+static inline uint64_t end_counter() {
+	asm volatile (
+		"li t0, 0;"
+		"csrr t0, mcycle;"
+		"mv %0, t0"
+		: "=r" (t_end)
+		:
+		: "t0"
+	);
+
+	return (t_end - t_start);
+}
 
 static int validate_buf(token_t *out, float *gold)
 {
 	int j;
 	unsigned errors = 0;
 
+	start_counter();
 	for (j = 0; j < 2 * len; j++) {
 		native_t val = fx2float(out[j], FX_IL);
 		uint32_t ival = *((uint32_t*)&val);
-		printf("  GOLD[%u] = 0x%08x  :  OUT[%u] = 0x%08x\n", j, ((uint32_t*)gold)[j], j, ival);
+		// printf("  GOLD[%u] = 0x%08x  :  OUT[%u] = 0x%08x\n", j, ((uint32_t*)gold)[j], j, ival);
 		if ((fabs(gold[j] - val) / fabs(gold[j])) > ERR_TH)
 			errors++;
 	}
+	t_cpu_read += end_counter();
 
 	//printf("  %u errors\n", errors);
 	return errors;
 }
 
+
+static void sw_run(float *gold)
+{
+	int j;
+	const float LO = -10.0;
+	const float HI = 10.0;
+
+	/* srand((unsigned int) time(NULL)); */
+
+	for (j = 0; j < 2 * len; j++) {
+		float scaling_factor = (float) rand () / (float) RAND_MAX;
+		gold[j] = LO + scaling_factor * (HI - LO);
+		uint32_t ig = ((uint32_t*)gold)[j];
+		// printf("  IN[%u] = 0x%08x\n", j, ig);
+	}
+
+	// Compute golden output
+	start_counter();
+	fft2_comp(gold, num_ffts, num_samples, logn_samples, do_inverse, do_shift);
+	t_sw += end_counter();
+}
 
 static void init_buf(token_t *in, float *gold)
 {
@@ -99,15 +155,19 @@ static void init_buf(token_t *in, float *gold)
 		float scaling_factor = (float) rand () / (float) RAND_MAX;
 		gold[j] = LO + scaling_factor * (HI - LO);
 		uint32_t ig = ((uint32_t*)gold)[j];
-		printf("  IN[%u] = 0x%08x\n", j, ig);
+		// printf("  IN[%u] = 0x%08x\n", j, ig);
 	}
 
 	// convert input to fixed point
+	start_counter();
 	for (j = 0; j < 2 * len; j++)
 		in[j] = float2fx((native_t) gold[j], FX_IL);
+	t_cpu_write += end_counter();
 
 	// Compute golden output
+	start_counter();
 	fft2_comp(gold, num_ffts, num_samples, logn_samples, do_inverse, do_shift);
+	t_sw += end_counter();
 }
 
 
@@ -153,7 +213,13 @@ int main(int argc, char * argv[])
 		return 0;
 	}
 
-	for (n = 0; n < ndev; n++) {
+	t_cpu_write = 0;
+	t_sw = 0;
+	t_acc = 0;
+	t_cpu_read = 0;
+
+	n = 0;
+	{
 
 		printf("**************** %s.%d ****************\n", DEV_NAME, n);
 
@@ -183,19 +249,25 @@ int main(int argc, char * argv[])
 		printf("  ptable = %p\n", ptable);
 		printf("  nchunk = %lu\n", NCHUNK(mem_size));
 
+		// printf("  --------------------\n");
+		// printf("  Generate input...\n");
+
+		init_buf(mem, gold);
+
 #ifndef __riscv
 		for (coherence = ACC_COH_NONE; coherence <= ACC_COH_FULL; coherence++) {
 #else
+		for (i = 0; i < ITERATIONS; i++)
 		{
 			/* TODO: Restore full test once ESP caches are integrated */
-			coherence = ACC_COH_NONE;
+			coherence = ACC_COH_FULL;
 #endif
-			printf("  --------------------\n");
-			printf("  Generate input...\n");
-			init_buf(mem, gold);
+
+			sw_run(gold);
 
 			// Pass common configuration parameters
 
+			start_counter();
 			iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
 			iowrite32(dev, COHERENCE_REG, coherence);
 
@@ -223,7 +295,7 @@ int main(int argc, char * argv[])
 			esp_flush(coherence);
 
 			// Start accelerators
-			printf("  Start...\n");
+			// printf("  Start...\n");
 			iowrite32(dev, CMD_REG, CMD_MASK_START);
 
 			// Wait for completion
@@ -235,20 +307,28 @@ int main(int argc, char * argv[])
 				spin_ct++;
 			}
 			iowrite32(dev, CMD_REG, 0x0);
+			t_acc += end_counter();
 
-			printf("  Done : spin_count = %u\n", spin_ct);
-			printf("  validating...\n");
-
-			/* Validation */
-			errors = validate_buf(&mem[out_offset], gold);
-			if ((float)((float)errors / (2.0 * (float)len)) > ERROR_COUNT_TH)
-				printf("  ... FAIL : %u errors out of %u\n", errors, 2*len);
-			else
-				printf("  ... PASS : %u errors out of %u\n", errors, 2*len);
+			// printf("  Done : spin_count = %u\n", spin_ct);
+			// printf("  validating...\n");
 		}
+
+		/* Validation */
+		errors = validate_buf(&mem[out_offset], gold);
+
 		aligned_free(ptable);
 		aligned_free(mem);
 		aligned_free(gold);
+
+		if ((float)((float)errors / (2.0 * (float)len)) > ERROR_COUNT_TH)
+			printf("  ... FAIL : %u errors out of %u\n", errors, 2*len);
+		else
+			printf("  ... PASS : %u errors out of %u\n", errors, 2*len);
+
+		printf("  CPU write = %lu\n", t_cpu_write/ITERATIONS);
+		printf("  Software = %lu\n", t_sw/ITERATIONS);
+		printf("  Accelerator = %lu\n", t_acc/ITERATIONS);
+		printf("  CPU read = %lu\n", t_cpu_read/ITERATIONS);
 	}
 
 	return 0;
