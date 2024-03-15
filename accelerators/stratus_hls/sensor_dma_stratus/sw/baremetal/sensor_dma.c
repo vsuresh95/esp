@@ -246,25 +246,25 @@ int main(int argc, char * argv[])
 
 		// Pass accelerator-specific configuration parameters
 		/* <<--regs-config-->> */
-	    iowrite32(dev, SENSOR_DMA_RD_SP_OFFSET_REG, 0);
-	    iowrite32(dev, SENSOR_DMA_RD_WR_ENABLE_REG, 0);
-	    iowrite32(dev, SENSOR_DMA_RD_SIZE_REG, mem_words);
-	    iowrite32(dev, SENSOR_DMA_SRC_OFFSET_REG, 0);
-
 		iowrite32(dev, SPANDEX_REG, spandex_config.spandex_reg);
 
   		void* dst = (void*)(mem);
-		int64_t value_64 = 123;
+		int64_t value_64;
 
 		// Start CPU write
 		start_counter();
     	for (j = 0; j < mem_words; j++, dst+=8)
     	{
+			value_64 = j+1;
 			write_mem (dst, value_64);
-
     	}
     	asm volatile ("fence w, w");
       	t_cpu_write += end_counter();
+
+	    iowrite32(dev, SENSOR_DMA_RD_SP_OFFSET_REG, 0);
+	    iowrite32(dev, SENSOR_DMA_RD_WR_ENABLE_REG, 0);
+	    iowrite32(dev, SENSOR_DMA_RD_SIZE_REG, mem_words);
+	    iowrite32(dev, SENSOR_DMA_SRC_OFFSET_REG, 0);
 
 		// Start ACC read
 		start_counter();
