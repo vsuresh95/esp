@@ -79,16 +79,16 @@ package nocpackage is
   constant REQ_O          : noc_msg_type := "00100";  -- Ownership Write (returns the value before update)
   constant REQ_V          : noc_msg_type := "00101";  -- Self-invalidated Read
   constant REQ_WTdata     : noc_msg_type := "00110";  -- Write-through Write (returns the value before update)
+  constant REQ_WTfwd      : noc_msg_type := "00111";
   constant REQ_AMO_SWAP   : noc_msg_type := "00110";
-  constant REQ_AMO_ADD    : noc_msg_type := "00111";
-  constant REQ_AMO_AND    : noc_msg_type := "01000";
-  constant REQ_AMO_OR     : noc_msg_type := "01001";
-  constant REQ_AMO_XOR    : noc_msg_type := "01010";
-  constant REQ_AMO_MAX    : noc_msg_type := "01011";
-  constant REQ_AMO_MAXU   : noc_msg_type := "01100";
-  constant REQ_AMO_MIN    : noc_msg_type := "01101";
-  constant REQ_AMO_MINU   : noc_msg_type := "01110";
-  constant REQ_WTfwd      : noc_msg_type := "01111";
+  constant REQ_AMO_ADD    : noc_msg_type := "01000";
+  constant REQ_AMO_AND    : noc_msg_type := "01001";
+  constant REQ_AMO_OR     : noc_msg_type := "01010";
+  constant REQ_AMO_XOR    : noc_msg_type := "01011";
+  constant REQ_AMO_MAX    : noc_msg_type := "01100";
+  constant REQ_AMO_MAXU   : noc_msg_type := "01101";
+  constant REQ_AMO_MIN    : noc_msg_type := "01110";
+  constant REQ_AMO_MINU   : noc_msg_type := "01111";
   -- Cachable data plane 2 -> forwarded messages
   constant FWD_REQ_S      : noc_msg_type := "00000";
   constant FWD_REQ_Odata  : noc_msg_type := "00001";
