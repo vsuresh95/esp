@@ -215,6 +215,7 @@ package allcaches is
       l2_cpu_req_data_use_owner_pred    : in  std_ulogic;
       l2_cpu_req_data_dcs               : in  std_logic_vector(DCS_WIDTH - 1 downto 0);
       l2_cpu_req_data_pred_cid          : in  std_logic_vector(CACHE_ID_WIDTH - 1 downto 0);
+      l2_cpu_req_data_len               : in  std_logic_vector(ADDR_BITS - 1 downto 0);
       l2_fwd_in_valid                   : in  std_ulogic;
       l2_fwd_in_data_coh_msg            : in  std_logic_vector(MIX_MSG_TYPE_WIDTH - 1 downto 0);
       l2_fwd_in_data_addr               : in  std_logic_vector(ADDR_BITS - OFFSET_BITS - 1 downto 0);

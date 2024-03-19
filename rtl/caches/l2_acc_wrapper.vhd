@@ -117,6 +117,7 @@ architecture rtl of l2_acc_wrapper is
   signal cpu_req_data_use_owner_pred : std_ulogic;
   signal cpu_req_data_dcs       : dcs_t;
   signal cpu_req_data_pred_cid  : cache_id_t;
+  signal cpu_req_data_len       : addr_t;
   signal flush_ready            : std_ulogic;
   signal flush_valid            : std_ulogic;
   signal flush_data             : std_ulogic;
@@ -581,6 +582,7 @@ begin  -- architecture rtl of l2_acc_wrapper
       l2_cpu_req_data_use_owner_pred => cpu_req_data_use_owner_pred,
       l2_cpu_req_data_dcs       => cpu_req_data_dcs,
       l2_cpu_req_data_pred_cid  => cpu_req_data_pred_cid,
+      l2_cpu_req_data_len       => cpu_req_data_len,
       l2_flush_ready            => flush_ready,
       l2_flush_valid            => '0',
       l2_flush_data             => flush_data,
@@ -843,98 +845,295 @@ begin  -- architecture rtl of l2_acc_wrapper
 -------------------------------------------------------------------------------
 -- FSM: Bridge from accelerator wrapper to L2 cache frontend input
 -------------------------------------------------------------------------------
-  fsm_req_acc : process (req_acc_reg, cpu_req_ready,
-                         dma_read, dma_write, dma_length, dma_address,
-                         dma_snd_valid, dma_snd_data, dma_rcv_ready,
-                         rd_rsp_valid, rd_rsp_data_line, pending_fence)
+  acc_bridge_gen: if USE_SPANDEX = 0 generate
+    fsm_req_acc : process (req_acc_reg, cpu_req_ready,
+                           dma_read, dma_write, dma_length, dma_address,
+                           dma_snd_valid, dma_snd_data, dma_rcv_ready,
+                           rd_rsp_valid, rd_rsp_data_line, pending_fence)
 
-    variable reg : req_acc_reg_type;
+      variable reg : req_acc_reg_type;
 
-  begin
+    begin
 
-    -- copy current state into a variable
-    reg := req_acc_reg;
+      -- copy current state into a variable
+      reg := req_acc_reg;
 
-    -- default values of output signals
-    dma_ready <= '0';
-    dma_snd_ready <= '0';
+      -- default values of output signals
+      dma_ready <= '0';
+      dma_snd_ready <= '0';
 
-    dma_rcv_valid <= '0';
-    dma_rcv_data <= (others => '0');
+      dma_rcv_valid <= '0';
+      dma_rcv_data <= (others => '0');
 
-    cpu_req_valid        <= '0';
-    cpu_req_data_cpu_msg <= (others => '0');
-    cpu_req_data_addr    <= (others => '0');
-    cpu_req_data_dcs_en  <= '0';
-    cpu_req_data_use_owner_pred <= '0';
-    cpu_req_data_dcs     <= (others => '0');
-    cpu_req_data_pred_cid <= (others => '0');
-    cpu_req_data_word    <= (others => '0');
+      cpu_req_valid        <= '0';
+      cpu_req_data_cpu_msg <= (others => '0');
+      cpu_req_data_addr    <= (others => '0');
+      cpu_req_data_dcs_en  <= '0';
+      cpu_req_data_use_owner_pred <= '0';
+      cpu_req_data_dcs     <= (others => '0');
+      cpu_req_data_pred_cid <= (others => '0');
+      cpu_req_data_word    <= (others => '0');
 
-    rd_rsp_ready <= '0';
+      rd_rsp_ready <= '0';
 
-    case req_acc_reg.state is
+      case req_acc_reg.state is
 
-      -- IDLE
-      when idle =>
+        -- IDLE
+        when idle =>
 
-        if cpu_req_ready = '1' and pending_fence = '0' then
+          if cpu_req_ready = '1' and pending_fence = '0' then
 
-          dma_ready <= '1';
+            dma_ready <= '1';
 
-          if dma_read = '1' then
+            if dma_read = '1' then
 
-            cpu_req_valid        <= '1';
-            cpu_req_data_cpu_msg <= CPU_READ;
-            cpu_req_data_addr    <= dma_address;
-            cpu_req_data_dcs_en  <= spandex_conf(0);
-            cpu_req_data_use_owner_pred <= spandex_conf(1);
-            cpu_req_data_dcs     <= spandex_conf(3 downto 2);
-            cpu_req_data_pred_cid <= spandex_conf(7 downto 4);
+              cpu_req_valid        <= '1';
+              cpu_req_data_cpu_msg <= CPU_READ;
+              cpu_req_data_addr    <= dma_address;
+              cpu_req_data_dcs_en  <= spandex_conf(0);
+              cpu_req_data_use_owner_pred <= spandex_conf(1);
+              cpu_req_data_dcs     <= spandex_conf(3 downto 2);
+              cpu_req_data_pred_cid <= spandex_conf(7 downto 4);
 
-            reg.offset := to_integer(unsigned(dma_address(W_OFF_RANGE_HI downto W_OFF_RANGE_LO)));
+              reg.offset := to_integer(unsigned(dma_address(W_OFF_RANGE_HI downto W_OFF_RANGE_LO)));
 
-            if to_integer(unsigned(dma_length)) < (WORDS_PER_LINE - reg.offset) then
-              reg.valid_words_cnt := to_integer(unsigned(dma_length));
-              reg.msw := to_integer(unsigned(dma_length)) + (reg.offset - 1);
-            else
-              reg.valid_words_cnt := WORDS_PER_LINE - reg.offset;
-              reg.msw := WORDS_PER_LINE - 1;
+              if to_integer(unsigned(dma_length)) < (WORDS_PER_LINE - reg.offset) then
+                reg.valid_words_cnt := to_integer(unsigned(dma_length));
+                reg.msw := to_integer(unsigned(dma_length)) + (reg.offset - 1);
+              else
+                reg.valid_words_cnt := WORDS_PER_LINE - reg.offset;
+                reg.msw := WORDS_PER_LINE - 1;
+              end if;
+
+              reg.addr       := dma_address + (reg.valid_words_cnt * BYTES_PER_WORD);
+              reg.length     := dma_length - std_logic_vector(to_unsigned(reg.valid_words_cnt, ADDR_BITS));
+
+              reg.state := wait_rsp;
+
+            elsif dma_write = '1' then
+
+              reg.addr := dma_address;
+
+              reg.state := store;
+
             end if;
-
-            reg.addr       := dma_address + (reg.valid_words_cnt * BYTES_PER_WORD);
-            reg.length     := dma_length - std_logic_vector(to_unsigned(reg.valid_words_cnt, ADDR_BITS));
-
-            reg.state := wait_rsp;
-
-          elsif dma_write = '1' then
-
-            reg.addr := dma_address;
-
-            reg.state := store;
 
           end if;
 
-        end if;
+
+        -- LOAD (wait response and make next request)
+        when wait_rsp =>
+
+          reg.cnt := reg.offset;
+
+          if rd_rsp_valid = '1' then
+
+            if cpu_req_ready = '1' and to_integer(unsigned(reg.length)) /= 0 then
+
+              cpu_req_valid        <= '1';
+              cpu_req_data_cpu_msg <= CPU_READ;
+              cpu_req_data_addr    <= reg.addr;
+              cpu_req_data_dcs_en  <= spandex_conf(0);
+              cpu_req_data_use_owner_pred <= spandex_conf(1);
+              cpu_req_data_dcs     <= spandex_conf(3 downto 2);
+              cpu_req_data_pred_cid <= spandex_conf(7 downto 4);
+
+              reg.line   := rd_rsp_data_line;
+              reg.offset := 0;
+
+              if to_integer(unsigned(reg.length)) < WORDS_PER_LINE then
+                reg.valid_words_cnt := to_integer(unsigned(reg.length));
+              else
+                reg.valid_words_cnt := WORDS_PER_LINE;
+              end if;
+
+              reg.state := load;
+
+              rd_rsp_ready <= '1';
+
+            elsif to_integer(unsigned(reg.length)) = 0 then
+
+              reg.line   := rd_rsp_data_line;
+              reg.offset := 0;
+
+              reg.state := load;
+
+              rd_rsp_ready <= '1';
+
+            end if;
+
+          end if;
 
 
-      -- LOAD (wait response and make next request)
-      when wait_rsp =>
+        -- LOAD (handle response)
+        when load =>
 
-        reg.cnt := reg.offset;
+          dma_rcv_valid <= '1';
 
-        if rd_rsp_valid = '1' then
+          if dma_rcv_ready = '1' then
 
-          if cpu_req_ready = '1' and to_integer(unsigned(reg.length)) /= 0 then
+            dma_rcv_data <= PREAMBLE_BODY &
+                            read_word(reg.line, reg.cnt);
 
-            cpu_req_valid        <= '1';
-            cpu_req_data_cpu_msg <= CPU_READ;
-            cpu_req_data_addr    <= reg.addr;
-            cpu_req_data_dcs_en  <= spandex_conf(0);
-            cpu_req_data_use_owner_pred <= spandex_conf(1);
-            cpu_req_data_dcs     <= spandex_conf(3 downto 2);
-            cpu_req_data_pred_cid <= spandex_conf(7 downto 4);
+            if reg.cnt = reg.msw and to_integer(unsigned(reg.length)) = 0 then
 
+              dma_rcv_data(NOC_FLIT_SIZE - 1 downto NOC_FLIT_SIZE - PREAMBLE_WIDTH) <= PREAMBLE_TAIL;
+
+              reg.state := idle;
+
+            elsif reg.cnt = reg.msw then
+
+              if to_integer(unsigned(reg.length)) < WORDS_PER_LINE then
+                reg.msw := to_integer(unsigned(reg.length)) - 1;
+              else
+                reg.msw := WORDS_PER_LINE - 1;
+              end if;
+
+              reg.addr   := reg.addr + (reg.valid_words_cnt * BYTES_PER_WORD);
+              reg.length := reg.length - reg.valid_words_cnt;
+
+              reg.state := wait_rsp;
+
+            else
+
+              reg.cnt := reg.cnt + 1;
+
+            end if;
+
+          end if;
+
+
+
+        -- STORE
+        when store =>
+
+          if cpu_req_ready = '1' and pending_fence = '0' then
+
+            dma_snd_ready <= '1';
+
+            if dma_snd_valid = '1'  then
+
+              cpu_req_valid        <= '1';
+              cpu_req_data_cpu_msg <= CPU_WRITE;
+              cpu_req_data_addr    <= reg.addr;
+              cpu_req_data_word    <= dma_snd_data(ARCH_BITS - 1 downto 0);
+              cpu_req_data_dcs_en  <= spandex_conf(8);
+              cpu_req_data_use_owner_pred <= spandex_conf(9);
+              cpu_req_data_dcs     <= spandex_conf(11 downto 10);
+              cpu_req_data_pred_cid <= spandex_conf(15 downto 12);
+
+              reg.addr := reg.addr + BYTES_PER_WORD;
+
+              if get_preamble(NOC_FLIT_SIZE, dma_snd_data) = PREAMBLE_TAIL then
+
+                reg.state := idle;
+
+              end if;
+
+            end if;
+
+          end if;
+
+      end case;
+
+      req_acc_reg_next <= reg;
+
+    end process fsm_req_acc;
+  end generate acc_bridge_gen;
+
+  acc_spx_bridge_gen: if USE_SPANDEX = 1 generate
+    fsm_req_acc : process (req_acc_reg, cpu_req_ready,
+                           dma_read, dma_write, dma_length, dma_address,
+                           dma_snd_valid, dma_snd_data, dma_rcv_ready,
+                           rd_rsp_valid, rd_rsp_data_line, pending_fence)
+  
+      variable reg : req_acc_reg_type;
+  
+    begin
+  
+      -- copy current state into a variable
+      reg := req_acc_reg;
+  
+      -- default values of output signals
+      dma_ready <= '0';
+      dma_snd_ready <= '0';
+  
+      dma_rcv_valid <= '0';
+      dma_rcv_data <= (others => '0');
+  
+      cpu_req_valid        <= '0';
+      cpu_req_data_cpu_msg <= (others => '0');
+      cpu_req_data_addr    <= (others => '0');
+      cpu_req_data_dcs_en  <= '0';
+      cpu_req_data_use_owner_pred <= '0';
+      cpu_req_data_dcs     <= (others => '0');
+      cpu_req_data_pred_cid <= (others => '0');
+      cpu_req_data_len <= (others => '0');
+      cpu_req_data_word    <= (others => '0');
+  
+      rd_rsp_ready <= '0';
+  
+      case req_acc_reg.state is
+  
+        -- IDLE
+        when idle =>
+  
+          if cpu_req_ready = '1' and pending_fence = '0' then
+  
+            dma_ready <= '1';
+  
+            if dma_read = '1' then
+  
+              cpu_req_valid        <= '1';
+              cpu_req_data_cpu_msg <= CPU_READ;
+              cpu_req_data_addr    <= dma_address;
+              cpu_req_data_dcs_en  <= spandex_conf(0);
+              cpu_req_data_use_owner_pred <= spandex_conf(1);
+              cpu_req_data_dcs     <= spandex_conf(3 downto 2);
+              cpu_req_data_pred_cid <= spandex_conf(7 downto 4);
+              cpu_req_data_len     <= dma_length;
+  
+              reg.offset := to_integer(unsigned(dma_address(W_OFF_RANGE_HI downto W_OFF_RANGE_LO)));
+  
+              if to_integer(unsigned(dma_length)) < (WORDS_PER_LINE - reg.offset) then
+                reg.valid_words_cnt := to_integer(unsigned(dma_length));
+                reg.msw := to_integer(unsigned(dma_length)) + (reg.offset - 1);
+              else
+                reg.valid_words_cnt := WORDS_PER_LINE - reg.offset;
+                reg.msw := WORDS_PER_LINE - 1;
+              end if;
+  
+              reg.addr       := dma_address + (reg.valid_words_cnt * BYTES_PER_WORD);
+              reg.length     := dma_length - std_logic_vector(to_unsigned(reg.valid_words_cnt, ADDR_BITS));
+  
+              reg.state := wait_rsp;
+  
+            elsif dma_write = '1' then
+  
+              cpu_req_valid        <= '1';
+              cpu_req_data_cpu_msg <= CPU_WRITE;
+              cpu_req_data_addr    <= dma_address;
+              cpu_req_data_dcs_en  <= spandex_conf(0);
+              cpu_req_data_use_owner_pred <= spandex_conf(1);
+              cpu_req_data_dcs     <= spandex_conf(3 downto 2);
+              cpu_req_data_pred_cid <= spandex_conf(7 downto 4);
+              cpu_req_data_len     <= dma_length;
+  
+              reg.addr := dma_address;
+  
+              reg.state := store;
+  
+            end if;
+  
+          end if;
+  
+        -- LOAD (wait for each line response)
+        when wait_rsp =>
+  
+          reg.cnt := reg.offset;
+  
+          if rd_rsp_valid = '1' then
+  
             reg.line   := rd_rsp_data_line;
             reg.offset := 0;
 
@@ -943,99 +1142,86 @@ begin  -- architecture rtl of l2_acc_wrapper
             else
               reg.valid_words_cnt := WORDS_PER_LINE;
             end if;
-
+  
             reg.state := load;
-
+  
             rd_rsp_ready <= '1';
-
-          elsif to_integer(unsigned(reg.length)) = 0 then
-
-            reg.line   := rd_rsp_data_line;
-            reg.offset := 0;
-
-            reg.state := load;
-
-            rd_rsp_ready <= '1';
-
+  
           end if;
-
-        end if;
-
-
-      -- LOAD (handle response)
-      when load =>
-
-        dma_rcv_valid <= '1';
-
-        if dma_rcv_ready = '1' then
-
-          dma_rcv_data <= PREAMBLE_BODY &
-                          read_word(reg.line, reg.cnt);
-
-          if reg.cnt = reg.msw and to_integer(unsigned(reg.length)) = 0 then
-
-            dma_rcv_data(NOC_FLIT_SIZE - 1 downto NOC_FLIT_SIZE - PREAMBLE_WIDTH) <= PREAMBLE_TAIL;
-
-            reg.state := idle;
-
-          elsif reg.cnt = reg.msw then
-
-            if to_integer(unsigned(reg.length)) < WORDS_PER_LINE then
-              reg.msw := to_integer(unsigned(reg.length)) - 1;
-            else
-              reg.msw := WORDS_PER_LINE - 1;
-            end if;
-
-            reg.addr   := reg.addr + (reg.valid_words_cnt * BYTES_PER_WORD);
-            reg.length := reg.length - reg.valid_words_cnt;
-
-            reg.state := wait_rsp;
-
-          else
-
-            reg.cnt := reg.cnt + 1;
-
-          end if;
-
-        end if;
-
-
-
-      -- STORE
-      when store =>
-
-        if cpu_req_ready = '1' and pending_fence = '0' then
-
-          dma_snd_ready <= '1';
-
-          if dma_snd_valid = '1'  then
-
-            cpu_req_valid        <= '1';
-            cpu_req_data_cpu_msg <= CPU_WRITE;
-            cpu_req_data_addr    <= reg.addr;
-            cpu_req_data_word    <= dma_snd_data(ARCH_BITS - 1 downto 0);
-            cpu_req_data_dcs_en  <= spandex_conf(8);
-            cpu_req_data_use_owner_pred <= spandex_conf(9);
-            cpu_req_data_dcs     <= spandex_conf(11 downto 10);
-            cpu_req_data_pred_cid <= spandex_conf(15 downto 12);
-
-            reg.addr := reg.addr + BYTES_PER_WORD;
-
-            if get_preamble(NOC_FLIT_SIZE, dma_snd_data) = PREAMBLE_TAIL then
-
+  
+        -- LOAD (split line response to dma words)
+        when load =>
+  
+          dma_rcv_valid <= '1';
+  
+          if dma_rcv_ready = '1' then
+  
+            dma_rcv_data <= PREAMBLE_BODY & read_word(reg.line, reg.cnt);
+  
+            if reg.cnt = reg.msw and to_integer(unsigned(reg.length)) = 0 then
+  
+              dma_rcv_data(NOC_FLIT_SIZE - 1 downto NOC_FLIT_SIZE - PREAMBLE_WIDTH) <= PREAMBLE_TAIL;
+  
               reg.state := idle;
-
+  
+            elsif reg.cnt = reg.msw then
+  
+              if to_integer(unsigned(reg.length)) < WORDS_PER_LINE then
+                reg.msw := to_integer(unsigned(reg.length)) - 1;
+              else
+                reg.msw := WORDS_PER_LINE - 1;
+              end if;
+  
+              reg.addr   := reg.addr + (reg.valid_words_cnt * BYTES_PER_WORD);
+              reg.length := reg.length - reg.valid_words_cnt;
+  
+              reg.state := wait_rsp;
+  
+            else
+  
+              reg.cnt := reg.cnt + 1;
+  
             end if;
-
+  
           end if;
-
-        end if;
-
-    end case;
-
-    req_acc_reg_next <= reg;
-
-  end process fsm_req_acc;
+  
+        -- STORE
+        when store =>
+  
+          if cpu_req_ready = '1' and pending_fence = '0' then
+  
+            dma_snd_ready <= '1';
+  
+            if dma_snd_valid = '1'  then
+  
+              cpu_req_valid        <= '1';
+              cpu_req_data_cpu_msg <= CPU_WRITE;
+              cpu_req_data_addr    <= reg.addr;
+              cpu_req_data_word    <= dma_snd_data(ARCH_BITS - 1 downto 0);
+              cpu_req_data_dcs_en  <= spandex_conf(8);
+              cpu_req_data_use_owner_pred <= spandex_conf(9);
+              cpu_req_data_dcs     <= spandex_conf(11 downto 10);
+              cpu_req_data_pred_cid <= spandex_conf(15 downto 12);
+              cpu_req_data_len     <= dma_length;
+  
+              reg.addr := reg.addr + BYTES_PER_WORD;
+  
+              if get_preamble(NOC_FLIT_SIZE, dma_snd_data) = PREAMBLE_TAIL then
+  
+                reg.state := idle;
+  
+              end if;
+  
+            end if;
+  
+          end if;
+  
+      end case;
+  
+      req_acc_reg_next <= reg;
+  
+    end process fsm_req_acc;
+  end generate acc_spx_bridge_gen;  
 
 -------------------------------------------------------------------------------
 -- FSM: Requests to NoC
