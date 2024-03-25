@@ -1146,7 +1146,18 @@ begin  -- architecture rtl of l2_acc_wrapper
             reg.state := load;
   
             rd_rsp_ready <= '1';
-  
+
+            -- If DMA is able to receive the input, send a response.
+            -- Else, in the next cycle, you will move to 'load'.
+            if to_integer(unsigned(reg.length)) > 0 and reg.cnt = 0 then
+              dma_rcv_valid <= '1';
+
+              if dma_rcv_ready = '1' then
+                dma_rcv_data <= PREAMBLE_BODY & read_word(rd_rsp_data_line, reg.cnt);
+                reg.cnt := reg.offset + 1;
+              end if;
+
+            end if;
           end if;
   
         -- LOAD (split line response to dma words)
