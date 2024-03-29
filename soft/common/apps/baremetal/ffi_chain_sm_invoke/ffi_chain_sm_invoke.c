@@ -399,6 +399,152 @@ int main(int argc, char * argv[])
 	}
 #endif
 
+// 	// Set all END variables to 1.
+// 	for (unsigned ChainID = 0; ChainID < 3; ChainID++) {
+// 		UpdateSync(ChainID*acc_len + END_FLAG_OFFSET, 1);
+// 	}
+
+// 	// Wait for FFT (consumer) to be ready.
+// 	SpinSync(ConsRdyFlag, 1);
+// 	// Reset flag for next iteration.
+// 	UpdateSync(ConsRdyFlag, 0);
+// 	// Inform FFT (consumer) to start.
+// 	UpdateSync(ConsVldFlag, 1);
+
+// 	// Wait for FIR (consumer) to be ready.
+// 	SpinSync(FltRdyFlag, 1);
+// 	// Reset flag for next iteration.
+// 	UpdateSync(FltRdyFlag, 0);
+// 	// Inform FIR (consumer) to start.
+// 	UpdateSync(FltVldFlag, 1);
+
+// 	// Wait for IFFT (producer) to send output.
+// 	SpinSync(ProdVldFlag, 1);
+// 	// Reset flag for next iteration.
+// 	UpdateSync(ProdVldFlag, 0);
+// 	// Inform IFFT (producer) - ready for next iteration.
+// 	UpdateSync(ProdRdyFlag, 1);
+
+// 	terminate_acc();
+
+// 	// Reset all sync variables to default values.
+// 	for (unsigned ChainID = 0; ChainID < 4; ChainID++) {
+// 		UpdateSync(ChainID*acc_len + VALID_FLAG_OFFSET, 0);
+// 		UpdateSync(ChainID*acc_len + READY_FLAG_OFFSET, 1);
+// 		UpdateSync(ChainID*acc_len + END_FLAG_OFFSET, 0);
+// 	}
+
+// 	UpdateSync(acc_len + FLT_VALID_FLAG_OFFSET, 0);
+// 	UpdateSync(acc_len + FLT_READY_FLAG_OFFSET, 1);
+	
+// 	start_acc();
+
+// #if (IS_PIPELINE == 0)
+// 	///////////////////////////////////////////////////////////////
+// 	// NON PIPELINED VERSION
+// 	///////////////////////////////////////////////////////////////
+// 	IterationsLeft = ITERATIONS;
+
+// 	while (IterationsLeft != 0) {
+// 		start_counter();
+// 		// Wait for FFT (consumer) to be ready.
+// 		SpinSync(ConsRdyFlag, 1);
+// 		// Reset flag for next iteration.
+// 		UpdateSync(ConsRdyFlag, 0);
+// 		// Write input data for FFT.
+// 		init_buf_data(mem, gold);
+
+// 		// Wait for FIR (consumer) to be ready.
+// 		SpinSync(FltRdyFlag, 1);
+// 		// Reset flag for next iteration.
+// 		UpdateSync(FltRdyFlag, 0);
+// 		// // Write input data for FIR filters.
+// 		// init_buf_filters((mem + 5 * acc_offset) /* in_filter */, (int64_t*) fxp_filters /* gold_filter */);
+// 		// Inform FIR (consumer) of filters ready.
+// 		UpdateSync(FltVldFlag, 1);
+// 		// Inform FFT (consumer) to start.
+// 		UpdateSync(ConsVldFlag, 1);
+// 		t_cpu_write += end_counter();
+
+// 		start_counter();
+// 		// Wait for IFFT (producer) to send output.
+// 		SpinSync(ProdVldFlag, 1);
+// 		// Reset flag for next iteration.
+// 		UpdateSync(ProdVldFlag, 0);
+// 		t_acc += end_counter();
+
+// 		start_counter();
+// 		// Read back output from IFFT
+// 		validate_buf(&mem[NUM_DEVICES*acc_offset], (gold + out_len));
+// 		// Inform IFFT (producer) - ready for next iteration.
+// 		UpdateSync(ProdRdyFlag, 1);
+// 		t_cpu_read += end_counter();
+
+// 		IterationsLeft--;
+// 	}
+// #else
+// 	///////////////////////////////////////////////////////////////
+// 	// PIPELINED VERSION
+// 	///////////////////////////////////////////////////////////////
+// 	InputIterationsLeft = ITERATIONS;
+// 	FilterIterationsLeft = ITERATIONS;
+// 	OutputIterationsLeft = ITERATIONS;
+
+// 	// Check if any of the tasks are pending. If yes,
+// 	// check if any of them a ready, based on a simple priority.
+// 	// Once a task is complete, we reduce the number of tasks left
+// 	// for that respective task.
+// 	while (InputIterationsLeft != 0 || FilterIterationsLeft != 0 || OutputIterationsLeft != 0) {
+// 		if (InputIterationsLeft) {
+// 			// Wait for FFT (consumer) to be ready
+// 			if (TestSync(ConsRdyFlag, 1)) {
+// 				UpdateSync(ConsRdyFlag, 0);
+
+// 				// Write input data for FFT
+//         		start_counter();
+// 				init_buf_data(mem, gold);
+// 				t_cpu_write += end_counter();
+
+// 				// Inform FFT (consumer)
+// 				UpdateSync(ConsVldFlag, 1);
+// 				InputIterationsLeft--;
+// 			}
+// 		}
+
+// 		if (FilterIterationsLeft) {
+// 			// Wait for FIR (consumer) to be ready
+// 			if (TestSync(FltRdyFlag, 1)) {
+// 				UpdateSync(FltRdyFlag, 0);
+
+// 				// Write input data for filters
+//         		start_counter();
+// 				// init_buf_filters((mem + 5 * acc_offset) /* in_filter */, (int64_t*) fxp_filters /* gold_filter */);
+// 				t_cpu_write += end_counter();
+
+// 				// Inform FIR (consumer)
+// 				UpdateSync(FltVldFlag, 1);
+// 				FilterIterationsLeft--;
+// 			}
+// 		}
+
+// 		if (OutputIterationsLeft) {
+// 			// Wait for IFFT (producer) to send output
+// 			if (TestSync(ProdVldFlag, 1)) {
+// 				UpdateSync(ProdVldFlag, 0);
+				
+// 				// Read back output
+//         		start_counter();
+// 				validate_buf(&mem[NUM_DEVICES*acc_offset], (gold + out_len));
+// 				t_cpu_read += end_counter();
+
+// 				// Inform IFFT (producer)
+// 				UpdateSync(ProdRdyFlag, 1);
+// 				OutputIterationsLeft--;
+// 			}
+// 		}
+// 	}
+// #endif
+
 	// Time marker to measure total execution time
 	t_end = get_counter();
 
