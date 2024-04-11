@@ -1113,10 +1113,10 @@ begin  -- architecture rtl of l2_acc_wrapper
               cpu_req_valid        <= '1';
               cpu_req_data_cpu_msg <= CPU_WRITE;
               cpu_req_data_addr    <= dma_address;
-              cpu_req_data_dcs_en  <= spandex_conf(0);
-              cpu_req_data_use_owner_pred <= spandex_conf(1);
-              cpu_req_data_dcs     <= spandex_conf(3 downto 2);
-              cpu_req_data_pred_cid <= spandex_conf(7 downto 4);
+              cpu_req_data_dcs_en  <= spandex_conf(8);
+              cpu_req_data_use_owner_pred <= spandex_conf(9);
+              cpu_req_data_dcs     <= spandex_conf(11 downto 10);
+              cpu_req_data_pred_cid <= spandex_conf(15 downto 12);
               cpu_req_data_len     <= dma_length;
   
               reg.addr := dma_address;
