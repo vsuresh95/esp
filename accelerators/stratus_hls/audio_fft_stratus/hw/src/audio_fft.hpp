@@ -18,7 +18,7 @@
 #define DATA_WIDTH 32
 #define DMA_SIZE SIZE_WORD
 
-#define PLM_IN_WORD 2048
+#define PLM_IN_WORD 32768
 
 #define UPDATE_VAR_SIZE 2
 #define TEST_VAR_SIZE 2

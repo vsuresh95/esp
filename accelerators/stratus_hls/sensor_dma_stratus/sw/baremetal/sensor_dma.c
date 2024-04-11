@@ -255,7 +255,7 @@ int main(int argc, char * argv[])
 		start_counter();
     	for (j = 0; j < mem_words; j++, dst+=8)
     	{
-			value_64 = j+1;
+			value_64 = ITERATIONS+j+1;
 			write_mem (dst, value_64);
     	}
     	asm volatile ("fence w, w");
@@ -306,9 +306,12 @@ int main(int argc, char * argv[])
  	   	for (j = 0; j < mem_words; j++, dst+=8)
  	   	{
 			value_64 = read_mem(dst);
-			if (value_64 == 22412.12412) j = 0;
+			if (value_64 != ITERATIONS+j+1) errors++;
  	   	}
       	t_cpu_read += end_counter();
+
+		// printf("Errors = %d\", errors);
+		errors = 0;
 	}
 
 	printf("CPU write = %lu\n", t_cpu_write/ITERATIONS);
