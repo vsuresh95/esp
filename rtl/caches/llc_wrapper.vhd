@@ -1177,31 +1177,39 @@ begin  -- architecture rtl
 
         if coherence_req_empty = '0' then
 
-          case reg.coh_msg is
-            when REQ_PUTM | REQ_WB | REQ_WTdata | REQ_WT | REQ_WTfwd | REQ_AMO_ADD | REQ_AMO_AND | REQ_AMO_OR | REQ_AMO_XOR | REQ_AMO_MAX | REQ_AMO_MAXU | REQ_AMO_MIN | REQ_AMO_MINU =>
-
+          if reg.coh_msg = REQ_V and preamble(0) = '0' then
             coherence_req_rdreq <= '1';
 
             reg.addr     := coherence_req_data_out(ADDR_BITS - 1 downto LINE_RANGE_LO);
             reg.word_cnt := 0;
             reg.state    := rcv_data;
+          else
+            case reg.coh_msg is
+              when REQ_PUTM | REQ_WB | REQ_WTdata | REQ_WT | REQ_WTfwd | REQ_AMO_ADD | REQ_AMO_AND | REQ_AMO_OR | REQ_AMO_XOR | REQ_AMO_MAX | REQ_AMO_MAXU | REQ_AMO_MIN | REQ_AMO_MINU =>
 
-            when others =>
-            if llc_req_in_ready = '1' then
+              coherence_req_rdreq <= '1';
 
-            coherence_req_rdreq <= '1';
+              reg.addr     := coherence_req_data_out(ADDR_BITS - 1 downto LINE_RANGE_LO);
+              reg.word_cnt := 0;
+              reg.state    := rcv_data;
 
-            llc_req_in_valid        <= '1';
-            llc_req_in_data_coh_msg <= reg.coh_msg;
-            llc_req_in_data_addr    <= coherence_req_data_out(ADDR_BITS - 1 downto LINE_RANGE_LO);
-            llc_req_in_data_hprot   <= reg.hprot;
-            llc_req_in_data_req_id  <= reg.req_id;
-            llc_req_in_data_word_mask    <= reg.word_mask;
+              when others =>
+              if llc_req_in_ready = '1' then
 
-            reg.state := rcv_header;
+              coherence_req_rdreq <= '1';
 
+              llc_req_in_valid        <= '1';
+              llc_req_in_data_coh_msg <= reg.coh_msg;
+              llc_req_in_data_addr    <= coherence_req_data_out(ADDR_BITS - 1 downto LINE_RANGE_LO);
+              llc_req_in_data_hprot   <= reg.hprot;
+              llc_req_in_data_req_id  <= reg.req_id;
+              llc_req_in_data_word_mask    <= reg.word_mask;
+
+              reg.state := rcv_header;
+
+            end if;
+            end case;
           end if;
-          end case;
         end if;
 
       -- RECEIVE DATA
