@@ -6,18 +6,6 @@
 
 const float ERR_TH = 0.05;
 
-#define ENABLE_SM
-#define SPX
-
-#ifdef SPX
-	#define COH_MODE 2
-#else
-	#define IS_ESP 1
-	#define COH_MODE 1
-#endif
-
-#define ITERATIONS 1000
-
 #include "coh_func.h"
 #include "sm.h"
 

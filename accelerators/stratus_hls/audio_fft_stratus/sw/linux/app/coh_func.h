@@ -41,26 +41,6 @@ typedef union
   int64_t value_64;
 } spandex_native_t;
 
-// typedef union
-// {
-//   struct
-//   {
-//     device_t value_32_1;
-//     device_t value_32_2;
-//   };
-//   int64_t value_64;
-// } device_token_t;
-
-// typedef union
-// {
-//   struct
-//   {
-//     audio_t value_32_1;
-//     audio_t value_32_2;
-//   };
-//   int64_t value_64;
-// } audio_token_t;
-
 // Coherence defines to different modes in ESP and Spandex.
 #define QUAUX(X) #X
 #define QU(X) QUAUX(X)

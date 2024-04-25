@@ -1794,6 +1794,20 @@ end process fsm_fwd_out;
               reg.word_cnt            := 0;
               reg.state               := rcv_data;
 
+            when RSP_NACK =>
+
+            if rsp_in_ready = '1' then
+
+              coherence_rsp_rcv_rdreq <= '1';
+              rsp_in_valid            <= '1';
+              rsp_in_data_coh_msg     <= reg.coh_msg;
+              rsp_in_data_addr        <= coherence_rsp_rcv_data_out(ADDR_BITS - 1 downto LINE_RANGE_LO);
+              rsp_in_data_word_mask   <= reg.word_mask;
+              rsp_in_data_invack_cnt  <= reg.invack_cnt;
+              reg.state               := rcv_header;
+
+            end if;
+
             when others =>
               -- RSP_INV_ACK
 
