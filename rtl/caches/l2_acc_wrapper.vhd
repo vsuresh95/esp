@@ -1536,7 +1536,7 @@ begin  -- process fsm_cache2noc
 
         case mix_msg is
 
-          when FWD_WTfwd =>
+          when FWD_WTfwd | FWD_WTfwd_BULK =>
 
             coherence_fwd_snd_data_in(NOC_FLIT_SIZE - 1 downto NOC_FLIT_SIZE - PREAMBLE_WIDTH) <= PREAMBLE_BODY;
             coherence_fwd_snd_data_in(GLOB_PHYS_ADDR_BITS - 1 downto 0) <= reg.addr & empty_offset;
@@ -1658,7 +1658,7 @@ end process fsm_fwd_out;
         if coherence_fwd_empty = '0' then
 
           case reg.coh_msg is
-            when FWD_WTfwd =>
+            when FWD_WTfwd | FWD_WTfwd_BULK =>
 
               coherence_fwd_rdreq <= '1';
 

@@ -98,6 +98,7 @@ package nocpackage is
   constant FWD_REQ_O      : noc_msg_type := "00101";
   constant FWD_WTfwd      : noc_msg_type := "00110";
   constant FWD_RVK_V      : noc_msg_type := "00111";
+  constant FWD_WTfwd_BULK : noc_msg_type := "01000";
   -- Cachable data plane 3 -> response messages
   constant RSP_S              : noc_msg_type := "00000";
   constant RSP_Odata          : noc_msg_type := "00001";
@@ -108,6 +109,8 @@ package nocpackage is
   constant RSP_O              : noc_msg_type := "00110";
   constant RSP_WT             : noc_msg_type := "00111";
   constant RSP_WTdata         : noc_msg_type := "01000";
+  constant RSP_WB_ACK         : noc_msg_type := "01001";
+  constant RSP_O_BULK         : noc_msg_type := "01010";
   constant RSP_DATA_DMA       : noc_msg_type := MSG_T_PR & MSG_T_PR & "011"; -- message type in common with original ESP caches
 
 -- ********

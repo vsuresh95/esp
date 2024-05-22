@@ -1689,7 +1689,7 @@ begin  -- architecture rtl
 
           case reg.coh_msg is
 
-            when FWD_WTfwd =>
+            when FWD_WTfwd | FWD_WTfwd_BULK =>
 
               coherence_fwd_data_in(NOC_FLIT_SIZE - 1 downto NOC_FLIT_SIZE - PREAMBLE_WIDTH) <= PREAMBLE_BODY;
               coherence_fwd_data_in(GLOB_PHYS_ADDR_BITS - 1 downto 0) <= reg.addr & empty_offset;
