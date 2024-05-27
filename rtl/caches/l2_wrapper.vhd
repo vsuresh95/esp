@@ -1669,6 +1669,7 @@ begin  -- architecture rtl of l2_wrapper
     variable reg   : rsp_out_reg_type;
     variable hprot : hprot_t := (others => '0');
     variable mix_msg : mix_msg_t;
+    variable word_mask : word_mask_t;
 
   begin  -- process fsm_cache2noc
 
@@ -1708,6 +1709,8 @@ begin  -- architecture rtl of l2_wrapper
                                                      cache_x, cache_y, rsp_out_data_word_mask);
             reg.state := send_addr;
 
+            word_mask := rsp_out_data_word_mask;
+
           end if;
         end if;
 
@@ -1726,23 +1729,34 @@ begin  -- architecture rtl of l2_wrapper
             mix_msg := '0' & reg.coh_msg;
           end if;
 
-          case mix_msg is
-
-            when RSP_DATA | RSP_S | RSP_Odata | RSP_RVK_O | RSP_WTdata | RSP_V =>
+          if mix_msg = RSP_O and word_mask = "00" then
 
             coherence_rsp_snd_data_in(NOC_FLIT_SIZE - 1 downto NOC_FLIT_SIZE - PREAMBLE_WIDTH) <= PREAMBLE_BODY;
             coherence_rsp_snd_data_in(GLOB_PHYS_ADDR_BITS - 1 downto 0) <= reg.addr & empty_offset;
             reg.state                 := send_data;
             reg.word_cnt              := 0;
 
-            when others =>
+          else
 
-            coherence_rsp_snd_data_in(NOC_FLIT_SIZE - 1 downto NOC_FLIT_SIZE - PREAMBLE_WIDTH) <= PREAMBLE_TAIL;
-            coherence_rsp_snd_data_in(GLOB_PHYS_ADDR_BITS - 1 downto 0) <= reg.addr & empty_offset;
-            reg.state                 := send_header;
+            case mix_msg is
 
-          end case;
+              when RSP_DATA | RSP_S | RSP_Odata | RSP_RVK_O | RSP_WTdata | RSP_V =>
+
+              coherence_rsp_snd_data_in(NOC_FLIT_SIZE - 1 downto NOC_FLIT_SIZE - PREAMBLE_WIDTH) <= PREAMBLE_BODY;
+              coherence_rsp_snd_data_in(GLOB_PHYS_ADDR_BITS - 1 downto 0) <= reg.addr & empty_offset;
+              reg.state                 := send_data;
+              reg.word_cnt              := 0;
+
+              when others =>
+
+              coherence_rsp_snd_data_in(NOC_FLIT_SIZE - 1 downto NOC_FLIT_SIZE - PREAMBLE_WIDTH) <= PREAMBLE_TAIL;
+              coherence_rsp_snd_data_in(GLOB_PHYS_ADDR_BITS - 1 downto 0) <= reg.addr & empty_offset;
+              reg.state                 := send_header;
+
+            end case;
+
           end if;
+        end if;
 
       -- SEND DATA
       when send_data =>

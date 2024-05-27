@@ -1292,7 +1292,7 @@ begin  -- architecture rtl of l2_acc_wrapper
             mix_msg := '0' & reg.coh_msg;
           end if;
 
-          if mix_msg = REQ_V and req_out_data_line /= "0" then
+          if mix_msg = REQ_V and reg.line /= "0" then
             coherence_req_data_in(NOC_FLIT_SIZE - 1 downto NOC_FLIT_SIZE - PREAMBLE_WIDTH) <= PREAMBLE_BODY;
             coherence_req_data_in(GLOB_PHYS_ADDR_BITS - 1 downto 0) <= reg.addr & empty_offset;
             reg.state             := send_data;
@@ -1361,6 +1361,7 @@ begin  -- architecture rtl of l2_acc_wrapper
     variable reg   : rsp_out_reg_type;
     variable hprot : hprot_t := (others => '0');
     variable mix_msg : mix_msg_t;
+    variable word_mask : word_mask_t;
 
   begin  -- process fsm_cache2noc
 
@@ -1403,6 +1404,8 @@ begin  -- architecture rtl of l2_acc_wrapper
 
             reg.state := send_addr;
 
+            word_mask := rsp_out_data_word_mask;
+
           end if;
         end if;
 
@@ -1421,22 +1424,33 @@ begin  -- architecture rtl of l2_acc_wrapper
             mix_msg := '0' & reg.coh_msg;
           end if;
 
-          case mix_msg is
-
-            when RSP_DATA | RSP_S | RSP_Odata | RSP_RVK_O | RSP_WTdata | RSP_V =>
+          if mix_msg = RSP_O and word_mask = "00" then
 
             coherence_rsp_snd_data_in(NOC_FLIT_SIZE - 1 downto NOC_FLIT_SIZE - PREAMBLE_WIDTH) <= PREAMBLE_BODY;
             coherence_rsp_snd_data_in(GLOB_PHYS_ADDR_BITS - 1 downto 0) <= reg.addr & empty_offset;
             reg.state                 := send_data;
             reg.word_cnt              := 0;
 
-            when others =>
+          else
+            
+            case mix_msg is
 
-            coherence_rsp_snd_data_in(NOC_FLIT_SIZE - 1 downto NOC_FLIT_SIZE - PREAMBLE_WIDTH) <= PREAMBLE_TAIL;
-            coherence_rsp_snd_data_in(GLOB_PHYS_ADDR_BITS - 1 downto 0) <= reg.addr & empty_offset;
-            reg.state                 := send_header;
+              when RSP_DATA | RSP_S | RSP_Odata | RSP_RVK_O | RSP_WTdata | RSP_V =>
 
-          end case;
+              coherence_rsp_snd_data_in(NOC_FLIT_SIZE - 1 downto NOC_FLIT_SIZE - PREAMBLE_WIDTH) <= PREAMBLE_BODY;
+              coherence_rsp_snd_data_in(GLOB_PHYS_ADDR_BITS - 1 downto 0) <= reg.addr & empty_offset;
+              reg.state                 := send_data;
+              reg.word_cnt              := 0;
+
+              when others =>
+
+              coherence_rsp_snd_data_in(NOC_FLIT_SIZE - 1 downto NOC_FLIT_SIZE - PREAMBLE_WIDTH) <= PREAMBLE_TAIL;
+              coherence_rsp_snd_data_in(GLOB_PHYS_ADDR_BITS - 1 downto 0) <= reg.addr & empty_offset;
+              reg.state                 := send_header;
+
+            end case;
+
+          end if;
 
           end if;
 
@@ -1785,44 +1799,54 @@ end process fsm_fwd_out;
             mix_msg := '0' & reg.coh_msg;
           end if;
 
-          case mix_msg is
+          if mix_msg = RSP_O and reg.word_mask = "00" then
 
-            when RSP_DATA | RSP_EDATA | RSP_S | RSP_Odata | RSP_RVK_O | RSP_WTdata | RSP_V =>
+            coherence_rsp_rcv_rdreq <= '1';
+            reg.addr                := coherence_rsp_rcv_data_out(ADDR_BITS - 1 downto LINE_RANGE_LO);
+            reg.word_cnt            := 0;
+            reg.state               := rcv_data;
 
-              coherence_rsp_rcv_rdreq <= '1';
-              reg.addr                := coherence_rsp_rcv_data_out(ADDR_BITS - 1 downto LINE_RANGE_LO);
-              reg.word_cnt            := 0;
-              reg.state               := rcv_data;
+          else
+  
+            case mix_msg is
 
-            when RSP_NACK =>
+              when RSP_DATA | RSP_EDATA | RSP_S | RSP_Odata | RSP_RVK_O | RSP_WTdata | RSP_V =>
 
-            if rsp_in_ready = '1' then
+                coherence_rsp_rcv_rdreq <= '1';
+                reg.addr                := coherence_rsp_rcv_data_out(ADDR_BITS - 1 downto LINE_RANGE_LO);
+                reg.word_cnt            := 0;
+                reg.state               := rcv_data;
 
-              coherence_rsp_rcv_rdreq <= '1';
-              rsp_in_valid            <= '1';
-              rsp_in_data_coh_msg     <= reg.coh_msg;
-              rsp_in_data_addr        <= coherence_rsp_rcv_data_out(ADDR_BITS - 1 downto LINE_RANGE_LO);
-              rsp_in_data_word_mask   <= reg.word_mask;
-              rsp_in_data_invack_cnt  <= reg.invack_cnt;
-              reg.state               := rcv_header;
+              when RSP_NACK =>
 
-            end if;
+              if rsp_in_ready = '1' then
 
-            when others =>
-              -- RSP_INV_ACK
-
-            if rsp_in_ready = '1' then
-
-              coherence_rsp_rcv_rdreq <= '1';
-              rsp_in_valid            <= '1';
-              rsp_in_data_coh_msg     <= reg.coh_msg;
-              rsp_in_data_addr        <= coherence_rsp_rcv_data_out(ADDR_BITS - 1 downto LINE_RANGE_LO);
+                coherence_rsp_rcv_rdreq <= '1';
+                rsp_in_valid            <= '1';
+                rsp_in_data_coh_msg     <= reg.coh_msg;
+                rsp_in_data_addr        <= coherence_rsp_rcv_data_out(ADDR_BITS - 1 downto LINE_RANGE_LO);
                 rsp_in_data_word_mask   <= reg.word_mask;
-              reg.state               := rcv_header;
+                rsp_in_data_invack_cnt  <= reg.invack_cnt;
+                reg.state               := rcv_header;
 
-            end if;
+              end if;
 
-          end case;
+              when others =>
+                -- RSP_INV_ACK
+
+              if rsp_in_ready = '1' then
+
+                coherence_rsp_rcv_rdreq <= '1';
+                rsp_in_valid            <= '1';
+                rsp_in_data_coh_msg     <= reg.coh_msg;
+                rsp_in_data_addr        <= coherence_rsp_rcv_data_out(ADDR_BITS - 1 downto LINE_RANGE_LO);
+                  rsp_in_data_word_mask   <= reg.word_mask;
+                reg.state               := rcv_header;
+
+              end if;
+
+            end case;
+          end if;
 
         end if;
 
