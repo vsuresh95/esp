@@ -102,12 +102,3 @@ int quicksort(float *array, int len)
 	insertion_sort(array, len);
 	return 0;
 }
-
-// static void sort_comp(struct test_info *info)
-// {
-// 	struct sort_test *t = to_sort(info);
-// 	int i;
-
-// 	for (i = 0; i < t->n_batches; i++)
-// 		quicksort(&t->sbuf[i * t->n_elems], t->n_elems);
-// }

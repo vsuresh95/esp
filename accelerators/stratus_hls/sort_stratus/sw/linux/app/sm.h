@@ -1,15 +1,5 @@
 #include "coh_func.h"
 
-// void WriteScratchReg(unsigned value) {
-// 	asm volatile (
-// 		"mv t0, %0;"
-// 		"csrrw t0, mscratch, t0"
-// 		:
-// 		: "r" (value)
-// 		: "t0", "t1", "memory"
-// 	);
-// }
-
 static inline void write_mem_wtfwd (void* dst, int64_t value_64)
 {
 	asm volatile (
@@ -74,15 +64,3 @@ void SpinSync(void* sync, int64_t SpinValue) {
 		ActualValue = read_mem_reqodata((void *) sync);
 	}
 }
-
-// bool TestSync(void* sync, int64_t TestValue) {
-// 	int64_t ExpectedValue = TestValue;
-// 	int64_t ActualValue = 0xcafedead;
-
-// 	// Need to cast to void* for extended ASM code.
-// 	ActualValue = read_mem_reqodata((void *) sync);
-
-// 	if (ActualValue != ExpectedValue) return false;
-// 	else return true;
-// }
-

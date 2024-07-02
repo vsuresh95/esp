@@ -31,7 +31,6 @@ uint64_t t_cpu_write;
 uint64_t t_sort;
 uint64_t t_cpu_read;
 
-// static inline
 void start_counter() {
     asm volatile (
 		"li t0, 0;"
@@ -43,7 +42,6 @@ void start_counter() {
 	);
 }
 
-// static inline
 uint64_t end_counter() {
 	asm volatile (
 		"li t0, 0;"
@@ -56,34 +54,6 @@ uint64_t end_counter() {
 
 	return (t_end - t_start);
 }
-
-// static inline void write_mem (void* dst, int64_t value_64)
-// {
-// 	asm volatile (
-// 		"mv t0, %0;"
-// 		"mv t1, %1;"
-// 		".word " QU(WRITE_CODE)
-// 		:
-// 		: "r" (dst), "r" (value_64)
-// 		: "t0", "t1", "memory"
-// 	);
-// }
-
-// static inline int64_t read_mem (void* dst)
-// {
-// 	int64_t value_64;
-
-// 	asm volatile (
-// 		"mv t0, %1;"
-// 		".word " QU(READ_CODE) ";"
-// 		"mv %0, t1"
-// 		: "=r" (value_64)
-// 		: "r" (dst)
-// 		: "t0", "t1", "memory"
-// 	);
-
-// 	return value_64;
-// }
 
 static int check_gold (float *gold, float *array, int len, bool verbose)
 {
@@ -117,8 +87,6 @@ static void init_buf (float *buf, float* gold, unsigned sort_size, unsigned sort
 
 	for (j = 0; j < sort_batch; j++)
 		for (i = 0; i < sort_size; i += 2, dst += 8) {
-			/* TAV rand between 0 and 1 */
-			// buf[sort_size * j + i] = gold[i];
 			in_data.value_32_1 = gold[i];
 			in_data.value_32_2 = gold[i + 1];
 

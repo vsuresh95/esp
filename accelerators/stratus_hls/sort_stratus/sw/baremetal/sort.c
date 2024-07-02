@@ -68,7 +68,6 @@ uint64_t t_cpu_read;
 static uint64_t t_start = 0;
 static uint64_t t_end = 0;
 
-// static inline
 void start_counter() {
     asm volatile (
 		"li t0, 0;"
@@ -80,7 +79,6 @@ void start_counter() {
 	);
 }
 
-// static inline
 uint64_t end_counter() {
 	asm volatile (
 		"li t0, 0;"
@@ -130,7 +128,6 @@ static void init_buf (float *buf, float* gold, unsigned sort_size, unsigned sort
 #ifndef __riscv
 			buf[sort_size * j + i] = ((float) rand () / (float) RAND_MAX);
 #else
-			// buf[sort_size * j + i] = 1.0 / ((float) i + 1);
 			in_data.value_32_1 = gold[i];
 			in_data.value_32_2 = gold[i + 1];
 			
@@ -146,7 +143,6 @@ int main(int argc, char * argv[])
 	int n;
 	int ndev;
 	struct esp_device *espdevs = NULL;
-	// unsigned coherence;
 
 	ndev = probe(&espdevs, VENDOR_SLD, SLD_SORT, DEV_NAME);
 	if (!ndev) {

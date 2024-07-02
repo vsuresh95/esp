@@ -72,15 +72,3 @@ void SpinSync(void* sync, int64_t SpinValue) {
 		ActualValue = read_mem_reqodata((void *) sync);
 	}
 }
-
-// bool TestSync(void* sync, int64_t TestValue) {
-// 	int64_t ExpectedValue = TestValue;
-// 	int64_t ActualValue = 0xcafedead;
-
-// 	// Need to cast to void* for extended ASM code.
-// 	ActualValue = read_mem_reqodata((void *) sync);
-
-// 	if (ActualValue != ExpectedValue) return false;
-// 	else return true;
-// }
-
