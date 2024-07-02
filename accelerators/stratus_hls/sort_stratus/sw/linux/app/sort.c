@@ -154,8 +154,6 @@ int main(int argc, char *argv[])
 	sort_cfg_000[0].cons_ready_offset = SYNC_VAR_SIZE + LEN + READY_FLAG_OFFSET;
 
 	printf("\n====== %s ======\n\n", cfg_000[0].devname);
-	printf("	Coherence = %s\n", CohPrintHeader);
-	printf("	ITERATIONS = %u\n", ITERATIONS);
 
 	for (i = 0; i < ITERATIONS; ++i) {
 		srand(time(NULL));

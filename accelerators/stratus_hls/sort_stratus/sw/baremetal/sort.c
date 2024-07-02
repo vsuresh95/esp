@@ -111,13 +111,6 @@ static int validate_sorted(float *array, float* gold, int len)
 		if (out_data.value_32_2 != gold[i + 1]) {
 			rtn++;
 		}
-		// if (i > 0 && array[i] < array[i-1]){
-		// 	printf("	Error at %d\n", i);
-		// 	printf("	mem[%d] = %llx\n", i, array[i]);
-		// 	printf("	mem[%d] = %llx\n", i - 1, array[i-1]);
-		// 	rtn++;
-		// }
-		// printf("A[%d]: array=%llx\n", i, array[i]);
 	}
 	return rtn;
 }
@@ -131,9 +124,6 @@ static void init_buf (float *buf, float* gold, unsigned sort_size, unsigned sort
 
 	dst = (void*) buf;
 
-	// printf("  Generate random input...\n");
-
-	/* srand(time(NULL)); */
 	for (j = 0; j < sort_batch; j++)
 		for (i = 0; i < sort_size; i += 2, dst += 8) {
 			/* TAV rand between 0 and 1 */
@@ -164,7 +154,6 @@ int main(int argc, char * argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	printf("Test parameters: [LEN, BATCH] = [%d, %d]\n\n", SORT_LEN, SORT_BATCH);
 	for (n = 0; n < ndev; n++) {
 			struct esp_device *dev = &espdevs[n];
 			unsigned sort_batch_max;
@@ -210,18 +199,12 @@ int main(int argc, char * argv[])
 			gold = aligned_malloc(SORT_LEN * sizeof(float));
 			mem = aligned_malloc(SORT_BUF_SIZE);
 
-			printf("  memory buffer base-address = %p\n", mem);
-			printf("  coherence = %u\n", coherence);
-			printf("  Coherence Mode: %s\n", CohPrintHeader);
-
 			if (scatter_gather) {
 				//Alocate and populate page table
 				ptable = aligned_malloc(NCHUNK * sizeof(unsigned *));
 				for (i = 0; i < NCHUNK; i++)
 					ptable[i] = (unsigned *) &mem[i * (CHUNK_SIZE / sizeof(unsigned))];
 
-				// printf("  ptable = %p\n", ptable);
-				// printf("  nchunk = %lu\n", NCHUNK);
 			}
 
 			// Configure device
@@ -359,12 +342,6 @@ int main(int argc, char * argv[])
 				t_cpu_read += end_counter();
 			}
 #endif
-			// if (errors)
-			// 	printf("  ... FAIL\n");
-			// else
-			// 	printf("  ... PASS\n");
-			// printf("**************************************************\n\n");
-			// printf("errors = %d\n", errors);
 
 			printf("	SW Time = %lu\n", t_sw_sort);
 			printf("	CPU Write Time = %lu\n", t_cpu_write);
