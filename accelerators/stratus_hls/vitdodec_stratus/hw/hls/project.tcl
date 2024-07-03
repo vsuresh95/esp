@@ -1,4 +1,4 @@
-# Copyright (c) 2011-2023 Columbia University, System Level Design Group
+# Copyright (c) 2011-2022 Columbia University, System Level Design Group
 # SPDX-License-Identifier: Apache-2.0
 
 ############################################################
@@ -73,7 +73,7 @@ define_system_module tb ../tb/system.cpp ../tb/sc_main.cpp
 ######################################################################
 set DEFAULT_ARGV ""
 
-foreach dma [list 32 64] {
+foreach dma [list 64] {
     define_io_config * IOCFG_DMA$dma -DDMA_WIDTH=$dma
 
     define_system_config tb TESTBENCH_DMA$dma -io_config IOCFG_DMA$dma
