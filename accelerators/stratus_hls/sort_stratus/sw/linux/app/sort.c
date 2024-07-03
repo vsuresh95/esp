@@ -6,18 +6,6 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-#define ENABLE_SM
-// #define SPX
-
-#ifdef SPX
-	#define COH_MODE 2
-#else
-	#define IS_ESP 1
-	#define COH_MODE 1
-#endif
-
-#define ITERATIONS 1000
-
 #include <my_stringify.h>
 
 #include "sw_func.h"
@@ -135,7 +123,7 @@ int main(int argc, char *argv[])
 		t_sw_sort += end_counter();
 	}
 
-#ifdef ENABLE_SM
+#if (ENABLE_SM == 1)
 	sort_cfg_000[0].esp.start_stop = 1;
 	esp_run(cfg_000, NACC);
 

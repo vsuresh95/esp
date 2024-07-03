@@ -11,24 +11,12 @@
 #include <esp_accelerator.h>
 #include <esp_probe.h>
 
-#define ENABLE_SM
-#define SPX
-
-#ifdef SPX
-	#define COH_MODE 0
-#else
-	#define IS_ESP 1
-	#define COH_MODE 0
-#endif
-
 #include "sm.h"
 #include "sw_func.h"
-#define ITERATIONS 100
 
 #define SLD_SORT   0x0B
 #define DEV_NAME "sld,sort_stratus"
 
-#define SORT_LEN 32
 #define SORT_BATCH 1
 
 #define SYNC_VAR_SIZE 6
@@ -229,7 +217,7 @@ int main(int argc, char * argv[])
 			iowrite32(dev, SORT_INPUT_OFFSET, SYNC_VAR_SIZE);
 			iowrite32(dev, SORT_OUTPUT_OFFSET, SYNC_VAR_SIZE + SORT_LEN + SYNC_VAR_SIZE);
 
-#ifdef ENABLE_SM
+#if (ENABLE_SM == 1)
 			// Reset all sync variables to default values.
 			UpdateSync((void*) &mem[VALID_FLAG_OFFSET], 0);
 			UpdateSync((void*) &mem[READY_FLAG_OFFSET], 1);
@@ -257,7 +245,7 @@ int main(int argc, char * argv[])
 				t_sw_sort += end_counter();
 			}
 
-#ifndef ENABLE_SM
+#if (ENABLE_SM == 1)
 			for (i = 0; i < ITERATIONS; ++i) {
 
 				// Initialize input: write floating point hex values (simpler to debug)
@@ -272,7 +260,7 @@ int main(int argc, char * argv[])
 			// Start accelerator
 			iowrite32(dev, CMD_REG, CMD_MASK_START);
 
-#ifdef ENABLE_SM
+#if (ENABLE_SM == 1)
 			for (i = 0; i < ITERATIONS; ++i) {
 
 				// Initialize input: write floating point hex values (simpler to debug)
@@ -326,7 +314,7 @@ int main(int argc, char * argv[])
 			}
 			iowrite32(dev, CMD_REG, 0x0);
 
-#ifndef ENABLE_SM
+#if (ENABLE_SM == 1)
 				/* For acc running */
 				t_sort += end_counter();
 

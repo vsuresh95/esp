@@ -1,4 +1,5 @@
-# For sort
+# Make the directories for storing different baremetal programs under different coherence protocols
+# Regular invocation
 if [ ! -d reg-mesi/ ]
 then
     mkdir reg-mesi/
@@ -12,6 +13,7 @@ then
     mkdir reg-spandex/
 fi
 
+# ASI
 if [ ! -d asi-mesi/ ]
 then
     mkdir asi-mesi/
@@ -25,7 +27,9 @@ then
     mkdir asi-spandex/
 fi
 
-# For sort
+
+# Compiling baremetal programs
+# Sort
 echo "For Sort Baremetal"
 for length in 32 64 128 256 512 1024
 do
