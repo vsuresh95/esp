@@ -1,6 +1,7 @@
 # Make the directories for storing different baremetal programs under different coherence protocols
 if [ ! -d test/ ]
-then mkdir test/
+then
+    mkdir test/
 fi
 # Regular invocation
 if [ ! -d test/reg-mesi/ ]
@@ -11,10 +12,6 @@ if [ ! -d test/reg-cdma/ ]
 then
     mkdir test/reg-cdma/
 fi
-if [ ! -d test/reg-spandex/ ]
-then
-    mkdir test/reg-spandex/
-fi
 
 # ASI
 if [ ! -d test/asi-mesi/ ]
@@ -24,10 +21,6 @@ fi
 if [ ! -d test/asi-cdma/ ]
 then
     mkdir test/asi-cdma/
-fi
-if [ ! -d test/asi-spandex/ ]
-then
-    mkdir test/asi-spandex/
 fi
 
 
@@ -48,12 +41,6 @@ do
     export COH_MODE=1
     make sort_stratus-app-clean sort_stratus-app
     mv soft-build/ariane/sysroot/applications/test/sort_stratus.exe test/reg-cdma/sort_stratus-test-reg-cdma-${length}.exe
-    
-    # Spandex
-    export IS_ESP=0
-    export COH_MODE=2
-    make sort_stratus-app-clean sort_stratus-app
-    mv soft-build/ariane/sysroot/applications/test/sort_stratus.exe test/reg-spandex/sort_stratus-test-reg-spandex-${length}.exe
 
 
     # ASI
@@ -68,10 +55,4 @@ do
     export COH_MODE=1
     make sort_stratus-app-clean sort_stratus-app
     mv soft-build/ariane/sysroot/applications/test/sort_stratus.exe test/asi-cdma/sort_stratus-test-asi-cdma-${length}.exe
-    
-    # Spandex
-    export IS_ESP=0
-    export COH_MODE=2
-    make sort_stratus-app-clean sort_stratus-app
-    mv soft-build/ariane/sysroot/applications/test/sort_stratus.exe test/asi-spandex/sort_stratus-test-asi-spandex-${length}.exe
 done

@@ -8,10 +8,6 @@ if [ ! -d reg-cdma/ ]
 then
     mkdir reg-cdma/
 fi
-if [ ! -d reg-spandex/ ]
-then
-    mkdir reg-spandex/
-fi
 
 # ASI
 if [ ! -d asi-mesi/ ]
@@ -21,10 +17,6 @@ fi
 if [ ! -d asi-cdma/ ]
 then
     mkdir asi-cdma/
-fi
-if [ ! -d asi-spandex/ ]
-then
-    mkdir asi-spandex/
 fi
 
 
@@ -45,12 +37,6 @@ do
     export COH_MODE=1
     make sort_stratus-baremetal-clean sort_stratus-baremetal
     mv soft-build/ariane/baremetal/sort_stratus.exe reg-cdma/sort_stratus-reg-cdma-${length}.exe
-    
-    # Spandex
-    export IS_ESP=0
-    export COH_MODE=2
-    make sort_stratus-baremetal-clean sort_stratus-baremetal
-    mv soft-build/ariane/baremetal/sort_stratus.exe reg-spandex/sort_stratus-reg-spandex-${length}.exe
 
 
     # ASI
@@ -65,10 +51,4 @@ do
     export COH_MODE=1
     make sort_stratus-baremetal-clean sort_stratus-baremetal
     mv soft-build/ariane/baremetal/sort_stratus.exe asi-cdma/sort_stratus-asi-cdma-${length}.exe
-    
-    # Spandex
-    export IS_ESP=0
-    export COH_MODE=2
-    make sort_stratus-baremetal-clean sort_stratus-baremetal
-    mv soft-build/ariane/baremetal/sort_stratus.exe asi-spandex/sort_stratus-asi-spandex-${length}.exe
 done
