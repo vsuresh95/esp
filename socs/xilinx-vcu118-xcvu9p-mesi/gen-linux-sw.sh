@@ -8,10 +8,6 @@ if [ ! -d test/reg-mesi/ ]
 then
     mkdir test/reg-mesi/
 fi
-if [ ! -d test/reg-cdma/ ]
-then
-    mkdir test/reg-cdma/
-fi
 
 # ASI
 if [ ! -d test/asi-mesi/ ]
@@ -37,10 +33,6 @@ do
     export COH_MODE=0
     make sort_stratus-app-clean sort_stratus-app
     mv soft-build/ariane/sysroot/applications/test/sort_stratus.exe test/reg-mesi/sort_stratus-test-reg-mesi-${length}.exe
-    # CDMA
-    export COH_MODE=1
-    make sort_stratus-app-clean sort_stratus-app
-    mv soft-build/ariane/sysroot/applications/test/sort_stratus.exe test/reg-cdma/sort_stratus-test-reg-cdma-${length}.exe
 
 
     # ASI

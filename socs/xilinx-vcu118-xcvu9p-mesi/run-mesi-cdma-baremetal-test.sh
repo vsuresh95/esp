@@ -7,20 +7,5 @@ do
     # MESI
     echo "Under MESI"
     TEST_PROGRAM=./reg-mesi/sort_stratus-reg-mesi-${length}.exe make fpga-program fpga-run
-    # CDMA
-    echo "Under Coherent DMA"
-    TEST_PROGRAM=./reg-mesi/sort_stratus-reg-cdma-${length}.exe make fpga-program fpga-run
 done
 
-# ASI
-echo "Running baremetal programs under MESI and CDMA with ASI"
-# Sort
-for length in 32 64 128 256 512 1024
-do
-    # MESI
-    echo "Under MESI"
-    TEST_PROGRAM=./asi-mesi/sort_stratus-asi-mesi-${length}.exe make fpga-program fpga-run
-    # CDMA
-    echo "Under Coherent DMA"
-    TEST_PROGRAM=./asi-mesi/sort_stratus-asi-cdma-${length}.exe make fpga-program fpga-run
-done

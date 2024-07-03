@@ -33,22 +33,4 @@ do
     export COH_MODE=0
     make sort_stratus-baremetal-clean sort_stratus-baremetal
     mv soft-build/ariane/baremetal/sort_stratus.exe reg-mesi/sort_stratus-reg-mesi-${length}.exe
-    # CDMA
-    export COH_MODE=1
-    make sort_stratus-baremetal-clean sort_stratus-baremetal
-    mv soft-build/ariane/baremetal/sort_stratus.exe reg-cdma/sort_stratus-reg-cdma-${length}.exe
-
-
-    # ASI
-    export ENABLE_SM=1
-    # MESI
-    export IS_ESP=1
-    export SORT_LEN=$length
-    export COH_MODE=0
-    make sort_stratus-baremetal-clean sort_stratus-baremetal
-    mv soft-build/ariane/baremetal/sort_stratus.exe asi-mesi/sort_stratus-asi-mesi-${length}.exe
-    # CDMA
-    export COH_MODE=1
-    make sort_stratus-baremetal-clean sort_stratus-baremetal
-    mv soft-build/ariane/baremetal/sort_stratus.exe asi-cdma/sort_stratus-asi-cdma-${length}.exe
 done
