@@ -245,7 +245,7 @@ int main(int argc, char * argv[])
 				t_sw_sort += end_counter();
 			}
 
-#if (ENABLE_SM == 1)
+#if (ENABLE_SM == 0)
 			for (i = 0; i < ITERATIONS; ++i) {
 
 				// Initialize input: write floating point hex values (simpler to debug)
@@ -314,7 +314,7 @@ int main(int argc, char * argv[])
 			}
 			iowrite32(dev, CMD_REG, 0x0);
 
-#if (ENABLE_SM == 1)
+#if (ENABLE_SM == 0)
 				/* For acc running */
 				t_sort += end_counter();
 
@@ -327,9 +327,9 @@ int main(int argc, char * argv[])
 			}
 #endif
 
-			printf("	SW Time = %lu\n", t_sw_sort);
+			printf("	SW Time = %lu\n\n", t_sw_sort);
 			printf("	CPU Write Time = %lu\n", t_cpu_write);
-			printf("	Sort Time = %lu\n", t_sort);
+			printf("	HW Sort Time = %lu\n", t_sort);
 			printf("	CPU Read Time = %lu\n", t_cpu_read);
 
 			if (scatter_gather)

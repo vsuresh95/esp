@@ -7,6 +7,5 @@ do
     # MESI
     echo "Under MESI"
     TEST_PROGRAM=./reg-mesi/sort_stratus-reg-mesi-${length}.exe make fpga-program fpga-run
-    sleep ${length}s
 done
 
