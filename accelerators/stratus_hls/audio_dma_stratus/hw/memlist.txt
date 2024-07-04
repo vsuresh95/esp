@@ -1,1 +1,0 @@
-sensor_dma_plm_data_dma64 98304 32 2w:0r 0w:2r
