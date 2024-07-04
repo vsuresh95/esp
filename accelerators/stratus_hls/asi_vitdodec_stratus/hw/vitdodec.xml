@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sld>
+  <accelerator name="vitdodec" desc="Accelerator VITDODEC" data_size="4" device_id="030" hls_tool="stratus_hls">
+    <param name="data_bits" desc="data_bits" />
+    <param name="ntraceback" desc="ntraceback" />
+    <param name="cbps" desc="cbps" />
+    <param name="in_length" desc="in_length" />
+    <param name="out_length" desc="out_length" />
+    <param name="input_start_offset" desc="input_start_offset" />
+    <param name="output_start_offset" desc="output_start_offset" />
+    <param name="accel_cons_vld_offset" desc="accel_cons_vld_offset" />
+    <param name="accel_prod_rdy_offset" desc="accel_prod_rdy_offset" />
+    <param name="accel_cons_rdy_offset" desc="accel_cons_rdy_offset" />
+    <param name="accel_prod_vld_offset" desc="accel_prod_vld_offset" /> 
+  </accelerator>
+</sld>
