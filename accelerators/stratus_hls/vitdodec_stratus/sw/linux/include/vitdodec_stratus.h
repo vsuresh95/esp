@@ -1,4 +1,4 @@
-// Copyright (c) 2011-2022 Columbia University, System Level Design Group
+// Copyright (c) 2011-2023 Columbia University, System Level Design Group
 // SPDX-License-Identifier: Apache-2.0
 #ifndef _VITDODEC_STRATUS_H_
 #define _VITDODEC_STRATUS_H_
@@ -23,17 +23,8 @@ struct vitdodec_stratus_access {
 	unsigned cbps;
 	unsigned ntraceback;
 	unsigned data_bits;
-	// unsigned src_offset;
-	// unsigned dst_offset;
-    unsigned in_length 			;
-    unsigned out_length 			;
-    unsigned input_start_offset 	;
-    unsigned output_start_offset 	;
-    unsigned accel_cons_vld_offset ;
-    unsigned accel_prod_rdy_offset ;
-    unsigned accel_cons_rdy_offset ;
-    unsigned accel_prod_vld_offset ;
-	unsigned spandex_reg;
+	unsigned src_offset;
+	unsigned dst_offset;
 };
 
 #define VITDODEC_STRATUS_IOC_ACCESS	_IOW ('S', 0, struct vitdodec_stratus_access)
