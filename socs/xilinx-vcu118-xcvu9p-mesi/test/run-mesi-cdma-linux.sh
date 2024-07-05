@@ -6,7 +6,7 @@ for length in 32 64 128 256 512 1024
 do
     # MESI
     echo "Under MESI"
-    ./reg-mesi/sort_stratus-reg-mesi-${length}.exe
+    ./reg-mesi/sort_stratus-test-reg-mesi-${length}.exe
 done
 
 # ASI
@@ -16,8 +16,8 @@ for length in 32 64 128 256 512 1024
 do
     # MESI
     echo "Under MESI"
-    ./asi-mesi/sort_stratus-asi-mesi-${length}.exe
+    ./asi-mesi/sort_stratus-test-asi-mesi-${length}.exe
     # CDMA
     echo "Under Coherent DMA"
-    ./asi-mesi/sort_stratus-asi-cdma-${length}.exe
+    ./asi-mesi/sort_stratus-test-asi-cdma-${length}.exe
 done
