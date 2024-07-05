@@ -15,8 +15,6 @@
 #define END_FLAG_OFFSET 2
 #define READY_FLAG_OFFSET 4
 
-#define LEN 32
-
 #define NACC 1
 #define NUM_DEVICES 1
 
@@ -32,7 +30,7 @@ struct sort_test {
 
 struct sort_stratus_access sort_cfg_000[] = {
     {
-        .size = LEN,
+        .size = SORT_LEN,
         .batch = 1,
         .input_offset = 0,
         .output_offset = 0,
