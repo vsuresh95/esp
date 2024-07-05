@@ -269,18 +269,14 @@ int main(int argc, char * argv[])
 				}
 				t_sw_sort += end_counter();
 			}
-			printf("After SW");
 
 #if (ENABLE_SM == 0)
 			for (i = 0; i < ITERATIONS; ++i) {
 
 				// Initialize input: write floating point hex values (simpler to debug)
-				printf("Iterations %d\n", i);
-				printf("Before init_buf\n");
 				start_counter();
 				init_buf((float *) &mem[SYNC_VAR_SIZE], gold, SORT_LEN, SORT_BATCH);
 				t_cpu_write += end_counter();
-				printf("After init_buf\n");
 
 				/* For acc running */
 				start_counter();
@@ -346,7 +342,6 @@ int main(int argc, char * argv[])
 #if (ENABLE_SM == 0)
 				/* For acc running */
 				t_sort += end_counter();
-				printf("After acc\n");
 
 				start_counter();
 				for (j = 0; j < SORT_BATCH; j++) {
@@ -354,7 +349,6 @@ int main(int argc, char * argv[])
 					errors += err;
 				}
 				t_cpu_read += end_counter();
-				printf("After validate_buf\n");
 			}
 #endif
 
