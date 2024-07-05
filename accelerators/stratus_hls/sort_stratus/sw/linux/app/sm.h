@@ -1,5 +1,34 @@
 #include "coh_func.h"
 
+static inline void write_mem (void* dst, int64_t value_64)
+{
+	asm volatile (
+		"mv t0, %0;"
+		"mv t1, %1;"
+		".word " QU(WRITE_CODE)
+		// ".word " QU(WRITE_CODE)
+		:
+		: "r" (dst), "r" (value_64)
+		: "t0", "t1", "memory"
+	);
+}
+
+static inline int64_t read_mem (void* dst)
+{
+	int64_t value_64;
+
+	asm volatile (
+		"mv t0, %1;"
+		".word " QU(READ_CODE) ";"
+		"mv %0, t1"
+		: "=r" (value_64)
+		: "r" (dst)
+		: "t0", "t1", "memory"
+	);
+
+	return value_64;
+}
+
 static inline void write_mem_wtfwd (void* dst, int64_t value_64)
 {
 	asm volatile (

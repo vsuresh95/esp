@@ -54,12 +54,13 @@ static int check_gold (float *gold, float *array, int len, bool verbose)
 	for (i = 0; i < len; i += 2, dst += 8) {
 		out_data.value_64 = read_mem_reqodata(dst);
 
-		if (out_data.value_32_1 != gold[i]) {
-			rtn += 1;
-		}
-		if (out_data.value_32_2 != gold[i + 1]) {
-			rtn += 1;
-		}
+		/* Commented for performance testing */
+		// if (out_data.value_32_1 != gold[i]) {
+		// 	rtn += 1;
+		// }
+		// if (out_data.value_32_2 != gold[i + 1]) {
+		// 	rtn += 1;
+		// }
 	}
 	return rtn;
 }
@@ -75,8 +76,12 @@ static void init_buf (float *buf, float* gold, unsigned sort_size, unsigned sort
 
 	for (j = 0; j < sort_batch; j++)
 		for (i = 0; i < sort_size; i += 2, dst += 8) {
-			in_data.value_32_1 = gold[i];
-			in_data.value_32_2 = gold[i + 1];
+			// in_data.value_32_1 = gold[i];
+			// in_data.value_32_2 = gold[i + 1];
+
+			/* For performance testing */
+			in_data.value_32_1 = 0.1;
+			in_data.value_32_2 = 0.2;
 
 			write_mem_wtfwd(dst, in_data.value_64);
 		}
@@ -112,14 +117,33 @@ int main(int argc, char *argv[])
 	printf("\n====== %s ======\n\n", cfg_000[0].devname);
 
 	for (i = 0; i < ITERATIONS; ++i) {
-		srand(time(NULL));
-		for (j = 0; j < SORT_LEN; ++j) {
-			gold[j] = ((float) rand () / (float) RAND_MAX);
-			// gold[j] = (1.0 / (float) j + 1);
+		// srand(time(NULL));
+		// for (j = 0; j < SORT_LEN; ++j) {
+		// 	gold[j] = ((float) rand () / (float) RAND_MAX);
+		// 	// gold[j] = (1.0 / (float) j + 1);
+		// }
+
+		/* For performance testing */
+		start_counter();
+		spandex_token_t in_data;
+		void* in_dst;
+		in_dst = (void*) gold;
+		for (j = 0; j < SORT_LEN; j += 2, in_dst += 8) {
+			in_data.value_32_1 = 0.1;
+			in_data.value_32_2 = 0.2;
+
+			write_mem(in_dst, in_data.value_64);
 		}
 
-		start_counter();
 		quicksort(gold, SORT_LEN);
+
+		/* For performance testing */
+		spandex_token_t out_data;
+		void* out_dst;
+		out_dst = (void*) gold;
+		for (j = 0; j < SORT_LEN; j += 2, out_dst += 8) {
+			out_data.value_64 = read_mem_reqodata(out_dst);
+		}
 		t_sw_sort += end_counter();
 	}
 

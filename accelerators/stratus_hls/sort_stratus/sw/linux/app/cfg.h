@@ -2,8 +2,6 @@
 #define __ESP_CFG_000_H__
 
 #include "libesp.h"
-#include <test/test.h>
-#include <test/time.h>
 #include "sort_stratus.h"
 
 #define DEVNAME "sort_stratus.0"
