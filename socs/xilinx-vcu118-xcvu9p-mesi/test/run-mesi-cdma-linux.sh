@@ -11,5 +11,5 @@ do
     # CDMA
     echo "Under Coherent DMA"
     echo "SORT_LEN=${length}"
-    ./asi-mesi/sort_stratus-test-asi-cdma-${length}.exe
+    ./asi-cdma/sort_stratus-test-asi-cdma-${length}.exe
 done
