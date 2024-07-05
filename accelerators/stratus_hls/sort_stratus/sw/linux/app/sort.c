@@ -189,7 +189,7 @@ int main(int argc, char *argv[])
 	printf("	SW Time = %lu\n\n", t_sw_sort);
 	printf("	CPU Write Time = %lu\n", t_cpu_write);
 	printf("	HW Sort Time = %lu\n", t_sort);
-	printf("	CPU Read Time = %lu\n", t_cpu_read);
+	printf("	CPU Read Time = %lu\n\n\n", t_cpu_read);
 
 	return errors;
 

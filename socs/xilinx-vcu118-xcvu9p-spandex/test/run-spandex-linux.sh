@@ -8,5 +8,6 @@ for length in 32 64 128 256 512 1024
 do
     # Spandex
     echo "Under Spandex-FCS"
+    echo "SORT_LEN=${length}"
     ./asi-spandex/sort_stratus-test-asi-spandex-${length}.exe
 done
