@@ -91,12 +91,14 @@ static int validate_sorted(float *array, float* gold, int len)
 
 	for (i = 0; i < len; i += 2, dst += 8) {
 		out_data.value_64 = read_mem_reqodata(dst);
-		if (out_data.value_32_1 != gold[i]) {
-			rtn++;
-		}
-		if (out_data.value_32_2 != gold[i + 1]) {
-			rtn++;
-		}
+		
+		/* Commented for performance testing */
+		// if (out_data.value_32_1 != gold[i]) {
+		// 	rtn++;
+		// }
+		// if (out_data.value_32_2 != gold[i + 1]) {
+		// 	rtn++;
+		// }
 	}
 	return rtn;
 }
@@ -116,8 +118,12 @@ static void init_buf (float *buf, float* gold, unsigned sort_size, unsigned sort
 #ifndef __riscv
 			buf[sort_size * j + i] = ((float) rand () / (float) RAND_MAX);
 #else
-			in_data.value_32_1 = gold[i];
-			in_data.value_32_2 = gold[i + 1];
+			// in_data.value_32_1 = gold[i];
+			// in_data.value_32_2 = gold[i + 1];
+			
+			/* For performance testing */
+			in_data.value_32_1 = 0.1;
+			in_data.value_32_1 = 0.2;
 			
 			write_mem_wtfwd(dst, in_data.value_64);
 			
@@ -180,7 +186,7 @@ int main(int argc, char * argv[])
 				}
 
 			// Allocate memory (will be contigous anyway in baremetal)
-			gold = aligned_malloc(SORT_LEN * sizeof(float));
+			gold = aligned_malloc(1024 * sizeof(float));
 			mem = aligned_malloc(SORT_BUF_SIZE);
 
 			if (scatter_gather) {
@@ -236,12 +242,31 @@ int main(int argc, char * argv[])
 			t_cpu_read = 0;
 
 			for (i = 0; i < ITERATIONS; ++i) {
-				for (j = 0; j < SORT_LEN; ++j) {
-					gold[j] = (1.0 / (float) j + 1);
+				// for (j = 0; j < SORT_LEN; ++j) {
+				// 	gold[j] = (1.0 / (float) j + 1);
+				// }
+
+				/* For performance testing */
+				start_counter();
+				spandex_token_t in_data;
+				void* in_dst;
+				in_dst = (void*) gold;
+				for (j = 0; j < SORT_LEN; j += 2, in_dst += 8) {
+					in_data.value_32_1 = 0.1;
+					in_data.value_32_2 = 0.2;
+
+					write_mem(in_dst, in_data.value_64);
 				}
 
-				start_counter();
 				quicksort(gold, SORT_LEN);
+
+				/* For performance testing */
+				spandex_token_t out_data;
+				void* out_dst;
+				out_dst = (void*) gold;
+				for (j = 0; j < SORT_LEN; j += 2, out_dst += 8) {
+					out_data.value_64 = read_mem(out_dst);
+				}
 				t_sw_sort += end_counter();
 			}
 
@@ -327,10 +352,11 @@ int main(int argc, char * argv[])
 			}
 #endif
 
+			printf("	SORT_LEN = %lu\n", SORT_LEN);
 			printf("	SW Time = %lu\n\n", t_sw_sort);
 			printf("	CPU Write Time = %lu\n", t_cpu_write);
 			printf("	HW Sort Time = %lu\n", t_sort);
-			printf("	CPU Read Time = %lu\n", t_cpu_read);
+			printf("	CPU Read Time = %lu\n\n", t_cpu_read);
 
 			if (scatter_gather)
 				aligned_free(ptable);

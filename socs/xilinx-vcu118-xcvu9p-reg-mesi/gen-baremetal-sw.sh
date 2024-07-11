@@ -3,11 +3,12 @@
 if [ ! -d reg-mesi/ ]
 then
     mkdir reg-mesi/
+fi
 
 # Compiling baremetal programs
 # Sort
 echo "For Sort Baremetal"
-echo "ITERATIONS=${ITERATIONS}"
+# echo "ITERATIONS=${ITERATIONS}"
 for length in 32 64 128 256 512 1024
 do
     # Regular invocation

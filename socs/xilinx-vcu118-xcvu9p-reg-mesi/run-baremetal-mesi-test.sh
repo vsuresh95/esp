@@ -4,8 +4,10 @@ echo "Running baremetal programs under MESI and Coherent DMA with regular invoca
 # Sort
 for length in 32 64 128 256 512 1024
 do
+    sleep $((length/10))    # Add this sleep in case the next fpga-program erases the previous run
     # MESI
     echo "Under MESI"
+    echo "SORT_LEN=${length}"
     TEST_PROGRAM=./reg-mesi/sort_stratus-reg-mesi-${length}.exe make fpga-program fpga-run
 done
 

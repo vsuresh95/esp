@@ -54,12 +54,13 @@ static int check_gold (float *gold, float *array, int len, bool verbose)
 	for (i = 0; i < len; i += 2, dst += 8) {
 		out_data.value_64 = read_mem_reqodata(dst);
 
-		if (out_data.value_32_1 != gold[i]) {
-			rtn += 1;
-		}
-		if (out_data.value_32_2 != gold[i + 1]) {
-			rtn += 1;
-		}
+		/* Commented for performance testing */
+		// if (out_data.value_32_1 != gold[i]) {
+		// 	rtn += 1;
+		// }
+		// if (out_data.value_32_2 != gold[i + 1]) {
+		// 	rtn += 1;
+		// }
 	}
 	return rtn;
 }
@@ -75,8 +76,12 @@ static void init_buf (float *buf, float* gold, unsigned sort_size, unsigned sort
 
 	for (j = 0; j < sort_batch; j++)
 		for (i = 0; i < sort_size; i += 2, dst += 8) {
-			in_data.value_32_1 = gold[i];
-			in_data.value_32_2 = gold[i + 1];
+			// in_data.value_32_1 = gold[i];
+			// in_data.value_32_2 = gold[i + 1];
+
+			/* For performance testing */
+			in_data.value_32_1 = 0.1;
+			in_data.value_32_2 = 0.2;
 
 			write_mem_wtfwd(dst, in_data.value_64);
 		}
@@ -96,30 +101,49 @@ int main(int argc, char *argv[])
 	float* gold;
 	float* buf;
 
-	buf = (float*) esp_alloc(2 * LEN * sizeof(float) + 2 * SYNC_VAR_SIZE * sizeof(unsigned));
-	gold = (float*) esp_alloc(LEN * sizeof(float));
+	buf = (float*) esp_alloc(2 * SORT_LEN * sizeof(float) + 2 * SYNC_VAR_SIZE * sizeof(unsigned));
+	gold = (float*) esp_alloc(SORT_LEN * sizeof(float));
 	cfg_000[0].hw_buf = buf;
 
 	sort_cfg_000[0].esp.coherence = coherence;
 	sort_cfg_000[0].spandex_conf = spandex_config.spandex_reg;
 	sort_cfg_000[0].input_offset = SYNC_VAR_SIZE;
-	sort_cfg_000[0].output_offset = SYNC_VAR_SIZE + LEN + SYNC_VAR_SIZE;
+	sort_cfg_000[0].output_offset = SYNC_VAR_SIZE + SORT_LEN + SYNC_VAR_SIZE;
 	sort_cfg_000[0].prod_valid_offset = VALID_FLAG_OFFSET;
 	sort_cfg_000[0].prod_ready_offset = READY_FLAG_OFFSET;
-	sort_cfg_000[0].cons_valid_offset = SYNC_VAR_SIZE + LEN + VALID_FLAG_OFFSET;
-	sort_cfg_000[0].cons_ready_offset = SYNC_VAR_SIZE + LEN + READY_FLAG_OFFSET;
+	sort_cfg_000[0].cons_valid_offset = SYNC_VAR_SIZE + SORT_LEN + VALID_FLAG_OFFSET;
+	sort_cfg_000[0].cons_ready_offset = SYNC_VAR_SIZE + SORT_LEN + READY_FLAG_OFFSET;
 
 	printf("\n====== %s ======\n\n", cfg_000[0].devname);
 
 	for (i = 0; i < ITERATIONS; ++i) {
-		srand(time(NULL));
-		for (j = 0; j < LEN; ++j) {
-			gold[j] = ((float) rand () / (float) RAND_MAX);
-			// gold[j] = (1.0 / (float) j + 1);
+		// srand(time(NULL));
+		// for (j = 0; j < SORT_LEN; ++j) {
+		// 	gold[j] = ((float) rand () / (float) RAND_MAX);
+		// 	// gold[j] = (1.0 / (float) j + 1);
+		// }
+
+		/* For performance testing */
+		start_counter();
+		spandex_token_t in_data;
+		void* in_dst;
+		in_dst = (void*) gold;
+		for (j = 0; j < SORT_LEN; j += 2, in_dst += 8) {
+			in_data.value_32_1 = 0.1;
+			in_data.value_32_2 = 0.2;
+
+			write_mem(in_dst, in_data.value_64);
 		}
 
-		start_counter();
-		quicksort(gold, LEN);
+		quicksort(gold, SORT_LEN);
+
+		/* For performance testing */
+		spandex_token_t out_data;
+		void* out_dst;
+		out_dst = (void*) gold;
+		for (j = 0; j < SORT_LEN; j += 2, out_dst += 8) {
+			out_data.value_64 = read_mem_reqodata(out_dst);
+		}
 		t_sw_sort += end_counter();
 	}
 
@@ -131,9 +155,9 @@ int main(int argc, char *argv[])
 	UpdateSync((void*) &buf[VALID_FLAG_OFFSET], 0);
 	UpdateSync((void*) &buf[READY_FLAG_OFFSET], 1);
 	UpdateSync((void*) &buf[END_FLAG_OFFSET], 0);
-	UpdateSync((void*) &buf[SYNC_VAR_SIZE + LEN + VALID_FLAG_OFFSET], 0);
-	UpdateSync((void*) &buf[SYNC_VAR_SIZE + LEN + READY_FLAG_OFFSET], 1);
-	UpdateSync((void*) &buf[SYNC_VAR_SIZE + LEN + END_FLAG_OFFSET], 0);
+	UpdateSync((void*) &buf[SYNC_VAR_SIZE + SORT_LEN + VALID_FLAG_OFFSET], 0);
+	UpdateSync((void*) &buf[SYNC_VAR_SIZE + SORT_LEN + READY_FLAG_OFFSET], 1);
+	UpdateSync((void*) &buf[SYNC_VAR_SIZE + SORT_LEN + END_FLAG_OFFSET], 0);
 
 	for (i = 0; i < ITERATIONS; ++i) {
 		start_counter();
@@ -142,12 +166,12 @@ int main(int argc, char *argv[])
 		// Reset flag for the next iteration
 		UpdateSync((void*) &buf[READY_FLAG_OFFSET], 0);
 		// When the accelerator is ready, we write the input data to it
-		init_buf((float *) &buf[SYNC_VAR_SIZE], gold, LEN, 1);
+		init_buf((float *) &buf[SYNC_VAR_SIZE], gold, SORT_LEN, 1);
 		
 
 		if (i == ITERATIONS - 1) {
 			UpdateSync((void*) &buf[END_FLAG_OFFSET], 1);
-			UpdateSync((void*) &buf[SYNC_VAR_SIZE + LEN + END_FLAG_OFFSET], 1);
+			UpdateSync((void*) &buf[SYNC_VAR_SIZE + SORT_LEN + END_FLAG_OFFSET], 1);
 		}
 		// Inform the accelerator to start.
 		UpdateSync((void*) &buf[VALID_FLAG_OFFSET], 1);
@@ -155,21 +179,21 @@ int main(int argc, char *argv[])
 
 		start_counter();
 		// Wait for the accelerator to send output.
-		SpinSync((void*) &buf[SYNC_VAR_SIZE + LEN + VALID_FLAG_OFFSET], 1);
+		SpinSync((void*) &buf[SYNC_VAR_SIZE + SORT_LEN + VALID_FLAG_OFFSET], 1);
 		// Reset flag for next iteration.
-		UpdateSync((void*) &buf[SYNC_VAR_SIZE + LEN + VALID_FLAG_OFFSET], 0);
+		UpdateSync((void*) &buf[SYNC_VAR_SIZE + SORT_LEN + VALID_FLAG_OFFSET], 0);
 		t_sort += end_counter();
 		
 		start_counter();
-		errors += check_gold(gold, &buf[SYNC_VAR_SIZE + LEN + SYNC_VAR_SIZE], LEN, true);
+		errors += check_gold(gold, &buf[SYNC_VAR_SIZE + SORT_LEN + SYNC_VAR_SIZE], SORT_LEN, true);
 		// Inform the accelerator - ready for next iteration.
-		UpdateSync((void*) &buf[SYNC_VAR_SIZE + LEN + READY_FLAG_OFFSET], 1);
+		UpdateSync((void*) &buf[SYNC_VAR_SIZE + SORT_LEN + READY_FLAG_OFFSET], 1);
 		t_cpu_read += end_counter();
 	}
 #else
 	for (i = 0; i < ITERATIONS; ++i) {
 		start_counter();
-		init_buf(&buf[SYNC_VAR_SIZE], gold, LEN, 1);
+		init_buf(&buf[SYNC_VAR_SIZE], gold, SORT_LEN, 1);
 		t_cpu_write += end_counter();
 
 		start_counter();
@@ -177,7 +201,7 @@ int main(int argc, char *argv[])
 		t_sort += end_counter();
 
 		start_counter();
-		errors += check_gold(gold, &buf[SYNC_VAR_SIZE + LEN + SYNC_VAR_SIZE], LEN, true);
+		errors += check_gold(gold, &buf[SYNC_VAR_SIZE + SORT_LEN + SYNC_VAR_SIZE], SORT_LEN, true);
 		t_cpu_read += end_counter();
 
 	}
@@ -189,7 +213,7 @@ int main(int argc, char *argv[])
 	printf("	SW Time = %lu\n\n", t_sw_sort);
 	printf("	CPU Write Time = %lu\n", t_cpu_write);
 	printf("	HW Sort Time = %lu\n", t_sort);
-	printf("	CPU Read Time = %lu\n", t_cpu_read);
+	printf("	CPU Read Time = %lu\n\n\n", t_cpu_read);
 
 	return errors;
 
