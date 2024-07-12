@@ -6,18 +6,6 @@
 
 const float ERR_TH = 0.05;
 
-#define ENABLE_SM
-#define SPX
-
-#ifdef SPX
-	#define COH_MODE 2
-#else
-	#define IS_ESP 1
-	#define COH_MODE 1
-#endif
-
-#define ITERATIONS 1000
-
 #include "coh_func.h"
 #include "sm.h"
 
@@ -148,7 +136,7 @@ static void init_parameters()
 	out_offset = in_len;
 	size = (out_offset * sizeof(token_t)) + out_size;
 
-	printf("ilen %u isize %u o_off %u olen %u osize %u msize %u\n", in_len, out_len, in_size, out_size, out_offset, size);
+	// printf("ilen %u isize %u o_off %u olen %u osize %u msize %u\n", in_len, out_len, in_size, out_size, out_offset, size);
 }
 
 int main(int argc, char **argv)
@@ -169,9 +157,9 @@ int main(int argc, char **argv)
     audio_fft_cfg_000[0].esp.coherence = coherence;
 	audio_fft_cfg_000[0].spandex_conf = spandex_config.spandex_reg;
 
-    printf("\n====== %s ======\n\n", cfg_000[0].devname);
-	printf("	Coherence = %s\n", CohPrintHeader);
-	printf("	ITERATIONS = %u\n", ITERATIONS);
+    // printf("\n====== %s ======\n\n", cfg_000[0].devname);
+	// printf("	Coherence = %s\n", CohPrintHeader);
+	// printf("	ITERATIONS = %u\n", ITERATIONS);
 
 	init_parameters();
 
@@ -189,7 +177,7 @@ int main(int argc, char **argv)
 	audio_fft_cfg_000[0].output_offset = in_len + SYNC_VAR_SIZE;
 
     // allocations
-    printf("  Allocations\n");
+    // printf("  Allocations\n");
 	const unsigned num_samples = (1 << logn_samples);
     mem = (token_t *) esp_alloc(size);
     gold = (native_t*) esp_alloc(2 * num_samples);
@@ -269,7 +257,7 @@ int main(int argc, char **argv)
 	printf("  Accel = %lu\n", t_acc/ITERATIONS);
 	printf("  Accel Output = %lu\n", t_acc_output/ITERATIONS);
 
-    printf("\n====== %s ======\n\n", cfg_000[0].devname);
+    // printf("\n====== %s ======\n\n", cfg_000[0].devname);
 
 	return errors;
 }

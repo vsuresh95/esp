@@ -18,7 +18,7 @@ typedef float native_t;
 #define DO_SHIFT 0
 
 /* <<--params-->> */
-const int32_t logn_samples = LOGN_SAMPLES;
+const int32_t logn_samples = LOG_LEN;
 const int32_t do_inverse = DO_INVERSE;
 const int32_t do_shift = DO_SHIFT;
 

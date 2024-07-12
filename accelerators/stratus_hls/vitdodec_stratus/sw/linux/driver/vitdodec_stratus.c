@@ -1,4 +1,4 @@
-// Copyright (c) 2011-2022 Columbia University, System Level Design Group
+// Copyright (c) 2011-2023 Columbia University, System Level Design Group
 // SPDX-License-Identifier: Apache-2.0
 #include <linux/of_device.h>
 #include <linux/mm.h>
@@ -13,15 +13,6 @@
 #define DRV_NAME	"vitdodec_stratus"
 
 /* <<--regs-->> */
-#define VITDODEC_IN_LENGTH_REG           0x4C
-#define VITDODEC_OUT_LENGTH_REG          0x50
-#define VITDODEC_INPUT_START_OFFSET_REG  0x54
-#define VITDODEC_OUTPUT_START_OFFSET_REG 0x58
-#define VITDODEC_CONS_VLD_OFFSET_REG     0x5C
-#define VITDODEC_PROD_RDY_OFFSET_REG     0x60
-#define VITDODEC_CONS_RDY_OFFSET_REG     0x64
-#define VITDODEC_PROD_VLD_OFFSET_REG     0x68
-
 #define VITDODEC_CBPS_REG 0x48
 #define VITDODEC_NTRACEBACK_REG 0x44
 #define VITDODEC_DATA_BITS_REG 0x40
@@ -60,18 +51,8 @@ static void vitdodec_prep_xfer(struct esp_device *esp, void *arg)
 	iowrite32be(a->cbps, esp->iomem + VITDODEC_CBPS_REG);
 	iowrite32be(a->ntraceback, esp->iomem + VITDODEC_NTRACEBACK_REG);
 	iowrite32be(a->data_bits, esp->iomem + VITDODEC_DATA_BITS_REG);
-	// iowrite32be(a->src_offset, esp->iomem + SRC_OFFSET_REG);
-	// iowrite32be(a->dst_offset, esp->iomem + DST_OFFSET_REG);
-
-    iowrite32be(a->in_length 			,esp->iomem + VITDODEC_IN_LENGTH_REG);
-    iowrite32be(a->out_length 			,esp->iomem + VITDODEC_OUT_LENGTH_REG);
-    iowrite32be(a->input_start_offset 	,esp->iomem + VITDODEC_INPUT_START_OFFSET_REG);
-    iowrite32be(a->output_start_offset 	,esp->iomem + VITDODEC_OUTPUT_START_OFFSET_REG);
-    iowrite32be(a->accel_cons_vld_offset,esp->iomem + VITDODEC_CONS_VLD_OFFSET_REG) ;
-    iowrite32be(a->accel_prod_rdy_offset,esp->iomem + VITDODEC_PROD_RDY_OFFSET_REG) ;
-    iowrite32be(a->accel_cons_rdy_offset,esp->iomem + VITDODEC_CONS_RDY_OFFSET_REG) ;
-    iowrite32be(a->accel_prod_vld_offset,esp->iomem + VITDODEC_PROD_VLD_OFFSET_REG) ;
-	iowrite32be(a->spandex_reg, esp->iomem + SPANDEX_REG);
+	iowrite32be(a->src_offset, esp->iomem + SRC_OFFSET_REG);
+	iowrite32be(a->dst_offset, esp->iomem + DST_OFFSET_REG);
 
 }
 
