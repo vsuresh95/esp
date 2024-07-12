@@ -4,7 +4,7 @@
 #define __ESP_CFG_000_H__
 
 #include "libesp.h"
-#include "vitdodec_stratus.h"
+#include "asi_vitdodec_stratus.h"
 
 typedef int8_t token_t;
 
@@ -20,7 +20,7 @@ const int32_t data_bits = DATA_BITS;
 
 #define NACC 1
 
-struct vitdodec_stratus_access vitdodec_cfg_000[] = {
+struct asi_vitdodec_stratus_access asi_vitdodec_cfg_000[] = {
 	{
 		/* <<--descriptor-->> */
 		.cbps = CBPS,
@@ -38,9 +38,9 @@ struct vitdodec_stratus_access vitdodec_cfg_000[] = {
 esp_thread_info_t cfg_000[] = {
 	{
 		.run = true,
-		.devname = "vitdodec_stratus.0",
-		.ioctl_req = VITDODEC_STRATUS_IOC_ACCESS,
-		.esp_desc = &(vitdodec_cfg_000[0].esp),
+		.devname = "asi_vitdodec_stratus.0",
+		.ioctl_req = ASI_VITDODEC_STRATUS_IOC_ACCESS,
+		.esp_desc = &(asi_vitdodec_cfg_000[0].esp),
 	}
 };
 

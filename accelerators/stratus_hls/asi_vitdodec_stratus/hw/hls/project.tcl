@@ -60,7 +60,7 @@ set_attr clock_period $CLOCK_PERIOD
 #
 # System level modules to be synthesized
 #
-define_hls_module vitdodec ../src/vitdodec.cpp
+define_hls_module asi_vitdodec ../src/asi_vitdodec.cpp
 
 
 #
@@ -78,15 +78,15 @@ foreach dma [list 64] {
 
     define_system_config tb TESTBENCH_DMA$dma -io_config IOCFG_DMA$dma
 
-    define_sim_config "BEHAV_DMA$dma" "vitdodec BEH" "tb TESTBENCH_DMA$dma" -io_config IOCFG_DMA$dma -argv $DEFAULT_ARGV
+    define_sim_config "BEHAV_DMA$dma" "asi_vitdodec BEH" "tb TESTBENCH_DMA$dma" -io_config IOCFG_DMA$dma -argv $DEFAULT_ARGV
 
     foreach cfg [list BASIC] {
 	set cname $cfg\_DMA$dma
-	define_hls_config vitdodec $cname -io_config IOCFG_DMA$dma --clock_period=$CLOCK_PERIOD $COMMON_HLS_FLAGS -DHLS_DIRECTIVES_$cfg
+	define_hls_config asi_vitdodec $cname -io_config IOCFG_DMA$dma --clock_period=$CLOCK_PERIOD $COMMON_HLS_FLAGS -DHLS_DIRECTIVES_$cfg
 	if {$TECH_IS_XILINX == 1} {
-	    define_sim_config "$cname\_V" "vitdodec RTL_V $cname" "tb TESTBENCH_DMA$dma" -io_config IOCFG_DMA$dma -argv $DEFAULT_ARGV -verilog_top_modules glbl
+	    define_sim_config "$cname\_V" "asi_vitdodec RTL_V $cname" "tb TESTBENCH_DMA$dma" -io_config IOCFG_DMA$dma -argv $DEFAULT_ARGV -verilog_top_modules glbl
 	} else {
-	    define_sim_config "$cname\_V" "vitdodec RTL_V $cname" "tb TESTBENCH_DMA$dma" -io_config IOCFG_DMA$dma -argv $DEFAULT_ARGV
+	    define_sim_config "$cname\_V" "asi_vitdodec RTL_V $cname" "tb TESTBENCH_DMA$dma" -io_config IOCFG_DMA$dma -argv $DEFAULT_ARGV
 	}
     }
 }

@@ -4,10 +4,10 @@
 #ifndef __SYSTEM_HPP__
 #define __SYSTEM_HPP__
 
-#include "vitdodec_conf_info.hpp"
-#include "vitdodec_debug_info.hpp"
-#include "vitdodec.hpp"
-#include "vitdodec_directives.hpp"
+#include "asi_vitdodec_conf_info.hpp"
+#include "asi_vitdodec_debug_info.hpp"
+#include "asi_vitdodec.hpp"
+#include "asi_vitdodec_directives.hpp"
 
 #include "do_decoding.h"
 
@@ -18,7 +18,7 @@ const size_t MEM_SIZE = 43448 / (DMA_WIDTH/8);
 #include "core/systems/esp_system.hpp"
 
 #ifdef CADENCE
-#include "vitdodec_wrap.h"
+#include "asi_vitdodec_wrap.h"
 #endif
 
 class system_t : public esp_system<DMA_WIDTH, MEM_SIZE>
@@ -27,9 +27,9 @@ public:
 
     // ACC instance
 #ifdef CADENCE
-    vitdodec_wrapper *acc;
+    asi_vitdodec_wrapper *acc;
 #else
-    vitdodec *acc;
+    asi_vitdodec *acc;
 #endif
 
     // Constructor
@@ -39,9 +39,9 @@ public:
     {
         // ACC
 #ifdef CADENCE
-        acc = new vitdodec_wrapper("vitdodec_wrapper");
+        acc = new asi_vitdodec_wrapper("asi_vitdodec_wrapper");
 #else
-        acc = new vitdodec("vitdodec_wrapper");
+        acc = new asi_vitdodec("asi_vitdodec_wrapper");
 #endif
         // Binding ACC
         acc->clk(clk);

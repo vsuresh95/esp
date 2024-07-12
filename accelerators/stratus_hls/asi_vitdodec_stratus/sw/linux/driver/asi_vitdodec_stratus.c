@@ -37,7 +37,7 @@ static struct of_device_id asi_vitdodec_device_ids[] = {
 		.name = "SLD_ASI_VITDODEC_STRATUS",
 	},
 	{
-		.name = "eb_030",
+		.name = "eb_031",
 	},
 	{
 		.compatible = "sld,asi_vitdodec_stratus",

@@ -21,7 +21,7 @@ static unsigned DMA_WORD_PER_BEAT(unsigned _st)
 }
 
 
-#define SLD_ASI_VITDODEC 0x030
+#define SLD_ASI_VITDODEC 0x031
 #define DEV_NAME "sld,asi_vitdodec_stratus"
 
 /* <<--params-->> */
