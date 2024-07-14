@@ -4,7 +4,6 @@ then
     mkdir test/
 fi
 
-# OS
 if [ ! -d test/fcnn/ ]
 then
     mkdir test/fcnn/
@@ -14,23 +13,23 @@ fi
 # TODO
 # OS
 ENABLE_SM=0 IS_ESP=1 COH_MODE=0 make gemm_stratus-app-clean gemm_stratus-app
-cp soft-build/ariane/sysroot/applications/test/gemm_stratus.exe test/fcnn/fcnn_stratus-test-os.exe
+cp soft-build/ariane/sysroot/applications/test/gemm_stratus.exe test/fcnn/fcnn-os.exe
 
 # Chaining
 # MESI
 ENABLE_SM=1 IS_ESP=1 COH_MODE=0 make gemm_stratus-app-clean gemm_stratus-app
-cp soft-build/ariane/sysroot/applications/test/gemm_stratus.exe test/fcnn/fcnn_stratus-test-chaining-mesi.exe
+cp soft-build/ariane/sysroot/applications/test/gemm_stratus.exe test/fcnn/fcnn-chaining-mesi.exe
 
 # DMA
 ENABLE_SM=1 IS_ESP=1 COH_MODE=1 make gemm_stratus-app-clean gemm_stratus-app
-cp soft-build/ariane/sysroot/applications/test/gemm_stratus.exe test/fcnn/fcnn_stratus-test-chaining-dma.exe
+cp soft-build/ariane/sysroot/applications/test/gemm_stratus.exe test/fcnn/fcnn-chaining-dma.exe
 
 # Pipelining
 # MESI
 ENABLE_SM=1 IS_ESP=1 COH_MODE=0 make gemm_stratus-app-clean gemm_stratus-app
-cp soft-build/ariane/sysroot/applications/test/gemm_stratus.exe test/fcnn/fcnn_stratus-test-pipelining-mesi.exe
+cp soft-build/ariane/sysroot/applications/test/gemm_stratus.exe test/fcnn/fcnn-pipelining-mesi.exe
 
 # DMA
 ENABLE_SM=1 IS_ESP=1 COH_MODE=1 make gemm_stratus-app-clean gemm_stratus-app
-cp soft-build/ariane/sysroot/applications/test/gemm_stratus.exe test/fcnn/fcnn_stratus-test-pipelining-dma.exe
+cp soft-build/ariane/sysroot/applications/test/gemm_stratus.exe test/fcnn/fcnn-pipelining-dma.exe
 

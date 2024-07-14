@@ -6,7 +6,7 @@ do
     echo "SORT: OS; Length: ${length}"
     echo "############################"
     echo "############################\n"
-    ./sort-os/sort_stratus-test-sort-os-${loglen}.exe
+    ./sort-os/sort-os-${loglen}.exe
 done
 
 # MESI
@@ -17,7 +17,7 @@ do
     echo "SORT: MESI; Length: ${length}"
     echo "############################"
     echo "############################\n"
-    ./sort-mesi/sort_stratus-test-sort-mesi-${loglen}.exe
+    ./sort-mesi/sort-mesi-${loglen}.exe
 done
 
 # DMA
@@ -28,5 +28,5 @@ do
     echo "SORT: DMA; Length: ${length}"
     echo "############################"
     echo "############################\n"
-    ./sort-dma/sort_stratus-test-sort-dma-${loglen}.exe
+    ./sort-dma/sort-dma-${loglen}.exe
 done

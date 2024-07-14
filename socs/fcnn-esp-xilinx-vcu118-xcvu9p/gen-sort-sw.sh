@@ -33,19 +33,19 @@ for length in 32 64 128 256 512 1024
 do
     # Bare metal
     SORT_LEN=$length ENABLE_SM=0 IS_ESP=1 COH_MODE=0 make sort_stratus-baremetal-clean sort_stratus-baremetal
-    cp soft-build/ariane/baremetal/sort_stratus.exe test/sort-bm/sort_stratus-sort-bm-${length}.exe
+    cp soft-build/ariane/baremetal/sort_stratus.exe test/sort-bm/sort-bm-${length}.exe
 
     # OS
     SORT_LEN=$length ENABLE_SM=0 IS_ESP=1 COH_MODE=0 make sort_stratus-app-clean sort_stratus-app
-    cp soft-build/ariane/sysroot/applications/test/sort_stratus.exe test/sort-os/sort_stratus-test-sort-os-${length}.exe
+    cp soft-build/ariane/sysroot/applications/test/sort_stratus.exe test/sort-os/sort-os-${length}.exe
 
     # MESI
     SORT_LEN=$length ENABLE_SM=1 IS_ESP=1 COH_MODE=0 make sort_stratus-app-clean sort_stratus-app
-    cp soft-build/ariane/sysroot/applications/test/sort_stratus.exe test/sort-mesi/sort_stratus-test-sort-mesi-${length}.exe
+    cp soft-build/ariane/sysroot/applications/test/sort_stratus.exe test/sort-mesi/sort-mesi-${length}.exe
 
     # DMA
     SORT_LEN=$length ENABLE_SM=1 IS_ESP=1 COH_MODE=1 make sort_stratus-app-clean sort_stratus-app
-    cp soft-build/ariane/sysroot/applications/test/sort_stratus.exe test/sort-dma/sort_stratus-test-sort-dma-${length}.exe
+    cp soft-build/ariane/sysroot/applications/test/sort_stratus.exe test/sort-dma/sort-dma-${length}.exe
 
 done
 

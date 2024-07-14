@@ -6,7 +6,7 @@ do
     echo "GEMM: OS; Length: ${length}"
     echo "############################"
     echo "############################\n"
-    ./gemm-os/gemm_stratus-test-gemm-os-${length}.exe
+    ./gemm-os/gemm-os-${length}.exe
 done
 
 # MESI
@@ -17,7 +17,7 @@ do
     echo "GEMM: MESI; Length: ${length}"
     echo "############################"
     echo "############################\n"
-    ./gemm-mesi/gemm_stratus-test-gemm-mesi-${length}.exe
+    ./gemm-mesi/gemm-mesi-${length}.exe
 done
 
 # DMA
@@ -28,5 +28,5 @@ do
     echo "GEMM: DMA; Length: ${length}"
     echo "############################"
     echo "############################\n"
-    ./gemm-dma/gemm_stratus-test-gemm-dma-${length}.exe
+    ./gemm-dma/gemm-dma-${length}.exe
 done

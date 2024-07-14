@@ -4,7 +4,7 @@ echo "############################"
 echo "FCNN: OS"
 echo "############################"
 echo "############################\n"
-./fcnn/fcnn_stratus-test-os.exe
+./fcnn/fcnn-os.exe
 
 # Chaining
 # MESI
@@ -13,7 +13,7 @@ echo "############################"
 echo "FCNN: Chaining MESI"
 echo "############################"
 echo "############################\n"
-./fcnn/fcnn_stratus-test-chaining-mesi.exe
+./fcnn/fcnn-chaining-mesi.exe
 
 # DMA
 echo "\n############################"
@@ -21,7 +21,7 @@ echo "############################"
 echo "FCNN: Chaining DMA"
 echo "############################"
 echo "############################\n"
-./fcnn/fcnn_stratus-test-chaining-dma.exe
+./fcnn/fcnn-chaining-dma.exe
 
 # Pipelining
 # MESI
@@ -30,7 +30,7 @@ echo "############################"
 echo "FCNN: Pipelining MESI"
 echo "############################"
 echo "############################\n"
-./fcnn/fcnn_stratus-test-pipelining-mesi.exe
+./fcnn/fcnn-pipelining-mesi.exe
 
 # DMA
 echo "\n############################"
@@ -38,4 +38,4 @@ echo "############################"
 echo "FCNN: Chaining DMA"
 echo "############################"
 echo "############################\n"
-./fcnn/fcnn_stratus-test-pipelining-dma.exe
+./fcnn/fcnn-pipelining-dma.exe

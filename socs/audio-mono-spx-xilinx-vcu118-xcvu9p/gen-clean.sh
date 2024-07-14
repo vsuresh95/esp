@@ -13,3 +13,5 @@ make linux-distclean
 
 # clean everything else
 make clean
+
+rm -rf test/audio
