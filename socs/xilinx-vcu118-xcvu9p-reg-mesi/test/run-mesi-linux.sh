@@ -5,8 +5,6 @@ echo "Running Linux apps under MESI with regular invocation"
 for length in 32 64 128 256 512 1024
 do
     # MESI
-    echo "Under MESI"
-    echo "SORT_LEN=${length}"
-    ./reg-mesi/sort_stratus-test-reg-mesi-${length}.exe
+    ./reg-mesi/sort_stratus-test-reg-mesi.exe ${length}
 done
 
