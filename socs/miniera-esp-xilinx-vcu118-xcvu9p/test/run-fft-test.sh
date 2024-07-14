@@ -1,6 +1,5 @@
 # OS
 loglen=6; while [ $loglen -le 14 ]; do
-    # ASI
     echo "\n############################"
     echo "############################"
     echo "FFT: OS; Length: $(( 2**(loglen+1) ))"
@@ -12,7 +11,6 @@ done
 
 # MESI
 loglen=6; while [ $loglen -le 14 ]; do
-    # ASI
     echo "\n############################"
     echo "############################"
     echo "FFT: MESI; Length: $(( 2**(loglen+1) ))"
@@ -24,7 +22,6 @@ done
 
 # DMA
 loglen=6; while [ $loglen -le 14 ]; do
-    # ASI
     echo "\n############################"
     echo "############################"
     echo "FFT: DMA; Length: $(( 2**(loglen+1) ))"

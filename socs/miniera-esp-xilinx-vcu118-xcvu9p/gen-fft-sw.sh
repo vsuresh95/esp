@@ -28,12 +28,6 @@ then
     mkdir test/fft-dma/
 fi
 
-# Spandex
-if [ ! -d test/fft-spx/ ]
-then
-    mkdir test/fft-spx/
-fi
-
 # FFT
 for length in {6..14}
 do
