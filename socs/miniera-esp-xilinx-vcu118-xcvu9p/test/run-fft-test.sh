@@ -5,7 +5,7 @@ loglen=6; while [ $loglen -le 14 ]; do
     echo "FFT: OS; Length: $(( 2**(loglen+1) ))"
     echo "############################"
     echo "############################\n"
-    ./fft-os/audio_fft_stratus-test-fft-os-${loglen}.exe
+    ./fft-os/fft-os-${loglen}.exe
     loglen=$(( loglen + 1 ))
 done
 
@@ -16,7 +16,7 @@ loglen=6; while [ $loglen -le 14 ]; do
     echo "FFT: MESI; Length: $(( 2**(loglen+1) ))"
     echo "############################"
     echo "############################\n"
-    ./fft-mesi/audio_fft_stratus-test-fft-mesi-${loglen}.exe
+    ./fft-mesi/fft-mesi-${loglen}.exe
     loglen=$(( loglen + 1 ))
 done
 
@@ -27,6 +27,6 @@ loglen=6; while [ $loglen -le 14 ]; do
     echo "FFT: DMA; Length: $(( 2**(loglen+1) ))"
     echo "############################"
     echo "############################\n"
-    ./fft-dma/audio_fft_stratus-test-fft-dma-${loglen}.exe
+    ./fft-dma/fft-dma-${loglen}.exe
     loglen=$(( loglen + 1 ))
 done

@@ -8,6 +8,6 @@ do
     echo "FFT: MESI; Length: $(( 2**(length+1) ))"
     echo "############################"
     echo "############################\n"
-    TEST_PROGRAM=./test/fft-bm/audio_fft_stratus-fft-bm-${length}.exe make fpga-program fpga-run
+    TEST_PROGRAM=./test/fft-bm/fft-bm-${length}.exe make fpga-program fpga-run
 done
 

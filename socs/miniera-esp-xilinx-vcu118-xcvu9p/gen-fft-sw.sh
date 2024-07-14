@@ -33,19 +33,19 @@ for length in {6..14}
 do
     # Bare metal
     LOG_LEN=$length ENABLE_SM=0 IS_ESP=1 COH_MODE=0 make audio_fft_stratus-baremetal-clean audio_fft_stratus-baremetal
-    mv soft-build/ariane/baremetal/audio_fft_stratus.exe fft-bm/audio_fft_stratus-fft-bm-${length}.exe
+    cp soft-build/ariane/baremetal/audio_fft_stratus.exe test/fft-bm/fft-bm-${length}.exe
 
     # OS
     LOG_LEN=$length ENABLE_SM=0 IS_ESP=1 COH_MODE=0 make audio_fft_stratus-app-clean audio_fft_stratus-app
-    mv soft-build/ariane/sysroot/applications/test/audio_fft_stratus.exe test/fft-os/audio_fft_stratus-test-fft-os-${length}.exe
+    cp soft-build/ariane/sysroot/applications/test/audio_fft_stratus.exe test/fft-os/fft-os-${length}.exe
 
     # MESI
     LOG_LEN=$length ENABLE_SM=1 IS_ESP=1 COH_MODE=0 make audio_fft_stratus-app-clean audio_fft_stratus-app
-    mv soft-build/ariane/sysroot/applications/test/audio_fft_stratus.exe test/fft-mesi/audio_fft_stratus-test-fft-mesi-${length}.exe
+    cp soft-build/ariane/sysroot/applications/test/audio_fft_stratus.exe test/fft-mesi/fft-mesi-${length}.exe
 
     # DMA
     LOG_LEN=$length ENABLE_SM=1 IS_ESP=1 COH_MODE=1 make audio_fft_stratus-app-clean audio_fft_stratus-app
-    mv soft-build/ariane/sysroot/applications/test/audio_fft_stratus.exe test/fft-dma/audio_fft_stratus-test-fft-dma-${length}.exe
+    cp soft-build/ariane/sysroot/applications/test/audio_fft_stratus.exe test/fft-dma/fft-dma-${length}.exe
 
 done
 
