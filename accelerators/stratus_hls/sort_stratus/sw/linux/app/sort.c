@@ -101,10 +101,16 @@ int main(int argc, char *argv[])
 	float* gold;
 	float* buf;
 
+	int SORT_LEN = 32;
+	if (argc == 2) {
+		SORT_LEN = atoi(argv[1]);
+	}
+
 	buf = (float*) esp_alloc(2 * SORT_LEN * sizeof(float) + 2 * SYNC_VAR_SIZE * sizeof(unsigned));
 	gold = (float*) esp_alloc(SORT_LEN * sizeof(float));
 	cfg_000[0].hw_buf = buf;
 
+	sort_cfg_000[0].size = SORT_LEN;
 	sort_cfg_000[0].esp.coherence = coherence;
 	sort_cfg_000[0].spandex_conf = spandex_config.spandex_reg;
 	sort_cfg_000[0].input_offset = SYNC_VAR_SIZE;
@@ -210,10 +216,28 @@ int main(int argc, char *argv[])
 	esp_free(gold);
 	esp_free(buf);
 
-	printf("	SW Time = %lu\n\n", t_sw_sort);
-	printf("	CPU Write Time = %lu\n", t_cpu_write);
-	printf("	HW Sort Time = %lu\n", t_sort);
-	printf("	CPU Read Time = %lu\n\n\n", t_cpu_read);
+#if (ENABLE_SM == 0)
+	printf("Result: Sort SW %d = %lu\n", SORT_LEN, t_sw_sort);
+	printf("Result: Sort Linux %d Total = %lu\n", SORT_LEN, t_cpu_write + t_cpu_read + t_sort);
+#else // ASI
+	#if (IS_ESP == 1 && COH_MODE == 0)	// MESI
+	printf("Result: Sort ASI %d MESI CPU_Write = %lu\n", SORT_LEN, t_cpu_write);
+	printf("Result: Sort ASI %d MESI CPU_Read = %lu\n", SORT_LEN, t_cpu_read);
+	printf("Result: Sort ASI %d MESI Acc = %lu\n", SORT_LEN, t_sort);
+	printf("Result: Sort ASI %d MESI Total = %lu\n", SORT_LEN, t_cpu_write + t_cpu_read + t_sort);
+	#elif (IS_ESP == 1 && COH_MODE == 1)	// DMA
+	printf("Result: Sort ASI %d DMA CPU_Write = %lu\n", SORT_LEN, t_cpu_write);
+	printf("Result: Sort ASI %d DMA CPU_Read = %lu\n", SORT_LEN, t_cpu_read);
+	printf("Result: Sort ASI %d DMA Acc = %lu\n", SORT_LEN, t_sort);
+	printf("Result: Sort ASI %d DMA Total = %lu\n", SORT_LEN, t_cpu_write + t_cpu_read + t_sort);
+	#elif (IS_ESP == 0 && COH_MODE == 2)	// Spandex-FCS
+	printf("Result: Sort ASI %d Spandex CPU_Write = %lu\n", SORT_LEN, t_cpu_write);
+	printf("Result: Sort ASI %d Spandex CPU_Read = %lu\n", SORT_LEN, t_cpu_read);
+	printf("Result: Sort ASI %d Spandex Acc = %lu\n", SORT_LEN, t_sort);
+	printf("Result: Sort ASI %d Spandex Total = %lu\n", SORT_LEN, t_cpu_write + t_cpu_read + t_sort);
+	#endif
+#endif
+
 
 	return errors;
 
