@@ -29,7 +29,7 @@ struct audio_fft_stratus_access audio_fft_cfg_000[] = {
 	{
 		/* <<--descriptor-->> */
 		.do_inverse = 0,
-		.logn_samples = LOGN_SAMPLES,
+		.logn_samples = LOG_LEN,
 		.do_shift = DO_SHIFT,
 
 		.prod_valid_offset = 0,
@@ -47,7 +47,11 @@ struct audio_fft_stratus_access audio_fft_cfg_000[] = {
 esp_thread_info_t cfg_000[] = {
 	{
 		.run = true,
+		#if (ENABLE_SM == 1)
 		.devname = "audio_fft_stratus.0",
+		#else
+		.devname = "audio_fft_stratus.1",
+		#endif
 		.ioctl_req = AUDIO_FFT_STRATUS_IOC_ACCESS,
 		.esp_desc = &(audio_fft_cfg_000[0].esp),
 	}

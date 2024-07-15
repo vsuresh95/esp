@@ -175,7 +175,7 @@ int main(int argc, char * argv[])
     const float ERROR_COUNT_TH = 0.001;
 	unsigned len = num_samples;
 
-	printf("logn %u nsmp %u nfft %u inv %u shft %u len %u\n", logn_samples, num_samples, 1, do_inverse, do_shift, len);
+	// printf("logn %u nsmp %u nfft %u inv %u shft %u len %u\n", logn_samples, num_samples, 1, do_inverse, do_shift, len);
 	if (DMA_WORD_PER_BEAT(sizeof(token_t)) == 0) {
 		in_words_adj = (2 * len) + SYNC_VAR_SIZE;
 		out_words_adj = (2 * len) + SYNC_VAR_SIZE;
@@ -190,7 +190,7 @@ int main(int argc, char * argv[])
 	out_offset  = in_len;
 	mem_size = (out_offset * sizeof(token_t)) + out_size;
 
-	printf("ilen %u isize %u o_off %u olen %u osize %u msize %u\n", in_len, out_len, in_size, out_size, out_offset, mem_size);
+	// printf("ilen %u isize %u o_off %u olen %u osize %u msize %u\n", in_len, out_len, in_size, out_size, out_offset, mem_size);
 	// Search for the device
 	ndev = probe(&espdevs, VENDOR_SLD, SLD_AUDIO_FFT, DEV_NAME);
 	if (ndev == 0) {
@@ -205,9 +205,9 @@ int main(int argc, char * argv[])
 	t_acc = 0;
 	t_acc_output = 0;
 
-	n = 0;
+	n = 1;
 	{
-		printf("**************** %s.%d ****************\n", DEV_NAME, n);
+		// printf("**************** %s.%d ****************\n", DEV_NAME, n);
 
 		dev = &espdevs[n];
 
@@ -387,13 +387,16 @@ int main(int argc, char * argv[])
 		aligned_free(mem);
 		aligned_free(gold);
 
-		printf("  Software Input = %lu\n", t_sw_input/(ITERATIONS/10));
-		printf("  Software = %lu\n", t_sw/(ITERATIONS/10));
-		printf("  Software Output = %lu\n", t_sw_output/(ITERATIONS/10));
-		printf("  Accel Input = %lu\n", t_acc_input/ITERATIONS);
-		printf("  Accel = %lu\n", t_acc/ITERATIONS);
-		printf("  Accel Output = %lu\n", t_acc_output/ITERATIONS);
+		printf("Result: FFT Baremetal %d Total = %lu\n\n", 2 * num_samples, (t_acc_input+t_acc+t_acc_output)/ITERATIONS);
+
+		// printf("  Software Input = %lu\n", t_sw_input/(ITERATIONS/10));
+		// printf("  Software = %lu\n", t_sw/(ITERATIONS/10));
+		// printf("  Software Output = %lu\n", t_sw_output/(ITERATIONS/10));
+		// printf("  Accel Input = %lu\n", t_acc_input/ITERATIONS);
+		// printf("  Accel = %lu\n", t_acc/ITERATIONS);
+		// printf("  Accel Output = %lu\n", t_acc_output/ITERATIONS);
 	}
 
-	return 0;
+	while(1);
+	// return 0;
 }
