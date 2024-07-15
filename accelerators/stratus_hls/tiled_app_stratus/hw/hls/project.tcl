@@ -73,23 +73,46 @@ define_system_module tb ../tb/system.cpp ../tb/sc_main.cpp
 ######################################################################
 set DEFAULT_ARGV ""
 
-#foreach dma [list 32 64] {
+
+set data_width "64"
+foreach gr [list cfa ma ] {
+foreach inv [list asi] {
 foreach dma [list 64] {
-    define_io_config * IOCFG_DMA$dma -DDMA_WIDTH=$dma
 
-    define_system_config tb TESTBENCH_DMA$dma -io_config IOCFG_DMA$dma
+    if {$inv eq "reg"} {
+        define_io_config * IOCFG_DMA$dma\_INV$inv\_$gr  -DDMA_WIDTH=$dma -DDATA_WIDTH=$data_width
+    } else {
+    if {$gr eq "cfa"} {
+        define_io_config * IOCFG_DMA$dma\_INV$inv\_$gr -DDMA_WIDTH=$dma -DENABLE_SM -DSYNTH_APP_CFA -DDATA_WIDTH=$data_width
+    } else {
+        define_io_config * IOCFG_DMA$dma\_INV$inv\_$gr  -DDMA_WIDTH=$dma -DENABLE_SM -DDATA_WIDTH=$data_width
+    }
+    }
 
-    define_sim_config "BEHAV_DMA$dma" "tiled_app BEH" "tb TESTBENCH_DMA$dma" -io_config IOCFG_DMA$dma -argv $DEFAULT_ARGV
+    define_system_config tb TESTBENCH_DMA$dma\_INV$inv\_$gr  -io_config IOCFG_DMA$dma\_INV$inv\_$gr
+
+    define_sim_config "BEHAV_DMA$dma\_INV$inv\_$gr " "tiled_app BEH" "tb TESTBENCH_DMA$dma\_INV$inv\_$gr" -io_config IOCFG_DMA$dma\_INV$inv\_$gr  -argv $DEFAULT_ARGV
 
     foreach cfg [list BASIC] {
-	set cname $cfg\_DMA$dma
-	define_hls_config tiled_app $cname -io_config IOCFG_DMA$dma --clock_period=$CLOCK_PERIOD $COMMON_HLS_FLAGS -DHLS_DIRECTIVES_$cfg
+	set cname $cfg\_DMA$dma\_INV$inv\_$gr 
+
+    if {$inv eq "reg"} {
+	    define_hls_config tiled_app $cname -io_config IOCFG_DMA$dma\_INV$inv\_$gr --clock_period=$CLOCK_PERIOD $COMMON_HLS_FLAGS -DHLS_DIRECTIVES_$cfg -DDATA_WIDTH=$data_width
+    } else {
+    if {$gr eq "cfa"} {
+	    define_hls_config tiled_app $cname -io_config IOCFG_DMA$dma\_INV$inv\_$gr --clock_period=$CLOCK_PERIOD $COMMON_HLS_FLAGS -DHLS_DIRECTIVES_$cfg -DENABLE_SM -DSYNTH_APP_CFA -DDATA_WIDTH=$data_width
+    } else {
+	    define_hls_config tiled_app $cname -io_config IOCFG_DMA$dma\_INV$inv\_$gr --clock_period=$CLOCK_PERIOD $COMMON_HLS_FLAGS -DHLS_DIRECTIVES_$cfg -DENABLE_SM -DDATA_WIDTH=$data_width
+    }
+    }
 	if {$TECH_IS_XILINX == 1} {
-	    define_sim_config "$cname\_V" "tiled_app RTL_V $cname" "tb TESTBENCH_DMA$dma" -io_config IOCFG_DMA$dma -argv $DEFAULT_ARGV -verilog_top_modules glbl
+	    define_sim_config "$cname\_V" "tiled_app RTL_V $cname" "tb TESTBENCH_DMA$dma\_INV$inv\_$gr" -io_config IOCFG_DMA$dma\_INV$inv\_$gr -argv $DEFAULT_ARGV -verilog_top_modules glbl
 	} else {
-	    define_sim_config "$cname\_V" "tiled_app RTL_V $cname" "tb TESTBENCH_DMA$dma" -io_config IOCFG_DMA$dma -argv $DEFAULT_ARGV
+	    define_sim_config "$cname\_V" "tiled_app RTL_V $cname" "tb TESTBENCH_DMA$dma\_INV$inv\_$gr" -io_config IOCFG_DMA$dma\_INV$inv\_$gr  -argv $DEFAULT_ARGV
 	}
     }
+}
+}
 }
 
 #
