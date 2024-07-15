@@ -1,4 +1,4 @@
-echo "Running Linux tests under MESI and Coherent DMA"
+echo "Running Linux tests under MESI"
 # Regular invocation
 echo "Running Linux apps under MESI with regular invocation"
 # Sort

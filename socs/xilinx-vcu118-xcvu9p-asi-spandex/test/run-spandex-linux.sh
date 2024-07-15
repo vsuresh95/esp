@@ -1,4 +1,3 @@
-# Run each baremetal program
 echo "Running Linux tests under Spandex"
 # Sort
 # ASI
