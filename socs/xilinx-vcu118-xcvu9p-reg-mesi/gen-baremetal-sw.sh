@@ -17,3 +17,14 @@ do
     mv soft-build/ariane/baremetal/sort_stratus.exe reg-mesi/sort_stratus-reg-mesi-${length}.exe
 done
 
+# FFT
+echo "For FFT Baremetal"
+# echo "ITERATIONS=${ITERATIONS}"
+for length in {6..14}
+do
+    # Regular invocation
+    # MESI
+    LOG_LEN=$length ENABLE_SM=1 IS_ESP=1 COH_MODE=0 make audio_fft_stratus-baremetal-clean audio_fft_stratus-baremetal
+    mv soft-build/ariane/baremetal/audio_fft_stratus.exe reg-mesi/audio_fft_stratus-reg-mesi-${length}.exe
+done
+
