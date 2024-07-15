@@ -93,7 +93,7 @@ fcnnASI_chain = [[1] for _ in range(coherenceLength)] # MESI, DMA, Spandex
 fcnnASI_pipe = [[1] for _ in range(coherenceLength)]
 
 # For synthetic
-synSize = ['150', '1500']
+synSize = ['Small', 'Large']
 synSizeLength = len(synSize)
 synAcc = ['1', '3', '5', '7', '10', '12', '13', '14', '15']
 synAccLength = len(synAcc)
