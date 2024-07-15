@@ -1,7 +1,11 @@
+# Chaining
 # Spandex
-echo "\n############################"
-echo "############################"
-echo "Synthetic CFA: Spandex"
-echo "############################"
-echo "############################\n"
+echo ""
+echo "Synthetic CFA: Chaining Spandex"
+echo ""
 
+# Pipelining
+# Spandex
+echo ""
+echo "Synthetic CFA: Pipelining Spandex"
+echo ""

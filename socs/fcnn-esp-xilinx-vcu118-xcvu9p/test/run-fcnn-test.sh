@@ -1,41 +1,31 @@
 # OS
-echo "\n############################"
-echo "############################"
+echo ""
 echo "FCNN: OS"
-echo "############################"
-echo "############################\n"
+echo ""
 ./fcnn/fcnn-os.exe
 
 # Chaining
 # MESI
-echo "\n############################"
-echo "############################"
+echo ""
 echo "FCNN: Chaining MESI"
-echo "############################"
-echo "############################\n"
+echo ""
 ./fcnn/fcnn-chaining-mesi.exe
 
 # DMA
-echo "\n############################"
-echo "############################"
+echo ""
 echo "FCNN: Chaining DMA"
-echo "############################"
-echo "############################\n"
+echo ""
 ./fcnn/fcnn-chaining-dma.exe
 
 # Pipelining
 # MESI
-echo "\n############################"
-echo "############################"
+echo ""
 echo "FCNN: Pipelining MESI"
-echo "############################"
-echo "############################\n"
+echo ""
 ./fcnn/fcnn-pipelining-mesi.exe
 
 # DMA
-echo "\n############################"
-echo "############################"
+echo ""
 echo "FCNN: Chaining DMA"
-echo "############################"
-echo "############################\n"
+echo ""
 ./fcnn/fcnn-pipelining-dma.exe

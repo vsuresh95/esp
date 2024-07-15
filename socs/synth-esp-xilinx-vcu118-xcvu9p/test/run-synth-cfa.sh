@@ -1,28 +1,26 @@
 # OS
-echo "\n############################"
-echo "############################"
-echo "Synthetic CFA: Software"
-echo "############################"
-echo "############################\n"
-
-# OS
-echo "\n############################"
-echo "############################"
+echo ""
 echo "Synthetic CFA: OS"
-echo "############################"
-echo "############################\n"
+echo ""
 
+# Chaining
 # MESI
-echo "\n############################"
-echo "############################"
-echo "Synthetic CFA: MESI"
-echo "############################"
-echo "############################\n"
+echo ""
+echo "Synthetic CFA: Chaining MESI"
+echo ""
 
 # DMA
-echo "\n############################"
-echo "############################"
-echo "Synthetic CFA: DMA"
-echo "############################"
-echo "############################\n"
+echo ""
+echo "Synthetic CFA: Chaining DMA"
+echo ""
 
+# Pipelining
+# MESI
+echo ""
+echo "Synthetic CFA: Pipelining MESI"
+echo ""
+
+# DMA
+echo ""
+echo "Synthetic CFA: Pipelining DMA"
+echo ""
