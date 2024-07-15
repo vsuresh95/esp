@@ -4,5 +4,5 @@ do
     echo ""
     echo "SORT: Spandex; Length=${length}"
     echo ""
-    ./sort-spx/sort-spx-${loglen}.exe
+    ./sort-spx/sort-spx.exe ${length}
 done

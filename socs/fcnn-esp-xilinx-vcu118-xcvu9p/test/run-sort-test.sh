@@ -4,7 +4,7 @@ do
     echo ""
     echo "SORT: OS; Length=${length}"
     echo ""
-    ./sort-os/sort-os-${length}.exe
+    ./sort-os/sort-os.exe ${length}
 done
 
 # MESI
@@ -13,7 +13,7 @@ do
     echo ""
     echo "SORT: MESI; Length=${length}"
     echo ""
-    ./sort-mesi/sort-mesi-${length}.exe
+    ./sort-mesi/sort-mesi.exe ${length}
 done
 
 # DMA
@@ -22,5 +22,5 @@ do
     echo ""
     echo "SORT: DMA; Length=${length}"
     echo ""
-    ./sort-dma/sort-dma-${length}.exe
+    ./sort-dma/sort-dma.exe ${length}
 done
