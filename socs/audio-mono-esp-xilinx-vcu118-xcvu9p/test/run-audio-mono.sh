@@ -1,42 +1,32 @@
 # OS
-echo "\n############################"
-echo "############################"
+echo ""
 echo "Audio: OS (Mono)"
-echo "############################"
-echo "############################\n"
+echo ""
 ./audio/audio-mono-os.exe
 
 # Chaining
 # MESI
-echo "\n############################"
-echo "############################"
+echo ""
 echo "Audio: Chaining MESI (Mono)"
-echo "############################"
-echo "############################\n"
-./audio/mono-chaining-mesi.exe
+echo ""
+./audio/audio-mono-chaining-mesi.exe
 
 # DMA
-echo "\n############################"
-echo "############################"
+echo ""
 echo "Audio: Chaining DMA (Mono)"
-echo "############################"
-echo "############################\n"
-./audio/mono-chaining-dma.exe
+echo ""
+./audio/audio-mono-chaining-dma.exe
 
 # Pipelining
 # MESI
-echo "\n############################"
-echo "############################"
+echo ""
 echo "Audio: Pipelining MESI (Mono)"
-echo "############################"
-echo "############################\n"
-./audio/mono-pipelining-mesi.exe
+echo ""
+./audio/audio-mono-pipelining-mesi.exe
 
 # DMA
-echo "\n############################"
-echo "############################"
+echo ""
 echo "Audio: Pipelining DMA (Mono)"
-echo "############################"
-echo "############################\n"
-./audio/mono-pipelining-dma.exe
+echo ""
+./audio/audio-mono-pipelining-dma.exe
 

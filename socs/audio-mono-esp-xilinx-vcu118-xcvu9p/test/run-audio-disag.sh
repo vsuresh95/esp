@@ -1,50 +1,38 @@
 # Software
-echo "\n############################"
-echo "############################"
+echo ""
 echo "Audio: Software"
-echo "############################"
-echo "############################\n"
+echo ""
 ./audio/audio-software.exe
 
 # OS
-echo "\n############################"
-echo "############################"
+echo ""
 echo "Audio: OS (Disag)"
-echo "############################"
-echo "############################\n"
+echo ""
 ./audio/audio-disag-os.exe
 
 # Chaining
 # MESI
-echo "\n############################"
-echo "############################"
+echo ""
 echo "Audio: Chaining MESI (Disag)"
-echo "############################"
-echo "############################\n"
-./audio/disag-chaining-mesi.exe
+echo ""
+./audio/audio-disag-chaining-mesi.exe
 
 # DMA
-echo "\n############################"
-echo "############################"
+echo ""
 echo "Audio: Chaining DMA (Disag)"
-echo "############################"
-echo "############################\n"
-./audio/disag-chaining-dma.exe
+echo ""
+./audio/audio-disag-chaining-dma.exe
 
 # Pipelining
 # MESI
-echo "\n############################"
-echo "############################"
+echo ""
 echo "Audio: Pipelining MESI (Disag)"
-echo "############################"
-echo "############################\n"
-./audio/disag-pipelining-mesi.exe
+echo ""
+./audio/audio-disag-pipelining-mesi.exe
 
 # DMA
-echo "\n############################"
-echo "############################"
+echo ""
 echo "Audio: Pipelining DMA (Disag)"
-echo "############################"
-echo "############################\n"
-./audio/disag-pipelining-dma.exe
+echo ""
+./audio/audio-disag-pipelining-dma.exe
 

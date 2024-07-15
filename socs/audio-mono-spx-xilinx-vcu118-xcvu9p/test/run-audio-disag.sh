@@ -1,18 +1,14 @@
 # Chaining
 # Spandex
-echo "\n############################"
-echo "############################"
+echo ""
 echo "Audio: Chaining Spandex (Disag)"
-echo "############################"
-echo "############################\n"
-./audio/disag-chaining-spandex.exe
+echo ""
+./audio/audio-disag-chaining-spandex.exe
 
 # Pipelining
 # Spandex
-echo "\n############################"
-echo "############################"
+echo ""
 echo "Audio: Pipelining Spandex (Disag)"
-echo "############################"
-echo "############################\n"
-./audio/disag-pipelining-spandex.exe
+echo ""
+./audio/audio-disag-pipelining-spandex.exe
 
