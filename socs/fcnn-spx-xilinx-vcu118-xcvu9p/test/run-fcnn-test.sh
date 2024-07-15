@@ -1,17 +1,13 @@
 # Chaining
 # Spandex
-echo "\n############################"
-echo "############################"
+echo ""
 echo "FCNN: Chaining Spandex"
-echo "############################"
-echo "############################\n"
+echo ""
 ./fcnn/fcnn-chaining-spx.exe
 
 # Pipelining
 # Spandex
-echo "\n############################"
-echo "############################"
-echo "FCNN: Chaining Spandex"
-echo "############################"
-echo "############################\n"
+echo ""
+echo "FCNN: Pipelining Spandex"
+echo ""
 ./fcnn/fcnn-pipelining-spx.exe

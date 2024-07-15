@@ -1,13 +1,18 @@
 # Run each baremetal program
-# GEMM
-for length in {6..14} # TODO
+# Sort
+for length in 32 64 128 256 512 1024
 do
-    sleep $((length/2))    # Add this sleep in case the next fpga-program erases the previous run
-    echo "\n############################"
-    echo "############################"
-    echo "GEMM: Bare metal; Length: " # TODO
-    echo "############################"
-    echo "############################\n"
-    TEST_PROGRAM=./test/gemm-bm/gemm_stratus-gemm-bm-${length}.exe make fpga-program fpga-run
+    sleep $((length/10))    # Add this sleep in case the next fpga-program erases the previous run
+    # MESI
+    echo "SORT_LEN=${length}"
+    TEST_PROGRAM=./test/sort-bm/sort-bm-${length}.exe make fpga-program fpga-run
+done
+
+# GEMM
+for length in 32 64 128 256 512 1024 # TODO
+do
+    sleep $((length/10))    # Add this sleep in case the next fpga-program erases the previous run
+    echo "GEMM Length=${length}" # TODO
+    TEST_PROGRAM=./test/gemm-bm/gemm-bm-${length}.exe make fpga-program fpga-run
 done
 
