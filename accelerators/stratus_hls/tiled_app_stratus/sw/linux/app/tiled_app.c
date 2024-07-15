@@ -136,14 +136,14 @@ int main(int argc, char **argv)
 	init_parameters();
 		
 	/* <<--print-params-->> */
- #ifdef CFA
- 	printf("\n Coh Mode\tnum_dev\tnum_tiles\ttile_size\tcomp_int\tstride\tcomp_size\tmode");
- 	printf("\n %s\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n", print_coh, num_devices, num_tiles, tile_size, comp_intensity, stride, comp_size, mode);
- #else
- 	printf("\n Coh Mode\tnum_stg\tnum_tiles\ttile_size\tcomp_int\tstride\tcomp_size\tmode");
- 	printf("\n %s\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n", print_coh, comp_stages, num_tiles, tile_size, comp_intensity, stride, comp_size, mode);
-
-#endif
+// #ifdef CFA
+// 	printf("\n Coh Mode\tnum_dev\tnum_tiles\ttile_size\tcomp_int\tstride\tcomp_size\tmode");
+// 	printf("\n %s\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n", print_coh, num_devices, num_tiles, tile_size, comp_intensity, stride, comp_size, mode);
+// #else
+// 	printf("\n Coh Mode\tnum_stg\tnum_tiles\ttile_size\tcomp_int\tstride\tcomp_size\tmode");
+// 	printf("\n %s\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n", print_coh, comp_stages, num_tiles, tile_size, comp_intensity, stride, comp_size, mode);
+//
+//#endif
 	
 
 	int n_dev = 0;
@@ -151,14 +151,14 @@ int main(int argc, char **argv)
 	if (mode == 0)
 		synth_accel_asi(mode);
 	else if(mode==5){
-	 	printf("\n SW MODE ======\n\n");
+	 	//printf("\n SW MODE ======\n\n");
 		int l_stride = tile_size/comp_size;
 		int64_t temp = get_counter();
 		for(int iter = 0; iter<ITERATIONS; iter++)
 			sw_run(l_stride);
 		int64_t temp2 = get_counter();
 		t_total = temp2-temp;
-	 	printf("\n SW MODE ======\n\n");
+	 //	printf("\n SW MODE ======\n\n");
 	}
 	else
 		for(int iter = 0; iter<ITERATIONS; iter++){
@@ -167,7 +167,7 @@ int main(int argc, char **argv)
 		}
 	// int64_t temp2 = get_counter();
 	// t_total = temp2 - total_time_start;
-
+#if 0
 #ifdef CFA
 	printf("\n(CFA)_Coh_Mode\tnum_dev\tnum_tiles\ttile_size\tcomp_int\tstride\tcomp_size\tmode");
 	// printf("\n %s\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n", print_coh, num_devices, num_tiles, tile_size, comp_intensity, stride, comp_size, mode);
@@ -192,6 +192,31 @@ int main(int argc, char **argv)
 		printf("\t%ld\t%ld\t%ld\t%ld\n", t_cpu_read/ITERATIONS, t_cpu_write/ITERATIONS, t_sw/ITERATIONS, t_total/ITERATIONS);
 	else
 		printf("\t%ld\t%ld\t%ld\t%ld\n", t_cpu_read/ITERATIONS, t_cpu_write/ITERATIONS, t_acc/ITERATIONS, t_total/ITERATIONS);
+
+#endif
+#ifdef CFA
+	printf("Results: Synthetic ");
+#else
+	printf("Results: Mono_Synthetic ");
+#endif
+	if(mode == 5)
+		printf("SW ");
+	else
+		printf("%s ", print_modes[mode]);
+	
+#ifdef CFA
+	if(num_devices*comp_intensity>200)
+		printf("Large %d %s =", num_devices, print_coh);
+	else
+		printf("Small %d %s =", num_devices, print_coh);
+#else
+	if(comp_stages*comp_intensity>200)
+		printf("Large %d %s =", num_devices, print_coh);
+	else
+		printf("Small %d %s =", num_devices, print_coh);
+#endif
+	
+printf("%ld\n",t_total/ITERATIONS);
 	
 	//for(int n_dev = 0; n_dev < num_devices; n_dev++) printf("Last item for %d: %ld\n",n_dev,buf[accel_cons_valid_offset[n_dev]+1]);
 	//// Cleanup

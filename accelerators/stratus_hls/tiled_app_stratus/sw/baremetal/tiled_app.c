@@ -218,7 +218,7 @@ int main(int argc, char * argv[])
 	
 
 	// Search for the device
-	printf("Scanning device tree... \n");
+	//printf("Scanning device tree... \n");
 
 	ndev = probe(&espdevs, VENDOR_SLD, SLD_TILED_APP, DEV_NAME);
 	if (ndev == 0) {
@@ -228,9 +228,9 @@ int main(int argc, char * argv[])
 	ndev = (num_devices<ndev)? num_devices : ndev;
 	num_devices = ndev;
 
-	#ifdef PRINT_DEBUG
-	printf("Devices found:%d\n", ndev);
-	#endif
+	//#ifdef PRINT_DEBUG
+	//printf("Devices found:%d\n", ndev);
+	//#endif
 
 	in_len = in_words_adj;//+64
 	out_len = out_words_adj;
@@ -279,27 +279,43 @@ int main(int argc, char * argv[])
 	comp_intensity = COMPUTE_INTENSITY;
 	mode = COMP_MODE;
 	
-	#ifdef CFA
-	printf("CFA Test\n");
-	#else
-	printf("MA Test\n");
-	#endif
+//	#ifdef CFA
+//	printf("CFA Test\n");
+//	#else
+//	printf("MA Test\n");
+//	#endif
 
-#ifdef CFA
-	printf("\n Coh_Mode\tnum_dev\tnum_tiles\ttile_size\tcomp_int\tcomp_size\tmode");
-	printf("\n %s\t%d\t%d\t%d\t%d\t%d\t%d\n", print_coh, num_devices, num_tiles, tile_size, comp_intensity, comp_size, mode);
-#else
-	printf("\n Coh Mode\tnum_stg\tnum_tiles\ttile_size\tcomp_int\tstride\tcomp_size\tmode");
-	printf("\n %s\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n", print_coh, comp_stages, num_tiles, tile_size, comp_intensity, stride, comp_size, mode);
-#endif
+//#ifdef CFA
+//	printf("\n Coh_Mode\tnum_dev\tnum_tiles\ttile_size\tcomp_int\tcomp_size\tmode");
+//	printf("\n %s\t%d\t%d\t%d\t%d\t%d\t%d\n", print_coh, num_devices, num_tiles, tile_size, comp_intensity, comp_size, mode);
+//#else
+//	printf("\n Coh Mode\tnum_stg\tnum_tiles\ttile_size\tcomp_int\tstride\tcomp_size\tmode");
+//	printf("\n %s\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n", print_coh, comp_stages, num_tiles, tile_size, comp_intensity, stride, comp_size, mode);
+//#endif
 	
 	synth_accel_asi(mode);
-	printf("\n CPURead\tCPU_Write\tAccel_Time\tSync_Time\nTotal_Time");
-	printf("\n %ld\t%ld\t%ld\t%ld\t%ld\n", t_cpu_read/ITERATIONS, t_cpu_write/ITERATIONS, t_acc/ITERATIONS, t_sw/ITERATIONS, t_total/ITERATIONS);
+	//printf("\n CPURead\tCPU_Write\tAccel_Time\tSync_Time\nTotal_Time");
+	//printf("\n %ld\t%ld\t%ld\t%ld\t%ld\n", t_cpu_read/ITERATIONS, t_cpu_write/ITERATIONS, t_acc/ITERATIONS, t_sw/ITERATIONS, t_total/ITERATIONS);
 	
 	//for(int n_dev = 0; n_dev < num_devices; n_dev++) printf("Last item for %d: %ld(prod) %ld(con)\n",n_dev,buf[accel_prod_valid_offset[n_dev]+1], buf[accel_cons_valid_offset[n_dev]+1]);
+	int comparison_val=0;
+	#ifdef CFA
+	printf("Results: Synthetic ");
+	comparison_val = num_devices;
+#else
+	printf("Results: Mono_Synthetic ");
+	comparison_val = comp_stages;
+#endif
+	if(mode == 0)printf("Linux ");
+	else if (mode == 1) printf("Chaining ");
+	else if (mode == 2) printf("Pipelining ");
+	else if (mode == 5) printf("SW");
 	
-	printf("\n  ** DONE **\n");
+	if(comparison_val*comp_intensity>500) printf("Large ");
+	else printf("Small ");
+	
+	printf("%d %s = ", comparison_val, print_coh);
+	printf("%ld\n", t_total/ITERATIONS);
 
 	return 0;
 }
