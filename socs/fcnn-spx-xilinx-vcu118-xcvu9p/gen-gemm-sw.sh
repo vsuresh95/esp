@@ -15,7 +15,7 @@ fi
 for length in 32 64 128 256 512 1024
 do
     # Spandex
-    GEMM_LEN=$length ENABLE_SM=1 IS_ESP=1 COH_MODE=1 make gemm_stratus-app-clean gemm_stratus-app
+    GEMM_LEN=$length ENABLE_SM=1 IS_ESP=0 COH_MODE=2 make gemm_stratus-app-clean gemm_stratus-app
     cp soft-build/ariane/sysroot/applications/test/gemm_stratus.exe test/gemm-spx/gemm-spx-${length}.exe
 
 done

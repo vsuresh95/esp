@@ -12,6 +12,6 @@ fi
 
 # Sort
 # Spandex
-ENABLE_SM=1 IS_ESP=1 COH_MODE=1 make sort_stratus-app-clean sort_stratus-app
+ENABLE_SM=1 IS_ESP=0 COH_MODE=2 make sort_stratus-app-clean sort_stratus-app
 cp soft-build/ariane/sysroot/applications/test/sort_stratus.exe test/sort-spx/sort-spx.exe
 
