@@ -17,4 +17,4 @@ echo "For Sort Linux App"
 # ASI
 # Spandex
 ENABLE_SM=1 IS_ESP=0 COH_MODE=2 make sort_stratus-app-clean sort_stratus-app
-mv soft-build/ariane/sysroot/applications/test/sort_stratus.exe test/asi-spandex/sort_stratus-test-asi-spandex-${length}.exe
+mv soft-build/ariane/sysroot/applications/test/sort_stratus.exe test/asi-spandex/sort_stratus-test-asi-spandex.exe
