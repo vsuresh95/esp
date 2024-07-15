@@ -1,10 +1,8 @@
 # Spandex
 loglen=6; while [ $loglen -le 14 ]; do
-    echo "\n############################"
-    echo "############################"
+    echo ""
     echo "FFT: Spandex; Length: $(( 2**(loglen+1) ))"
-    echo "############################"
-    echo "############################\n"
-    ./fft-dma/fft-spx-${loglen}.exe
+    echo ""
+    ./fft-spx/fft-spx-${loglen}.exe
     loglen=$(( loglen + 1 ))
 done
