@@ -313,9 +313,13 @@ int main(int argc, char * argv[])
 	
 	if(comparison_val*comp_intensity>500) printf("Large ");
 	else printf("Small ");
-	
-	printf("%d %s = ", comparison_val, print_coh);
-	printf("%ld\n", t_total/ITERATIONS);
+
+	if(mode != 5){	
+		printf("%d ", comparison_val);
+		if(mode != 0)
+		printf("%d %s ", comparison_val, print_coh);
+	}
+	printf("= %ld\n", t_total/ITERATIONS);
 
 	return 0;
 }

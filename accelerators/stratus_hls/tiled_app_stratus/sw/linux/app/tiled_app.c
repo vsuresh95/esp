@@ -193,7 +193,6 @@ int main(int argc, char **argv)
 	else
 		printf("\t%ld\t%ld\t%ld\t%ld\n", t_cpu_read/ITERATIONS, t_cpu_write/ITERATIONS, t_acc/ITERATIONS, t_total/ITERATIONS);
 
-#endif
 #ifdef CFA
 	printf("Results: Synthetic ");
 #else
@@ -217,6 +216,31 @@ int main(int argc, char **argv)
 #endif
 	
 printf("%ld\n",t_total/ITERATIONS);
+
+#endif
+	int comparison_val=0;
+	#ifdef CFA
+	printf("Results: Synthetic ");
+	comparison_val = num_devices;
+#else
+	printf("Results: Mono_Synthetic ");
+	comparison_val = comp_stages;
+#endif
+	if(mode == 0)printf("Linux ");
+	else if (mode == 1) printf("Chaining ");
+	else if (mode == 2) printf("Pipelining ");
+	else if (mode == 5) printf("SW");
+	
+	if(comparison_val*comp_intensity>500) printf("Large ");
+	else printf("Small ");
+
+	if(mode != 5){	
+		printf("%d ", comparison_val);
+		if(mode != 0)
+		printf("%d %s ", comparison_val, print_coh);
+	}
+	printf("= %ld\n", t_total/ITERATIONS);
+
 	
 	//for(int n_dev = 0; n_dev < num_devices; n_dev++) printf("Last item for %d: %ld\n",n_dev,buf[accel_cons_valid_offset[n_dev]+1]);
 	//// Cleanup
