@@ -360,6 +360,8 @@ int main(int argc, char * argv[])
 			aligned_free(mem);
 			aligned_free(gold);
 
+			while (1) {}
+
 		// }
 	}
 	return 0;

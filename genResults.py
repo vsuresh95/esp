@@ -120,6 +120,8 @@ def dataParsing():
             if chars:
                 if chars[0] != 'Result:':
                     continue    # This line is not about the results
+                if 'random:' in chars:
+                    continue
 
                 # Single-accelerator benchmarks first
                 if chars[1] == 'FFT':
@@ -656,7 +658,6 @@ def generate5d():
             newLine += str(100 * fcnnASI_pipe[j][0] / fcnnBase[0])
             newLine += ', '
         newLine += '\n'
-        print(newLine)
         f.write(newLine)
 
         f.write('\n')
