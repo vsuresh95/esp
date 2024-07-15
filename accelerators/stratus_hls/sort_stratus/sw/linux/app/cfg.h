@@ -4,7 +4,12 @@
 #include "libesp.h"
 #include "sort_stratus.h"
 
-#define DEVNAME "sort_stratus.0"
+#if (ENABLE_SM == 1)
+#define DEVNAME "sort_stratus.0"	// The ASI-version of the accelerator
+#else
+#define DEVNAME "sort_stratus.1"	// The regular version of the accelerator
+#endif
+
 #define NAME "sort_stratus"
 
 #define SYNC_VAR_SIZE 6

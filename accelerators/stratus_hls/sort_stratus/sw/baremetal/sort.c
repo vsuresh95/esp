@@ -144,7 +144,8 @@ int main(int argc, char * argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	for (n = 0; n < ndev; n++) {
+	n = 1;	// For picking the regular invocation accelerator
+	{
 			struct esp_device *dev = &espdevs[n];
 			unsigned sort_batch_max;
 			unsigned sort_len_max;
@@ -161,7 +162,7 @@ int main(int argc, char * argv[])
 			sort_len_min = ioread32(dev, SORT_LEN_MIN_REG);
 			sort_len_max = ioread32(dev, SORT_LEN_MAX_REG);
 
-			printf("******************** %s.%d ********************\n", DEV_NAME, n);
+			// printf("******************** %s.%d ********************\n", DEV_NAME, n);
 			// Check access ok
 			if (SORT_LEN < sort_len_min ||
 				SORT_LEN > sort_len_max ||
