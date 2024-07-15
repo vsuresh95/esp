@@ -352,16 +352,15 @@ int main(int argc, char * argv[])
 			}
 #endif
 
-			printf("	SORT_LEN = %lu\n", SORT_LEN);
-			printf("	SW Time = %lu\n\n", t_sw_sort);
-			printf("	CPU Write Time = %lu\n", t_cpu_write);
-			printf("	HW Sort Time = %lu\n", t_sort);
-			printf("	CPU Read Time = %lu\n\n", t_cpu_read);
+
+			printf("Result: Sort Baremetal %lu Total = %lu\n", SORT_LEN, t_cpu_write + t_cpu_read + t_sort);
 
 			if (scatter_gather)
 				aligned_free(ptable);
 			aligned_free(mem);
 			aligned_free(gold);
+
+			while (1) {}
 
 		// }
 	}

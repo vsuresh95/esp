@@ -17,27 +17,10 @@ fi
 # Compiling Linux apps
 # Sort
 echo "For Sort Linux App"
-for length in 32 64 128 256 512 1024
-do
-    # ASI
-    # MESI
-    SORT_LEN=$length ENABLE_SM=1 IS_ESP=1 COH_MODE=0 make sort_stratus-app-clean sort_stratus-app
-    mv soft-build/ariane/sysroot/applications/test/sort_stratus.exe test/asi-mesi/sort_stratus-test-asi-mesi-${length}.exe
-    # CDMA
-    SORT_LEN=$length ENABLE_SM=1 IS_ESP=1 COH_MODE=1 make sort_stratus-app-clean sort_stratus-app
-    mv soft-build/ariane/sysroot/applications/test/sort_stratus.exe test/asi-cdma/sort_stratus-test-asi-cdma-${length}.exe
-done
-
-
-# FFT
-echo "For FFT Linux App"
-for length in {6..14}
-do
-    # ASI
-    # MESI
-    LOG_LEN=$length ENABLE_SM=1 IS_ESP=1 COH_MODE=0 make audio_fft_stratus-app-clean audio_fft_stratus-app
-    mv soft-build/ariane/sysroot/applications/test/audio_fft_stratus.exe test/asi-mesi/audio_fft_stratus-test-asi-mesi-${length}.exe
-    # CDMA
-    LOG_LEN=$length ENABLE_SM=1 IS_ESP=1 COH_MODE=1 make audio_fft_stratus-app-clean audio_fft_stratus-app
-    mv soft-build/ariane/sysroot/applications/test/audio_fft_stratus.exe test/asi-cdma/audio_fft_stratus-test-asi-cdma-${length}.exe
-done
+# ASI
+# MESI
+ENABLE_SM=1 IS_ESP=1 COH_MODE=0 make sort_stratus-app-clean sort_stratus-app
+mv soft-build/ariane/sysroot/applications/test/sort_stratus.exe test/asi-mesi/sort_stratus-test-asi-mesi.exe
+# CDMA
+ENABLE_SM=1 IS_ESP=1 COH_MODE=1 make sort_stratus-app-clean sort_stratus-app
+mv soft-build/ariane/sysroot/applications/test/sort_stratus.exe test/asi-cdma/sort_stratus-test-asi-cdma.exe

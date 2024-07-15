@@ -13,20 +13,7 @@ fi
 # Compiling Linux apps
 # Sort
 echo "For Sort Linux App"
-for length in 32 64 128 256 512 1024
-do
-    # Regular invocation
-    # MESI
-    SORT_LEN=$length ENABLE_SM=0 IS_ESP=1 COH_MODE=0 make sort_stratus-app-clean sort_stratus-app
-    mv soft-build/ariane/sysroot/applications/test/sort_stratus.exe test/reg-mesi/sort_stratus-test-reg-mesi-${length}.exe
-done
-
-# FFT
-echo "For FFT Linux App"
-for length in {6..14}
-do
-    # Regular invocation
-    # MESI
-    LOG_LEN=$length ENABLE_SM=0 IS_ESP=1 COH_MODE=0 make audio_fft_stratus-app-clean audio_fft_stratus-app
-    mv soft-build/ariane/sysroot/applications/test/audio_fft_stratus.exe test/reg-mesi/audio_fft_stratus-test-reg-mesi-${length}.exe
-done
+# Regular invocation
+# MESI
+ENABLE_SM=0 IS_ESP=1 COH_MODE=0 make sort_stratus-app-clean sort_stratus-app
+mv soft-build/ariane/sysroot/applications/test/sort_stratus.exe test/reg-mesi/sort_stratus-test-reg-mesi.exe

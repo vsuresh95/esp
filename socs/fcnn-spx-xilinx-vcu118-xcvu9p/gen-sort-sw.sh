@@ -11,10 +11,7 @@ then
 fi
 
 # Sort
-for length in 32 64 128 256 512 1024
-do
-    # Spandex
-    SORT_LEN=$length ENABLE_SM=1 IS_ESP=1 COH_MODE=1 make sort_stratus-app-clean sort_stratus-app
-    cp soft-build/ariane/sysroot/applications/test/sort_stratus.exe test/sort-spx/sort-spx-${length}.exe
-done
+# Spandex
+ENABLE_SM=1 IS_ESP=0 COH_MODE=2 make sort_stratus-app-clean sort_stratus-app
+cp soft-build/ariane/sysroot/applications/test/sort_stratus.exe test/sort-spx/sort-spx.exe
 

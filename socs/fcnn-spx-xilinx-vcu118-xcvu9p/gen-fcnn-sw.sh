@@ -13,11 +13,11 @@ fi
 # TODO
 # Chaining
 # Spandex
-ENABLE_SM=1 IS_ESP=1 COH_MODE=0 make gemm_stratus-app-clean gemm_stratus-app
+ENABLE_SM=1 IS_ESP=0 COH_MODE=2 make gemm_stratus-app-clean gemm_stratus-app
 cp soft-build/ariane/sysroot/applications/test/gemm_stratus.exe test/fcnn/fcnn-chaining-spandex.exe
 
 # Pipelining
 # Spandex
-ENABLE_SM=1 IS_ESP=1 COH_MODE=0 make gemm_stratus-app-clean gemm_stratus-app
+ENABLE_SM=1 IS_ESP=0 COH_MODE=2 make gemm_stratus-app-clean gemm_stratus-app
 cp soft-build/ariane/sysroot/applications/test/gemm_stratus.exe test/fcnn/fcnn-pipelining-spandex.exe.exe
 

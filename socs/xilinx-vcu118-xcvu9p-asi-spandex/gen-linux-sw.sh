@@ -14,20 +14,7 @@ fi
 # Compiling Linux apps
 # Sort
 echo "For Sort Linux App"
-for length in 32 64 128 256 512 1024
-do
-    # ASI
-    # Spandex
-    SORT_LEN=$length ENABLE_SM=1 IS_ESP=0 COH_MODE=2 make sort_stratus-app-clean sort_stratus-app
-    mv soft-build/ariane/sysroot/applications/test/sort_stratus.exe test/asi-spandex/sort_stratus-test-asi-spandex-${length}.exe
-done
-
-# FFT
-echo "For FFT Linux App"
-for length in {6..14}
-do
-    # ASI
-    # Spandex
-    LOG_LEN=$length ENABLE_SM=1 IS_ESP=0 COH_MODE=2 make audio_fft_stratus-app-clean audio_fft_stratus-app
-    mv soft-build/ariane/sysroot/applications/test/audio_fft_stratus.exe test/asi-spandex/audio_fft_stratus-test-asi-spandex-${length}.exe
-done
+# ASI
+# Spandex
+ENABLE_SM=1 IS_ESP=0 COH_MODE=2 make sort_stratus-app-clean sort_stratus-app
+mv soft-build/ariane/sysroot/applications/test/sort_stratus.exe test/asi-spandex/sort_stratus-test-asi-spandex.exe
