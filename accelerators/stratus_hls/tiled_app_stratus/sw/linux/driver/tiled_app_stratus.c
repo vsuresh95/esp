@@ -14,20 +14,35 @@
 #define DRV_NAME	"tiled_app_stratus"
 
 /* <<--regs-->> */
-#define TILED_APP_OUTPUT_TILE_START_OFFSET_REG 0x60
-#define TILED_APP_INPUT_TILE_START_OFFSET_REG 0x5C
-#define TILED_APP_OUTPUT_UPDATE_SYNC_OFFSET_REG 0x58
-#define TILED_APP_INPUT_UPDATE_SYNC_OFFSET_REG 0x54
-#define TILED_APP_OUTPUT_SPIN_SYNC_OFFSET_REG 0x50
-#define TILED_APP_INPUT_SPIN_SYNC_OFFSET_REG 0x4C
-#define TILED_APP_NUM_TILES_REG 0x48
-#define TILED_APP_TILE_SIZE_REG 0x44
-#define TILED_APP_RD_WR_ENABLE_REG 0x40
-// New registers
-#define TILED_APP_PING_PONG_EN_REG 0x6C
-#define TILED_APP_COMPUTE_OVER_DATA_REG 0x68
-#define TILED_APP_COMPUTE_ITERS_REG 0x64
+//#define TILED_APP_OUTPUT_TILE_START_OFFSET_REG (0x60+4)
+//#define TILED_APP_INPUT_TILE_START_OFFSET_REG (0x5C+4)
+//#define TILED_APP_OUTPUT_UPDATE_SYNC_OFFSET_REG (0x58+4)
+//#define TILED_APP_INPUT_UPDATE_SYNC_OFFSET_REG (0x54+4)
+//#define TILED_APP_OUTPUT_SPIN_SYNC_OFFSET_REG (0x50+4)
+//#define TILED_APP_INPUT_SPIN_SYNC_OFFSET_REG (0x4C+4)
+//#define TILED_APP_NUM_TILES_REG (0x48+4)
+//#define TILED_APP_TILE_SIZE_REG (0x44+4)
+//#define TILED_APP_RD_WR_ENABLE_REG (0x40+4)
+//// New registers
+//#define TILED_APP_PING_PONG_EN_REG (0x6C+4)
+//#define TILED_APP_COMPUTE_OVER_DATA_REG (0x68+4)
+//#define TILED_APP_COMPUTE_ITERS_REG (0x64+4)
+//#define TILED_APP_NUM_COMP_UNITS_REG 0x40
 
+/* <<--regs-->> */
+#define TILED_APP_NUM_COMP_UNITS_REG 0x40
+#define TILED_APP_RD_WR_ENABLE_REG 0x44
+#define TILED_APP_TILE_SIZE_REG 0x48
+#define TILED_APP_NUM_TILES_REG 0x4C
+#define TILED_APP_INPUT_SPIN_SYNC_OFFSET_REG 0x50
+#define TILED_APP_OUTPUT_SPIN_SYNC_OFFSET_REG 0x54
+#define TILED_APP_INPUT_UPDATE_SYNC_OFFSET_REG 0x58
+#define TILED_APP_OUTPUT_UPDATE_SYNC_OFFSET_REG 0x5C
+#define TILED_APP_INPUT_TILE_START_OFFSET_REG 0x60
+#define TILED_APP_OUTPUT_TILE_START_OFFSET_REG 0x64
+#define TILED_APP_COMPUTE_OVER_DATA_REG 0x68
+#define TILED_APP_COMPUTE_ITERS_REG 0x6C
+#define TILED_APP_PING_PONG_EN_REG 0x70
 // #define SPANDEX_REG 0x34
 
 struct tiled_app_stratus_device {
@@ -75,6 +90,7 @@ static void tiled_app_prep_xfer(struct esp_device *esp, void *arg)
 	iowrite32be(a->ping_pong_en, esp->iomem + TILED_APP_PING_PONG_EN_REG);
 	iowrite32be(a->compute_over_data, esp->iomem + TILED_APP_COMPUTE_OVER_DATA_REG);
 	iowrite32be(a->compute_iters, esp->iomem + TILED_APP_COMPUTE_ITERS_REG);
+	iowrite32be(a->num_comp_units_reg, esp->iomem + TILED_APP_NUM_COMP_UNITS_REG);
 
 	// printf("In %s func %s line %d Setting spandex reg: %x\n",  __FILE__, __func__, __LINE__, a->spandex_reg);
 	iowrite32be(a->spandex_reg, esp->iomem + SPANDEX_REG);

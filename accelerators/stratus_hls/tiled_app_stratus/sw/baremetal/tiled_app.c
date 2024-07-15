@@ -17,14 +17,14 @@
 #include "../linux/app/tiled_app.h"
 #define QUAUX(X) #X
 #define QU(X) QUAUX(X)
-//
-//
+
 
 // typedef int64_t token_t;
 
 // #define SYNC_VAR_SIZE 4
 
 /* Size of the contiguous chunks for scatter/gather */
+
 
 
 static unsigned DMA_WORD_PER_BEAT(unsigned _st)
@@ -194,6 +194,7 @@ inline static void print_mem(int read ){
 	}
 }
 
+
 int main(int argc, char * argv[])
 {
 	// printf("Hello World 123\n");
@@ -253,7 +254,7 @@ int main(int argc, char * argv[])
 	buf = mem;
 
 	set_offsets();
-	// reset_sync();
+	reset_sync();
 
 
 	read_tile = 0;
@@ -277,14 +278,26 @@ int main(int argc, char * argv[])
 	
 	comp_intensity = COMPUTE_INTENSITY;
 	mode = COMP_MODE;
-	printf("\n Coh_Mode\tnum_dev\tnum_tiles\ttile_size\tcomp_int\tcomp_size\tmode"); 
-	printf("\n %s\t%d\t%d\t\t%d\t\t%d\t%d\t%d\n", print_coh, num_devices, num_tiles, tile_size, comp_intensity, comp_size, mode);
+	
+	#ifdef CFA
+	printf("CFA Test\n");
+	#else
+	printf("MA Test\n");
+	#endif
+
+#ifdef CFA
+	printf("\n Coh_Mode\tnum_dev\tnum_tiles\ttile_size\tcomp_int\tcomp_size\tmode");
+	printf("\n %s\t%d\t%d\t%d\t%d\t%d\t%d\n", print_coh, num_devices, num_tiles, tile_size, comp_intensity, comp_size, mode);
+#else
+	printf("\n Coh Mode\tnum_stg\tnum_tiles\ttile_size\tcomp_int\tstride\tcomp_size\tmode");
+	printf("\n %s\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n", print_coh, comp_stages, num_tiles, tile_size, comp_intensity, stride, comp_size, mode);
+#endif
 	
 	synth_accel_asi(mode);
 	printf("\n CPURead\tCPU_Write\tAccel_Time\tSync_Time\nTotal_Time");
 	printf("\n %ld\t%ld\t%ld\t%ld\t%ld\n", t_cpu_read/ITERATIONS, t_cpu_write/ITERATIONS, t_acc/ITERATIONS, t_sw/ITERATIONS, t_total/ITERATIONS);
 	
-	for(int n_dev = 0; n_dev < num_devices; n_dev++) printf("Last item for %d: %ld(prod) %ld(con)\n",n_dev,buf[accel_prod_valid_offset[n_dev]+1], buf[accel_cons_valid_offset[n_dev]+1]);
+	//for(int n_dev = 0; n_dev < num_devices; n_dev++) printf("Last item for %d: %ld(prod) %ld(con)\n",n_dev,buf[accel_prod_valid_offset[n_dev]+1], buf[accel_cons_valid_offset[n_dev]+1]);
 	
 	printf("\n  ** DONE **\n");
 

@@ -10,8 +10,9 @@
 // else
 
 
-#endif 
+#endif
 
+#include "stdlib.h"
 #include "coh_func.h"
 typedef int64_t token_t;
 
@@ -24,20 +25,34 @@ typedef int64_t token_t;
 #define MODE_PIPE 2
 
 #define COMP_MODE MODE_PIPE
-#define NUM_TILES 1024
-#define TILE_SIZE 1024
+#define NUM_TILES 20
+#define TILE_SIZE 10
+//#define TILE_SIZE 1024
 #define RD_WR_ENABLE 0
-#define COMPUTE_INTENSITY (1000)
-#define COMPUTE_SIZE (1024)
+//#define COMPUTE_INTENSITY (150)
+#define COMPUTE_INTENSITY (10)
+//75 50 30
+#define COMPUTE_SIZE (TILE_SIZE)
 // #define TIMERS 1
 #define ITERATIONS 1
+#define MAX_DEVICES 15
+
+//#define CFA
 
 #define NACC 1
 
 #define SYNC_VAR_SIZE 6
 
-#define NUM_DEVICES 5
-#define MAX_DEVICES 5
+
+#ifdef CFA
+#define COMPUTE_STAGES 1
+#define NUM_DEVICES 3
+//#define NUM_DEVICES 1
+#else
+#define COMPUTE_STAGES 15
+#define NUM_DEVICES 1
+//#define MAX_DEVICES 3
+#endif
 
 
 #define CHUNK_SHIFT 20
@@ -52,6 +67,7 @@ int32_t tile_size = TILE_SIZE;
 int32_t num_devices = NUM_DEVICES;
 int32_t comp_intensity = COMPUTE_INTENSITY;
 int32_t comp_size = COMPUTE_SIZE;
+int32_t comp_stages = COMPUTE_STAGES;
 int32_t stride = 1;
 int32_t mode = COMP_MODE;
 const int32_t rd_wr_enable = RD_WR_ENABLE;
@@ -61,6 +77,7 @@ token_t *buf;
 // int regInv;
 
 int32_t input_buffer_offset[MAX_DEVICES];
+char accel_names[MAX_DEVICES][25];
 int32_t output_buffer_offset[MAX_DEVICES];
 
 int32_t accel_prod_last_element[MAX_DEVICES];
@@ -94,11 +111,6 @@ esp_thread_info_t cfg_000[MAX_DEVICES];
 
 void update_tiled_app_cfg(int num_devices, int tile_size){
 	int dev_id;
-	printf("Configuring %d/%d devices\n", num_devices, (int)MAX_DEVICES);
-
-	cpu_prod_ready_offset = &accel_cons_ready_offset[num_devices-1];
-	cpu_prod_valid_offset = &accel_cons_valid_offset[num_devices-1];
-	
 	for(dev_id = 0; dev_id < num_devices; dev_id++){
 
 		if(mode==MODE_REG_INV)
@@ -113,6 +125,7 @@ void update_tiled_app_cfg(int num_devices, int tile_size){
 		tiled_app_cfg_000[dev_id].output_update_sync_offset = accel_cons_valid_offset[dev_id];
 		tiled_app_cfg_000[dev_id].input_tile_start_offset = input_buffer_offset[dev_id];
 		tiled_app_cfg_000[dev_id].output_tile_start_offset = output_buffer_offset[dev_id];
+		tiled_app_cfg_000[dev_id].num_comp_units_reg = comp_stages;
 		tiled_app_cfg_000[dev_id].esp = esp;
 		tiled_app_cfg_000[dev_id].esp.coherence = coherence;
 		//spandex
@@ -126,12 +139,18 @@ void update_tiled_app_cfg(int num_devices, int tile_size){
 			tiled_app_cfg_000[dev_id].esp.start_stop = 0;
 
 		cfg_000[dev_id].run = true;
-		if(dev_id == 0)
-			cfg_000[dev_id].devname = "tiled_app_stratus.0";
-		if(dev_id == 1)
-			cfg_000[dev_id].devname = "tiled_app_stratus.1";
-		if(dev_id == 2)
-			cfg_000[dev_id].devname = "tiled_app_stratus.2";
+	//	char namebuf[21];//="tiled_app_stratus.";
+		snprintf ( accel_names[dev_id], 25, "tiled_app_stratus.%d",dev_id );
+	//	itoa(dev_id, namebuf+18, 10);
+	//	strcpy( cfg_000[dev_id].devname,namebuf);// = namebuf;
+		cfg_000[dev_id].devname = accel_names[dev_id];
+		//printf("%s\n",cfg_000[dev_id].devname);
+		//if(dev_id == 0)
+		//	cfg_000[dev_id].devname = "tiled_app_stratus.0";
+		//if(dev_id == 1)
+		//	cfg_000[dev_id].devname = "tiled_app_stratus.1";
+		//if(dev_id == 2)
+		//	cfg_000[dev_id].devname = "tiled_app_stratus.2";
 		cfg_000[dev_id].ioctl_req = TILED_APP_STRATUS_IOC_ACCESS;
 		cfg_000[dev_id].esp_desc = &(tiled_app_cfg_000[dev_id].esp);
 		cfg_000[dev_id].hw_buf = buf;
@@ -149,19 +168,47 @@ void update_tiled_app_cfg(int num_devices, int tile_size){
 
 /* User defined registers */
 /* <<--regs-->> */
-#define TILED_APP_OUTPUT_TILE_START_OFFSET_REG 0x60
-#define TILED_APP_INPUT_TILE_START_OFFSET_REG 0x5C
-#define TILED_APP_OUTPUT_UPDATE_SYNC_OFFSET_REG 0x58
-#define TILED_APP_INPUT_UPDATE_SYNC_OFFSET_REG 0x54
-#define TILED_APP_OUTPUT_SPIN_SYNC_OFFSET_REG 0x50
-#define TILED_APP_INPUT_SPIN_SYNC_OFFSET_REG 0x4C
-#define TILED_APP_NUM_TILES_REG 0x48
-#define TILED_APP_TILE_SIZE_REG 0x44
-#define TILED_APP_RD_WR_ENABLE_REG 0x40
-// New registers
-#define TILED_APP_PING_PONG_EN_REG 0x6C
+//#define TILED_APP_OUTPUT_TILE_START_OFFSET_REG 0x60
+//#define TILED_APP_INPUT_TILE_START_OFFSET_REG 0x5C
+//#define TILED_APP_OUTPUT_UPDATE_SYNC_OFFSET_REG 0x58
+//#define TILED_APP_INPUT_UPDATE_SYNC_OFFSET_REG 0x54
+//#define TILED_APP_OUTPUT_SPIN_SYNC_OFFSET_REG 0x50
+//#define TILED_APP_INPUT_SPIN_SYNC_OFFSET_REG 0x4C
+//#define TILED_APP_NUM_TILES_REG 0x48
+//#define TILED_APP_TILE_SIZE_REG 0x44
+//#define TILED_APP_RD_WR_ENABLE_REG 0x40
+//// New registers
+//#define TILED_APP_PING_PONG_EN_REG 0x6C
+//#define TILED_APP_COMPUTE_OVER_DATA_REG 0x68
+//#define TILED_APP_COMPUTE_ITERS_REG 0x64
+//<param name="num_comp_units" desc="num_comp_units" />
+//   <param name="rd_wr_enable" desc="rd_wr_enable" />
+//   <param name="tile_size" desc="tile_size" />
+//   <param name="num_tiles" desc="num_tiles" />
+//   <param name="prod_valid_offset" desc="prod_valid_offset" />
+//   <param name="cons_ready_offset" desc="cons_ready_offset" />
+//   <param name="prod_ready_offset" desc="prod_ready_offset" />
+//   <param name="cons_valid_offset" desc="cons_valid_offset" />
+//   <param name="input_offset" desc="input_offset" />
+//   <param name="output_offset" desc="output_offset" />
+//   <param name="compute_over_data" desc="compute_over_data" />
+//   <param name="compute_iters" desc="compute_iters" />
+//   <param name="ping_pong_en" desc="ping_pong_en" />
+
+/* <<--regs-->> */
+#define TILED_APP_NUM_COMP_UNITS_REG 0x40
+#define TILED_APP_RD_WR_ENABLE_REG 0x44
+#define TILED_APP_TILE_SIZE_REG 0x48
+#define TILED_APP_NUM_TILES_REG 0x4C
+#define TILED_APP_INPUT_SPIN_SYNC_OFFSET_REG 0x50
+#define TILED_APP_OUTPUT_SPIN_SYNC_OFFSET_REG 0x54
+#define TILED_APP_INPUT_UPDATE_SYNC_OFFSET_REG 0x58
+#define TILED_APP_OUTPUT_UPDATE_SYNC_OFFSET_REG 0x5C
+#define TILED_APP_INPUT_TILE_START_OFFSET_REG 0x60
+#define TILED_APP_OUTPUT_TILE_START_OFFSET_REG 0x64
 #define TILED_APP_COMPUTE_OVER_DATA_REG 0x68
-#define TILED_APP_COMPUTE_ITERS_REG 0x64
+#define TILED_APP_COMPUTE_ITERS_REG 0x6C
+#define TILED_APP_PING_PONG_EN_REG 0x70
 
 int ndev;
 struct esp_device *espdevs;
@@ -178,13 +225,12 @@ token_t *gold;
 token_t *out;
 
 int update_tiled_app_cfg(int num_devices, int tile_size){
-	printf("Configuring %d/%d devices\n", num_devices, (int)MAX_DEVICES);
 	struct esp_device *dev;
 	cpu_prod_ready_offset = &accel_cons_ready_offset[num_devices-1];
 	cpu_prod_valid_offset = &accel_cons_valid_offset[num_devices-1];
 	for (int n = 0; n < num_devices; n++) {
 
-		printf("**************** %s.%d ****************\n", DEV_NAME, n);
+	//	printf("**************** %s.%d ****************\n", DEV_NAME, n);
 
 		dev = &espdevs[n];
 
@@ -202,7 +248,7 @@ int update_tiled_app_cfg(int num_devices, int tile_size){
 		#ifdef VALIDATE
 		printf("  out buffer base-address = %p\n", out);
 		#endif
-		printf("  memory buffer base-address = %p\n", mem);
+	//	printf("  memory buffer base-address = %p\n", mem);
 
 		ptable = aligned_malloc(NCHUNK(mem_size) * sizeof(unsigned *));
 		unsigned int dev_mem_layout_offset = (n*(tile_size + SYNC_VAR_SIZE)); //basically don't include input tile and input sync for previous accelerator
@@ -211,8 +257,8 @@ int update_tiled_app_cfg(int num_devices, int tile_size){
 			ptable[i] = (unsigned *) &mem[i * (CHUNK_SIZE / sizeof(token_t))];
 		ptable_list[n] = ptable;
 
-		printf("  ptable = %p\n", ptable);
-		printf("  nchunk = %lu\n", NCHUNK(mem_size));
+	//	printf("  ptable = %p\n", ptable);
+	//	printf("  nchunk = %lu\n", NCHUNK(mem_size));
 
         	asm volatile ("fence w, rw");
 
@@ -222,7 +268,7 @@ int update_tiled_app_cfg(int num_devices, int tile_size){
 		#if(COH_MODE==3)
 			spandex_config.w_cid = (n+2)%(NUM_DEVICES+1);
 		#endif
-		printf("Writing spandex :%d\n", spandex_config.spandex_reg);
+	//	printf("Writing spandex :%d\n", spandex_config.spandex_reg);
 		iowrite32(dev, SPANDEX_REG, spandex_config.spandex_reg);
 		#endif
 
@@ -241,12 +287,12 @@ int update_tiled_app_cfg(int num_devices, int tile_size){
 		iowrite32(dev, SRC_OFFSET_REG, 0x0);
 		iowrite32(dev, DST_OFFSET_REG, 0x0);
 
-		iowrite32(dev, TILED_APP_OUTPUT_TILE_START_OFFSET_REG , output_buffer_offset[n]);
-		iowrite32(dev, TILED_APP_INPUT_TILE_START_OFFSET_REG  , input_buffer_offset[n]);
-		iowrite32(dev, TILED_APP_OUTPUT_UPDATE_SYNC_OFFSET_REG, accel_cons_valid_offset[n]);
-		iowrite32(dev, TILED_APP_INPUT_UPDATE_SYNC_OFFSET_REG , accel_prod_ready_offset[n]);
-		iowrite32(dev, TILED_APP_OUTPUT_SPIN_SYNC_OFFSET_REG  , accel_cons_ready_offset[n]); //
-		iowrite32(dev, TILED_APP_INPUT_SPIN_SYNC_OFFSET_REG   , accel_prod_valid_offset[n]);
+		iowrite32(dev, TILED_APP_OUTPUT_TILE_START_OFFSET_REG ,  output_buffer_offset[n]);
+		iowrite32(dev, TILED_APP_INPUT_TILE_START_OFFSET_REG  ,  input_buffer_offset[n]);
+		iowrite32(dev, TILED_APP_OUTPUT_UPDATE_SYNC_OFFSET_REG,  accel_cons_valid_offset[n]);
+		iowrite32(dev, TILED_APP_INPUT_UPDATE_SYNC_OFFSET_REG ,  accel_prod_ready_offset[n]);
+		iowrite32(dev, TILED_APP_OUTPUT_SPIN_SYNC_OFFSET_REG  ,  accel_cons_ready_offset[n]); //
+		iowrite32(dev, TILED_APP_INPUT_SPIN_SYNC_OFFSET_REG   ,  accel_prod_valid_offset[n]);
 
 		#ifndef REG_INV
 		iowrite32(dev, TILED_APP_NUM_TILES_REG, num_tiles);//ndev-n- +ndev-n-1
@@ -258,6 +304,7 @@ int update_tiled_app_cfg(int num_devices, int tile_size){
 		iowrite32(dev, TILED_APP_PING_PONG_EN_REG, 0);
 		iowrite32(dev, TILED_APP_COMPUTE_OVER_DATA_REG, comp_size);
 		iowrite32(dev, TILED_APP_COMPUTE_ITERS_REG, comp_intensity);
+		iowrite32(dev, TILED_APP_NUM_COMP_UNITS_REG, comp_stages);
 
 		// Flush (customize coherence model here)
 		esp_flush(coherence);

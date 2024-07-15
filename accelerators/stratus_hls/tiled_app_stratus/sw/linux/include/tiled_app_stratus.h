@@ -35,6 +35,7 @@ struct tiled_app_stratus_access {
 	unsigned compute_over_data;
 	unsigned compute_iters;
 	unsigned ping_pong_en;
+	unsigned num_comp_units_reg;
 	unsigned spandex_reg;
 };
 
