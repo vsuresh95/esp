@@ -24,13 +24,15 @@ typedef int64_t token_t;
 #define MODE_CHAIN 1
 #define MODE_PIPE 2
 
-#define COMP_MODE MODE_PIPE
-#define NUM_TILES 20
-#define TILE_SIZE 10
+const char* print_modes[]= {"Linux", "Chaining", "Pipelining"};
+
+//#define COMP_MODE MODE_PIPE
+#define NUM_TILES 1024
+#define TILE_SIZE 1024
 //#define TILE_SIZE 1024
 #define RD_WR_ENABLE 0
 //#define COMPUTE_INTENSITY (150)
-#define COMPUTE_INTENSITY (10)
+//#define COMPUTE_INTENSITY (100)
 //75 50 30
 #define COMPUTE_SIZE (TILE_SIZE)
 // #define TIMERS 1
@@ -46,10 +48,10 @@ typedef int64_t token_t;
 
 #ifdef CFA
 #define COMPUTE_STAGES 1
-#define NUM_DEVICES 3
+//#define NUM_DEVICES 3
 //#define NUM_DEVICES 1
 #else
-#define COMPUTE_STAGES 15
+//#define COMPUTE_STAGES 15
 #define NUM_DEVICES 1
 //#define MAX_DEVICES 3
 #endif

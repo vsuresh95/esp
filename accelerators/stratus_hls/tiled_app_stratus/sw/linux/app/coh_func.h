@@ -4,8 +4,20 @@
 #ifndef __COH_FUNC__
 #define __COH_FUNC__
 
+#ifdef COH_CODE
+	#if (COH_CODE==1)
+	#define ESP
+	#define COH_MODE 0
+	#elif (COH_CODE ==2)
+	#define ESP
+	#define COH_MODE 1
+	#elif (COH_CODE==3)
+	#define COH_MODE 2
+	#endif
+#else
 #define ESP
-#define COH_MODE 1
+#define COH_MODE 0
+#endif
 
 
 typedef union
@@ -55,10 +67,10 @@ unsigned coherence = ACC_COH_LLC;
 const char print_coh[] = "LLC-Coherent_DMA";
 #elif (COH_MODE == 1)
 unsigned coherence = ACC_COH_RECALL;
-const char print_coh[] = "Coherent_DMA";
+const char print_coh[] = "DMA";
 #else
 unsigned coherence = ACC_COH_FULL;
-const char print_coh[] = "Baseline_MESI";
+const char print_coh[] = "MESI";
 #endif
 
 #else
@@ -75,7 +87,7 @@ const char print_coh[] = "Owner_Prediction";
 #define READ_CODE 0x4002B30B
 #define WRITE_CODE 0x2062B02B
 spandex_config_t spandex_config = {.spandex_reg = 0, .r_en = 1, .r_type = 2, .w_en = 1, .w_type = 1};
-const char print_coh[] = "Write-through_forwarding";
+const char print_coh[] = "Spandex";
 #elif (COH_MODE == 1)
 // Baseline Spandex
 #define READ_CODE 0x2002B30B
