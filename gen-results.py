@@ -3,6 +3,7 @@ This is the file to generate the results in .csv formats for comparison with the
 '''
 import csv
 import os
+import sys
 
 
 coherence = ['MESI', 'DMA', 'Spandex']  # 3 coherence in total
@@ -110,8 +111,8 @@ monoSynASI_pipe = [[[[1] for _ in range(coherenceLength)] for _ in range(synAccL
 '''
 Data parsing
 '''
-def dataParsing():
-    fileRead = open('minicom.log', 'r')
+def dataParsing(logFile):
+    fileRead = open(logFile, 'r')
     lines = fileRead.readlines()
     # Parsing the file
     for line in lines:
@@ -1152,7 +1153,7 @@ def generateSynLargePipeCompare():
 
 
 if __name__ == '__main__':
-    dataParsing()
+    dataParsing(sys.argv[1])
     if os.path.isfile('./results.csv'):
         os.system('rm results.csv')
     generate4a()
