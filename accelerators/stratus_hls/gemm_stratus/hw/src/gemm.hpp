@@ -1,4 +1,4 @@
-// Copyright (c) 2011-2023 Columbia University, System Level Design Group
+// Copyright (c) 2011-2022 Columbia University, System Level Design Group
 // SPDX-License-Identifier: Apache-2.0
 
 #ifndef __GEMM_HPP__
@@ -15,21 +15,35 @@
 #define __round_mask(x, y) ((y)-1)
 #define round_up(x, y) ((((x)-1) | __round_mask(x, y))+1)
 
+#ifdef  ENABLE_SM
+class gemm : public esp_accelerator_asi<DMA_WIDTH>
+#else
 class gemm : public esp_accelerator_3P<DMA_WIDTH>
+#endif
 {
 public:
 
     // Constructor
     SC_HAS_PROCESS(gemm);
+#ifdef  ENABLE_SM
+    gemm(const sc_module_name& name)
+	: esp_accelerator_asi<DMA_WIDTH>(name)
+	, output_done("output_done")
+	, load_compute_cfg_done("load_compute_cfg_done")
+	, load_store_cfg_done("load_store_cfg_done")
+#else
     gemm(const sc_module_name& name)
 	: esp_accelerator_3P<DMA_WIDTH>(name)
 	, cfg("config")
 	, output_done("output_done")
 	, load_compute_cfg_done("load_compute_cfg_done")
 	, load_store_cfg_done("load_store_cfg_done")
+#endif
         {
             // Signal binding
+#ifndef  ENABLE_SM
             cfg.bind_with(*this);
+#endif
 	    output_done.bind_with<DMA_WIDTH>(*this);
 	    load_compute_cfg_done.bind_with<DMA_WIDTH>(*this);
 	    load_store_cfg_done.bind_with<DMA_WIDTH>(*this);
@@ -60,7 +74,9 @@ public:
     void store_output();
 
     // Configure gemm
+#ifndef  ENABLE_SM
     esp_config_proc cfg;
+#endif
 
     // Custom handshakes
     handshake_t output_done;

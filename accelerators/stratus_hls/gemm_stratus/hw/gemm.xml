@@ -10,5 +10,9 @@
     <param name="st_offset" desc="Output offset"/>
     <param name="do_relu" desc="Do ReLU stage"/>
     <param name="transpose" desc="True if matrix 2 is transposed"/>
+    <param name="prod_valid_offset" desc="prod_valid_offset" />
+    <param name="cons_ready_offset" desc="cons_ready_offset" />
+    <param name="prod_ready_offset" desc="prod_ready_offset" />
+    <param name="cons_valid_offset" desc="cons_valid_offset" />
   </accelerator>
 </sld>

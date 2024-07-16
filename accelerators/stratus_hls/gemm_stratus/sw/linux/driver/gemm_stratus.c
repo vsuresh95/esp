@@ -21,6 +21,19 @@
 #define GEMM_D1_REG 0x44
 #define GEMM_NINPUTS_REG 0x40
 
+// #define GEMM_PROD_VALID_OFFSET 0x64
+// #define GEMM_PROD_READY_OFFSET 0x68
+// #define GEMM_CONS_VALID_OFFSET 0x6c
+// #define GEMM_CONS_READY_OFFSET 0x70
+#define GEMM_PROD_VALID_OFFSET 0x64
+#define GEMM_CONS_READY_OFFSET 0x68
+#define GEMM_PROD_READY_OFFSET 0x6C
+#define GEMM_CONS_VALID_OFFSET 0x70
+
+// #define GEMM_INPUT_OFFSET 0x74
+// #define GEMM_OUTPUT_OFFSET 0x78
+
+
 struct gemm_stratus_device {
 	struct esp_device esp;
 };
@@ -63,6 +76,14 @@ static void gemm_prep_xfer(struct esp_device *esp, void *arg)
 	iowrite32be(a->ld_offset2, esp->iomem + GEMM_LD_OFFSET2_REG);
 	iowrite32be(a->src_offset, esp->iomem + SRC_OFFSET_REG);
 	iowrite32be(a->dst_offset, esp->iomem + DST_OFFSET_REG);
+
+	iowrite32be(a->prod_valid_offset, esp->iomem + GEMM_PROD_VALID_OFFSET);
+	iowrite32be(a->cons_ready_offset, esp->iomem + GEMM_CONS_READY_OFFSET);
+	iowrite32be(a->prod_ready_offset, esp->iomem + GEMM_PROD_READY_OFFSET);
+	iowrite32be(a->cons_valid_offset, esp->iomem + GEMM_CONS_VALID_OFFSET);
+	// iowrite32be(a->input_offset, esp->iomem + GEMM_INPUT_OFFSET);
+	// iowrite32be(a->output_offset, esp->iomem + GEMM_OUTPUT_OFFSET);
+	iowrite32be(a->spandex_conf, esp->iomem + SPANDEX_REG);
 }
 
 static bool gemm_xfer_input_ok(struct esp_device *esp, void *arg)

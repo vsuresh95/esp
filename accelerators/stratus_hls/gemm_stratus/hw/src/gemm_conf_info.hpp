@@ -1,4 +1,4 @@
-// Copyright (c) 2011-2023 Columbia University, System Level Design Group
+// Copyright (c) 2011-2022 Columbia University, System Level Design Group
 // SPDX-License-Identifier: Apache-2.0
 
 #ifndef __GEMM_CONF_INFO_HPP__
@@ -27,6 +27,12 @@ public:
     uint32_t st_offset;  // Output offset
     uint32_t do_relu; // Do ReLU stage
     uint32_t transpose; // True if matrix 2 is transposed
+// #ifdef ENABLE_SM
+    int32_t cons_valid_offset;
+    int32_t prod_ready_offset ;
+    int32_t cons_ready_offset  ;
+    int32_t prod_valid_offset   ;
+// #endif
 
     //
     // constructors
@@ -42,7 +48,15 @@ public:
             , st_offset(0)
 	    , do_relu(0)
 	    , transpose(0)
-	{}
+	{
+
+#ifdef ENABLE_SM
+        this->cons_valid_offset  = 0;
+        this->prod_ready_offset   = 0;
+        this->cons_ready_offset    = 0;
+        this->prod_valid_offset     = 0;
+#endif
+    }
 
     // equals operator
     inline bool operator==(const conf_info_t &rhs) const
@@ -55,7 +69,14 @@ public:
                 && (rhs.ld_offset2 == ld_offset2)
                 && (rhs.st_offset == st_offset)
 		&& (rhs.do_relu == do_relu)
-		&& (rhs.transpose == transpose);
+		&& (rhs.transpose == transpose)
+// #ifdef ENABLE_SM
+        && (cons_valid_offset== rhs.cons_valid_offset) 
+        && (prod_ready_offset == rhs.prod_ready_offset ) 
+        && (cons_ready_offset  == rhs.cons_ready_offset  ) 
+        && (prod_valid_offset   == rhs.prod_valid_offset   )
+// #endif
+;
 	}
 
     // assignment operator
@@ -70,6 +91,12 @@ public:
             st_offset = other.st_offset;
             do_relu = other.do_relu;
 	    transpose = other.transpose;
+// #ifdef ENABLE_SM
+        cons_valid_offset   = other.cons_valid_offset;
+        prod_ready_offset    = other.prod_ready_offset ;
+        cons_ready_offset     = other.cons_ready_offset  ;
+        prod_valid_offset      = other.prod_valid_offset   ;
+// #endif
             return *this;
 	}
 
