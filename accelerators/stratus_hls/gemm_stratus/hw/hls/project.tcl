@@ -1,4 +1,4 @@
-# Copyright (c) 2011-2023 Columbia University, System Level Design Group
+# Copyright (c) 2011-2022 Columbia University, System Level Design Group
 # SPDX-License-Identifier: Apache-2.0
 
 ############################################################
@@ -99,8 +99,11 @@ if {$TECH_IS_XILINX == 1} {
 #
 # DSE configuration
 #
-set DMA_WIDTH "32 64"
-set DMA_CHUNK "2048" 
+#set INVOC "reg asi"
+set INVOC "asi"
+set DMA_WIDTH "64"
+#set DMA_CHUNK "2048 4096" 
+set DMA_CHUNK "4096" 
 set WORD_SIZE "32"
 set PARALLELISM "8"
 # set DMA_WIDTH "64"
@@ -117,63 +120,135 @@ set_attr split_add 32
 
 set DEFAULT_ARGV ""
 
-foreach chk $DMA_CHUNK {
-    foreach dma $DMA_WIDTH {
-	foreach word $WORD_SIZE {
-	    foreach paral $PARALLELISM {
+foreach inv $INVOC {
+	foreach chk $DMA_CHUNK {
+		foreach dma $DMA_WIDTH {
+		foreach word $WORD_SIZE {
+			foreach paral $PARALLELISM {
 
-		# Skip these configurations
-		if {$word == 64 && $dma == 32} {continue}
-		
-		set conf "CHK$chk\_DMA$dma\_WORD$word\_PARAL$paral"
+			# Skip these configurations
+			if {$word == 64 && $dma == 32} {continue}
+			
+			set conf "CHK$chk\_DMA$dma\_WORD$word\_PARAL$paral\_INV$inv"
 
-		define_io_config * IOCFG_$conf -DDMA_CHUNK=$chk \
-		    -DDMA_WIDTH=$dma -DWORD_SIZE=$word -DPARALLELISM=$paral $COMMON_CFG_FLAGS
-
-		define_system_config tb TESTBENCH_$conf -io_config IOCFG_$conf
-
-		foreach tb $TESTBENCHES {
-
-		    set ARGV ""
-		    append ARGV "$INPUT_PATH/$tb\_A.txt ";  # argv[1]
-		    append ARGV "$INPUT_PATH/$tb\_B.txt ";  # argv[2]
-		    append ARGV "$OUTPUT_PATH/$tb.txt ";    # argv[3]
-
-		    define_sim_config "BEHAV_$conf\_$tb" "gemm BEH" \
-			"tb TESTBENCH_$conf" -io_config IOCFG_$conf \
-			-argv $ARGV
-		}
-
-		foreach cfg [list BASIC] {
-
-		    set cname $cfg\_$conf
-
-		    define_hls_config gemm $cname -io_config IOCFG_$conf \
-			-DDMA_CHUNK=$chk -DDMA_WIDTH=$dma -DWORD_SIZE=$word \
-			-DPARALLELISM=$paral $COMMON_HLS_FLAGS -DHLS_DIRECTIVES_$cfg
-
-		    foreach tb $TESTBENCHES {
-
-			set ARGV ""
-			append ARGV "$INPUT_PATH/$tb\_A.txt ";  # argv[1]
-			append ARGV "$INPUT_PATH/$tb\_B.txt ";  # argv[2]
-			append ARGV "$OUTPUT_PATH/$tb.txt ";    # argv[3]
-
-			if {$TECH_IS_XILINX == 1} {
-			    define_sim_config "$cname\_$tb\_V" "gemm RTL_V $cname" \
-				"tb TESTBENCH_$conf" -io_config IOCFG_$conf \
-				-argv $ARGV -verilog_top_modules glbl
+			if {$inv eq "reg"} {
+			define_io_config * IOCFG_$conf -DDMA_CHUNK=$chk \
+				-DDMA_WIDTH=$dma -DWORD_SIZE=$word -DPARALLELISM=$paral $COMMON_CFG_FLAGS
 			} else {
-			    define_sim_config "$cname\_$tb\_V" "gemm RTL_V $cname" \
+			define_io_config * IOCFG_$conf -DDMA_CHUNK=$chk \
+				-DDMA_WIDTH=$dma -DWORD_SIZE=$word -DPARALLELISM=$paral -DENABLE_SM $COMMON_CFG_FLAGS -DDATAWIDTH=$word
+			}
+
+			define_system_config tb TESTBENCH_$conf -io_config IOCFG_$conf
+
+			foreach tb $TESTBENCHES {
+
+				set ARGV ""
+				append ARGV "$INPUT_PATH/$tb\_A.txt ";  # argv[1]
+				append ARGV "$INPUT_PATH/$tb\_B.txt ";  # argv[2]
+				append ARGV "$OUTPUT_PATH/$tb.txt ";    # argv[3]
+
+				define_sim_config "BEHAV_$conf\_$tb" "gemm BEH" \
 				"tb TESTBENCH_$conf" -io_config IOCFG_$conf \
 				-argv $ARGV
 			}
-		    }
+
+			foreach cfg [list BASIC] {
+
+				set cname $cfg\_$conf
+
+				if {$inv eq "reg"} {
+					define_hls_config gemm $cname -io_config IOCFG_$conf \
+					-DDMA_CHUNK=$chk -DDMA_WIDTH=$dma -DWORD_SIZE=$word \
+					-DPARALLELISM=$paral $COMMON_HLS_FLAGS -DHLS_DIRECTIVES_$cfg
+				} else {
+					define_hls_config gemm $cname -io_config IOCFG_$conf \
+					-DDMA_CHUNK=$chk -DDMA_WIDTH=$dma -DWORD_SIZE=$word \
+					-DPARALLELISM=$paral $COMMON_HLS_FLAGS -DENABLE_SM -DHLS_DIRECTIVES_$cfg -DDATA_WIDTH=$word
+				}
+
+				foreach tb $TESTBENCHES {
+
+				set ARGV ""
+				append ARGV "$INPUT_PATH/$tb\_A.txt ";  # argv[1]
+				append ARGV "$INPUT_PATH/$tb\_B.txt ";  # argv[2]
+				append ARGV "$OUTPUT_PATH/$tb.txt ";    # argv[3]
+
+				if {$TECH_IS_XILINX == 1} {
+					define_sim_config "$cname\_$tb\_V" "gemm RTL_V $cname" \
+					"tb TESTBENCH_$conf" -io_config IOCFG_$conf \
+					-argv $ARGV -verilog_top_modules glbl
+				} else {
+					define_sim_config "$cname\_$tb\_V" "gemm RTL_V $cname" \
+					"tb TESTBENCH_$conf" -io_config IOCFG_$conf \
+					-argv $ARGV
+				}
+				}
+			}
+			}
 		}
-	    }
+		}
 	}
-    }
 }
+
+
+#foreach chk $DMA_CHUNK {
+#   foreach dma $DMA_WIDTH {
+#	foreach word $WORD_SIZE {
+#	    foreach paral $PARALLELISM {
+#
+#		# Skip these configurations
+#		if {$word == 64 && $dma == 32} {continue}
+#		
+#		set conf "CHK$chk\_DMA$dma\_WORD$word\_PARAL$paral\_asi"
+#
+#		define_io_config * IOCFG_$conf -DDMA_CHUNK=$chk \
+#		    -DDMA_WIDTH=$dma -DWORD_SIZE=$word -DPARALLELISM=$paral -DENABLE_SM $COMMON_CFG_FLAGS
+#
+#		define_system_config tb TESTBENCH_$conf -io_config IOCFG_$conf
+#
+#		foreach tb $TESTBENCHES {
+#
+#		    set ARGV ""
+#		    append ARGV "$INPUT_PATH/$tb\_A.txt ";  # argv[1]
+#		    append ARGV "$INPUT_PATH/$tb\_B.txt ";  # argv[2]
+#		    append ARGV "$OUTPUT_PATH/$tb.txt ";    # argv[3]
+#
+#		    define_sim_config "BEHAV_$conf\_$tb" "gemm BEH" \
+#			"tb TESTBENCH_$conf" -io_config IOCFG_$conf \
+#			-argv $ARGV
+#		}
+#
+#		foreach cfg [list BASIC] {
+#
+#		    set cname $cfg\_$conf
+#
+#		    define_hls_config gemm $cname -io_config IOCFG_$conf \
+#			-DDMA_CHUNK=$chk -DDMA_WIDTH=$dma -DWORD_SIZE=$word \
+#			-DPARALLELISM=$paral $COMMON_HLS_FLAGS -DENABLE_SM -DHLS_DIRECTIVES_$cfg
+#
+#		    foreach tb $TESTBENCHES {
+#
+#			set ARGV ""
+#			append ARGV "$INPUT_PATH/$tb\_A.txt ";  # argv[1]
+#			append ARGV "$INPUT_PATH/$tb\_B.txt ";  # argv[2]
+#			append ARGV "$OUTPUT_PATH/$tb.txt ";    # argv[3]
+#
+#			if {$TECH_IS_XILINX == 1} {
+#			    define_sim_config "$cname\_$tb\_V" "gemm RTL_V $cname" \
+#				"tb TESTBENCH_$conf" -io_config IOCFG_$conf \
+#				-argv $ARGV -verilog_top_modules glbl
+#			} else {
+#			    define_sim_config "$cname\_$tb\_V" "gemm RTL_V $cname" \
+#				"tb TESTBENCH_$conf" -io_config IOCFG_$conf \
+#				-argv $ARGV
+#			}
+#		    }
+#		}
+#	    }
+#	}
+#    }
+#}
 
 #
 # Compile Flags

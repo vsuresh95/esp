@@ -1,4 +1,4 @@
-// Copyright (c) 2011-2023 Columbia University, System Level Design Group
+// Copyright (c) 2011-2022 Columbia University, System Level Design Group
 // SPDX-License-Identifier: Apache-2.0
 
 #include "gemm.hpp"
@@ -153,7 +153,14 @@ void gemm::load_input()
     for (uint24_t a = 0; a < ninputs; a++)
     {
     	index_d1 = index_d1_n;
-
+#ifdef  ENABLE_SM
+            // Addition for ASI
+            printf("LOAD hit Start-load-asi handshake... DMA_WORD_PER_BEAT=%d\n", (int)(DMA_WORD_PER_BEAT));
+            this->start_load_asi_handshake();
+            load_req_dma_read.write(1);
+            wait();
+            while(dma_read_arbiter.read() != LOAD_UNIT ) wait();
+#endif
     	for (uint24_t d1 = 0; d1 < matrix_d1; d1 += loadable_rows)
     	{
     	    index_d2_tmp = index_d2;
@@ -335,8 +342,13 @@ void gemm::load_input()
     	    }
     	    index_d1 += index_d1_incr;
     	}
+#ifdef  ENABLE_SM
+            load_req_dma_read.write(0);// load relinquishes dma read
+            this->end_load_asi_handshake();
+#else
     	index_d2 += size_matrix2;
     	index_d1_n += size_matrix1;
+	#endif
     }
 
     // Conclude
@@ -436,6 +448,11 @@ void gemm::store_output()
 
     for (uint24_t a = 0; a < ninputs; a++)
     {
+#ifdef  ENABLE_SM
+            //Addition for ASI
+            printf("STORE hit the start store asi handshake... DMA_WORD_PER_BEAT=%d\n", (int)(DMA_WORD_PER_BEAT));
+            this->start_store_asi_handshake();
+#endif
     	uint32_t index_d1 = index_a;
     	for (uint24_t d1 = 0; d1 < matrix_d1; d1 += loadable_rows)
     	{
@@ -465,6 +482,11 @@ void gemm::store_output()
     			store_compute_handshake();
     			// ESP_REPORT_INFO("STORE: after compute hs %u %u %u %u",
     			// 		(unsigned) d1, (unsigned) d2, (unsigned) d1i, (unsigned) chk);
+#ifdef  ENABLE_SM
+            store_req_dma_write.write(1);
+            wait();
+            while(dma_write_arbiter.read() != STORE_UNIT ) wait();
+#endif
 
     			{
     			    HLS_DEFINE_PROTOCOL("store-matrix-info");
@@ -504,6 +526,11 @@ void gemm::store_output()
     			    this->dma_write_chnl.put(data);
     			}
 
+#ifdef  ENABLE_SM
+            store_req_dma_write.write(0);
+    				wait(); 
+#endif
+
 			// toggle pingpong
 			pingpong = !pingpong;
 
@@ -516,12 +543,20 @@ void gemm::store_output()
     	    }
     	    index_d1 += (loadable_rows * matrix_d3);
     	}
+#ifdef  ENABLE_SM
+        // Addition for ASI 
+        printf("STORE hit the end-store handshake...\n");
+        this->end_store_asi_handshake();
+#else
     	index_a += (size_matrix_out / ninputs);
+#endif
     }
 
     // Conclude
     {
+        #ifndef ENABLE_SM
     	this->accelerator_done();
+        #endif
     	this->process_done();
     }
 }
