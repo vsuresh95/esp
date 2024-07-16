@@ -229,7 +229,7 @@ printf("%ld\n",t_total/ITERATIONS);
 	if(mode == 0)printf("Linux ");
 	else if (mode == 1) printf("Chaining ");
 	else if (mode == 2) printf("Pipelining ");
-	else if (mode == 5) printf("SW");
+	else if (mode == 5) printf("SW ");
 	
 	if(comparison_val*comp_intensity>500) printf("Large ");
 	else printf("Small ");
@@ -237,9 +237,9 @@ printf("%ld\n",t_total/ITERATIONS);
 	if(mode != 5){	
 		printf("%d ", comparison_val);
 		if(mode != 0)
-		printf("%d %s ", comparison_val, print_coh);
+		printf("%s ", print_coh);
 	}
-	printf("= %ld\n", t_total/ITERATIONS);
+	printf("=\t%ld\n", t_total/ITERATIONS);
 
 	
 	//for(int n_dev = 0; n_dev < num_devices; n_dev++) printf("Last item for %d: %ld\n",n_dev,buf[accel_cons_valid_offset[n_dev]+1]);
