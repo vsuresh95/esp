@@ -320,7 +320,7 @@ int main(int argc, char * argv[])
 		printf("%s ", print_coh);
 	}
 	printf("=\t%ld\n", t_total/ITERATIONS);
-
+	while(1);
 	return 0;
 }
 
