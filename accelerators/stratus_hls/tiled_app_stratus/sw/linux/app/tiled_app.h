@@ -78,16 +78,8 @@ static inline void set_offsets(){
 	int32_t rel_accel_cons_valid_offset = rel_accel_cons_ready_offset+2;
 	int32_t rel_accel_con_last_offset = rel_accel_cons_valid_offset+1;
 	int32_t rel_output_buffer_offset = tile_size + 2*SYNC_VAR_SIZE;
-	// printf("rel_accel_prod_ready_offset: %d\n", rel_accel_prod_ready_offset);
-	// printf("rel_accel_prod_valid_offset: %d\n", rel_accel_prod_valid_offset);
-	// printf("rel_accel_prod_last_offset: %d\n", rel_accel_prod_last_offset);
-	// printf("rel_input_buffer_offset: %d\n", rel_input_buffer_offset);
-	// printf("rel_accel_cons_ready_offset: %d\n", rel_accel_cons_ready_offset);
-	// printf("rel_accel_cons_valid_offset: %d\n", rel_accel_cons_valid_offset);
-	// printf("rel_accel_con_last_offset: %d\n", rel_accel_con_last_offset);
-	// printf("rel_output_buffer_offset: %d\n", rel_output_buffer_offset);
+
     for(int dev_id = 0; dev_id < num_devices; dev_id++){
-		printf("Set offsets for dev%d\n", dev_id);
 		accel_prod_valid_offset[dev_id] = dev_id*(tile_size + SYNC_VAR_SIZE) + rel_accel_prod_valid_offset;
 		accel_cons_ready_offset[dev_id] = dev_id*(tile_size + SYNC_VAR_SIZE) + rel_accel_cons_ready_offset;
 		accel_prod_ready_offset[dev_id] = dev_id*(tile_size + SYNC_VAR_SIZE) + rel_accel_prod_ready_offset;
@@ -98,37 +90,35 @@ static inline void set_offsets(){
 	cpu_prod_ready_offset = &accel_cons_ready_offset[num_devices-1];
 	cpu_prod_valid_offset = &accel_cons_valid_offset[num_devices-1];
 }
-
+static inline void print_flags(){
+	for(int n = 0; n < num_devices; n++){
+		printf("Device %d prod rdy [%d] = %d ", n,accel_prod_ready_offset[n], read_mem((void*)&buf[accel_prod_ready_offset[n]]) );
+		printf(" cons rdy [%d] = %d", accel_cons_ready_offset[n], read_mem((void*)&buf[accel_cons_ready_offset[n]] ));
+		printf(" prod vld [%d] = %d", accel_prod_valid_offset[n], read_mem((void*)&buf[accel_prod_valid_offset[n]] ));
+		printf(" cons vld [%d] = %d\n", accel_cons_valid_offset[n], read_mem((void*)&buf[accel_cons_valid_offset[n]]) );
+		//printf("accel %d pv[%d]=%d ",dev_id, accel_prod_valid_offset[dev_id], buf[accel_prod_valid_offset[dev_id]]);
+		//printf("cr[%d]=%d " ,accel_cons_ready_offset[dev_id], buf[accel_cons_ready_offset[dev_id]]);
+		//printf("pr[%d]=%d " ,accel_prod_ready_offset[dev_id], buf[accel_prod_ready_offset[dev_id]]);
+		//printf("cv=[%d]%d\n",accel_cons_valid_offset[dev_id], buf[accel_cons_valid_offset[dev_id]]);
+	}
+}
 static inline void reset_sync(){
 	int n;
-    printf("Inside reset sync num_dev %d\n", num_devices);
+    // printf("Inside reset sync\n");
 	for(n = 0; n< num_devices; n++){
-    	// printf("accel_prod_ready_offset %d %x\n", n ,((void*)(buf + accel_prod_ready_offset[n])));
-		write_mem(((void*)(buf + accel_prod_ready_offset[n])), 1);//BM
-    	// printf("accel_cons_valid_offset %d %x\n", n, ((void*)(buf + accel_cons_valid_offset[n])));
 		write_mem(((void*)(buf + accel_cons_valid_offset[n])), 0);
-    	// printf("accel_cons_valid_offset+1 %d %x\n", n, ((void*)(buf + accel_cons_valid_offset[n]+1)));
-		write_mem(((void*)(buf + accel_cons_valid_offset[n]+1)), 0);
-    	// printf("accel_prod_valid_offset %d %x\n", n, ((void*)(buf + accel_prod_valid_offset[n])));
+	//	write_mem(((void*)(buf + accel_cons_valid_offset[n]+1)), 0);
+		asm volatile ("fence w, w");	
 		write_mem(((void*)(buf + accel_prod_valid_offset[n])), 0);
-    	// printf("accel_prod_valid_offset+1 %d %x\n", n, ((void*)(buf + accel_prod_valid_offset[n]+1)));
-		write_mem(((void*)(buf + accel_prod_valid_offset[n]+1)), 0);
-    	// printf("accel_cons_ready_offset %d %x\n", n, ((void*)(buf + accel_cons_ready_offset[n])));
-		write_mem(((void*)(buf + accel_cons_ready_offset[n])), 0); 
+		asm volatile ("fence w, w");	
+		write_mem(((void*)(buf + accel_prod_ready_offset[n])), 1);//BM
+		asm volatile ("fence w, w");
+		if (n == num_devices-1)	
+		write_mem(((void*)(buf + accel_cons_ready_offset[n])), 0);
+		else 
+		write_mem(((void*)(buf + accel_cons_ready_offset[n])), 1);
+		asm volatile ("fence w, w");	
 	}
-	// printf("cpu_cons_ready_offset: %x\n", (void*)(buf + (*cpu_cons_ready_offset)));
-	// printf("cpu_prod_ready_offset: %x\n", (void*)(buf + (*cpu_prod_ready_offset)));
-	// printf("cpu_cons_valid_offset: %x\n", (void*)(buf + (*cpu_cons_valid_offset)));
-	// printf("cpu_cons_valid_offset+1: %x\n", (void*)(buf + (*cpu_cons_valid_offset)+1));
-	// printf("cpu_prod_valid_offset: %x\n", (void*)(buf + (*cpu_prod_valid_offset)));
-	// printf("cpu_prod_valid_offset+1: %x\n", (void*)(buf + (*cpu_prod_valid_offset)+1));
-	// write_mem((void*)(buf + (*cpu_cons_ready_offset)), 1);
-	// write_mem((void*)(buf + (*cpu_prod_ready_offset)), 0);
-	// write_mem((void*)(buf + (*cpu_cons_valid_offset)+1), 0);
-	// write_mem((void*)(buf +( *cpu_cons_valid_offset)), 0);
-	// write_mem((void*)(buf +( *cpu_prod_valid_offset)), 0);
-	// write_mem((void*)(buf +( *cpu_prod_valid_offset)+1), 0);
-    printf("Done reset sync\n");
 	asm volatile ("fence w, w");	
 }
 
@@ -143,7 +133,8 @@ static inline uint32_t poll_prod_valid(){
 	void* dst = (void*)(buf+(*cpu_prod_valid_offset));
 	int64_t value_64 = 0;
 	value_64 = read_mem(dst);
-	return (value_64 == 1);
+	//if(value_64 == 2) printf("last from accel\n");
+	return (value_64 == 1 || value_64 == 2);
 }
 
 static inline uint32_t accel_rdy(int toggle){
@@ -157,23 +148,16 @@ static inline uint32_t accel_rdy(int toggle){
 }
 
 static inline void update_cons_valid(int64_t last){
-	#ifndef ESP
 	asm volatile ("fence w, w");	//release semantics
-	#endif
-	void* dst = (void*)(buf+(*cpu_cons_valid_offset)+1);
-	write_mem(dst, last);
-
-	#ifdef ESP
-	asm volatile ("fence w, w");	//release semantics
-	#endif
-
-	dst = (void*)(buf+(*cpu_cons_valid_offset));
-	int64_t value_64 = 1;
+	void* dst = (void*)(buf+(*cpu_cons_valid_offset));
+	int64_t value_64 = 1+last;
 	write_mem(dst, value_64);
 
 
-	int time_var = 0;
-	while(time_var<100) time_var++;
+//#if defined(ESP) && COH_MODE==1
+//	int time_var = 0;
+//	while(time_var<100) time_var++;
+//#endif
 	asm volatile ("fence w, w");	
 }
 
@@ -183,8 +167,10 @@ static inline void update_cons_rdy(){
 	void* dst = (void*)(buf+(*cpu_cons_ready_offset));
 	int64_t value_64 = 0;
 	write_mem(dst, value_64);
-	int time_var = 0;
-	while(time_var<100) time_var++;
+//#if defined(ESP) && COH_MODE==1
+//	int time_var = 0;
+//	while(time_var<100) time_var++;
+//#endif
 	asm volatile ("fence w, w");	
 }
 
@@ -193,8 +179,10 @@ static inline void update_prod_rdy(){
 	void* dst = (void*)(buf+(*cpu_prod_ready_offset));
 	int64_t value_64 = 1; 
 	write_mem(dst, value_64);
-	int time_var = 0;
-	while(time_var<100) time_var++;
+//#if defined(ESP) && COH_MODE==1
+//	int time_var = 0;
+//	while(time_var<100) time_var++;
+//#endif
 	asm volatile ("fence w, w");	
 }
 
@@ -203,8 +191,10 @@ static inline void update_prod_valid(){
 	void* dst = (void*)(buf+(*cpu_prod_valid_offset));
 	int64_t value_64 = 0; 
 	write_mem(dst, value_64);
-	int time_var = 0;
-	while(time_var<100) time_var++;
+//#if defined(ESP) && COH_MODE==1
+//	int time_var = 0;
+//	while(time_var<100) time_var++;
+//#endif
 	asm volatile ("fence w, w");	//acquire semantics
 }
 
@@ -237,6 +227,7 @@ static inline void read_from_prod(){
 	int local_tile_size = tile_size;
 	for (int j = 0; j < local_tile_size; j++){
 			out_val = read_mem(src);
+			//printf("%ld\n", out_val);
 			src += 8;
 	}
 }
@@ -254,13 +245,17 @@ void synth_accel_asi(int mode){
 	 t_total=0;
 	int local_num_tiles = (mode==MODE_REG_INV)? 1 : num_tiles;
 	int iterations = (mode==MODE_REG_INV)? num_tiles : 1;
+#ifdef CFA
 	int pipeline_depth = (mode==MODE_PIPE)?num_devices-1:0;
-		// printf(" Pipeline Depth: %d\n", pipeline_depth);
-	if (pipeline_depth > local_num_tiles) pipeline_depth = local_num_tiles;
-
-	reset_sync();
-	printf("dummy prod read\n");
-
+#else
+	int pipeline_depth = (mode==MODE_PIPE)?comp_stages-1:0;
+#endif
+	if(mode == MODE_PIPE)
+	if (pipeline_depth > local_num_tiles) {
+		pipeline_depth = 0; //local_num_tiles;
+		mode = MODE_CHAIN;
+	}
+	//printf(" Pipeline Depth: %d\n", pipeline_depth);
 	read_from_prod(); //dummy read for ownership
 
 	int64_t total_time_start = get_counter();
@@ -271,12 +266,10 @@ void synth_accel_asi(int mode){
 		for(int reg_iters = 0; reg_iters < iterations; reg_iters++){
 			// printf("reg iter %d/%d\n", reg_iters, iterations);
 			temp = get_counter();
-			// printf("Commented: write to cons\n");
 			write_to_cons();
 			temp2 = get_counter();
-			// update_con_last();	
 			update_cons_valid(1);
-			// update_prod_rdy();
+			update_prod_rdy();
 			temp3 = get_counter();
 			t_cpu_write += (temp2-temp);
 			t_sw += (temp3-temp2);
@@ -304,236 +297,155 @@ void synth_accel_asi(int mode){
 			t_acc += (temp2-accel_time_start);
 
 			temp = get_counter();
-			// printf("Commented: read from cons\n");
 			read_from_prod();
 			temp2 = get_counter();
 			t_cpu_read += (temp2-temp);
 		}
 	} // mode REG INV ends
 	else{
-		int local_ndev = (num_devices > 3)? 3 : num_devices;
-	for (n_dev = 0; n_dev < num_devices; n_dev++){
+		update_prod_rdy();
+		for (n_dev = 0; n_dev < num_devices; n_dev++){
 #ifdef BAREMETAL_TEST
-		struct esp_device *dev = &espdevs[n_dev];
-		iowrite32(dev, CMD_REG, CMD_MASK_START);
+			struct esp_device *dev = &espdevs[n_dev];
+			iowrite32(dev, CMD_REG, CMD_MASK_START);
 #else
-		printf("esp run %d\n", n_dev);
-		esp_run(cfg_000+n_dev, NACC);
+			esp_run(cfg_000+n_dev, NACC);
 #endif
-	}
-
-	printf("update prod rdy\n");
-	update_prod_rdy();
-	printf("poll cons rdy\n");
-	poll_cons_rdy();
-	printf("poll prod valid\n");
-	poll_prod_valid();
-	total_time_start = get_counter();
-	if(mode == MODE_PIPE){
-		int input_tile = 0;
-		int output_tile = 0;
-		int accel_status = 0;
-		int64_t last_tile = 0;
-		// while(!last_tile){
-		while(input_tile < local_num_tiles || output_tile< local_num_tiles){
-			accel_status = 0;
-			#ifdef TIMERS
-			int64_t accel_time_start = get_counter();
-			#endif
-			// // int toggle = 0;
-			// if(input_tile < MAX_DEVICES){
-			// 	while(!poll_cons_rdy());
-			// 	accel_status = 1;
-			// }
-			// else 
-			while(!accel_status){
-				// // accel_status = accel_rdy(toggle);
-
-				// if(input_tile<2 || ((input_tile < local_num_tiles) && toggle)){
-				// // if(((input_tile < local_num_tiles) && toggle)){
-				// 	if(poll_cons_rdy()) accel_status = 1;
-				// }
-				// else{
-				// 	if(poll_prod_valid()) accel_status = 2;
-				// }
-				// toggle = !toggle;
-				// printf("input tile %d output tile %d\n", input_tile, output_tile);
-				if(input_tile < local_num_tiles && poll_cons_rdy()) accel_status = 1;
-				else if(poll_prod_valid()) accel_status = 2;
-
-			}
-			#ifdef TIMERS
-			temp2 = get_counter();
-			t_acc += (temp2-accel_time_start);
-			#endif
-			if(accel_status == 1){ // consumer ready //&& input_tile < local_num_tiles
-				// #ifdef TIMERS
-				// temp3 = get_counter();
-				// #endif
-				// update_cons_rdy();
-				#ifdef TIMERS
-				temp = get_counter();
-				#endif
-			printf("Commented: write to cons\n");
-				// write_to_cons();
-
-				#ifdef TIMERS
-				temp2 = get_counter();
-				t_cpu_write += (temp2-temp);
-				// t_sw += (temp - temp3);
-
-				temp = get_counter();
-				#endif
-				// #ifdef TIMERS
-				// temp3 = get_counter();
-				// #endif
-				update_cons_rdy();
-				// #ifdef TIMERS
-				// temp = get_counter();
-				// #endif
-				int last = 0;
-				if(input_tile==local_num_tiles-1){
-					// printf("last\n");
-					last = 1;
-					// update_con_last();	
-				}
-				// printf("Write to Consumer %d/%d, %d\n", input_tile, local_num_tiles, last);
-				// else
-				// 	update_con_not_last();
-				update_cons_valid(last);
-				#ifdef TIMERS
-				temp2 = get_counter();
-				t_sw += (temp2 - temp);
-				#endif
-				input_tile++;
-			} else if(accel_status == 2){ // producer ready
-				void* dst = (void*)(buf + (*cpu_prod_valid_offset)+1);
-				last_tile = read_mem(dst);
-				#ifdef TIMERS
-				temp = get_counter();
-				#endif
-				update_prod_valid();
-				#ifdef TIMERS
-				temp2 = get_counter();
-				t_sw += (temp2 - temp);
-				temp = get_counter();
-				#endif
-				read_from_prod();
-				// printf("Read from Producer %d, last:%ld\n", output_tile, last_tile);
-				#ifdef TIMERS
-				temp2 = get_counter();
-				t_cpu_read += (temp2-temp);
-				temp3 = get_counter();
-				#endif
-				update_prod_rdy();
-				#ifdef TIMERS
-				temp = get_counter();
-				t_sw += (temp - temp3);
-				#endif
-				output_tile ++;
-			}
-			accel_status = 0;
 		}
-		// // Drain pipeline
-		// for(; output_tile < local_num_tiles; output_tile++){
-		// 	// asm volatile ("fence rw, w");
-		// 	int64_t accel_time_start = get_counter();
-		// 	asm volatile ("fence w, r");
-		// 	while(!poll_prod_valid()); //Wait for Output
-		// 	temp2 = get_counter();
-		// 	t_acc += (temp2-accel_time_start);
-		// 	update_prod_valid();
-		// 	temp = get_counter();
-		// 	read_from_prod();
-		// 	temp2 = get_counter();
-		// 	t_cpu_read += (temp2-temp);
-		// 	update_prod_rdy();
-		// }
-	}else{
+
+
+		total_time_start = get_counter();
 		// Fill pipeline first
 		int tile = 0;
-		// for(; tile < pipeline_depth; tile++){
-		// 	asm volatile ("fence rw, r");
-		// 	int64_t accel_time_start = get_counter();
-		// 	while(!poll_cons_rdy());
-		// 	temp2 = get_counter();
-		// 	t_acc += (temp2-accel_time_start);
-		// 	update_cons_rdy();
+	 	for(; tile < pipeline_depth; tile++){
+	 		int64_t accel_time_start = get_counter();
+	 		while(!poll_cons_rdy());
+	 		temp2 = get_counter();
+	 		t_acc += (temp2-accel_time_start);
+	 	//	update_cons_rdy();
 
-		// 	temp = get_counter();
-		// 	write_to_cons();
-		// 	// printf("Write to Consumer %d\n", tile);
+	 		temp = get_counter();
+	 		write_to_cons();
+#if defined(ESP)
+		 	asm volatile ("fence rw, rw");
+#endif
+		 	//printf("Write to Consumer %d\n", tile);
 
-		// 	temp2 = get_counter();
-		// 	t_cpu_write += (temp2-temp);
-		// 	if(tile==local_num_tiles-1)
-		// 		update_con_last();	
-		// 	else
-		// 		update_con_not_last();
-		// 	update_cons_valid();
-		// 	// printf("Write to Consumer %d\n", tile);
-		// }
-
-		// Steady State // Chain
+		 	temp2 = get_counter();
+		 	int last = 0;
+		 	if(tile==local_num_tiles-1)last = 1;
+		 	t_cpu_write += (temp2-temp);
+#if defined(ESP) 
+		 	asm volatile ("fence rw, w");
+#endif
+			//bmjul15	
+	 		update_cons_rdy();
+			update_cons_valid(last);
+#if defined(ESP)  
+	 		asm volatile ("fence rw, w");
+#endif
+	 		//printf("Update cons valid %d\n", tile);
+	 	}
 		for(; tile < local_num_tiles; tile++){
 			int64_t accel_time_start = get_counter();
-			// #if(defined(ESP) && COH_MODE==1)
-			// asm volatile ("fence rw, r");
-			// #endif
 
-			// printf("Poll Cons Rdy %d/%d\n", tile, local_num_tiles);
-			while(!poll_cons_rdy());
+			//printf("wait for cons rdy\n");
+			
+			while(!poll_cons_rdy());//print_flags();
+			//print_flags();
 			temp2 = get_counter();
 			t_acc += (temp2-accel_time_start);
-			update_cons_rdy();
 
 			temp = get_counter();
 			write_to_cons();
-			// printf("Write to Consumer %d\n", tile);
+
+			//printf("Write to Consumer %d\n", tile);
+
+#if defined(ESP) 
+			asm volatile ("fence rw, rw");
+#endif
 
 			temp2 = get_counter();
 			t_cpu_write += (temp2-temp);
 			int last = 0;
-			if(tile==local_num_tiles-1)last = 1;
-			// 	update_con_last();	
-			// else
-			// 	update_con_not_last();
+			if(tile==local_num_tiles-1)
+				last = 1;
+
+			update_cons_rdy();
 
 			update_cons_valid(last);
-
-
+			//print_flags();
 			accel_time_start = get_counter();
-			// #if(defined(ESP) && COH_MODE==1)
-			// asm volatile ("fence rw, r");
-			// #endif
-			// printf("Poll Prod Valid %d/%d, last: %d\n", tile, local_num_tiles, last);
-			while(!poll_prod_valid()); //Wait for Output
+			//printf("wait for prod valid\n");
+
+#if defined(ESP) && (COH_MODE==1)
+			asm volatile ("fence rw, rw");
+#endif
+			while(!poll_prod_valid());//print_flags(); //Wait for Output
+			//print_flags();
 			temp2 = get_counter();
 			t_acc += (temp2-accel_time_start);
-			update_prod_valid();
+
+#if defined(ESP) && (COH_MODE==1)
+			asm volatile ("fence rw, rw");
+#endif
+
+			//update_prod_valid();
+
+#if defined(ESP) && (COH_MODE==1)
+			asm volatile ("fence rw, rw");
+#endif
 			temp = get_counter();
 			read_from_prod();
 			temp2 = get_counter();
 			t_cpu_read += (temp2-temp);
+
+			//printf("Consumed output %d\n", tile);
+
+#if defined(ESP) && (COH_MODE==1)
+			asm volatile ("fence rw, w");
+#endif
+			//bmjul15
+			update_prod_valid();
+			//print_flags();
+			if(tile < local_num_tiles+pipeline_depth-1)
 			update_prod_rdy();
+
+
 		}
 		// Drain pipeline
-		// for(; tile < local_num_tiles+pipeline_depth; tile++){
-		// 	// asm volatile ("fence rw, w");
-		// 	update_prod_rdy();
+	 	for(; tile < local_num_tiles+pipeline_depth; tile++){
+	 		int64_t accel_time_start = get_counter();
+	 		//asm volatile ("fence w, r");
+#if defined(ESP) && (COH_MODE==1)
+			asm volatile ("fence rw, rw");
+#endif
+	 		while(!poll_prod_valid());//print_flags(); //Wait for Output
+			
+			//print_flags();
+	 		temp2 = get_counter();
+	 		t_acc += (temp2-accel_time_start);
 
-		// 	int64_t accel_time_start = get_counter();
-		// 	asm volatile ("fence w, r");
-		// 	while(!poll_prod_valid()); //Wait for Output
-		// 	temp2 = get_counter();
-		// 	t_acc += (temp2-accel_time_start);
-		// 	update_prod_valid();
-		// 	temp = get_counter();
-		// 	read_from_prod();
-		// 	temp2 = get_counter();
-		// 	t_cpu_read += (temp2-temp);
-		// }
-	}
+#if defined(ESP) && (COH_MODE==1)
+			asm volatile ("fence rw, rw");
+#endif
+			//printf("Drained output %d\n", tile-pipeline_depth);
+
+	 		temp = get_counter();
+	 		read_from_prod();
+	 		temp2 = get_counter();
+	 		t_cpu_read += (temp2-temp);
+	 		asm volatile ("fence rw, w");
+			//bmjul15
+	 		update_prod_valid();
+			if(tile < local_num_tiles+pipeline_depth-1){
+	 			update_prod_rdy();
+	 			asm volatile ("fence rw, w");
+			}
+			//printf("Drained output %d\n", tile);
+			//print_flags();
+		}
+	//		printf("drained pipeline\n");
 
 	} // end of else (Reg Inv)
 
@@ -541,20 +453,6 @@ void synth_accel_asi(int mode){
 	t_total = temp2 - total_time_start;
 
 	// for(n_dev = 0; n_dev < num_devices; n_dev++) printf("Last item for %d: %ld\n",n_dev,buf[accel_cons_valid_offset[n_dev]+1]);
-	
-	// Cleanup
-#ifdef BAREMETAL_TEST
-	for(n_dev = 0; n_dev < num_devices; n_dev++){
-		struct esp_device *dev = &espdevs[n_dev];
-		iowrite32(dev, CMD_REG, 0x0);
-		aligned_free(ptable[n_dev]);
-	}
-	// for(n_dev = 0; n_dev < num_devices; n_dev++) aligned_free(ptable[n_dev]);
-	aligned_free(ptable);
-	aligned_free(mem);
-#else
-	esp_free(buf);
-#endif
 }
 
 #endif
