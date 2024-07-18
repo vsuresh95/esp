@@ -116,11 +116,11 @@ const char CohPrintHeader[] = "ESP LLC-Coherent DMA";
 spandex_config_t spandex_config = {.spandex_reg = 0};
 #elif (COH_MODE == ESP_COHERENT_DMA)
 unsigned coherence = ACC_COH_RECALL;
-const char CohPrintHeader[] = "ESP Coherent DMA";
+const char CohPrintHeader[] = "DMA";
 spandex_config_t spandex_config = {.spandex_reg = 0};
 #else
 unsigned coherence = ACC_COH_FULL;
-const char CohPrintHeader[] = "ESP Baseline MESI";
+const char CohPrintHeader[] = "MESI";
 spandex_config_t spandex_config = {.spandex_reg = 0};
 #endif
 #else
@@ -129,7 +129,7 @@ unsigned coherence = ACC_COH_FULL;
 const char CohPrintHeader[] = "SPX Owner Prediction";
 spandex_config_t spandex_config = {.spandex_reg = 0, .r_en = 1, .r_type = 2, .w_en = 1, .w_op = 1, .w_type = 1};
 #elif (COH_MODE == SPX_WRITE_THROUGH_FWD)
-const char CohPrintHeader[] = "SPX Write-through forwarding";
+const char CohPrintHeader[] = "SPX";
 spandex_config_t spandex_config = {.spandex_reg = 0, .r_en = 1, .r_type = 2, .w_en = 1, .w_type = 1};
 #elif (COH_MODE == SPX_BASELINE_REQV)
 const char CohPrintHeader[] = "SPX Baseline Spandex (ReqV)";
