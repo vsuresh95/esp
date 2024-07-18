@@ -132,19 +132,28 @@ void update_gemm_cfg(int num_devices){
 			gemm_cfg_000[dev_id].esp.start_stop = 0;
 
 		gemm_cfg_000[dev_id].spandex_conf = spandex_config.spandex_reg;
-		gemm_cfg_000[dev_id].input_offset = input_buffer_offset[dev_id];
+		//gemm_cfg_000[dev_id].input_offset = input_buffer_offset[dev_id];
 		gemm_cfg_000[dev_id].cons_valid_offset = accel_cons_valid_offset[dev_id];
 		gemm_cfg_000[dev_id].prod_rdy_offset = accel_prod_ready_offset[dev_id];
 		gemm_cfg_000[dev_id].cons_rdy_offset = accel_cons_ready_offset[dev_id];
 		gemm_cfg_000[dev_id].prod_valid_offset = accel_prod_valid_offset[dev_id];
 
 		cfg_000[dev_id].run = true;
+		#ifdef ENABLE_SM
 		if(dev_id == 0)
 			cfg_000[dev_id].devname = "gemm_stratus.0";
 		if(dev_id == 1)
 			cfg_000[dev_id].devname = "gemm_stratus.1";
 		if(dev_id == 2)
 			cfg_000[dev_id].devname = "gemm_stratus.2";
+		#else
+		if(dev_id == 0)
+			cfg_000[dev_id].devname = "gemm_stratus.3";
+		if(dev_id == 1)
+			cfg_000[dev_id].devname = "gemm_stratus.4";
+		if(dev_id == 2)
+			cfg_000[dev_id].devname = "gemm_stratus.5";
+		#endif
 		cfg_000[dev_id].ioctl_req = GEMM_STRATUS_IOC_ACCESS;
 		cfg_000[dev_id].esp_desc = &(gemm_cfg_000[dev_id].esp);
 		cfg_000[dev_id].hw_buf = acc_buf;

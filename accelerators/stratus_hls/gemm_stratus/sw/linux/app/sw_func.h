@@ -23,6 +23,7 @@ static void init_parameters(int test, int32_t do_relu, int32_t transpose, int32_
     *out_size = *out_len * sizeof(token_t);
     *size = *in_size + *out_size;
 
+#ifndef FCN
     #ifdef ENABLE_SM
     ld_offset1 = inp_offset; //0;
     ld_offset2 = ld_offset1 + *in1_len;
@@ -43,6 +44,31 @@ static void init_parameters(int test, int32_t do_relu, int32_t transpose, int32_
     gemm_cfg_000[0].ld_offset1 = ld_offset1;
     gemm_cfg_000[0].ld_offset2 = ld_offset2;
     gemm_cfg_000[0].st_offset = *st_offset;
+#else
+ld_offset1 = inp_offset; //0;
+    ld_offset2 = ld_offset1 + *in1_len;
+    *st_offset = 2*inp_offset + (*in_len);
+for(int dev_id = 0; dev_id < NUM_DEVICES; dev_id++){
+		accel_prod_valid_offset[dev_id] = dev_id*(tile_size + SYNC_VAR_SIZE) + rel_accel_prod_valid_offset;
+		accel_cons_ready_offset[dev_id] = dev_id*(tile_size + SYNC_VAR_SIZE) + rel_accel_cons_ready_offset;
+		accel_prod_ready_offset[dev_id] = dev_id*(tile_size + SYNC_VAR_SIZE) + rel_accel_prod_ready_offset;
+		accel_cons_valid_offset[dev_id] = dev_id*(tile_size + SYNC_VAR_SIZE) + rel_accel_cons_valid_offset;
+		accel_cons_last_element[dev_id] = dev_id*(tile_size + SYNC_VAR_SIZE) + rel_accel_con_last_offset;
+		accel_prod_last_element[dev_id] = dev_id*(tile_size + SYNC_VAR_SIZE) + rel_accel_prod_last_offset;
+		input_buffer_offset[dev_id]  	= dev_id*(tile_size + SYNC_VAR_SIZE) + rel_input_buffer_offset;
+		output_buffer_offset[dev_id] 	= dev_id*(tile_size + SYNC_VAR_SIZE) + rel_output_buffer_offset;
+    }
+    gemm_cfg_000[0].prod_valid_offset = CONS_VALID_OFFSET;//VALID_FLAG_OFFSET;
+	gemm_cfg_000[0].prod_ready_offset = CONS_READY_OFFSET;//READY_FLAG_OFFSET;
+	gemm_cfg_000[0].cons_valid_offset = INPUT_OFFSET + in_len + CONS_VALID_OFFSET; //PROD_VALID_OFFSET;//SYNC_VAR_SIZE + LEN + VALID_FLAG_OFFSET;
+	gemm_cfg_000[0].cons_ready_offset = INPUT_OFFSET + in_len + CONS_READY_OFFSET; //PROD_READY_OFFSET;//SYNC_VAR_SIZE + LEN + VALID_FLAG_OFFSET;
+
+	const unsigned cpu_cons_valid_offset =gemm_cfg_000[0].prod_valid_offset ;//CONS_VALID_OFFSET;//VALID_FLAG_OFFSET;
+	const unsigned cpu_cons_ready_offset =gemm_cfg_000[0].prod_ready_offset ;//CONS_READY_OFFSET;//READY_FLAG_OFFSET;
+	const unsigned cpu_prod_valid_offset =gemm_cfg_000[0].cons_valid_offset ;//INPUT_OFFSET + in_len + CONS_VALID_OFFSET; //PROD_VALID_OFFSET;//SYNC_VAR_SIZE + LEN + VALID_FLAG_OFFSET;
+	const unsigned cpu_prod_ready_offset =gemm_cfg_000[0].cons_ready_offset ;//INPUT_OFFSET + in_len + CONS_READY_OFFSET; //PROD_READY_OFFSET;//SYNC_VAR_SIZE + LEN + VALID_FLAG_OFFSET;
+  
+#endif
 
     for (i = 0; i < *in_len; ++i) {
         sw_buf[i] = i % 17 - 8;
@@ -50,16 +76,16 @@ static void init_parameters(int test, int32_t do_relu, int32_t transpose, int32_
     }
 
     // print test info
-    printf("  Prepare test %d parameters\n", test);
-    printf("    .do_relu = %d\n", do_relu);
-    printf("    .transpose = %d\n", transpose);
-    printf("    .ninputs = %d\n", ninputs);
-    printf("    .d3 = %d\n", d3);
-    printf("    .d2 = %d\n", d2);
-    printf("    .d1 = %d\n", d1);
-    printf("    .st_offset = %d\n", *st_offset);
-    printf("    .ld_offset1 = %d\n", ld_offset1);
-    printf("    .ld_offset2 = %d\n", ld_offset2);
+    // printf("  Prepare test %d parameters\n", test);
+    // printf("    .do_relu = %d\n", do_relu);
+    // printf("    .transpose = %d\n", transpose);
+    // printf("    .ninputs = %d\n", ninputs);
+    // printf("    .d3 = %d\n", d3);
+    // printf("    .d2 = %d\n", d2);
+    // printf("    .d1 = %d\n", d1);
+    // printf("    .st_offset = %d\n", *st_offset);
+    // printf("    .ld_offset1 = %d\n", ld_offset1);
+    // printf("    .ld_offset2 = %d\n", ld_offset2);
 }
 
 static void sw_run(int32_t do_relu, int32_t transpose, int32_t ninputs,
