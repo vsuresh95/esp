@@ -9,4 +9,7 @@ make linux
 # Copy the test programs to soft-build/ariane/sysroot/applications/test
 cp -r test/ soft-build/ariane/sysroot/applications/
 
-make linux fpga-program fpga-run-linux
+make linux
+
+cp riscv.dts socgen/esp/riscv.dts
+make soft fpga-program fpga-run-linux

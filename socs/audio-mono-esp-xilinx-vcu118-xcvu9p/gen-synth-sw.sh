@@ -4,29 +4,15 @@ then
     mkdir test/
 fi
 
-# SW
-if [ ! -d test/synth-ma-sw/ ]
-then
-    mkdir test/synth-ma-sw/
-fi
-
-# OS
-if [ ! -d test/synth-ma-os/ ]
-then
-    mkdir test/synth-ma-os/
-fi
-
-# MESI
-if [ ! -d test/synth-ma-mesi/ ]
-then
-    mkdir test/synth-ma-mesi/
-fi
-
-# DMA
-if [ ! -d test/synth-ma-dma/ ]
-then
-    mkdir test/synth-ma-dma/
-fi
-
 # Synthetic MA
+work=(150 1500)
+test_size=("Small" "Large")
+cohmodes=("MESI" "DMA" "SPX")
+test_types=("Linux" "Chaining" "Pipelining")
+hw_types=("ma" "cfa")
 
+for cohcode in {1,2};
+do
+COH_CODE=$cohcode NUM_STAGES=15 make tiled_app_stratus-app-clean tiled_app_stratus-app;
+mv soft-build/ariane/sysroot/applications/test/tiled_app_stratus.exe test/tiled_app_stratus_ma_${cohmodes[cohcode-1]}.exe
+done;

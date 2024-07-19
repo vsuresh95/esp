@@ -1,0 +1,242 @@
+/dts-v1/;
+
+/ {
+  #address-cells = <2>;
+  #size-cells = <2>;
+  compatible = "eth,ariane-bare-dev";
+  model = "eth,ariane-bare";
+  chosen {
+    stdout-path = "/soc/uart@60000100:38400";
+  };
+  cpus {
+    #address-cells = <1>;
+    #size-cells = <0>;
+    timebase-frequency = <39062500>; // CPU_FREQ / 2
+    CPU0: cpu@0 {
+      clock-frequency = <78125000>;
+      device_type = "cpu";
+      reg = <0>;
+      status = "okay";
+      compatible = "eth, ariane", "riscv";
+      riscv,isa = "rv64imafdc";
+      mmu-type = "riscv,sv39";
+      tlb-split;
+      // HLIC - hart local interrupt controller
+      CPU0_intc: interrupt-controller {
+        #interrupt-cells = <1>;
+        interrupt-controller;
+        compatible = "riscv,cpu-intc";
+      };
+    };
+  };
+  memory@80000000 {
+    device_type = "memory";
+    reg = <0x0 0x80000000 0x0 0x20000000>;
+  };
+  reserved-memory {
+    #address-cells = <2>;
+    #size-cells = <2>;
+    ranges;
+
+    greth_reserved: buffer@a0000000 {
+      compatible = "shared-dma-pool";
+      no-map;
+      reg = <0x0 0xa0000000 0x0 0x200000>;
+    };
+
+    accelerator_reserved: buffer@a0200000 {
+      compatible = "shared-dma-pool";
+      no-map;
+      reg = <0x0 0xa0200000 0x0 0x1fe00000>;
+    };
+  };
+  L26: soc {
+    #address-cells = <2>;
+    #size-cells = <2>;
+    compatible = "eth,ariane-bare-soc", "simple-bus";
+    ranges;
+    clint@2000000 {
+      compatible = "riscv,clint0";
+      interrupts-extended = <
+                             &CPU0_intc 3 &CPU0_intc 7
+                            >;
+      reg = <0x0 0x2000000 0x0 0xc0000>;
+      reg-names = "control";
+    };
+    PLIC0: interrupt-controller@6c000000 {
+      #address-cells = <0>;
+      #interrupt-cells = <1>;
+      compatible = "riscv,plic0";
+      interrupt-controller;
+      interrupts-extended = <
+                             &CPU0_intc 11 &CPU0_intc 9
+                            >;
+      reg = <0x0 0x6c000000 0x0 0x4000000>;
+      riscv,max-priority = <7>;
+      riscv,ndev = <32>;
+    };
+    uart@60000100 {
+      compatible = "gaisler,apbuart";
+      reg = <0x0 0x60000100 0x0 0x100>;
+      freq = <78125000>;
+      interrupt-parent = <&PLIC0>;
+      interrupts = <3>;
+      reg-shift = <2>; // regs are spaced on 32 bit boundary
+      reg-io-width = <4>; // only 32-bit access are supported
+    };
+    eth: greth@60080000 {
+      #address-cells = <1>;
+      #size-cells = <1>;
+      compatible = "gaisler,ethmac";
+      device_type = "network";
+      interrupt-parent = <&PLIC0>;
+      interrupts = <13 0>;
+      local-mac-address = [00 00 be 71 e6 b3];
+      reg = <0x0 0x60080000 0x0 0x10000>;
+      phy-handle = <&phy0>;
+      phy-connection-type = "sgmii";
+      memory-region = <&greth_reserved>;
+
+      phy0: mdio@60001000 {
+            #address-cells = <1>;
+            #size-cells = <0>;
+            compatible = "gaisler,sgmii";
+            reg = <0x0 0x60001000 0x0 0x1000>;
+            interrupt-parent = <&PLIC0>;
+            interrupts = <12 0>;
+      };
+    };
+    l2cache0@6000d900 {
+      compatible = "sld,l2_cache";
+      reg = <0x0 0x6000d900 0x0 0x100>;
+      reg-shift = <2>; // regs are spaced on 32 bit boundary
+      reg-io-width = <4>; // only 32-bit access are supported
+    };
+    llccache0@6000e000 {
+      compatible = "sld,llc_cache";
+      reg = <0x0 0x6000e000 0x0 0x100>;
+      reg-shift = <2>; // regs are spaced on 32 bit boundary
+      reg-io-width = <4>; // only 32-bit access are supported
+    };
+    tiled_app_stratus@60010000 {
+      compatible = "sld,tiled_app_stratus";
+      reg = <0x0 0x60010000 0x0 0x100>;
+      interrupt-parent = <&PLIC0>;
+      interrupts = <6>;
+      reg-shift = <2>; // regs are spaced on 32 bit boundary
+      reg-io-width = <4>; // only 32-bit access are supported
+    };
+    tiled_app_stratus@60010100 {
+      compatible = "sld,tiled_app_stratus";
+      reg = <0x0 0x60010100 0x0 0x100>;
+      interrupt-parent = <&PLIC0>;
+      interrupts = <7>;
+      reg-shift = <2>; // regs are spaced on 32 bit boundary
+      reg-io-width = <4>; // only 32-bit access are supported
+    };
+    tiled_app_stratus@60010200 {
+      compatible = "sld,tiled_app_stratus";
+      reg = <0x0 0x60010200 0x0 0x100>;
+      interrupt-parent = <&PLIC0>;
+      interrupts = <8>;
+      reg-shift = <2>; // regs are spaced on 32 bit boundary
+      reg-io-width = <4>; // only 32-bit access are supported
+    };
+    tiled_app_stratus@60010300 {
+      compatible = "sld,tiled_app_stratus";
+      reg = <0x0 0x60010300 0x0 0x100>;
+      interrupt-parent = <&PLIC0>;
+      interrupts = <9>;
+      reg-shift = <2>; // regs are spaced on 32 bit boundary
+      reg-io-width = <4>; // only 32-bit access are supported
+    };
+    tiled_app_stratus@60010400 {
+      compatible = "sld,tiled_app_stratus";
+      reg = <0x0 0x60010400 0x0 0x100>;
+      interrupt-parent = <&PLIC0>;
+      interrupts = <10>;
+      reg-shift = <2>; // regs are spaced on 32 bit boundary
+      reg-io-width = <4>; // only 32-bit access are supported
+    };
+    tiled_app_stratus@60010500 {
+      compatible = "sld,tiled_app_stratus";
+      reg = <0x0 0x60010500 0x0 0x100>;
+      interrupt-parent = <&PLIC0>;
+      interrupts = <11>;
+      reg-shift = <2>; // regs are spaced on 32 bit boundary
+      reg-io-width = <4>; // only 32-bit access are supported
+    };
+    tiled_app_stratus@60010600 {
+      compatible = "sld,tiled_app_stratus";
+      reg = <0x0 0x60010600 0x0 0x100>;
+      interrupt-parent = <&PLIC0>;
+      interrupts = <14>;
+      reg-shift = <2>; // regs are spaced on 32 bit boundary
+      reg-io-width = <4>; // only 32-bit access are supported
+    };
+    tiled_app_stratus@60010700 {
+      compatible = "sld,tiled_app_stratus";
+      reg = <0x0 0x60010700 0x0 0x100>;
+      interrupt-parent = <&PLIC0>;
+      interrupts = <15>;
+      reg-shift = <2>; // regs are spaced on 32 bit boundary
+      reg-io-width = <4>; // only 32-bit access are supported
+    };
+    tiled_app_stratus@60010800 {
+      compatible = "sld,tiled_app_stratus";
+      reg = <0x0 0x60010800 0x0 0x100>;
+      interrupt-parent = <&PLIC0>;
+      interrupts = <16>;
+      reg-shift = <2>; // regs are spaced on 32 bit boundary
+      reg-io-width = <4>; // only 32-bit access are supported
+    };
+    tiled_app_stratus@60010900 {
+      compatible = "sld,tiled_app_stratus";
+      reg = <0x0 0x60010900 0x0 0x100>;
+      interrupt-parent = <&PLIC0>;
+      interrupts = <17>;
+      reg-shift = <2>; // regs are spaced on 32 bit boundary
+      reg-io-width = <4>; // only 32-bit access are supported
+    };
+    tiled_app_stratus@60010a00 {
+      compatible = "sld,tiled_app_stratus";
+      reg = <0x0 0x60010a00 0x0 0x100>;
+      interrupt-parent = <&PLIC0>;
+      interrupts = <18>;
+      reg-shift = <2>; // regs are spaced on 32 bit boundary
+      reg-io-width = <4>; // only 32-bit access are supported
+    };
+    tiled_app_stratus@60010b00 {
+      compatible = "sld,tiled_app_stratus";
+      reg = <0x0 0x60010b00 0x0 0x100>;
+      interrupt-parent = <&PLIC0>;
+      interrupts = <19>;
+      reg-shift = <2>; // regs are spaced on 32 bit boundary
+      reg-io-width = <4>; // only 32-bit access are supported
+    };
+    tiled_app_stratus@60010c00 {
+      compatible = "sld,tiled_app_stratus";
+      reg = <0x0 0x60010c00 0x0 0x100>;
+      interrupt-parent = <&PLIC0>;
+      interrupts = <20>;
+      reg-shift = <2>; // regs are spaced on 32 bit boundary
+      reg-io-width = <4>; // only 32-bit access are supported
+    };
+    tiled_app_stratus@60010d00 {
+      compatible = "sld,tiled_app_stratus";
+      reg = <0x0 0x60010d00 0x0 0x100>;
+      interrupt-parent = <&PLIC0>;
+      interrupts = <21>;
+      reg-shift = <2>; // regs are spaced on 32 bit boundary
+      reg-io-width = <4>; // only 32-bit access are supported
+    };
+    tiled_app_stratus@60010e00 {
+      compatible = "sld,tiled_app_stratus";
+      reg = <0x0 0x60010e00 0x0 0x100>;
+      interrupt-parent = <&PLIC0>;
+      interrupts = <22>;
+      reg-shift = <2>; // regs are spaced on 32 bit boundary
+      reg-io-width = <4>; // only 32-bit access are supported
+    };
+  };
+};
