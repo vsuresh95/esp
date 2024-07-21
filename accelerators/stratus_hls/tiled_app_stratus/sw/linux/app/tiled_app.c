@@ -220,10 +220,10 @@ printf("%ld\n",t_total/ITERATIONS);
 #endif
 	int comparison_val=0;
 	#ifdef CFA
-	printf("Results: Synthetic ");
+	printf("Result: Synthetic ");
 	comparison_val = num_devices;
 #else
-	printf("Results: Mono_Synthetic ");
+	printf("Result: Mono_Synthetic ");
 	comparison_val = comp_stages;
 #endif
 	if(mode == 0)printf("Linux ");

@@ -29,6 +29,8 @@ LOGS = logs
 HLS_LOGS = $(LOGS)/hls
 VIVADO_LOGS = $(LOGS)/vivado
 
+UART_FILE ?=
+
 ### Quick help ###
 include $(ESP_ROOT)/utils/make/help.mk
 

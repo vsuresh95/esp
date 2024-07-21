@@ -752,7 +752,7 @@ def generateSynSmallChain():
         f.write(newLine)
 
         # Baseline
-        newLine = 'Base (Linux), '
+        newLine = 'OS, '
         for i in range(1, 16, 1):
             if str(i) in synAcc:
                 newLine += str(synBase[0][0] / synLinux[0][synAcc.index(str(i))][0])
@@ -763,7 +763,7 @@ def generateSynSmallChain():
         f.write(newLine)
 
         # ASI+MESI
-        newLine = 'M+ (ASI+MESI), '
+        newLine = 'ASI+MESI, '
         for i in range(1, 16, 1):
             if str(i) in synAcc:
                 newLine += str(synBase[0][0] / synASI_chain[0][synAcc.index(str(i))][0][0])
@@ -774,7 +774,7 @@ def generateSynSmallChain():
         f.write(newLine)
 
         # ASI+DMA
-        newLine = 'D+ (ASI+DMA), '
+        newLine = 'ASI+DMA, '
         for i in range(1, 16, 1):
             if str(i) in synAcc:
                 newLine += str(synBase[0][0] / synASI_chain[0][synAcc.index(str(i))][1][0])
@@ -785,7 +785,7 @@ def generateSynSmallChain():
         f.write(newLine)
 
         # ASI+Spandex
-        newLine = 'Mozart (ASI+Spandex), '
+        newLine = 'ASI+Spandex, '
         for i in range(1, 16, 1):
             if str(i) in synAcc:
                 newLine += str(synBase[0][0] / synASI_chain[0][synAcc.index(str(i))][2][0])
@@ -817,7 +817,7 @@ def generateSynLargeChain():
         f.write(newLine)
 
         # Baseline
-        newLine = 'Base (Linux), '
+        newLine = 'OS, '
         for i in range(1, 16, 1):
             if str(i) in synAcc:
                 newLine += str(synBase[1][0] / synLinux[1][synAcc.index(str(i))][0])
@@ -828,7 +828,7 @@ def generateSynLargeChain():
         f.write(newLine)
 
         # ASI+MESI
-        newLine = 'M+ (ASI+MESI), '
+        newLine = 'ASI+MESI, '
         for i in range(1, 16, 1):
             if str(i) in synAcc:
                 newLine += str(synBase[1][0] / synASI_chain[1][synAcc.index(str(i))][0][0])
@@ -839,7 +839,7 @@ def generateSynLargeChain():
         f.write(newLine)
 
         # ASI+DMA
-        newLine = 'D+ (ASI+DMA), '
+        newLine = 'ASI+DMA, '
         for i in range(1, 16, 1):
             if str(i) in synAcc:
                 newLine += str(synBase[1][0] / synASI_chain[1][synAcc.index(str(i))][1][0])
@@ -850,7 +850,7 @@ def generateSynLargeChain():
         f.write(newLine)
 
         # ASI+Spandex
-        newLine = 'Mozart (ASI+Spandex), '
+        newLine = 'ASI+Spandex, '
         for i in range(1, 16, 1):
             if str(i) in synAcc:
                 newLine += str(synBase[1][0] / synASI_chain[1][synAcc.index(str(i))][2][0])
@@ -882,7 +882,7 @@ def generateSynSmallPipe():
         f.write(newLine)
 
         # ASI+MESI
-        newLine = 'M+ (ASI+MESI), '
+        newLine = 'ASI+MESI, '
         for i in range(1, 16, 1):
             if str(i) in synAcc:
                 newLine += str(synBase[0][0] / synASI_pipe[0][synAcc.index(str(i))][0][0])
@@ -893,7 +893,7 @@ def generateSynSmallPipe():
         f.write(newLine)
 
         # ASI+DMA
-        newLine = 'D+ (ASI+DMA), '
+        newLine = 'ASI+DMA, '
         for i in range(1, 16, 1):
             if str(i) in synAcc:
                 newLine += str(synBase[0][0] / synASI_pipe[0][synAcc.index(str(i))][1][0])
@@ -904,7 +904,7 @@ def generateSynSmallPipe():
         f.write(newLine)
 
         # ASI+Spandex
-        newLine = 'Mozart (ASI+Spandex), '
+        newLine = 'ASI+Spandex, '
         for i in range(1, 16, 1):
             if str(i) in synAcc:
                 newLine += str(synBase[0][0] / synASI_pipe[0][synAcc.index(str(i))][2][0])
@@ -936,7 +936,7 @@ def generateSynLargePipe():
         f.write(newLine)
 
         # ASI+MESI
-        newLine = 'M+ (ASI+MESI), '
+        newLine = 'ASI+MESI, '
         for i in range(1, 16, 1):
             if str(i) in synAcc:
                 newLine += str(synBase[1][0] / synASI_pipe[1][synAcc.index(str(i))][0][0])
@@ -947,7 +947,7 @@ def generateSynLargePipe():
         f.write(newLine)
 
         # ASI+DMA
-        newLine = 'D+ (ASI+DMA), '
+        newLine = 'ASI+DMA, '
         for i in range(1, 16, 1):
             if str(i) in synAcc:
                 newLine += str(synBase[1][0] / synASI_pipe[1][synAcc.index(str(i))][1][0])
@@ -958,7 +958,7 @@ def generateSynLargePipe():
         f.write(newLine)
 
         # ASI+Spandex
-        newLine = 'Mozart (ASI+Spandex), '
+        newLine = 'ASI+Spandex, '
         for i in range(1, 16, 1):
             if str(i) in synAcc:
                 newLine += str(synBase[1][0] / synASI_pipe[1][synAcc.index(str(i))][2][0])
@@ -991,7 +991,7 @@ def generateSynSmallPipeCompare():
 
         # Disag
         # ASI+MESI
-        newLine = 'Disag, M+ (ASI+MESI), '
+        newLine = 'Disag, ASI+MESI, '
         for i in range(1, 16, 1):
             if str(i) in synAcc:
                 newLine += str(synBase[0][0] / synASI_pipe[0][synAcc.index(str(i))][0][0])
@@ -1002,7 +1002,7 @@ def generateSynSmallPipeCompare():
         f.write(newLine)
 
         # ASI+DMA
-        newLine = ', D+ (ASI+DMA), '
+        newLine = ', ASI+DMA, '
         for i in range(1, 16, 1):
             if str(i) in synAcc:
                 newLine += str(synBase[0][0] / synASI_pipe[0][synAcc.index(str(i))][1][0])
@@ -1013,7 +1013,7 @@ def generateSynSmallPipeCompare():
         f.write(newLine)
 
         # ASI+Spandex
-        newLine = ', Mozart (ASI+Spandex), '
+        newLine = ', ASI+Spandex, '
         for i in range(1, 16, 1):
             if str(i) in synAcc:
                 newLine += str(synBase[0][0] / synASI_pipe[0][synAcc.index(str(i))][2][0])
@@ -1025,7 +1025,7 @@ def generateSynSmallPipeCompare():
 
         # Mono
         # ASI+MESI
-        newLine = 'Mono, M+ (ASI+MESI), '
+        newLine = 'Mono, ASI+MESI, '
         for i in range(1, 16, 1):
             if str(i) in synAcc:
                 newLine += str(synBase[0][0] / monoSynASI_pipe[0][synAcc.index(str(i))][0][0])
@@ -1036,7 +1036,7 @@ def generateSynSmallPipeCompare():
         f.write(newLine)
 
         # ASI+DMA
-        newLine = ', D+ (ASI+DMA), '
+        newLine = ', ASI+DMA, '
         for i in range(1, 16, 1):
             if str(i) in synAcc:
                 newLine += str(synBase[0][0] / monoSynASI_pipe[0][synAcc.index(str(i))][1][0])
@@ -1047,7 +1047,7 @@ def generateSynSmallPipeCompare():
         f.write(newLine)
 
         # ASI+Spandex
-        newLine = ', Mozart (ASI+Spandex), '
+        newLine = ', ASI+Spandex, '
         for i in range(1, 16, 1):
             if str(i) in synAcc:
                 newLine += str(synBase[0][0] / monoSynASI_pipe[0][synAcc.index(str(i))][2][0])
@@ -1080,7 +1080,7 @@ def generateSynLargePipeCompare():
 
         # Disag
         # ASI+MESI
-        newLine = 'Disag, M+ (ASI+MESI), '
+        newLine = 'Disag, ASI+MESI, '
         for i in range(1, 16, 1):
             if str(i) in synAcc:
                 newLine += str(synBase[1][0] / synASI_pipe[1][synAcc.index(str(i))][0][0])
@@ -1091,7 +1091,7 @@ def generateSynLargePipeCompare():
         f.write(newLine)
 
         # ASI+DMA
-        newLine = ', D+ (ASI+DMA), '
+        newLine = ', ASI+DMA, '
         for i in range(1, 16, 1):
             if str(i) in synAcc:
                 newLine += str(synBase[1][0] / synASI_pipe[1][synAcc.index(str(i))][1][0])
@@ -1102,7 +1102,7 @@ def generateSynLargePipeCompare():
         f.write(newLine)
 
         # ASI+Spandex
-        newLine = ', Mozart (ASI+Spandex), '
+        newLine = ', ASI+Spandex, '
         for i in range(1, 16, 1):
             if str(i) in synAcc:
                 newLine += str(synBase[1][0] / synASI_pipe[1][synAcc.index(str(i))][2][0])
@@ -1114,7 +1114,7 @@ def generateSynLargePipeCompare():
 
         # Mono
         # ASI+MESI
-        newLine = 'Mono, M+ (ASI+MESI), '
+        newLine = 'Mono, ASI+MESI, '
         for i in range(1, 16, 1):
             if str(i) in synAcc:
                 newLine += str(synBase[1][0] / monoSynASI_pipe[1][synAcc.index(str(i))][0][0])
@@ -1125,7 +1125,7 @@ def generateSynLargePipeCompare():
         f.write(newLine)
 
         # ASI+DMA
-        newLine = ', D+ (ASI+DMA), '
+        newLine = ', ASI+DMA, '
         for i in range(1, 16, 1):
             if str(i) in synAcc:
                 newLine += str(synBase[1][0] / monoSynASI_pipe[1][synAcc.index(str(i))][1][0])
@@ -1136,7 +1136,7 @@ def generateSynLargePipeCompare():
         f.write(newLine)
 
         # ASI+Spandex
-        newLine = ', Mozart (ASI+Spandex), '
+        newLine = ', ASI+Spandex, '
         for i in range(1, 16, 1):
             if str(i) in synAcc:
                 newLine += str(synBase[1][0] / monoSynASI_pipe[1][synAcc.index(str(i))][2][0])
