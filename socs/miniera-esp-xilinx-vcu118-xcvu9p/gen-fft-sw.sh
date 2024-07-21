@@ -33,6 +33,7 @@ for length in {6..14}
 do
     # Bare metal
     LOG_LEN=$length ENABLE_SM=0 IS_ESP=1 COH_MODE=0 make audio_fft_stratus-baremetal-clean audio_fft_stratus-baremetal
+    cp soft-build/ariane/baremetal/audio_fft_stratus.bin test/fft-bm/fft-bm-${length}.bin
     cp soft-build/ariane/baremetal/audio_fft_stratus.exe test/fft-bm/fft-bm-${length}.exe
 
     # OS

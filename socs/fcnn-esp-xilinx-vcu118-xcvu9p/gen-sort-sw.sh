@@ -33,6 +33,7 @@ for length in 32 64 128 256 512 1024
 do
     # Bare metal
     SORT_LEN=$length ENABLE_SM=0 IS_ESP=1 COH_MODE=0 make sort_stratus-baremetal-clean sort_stratus-baremetal
+    cp soft-build/ariane/baremetal/sort_stratus.bin test/sort-bm/sort-bm-${length}.bin
     cp soft-build/ariane/baremetal/sort_stratus.exe test/sort-bm/sort-bm-${length}.exe
 done
 

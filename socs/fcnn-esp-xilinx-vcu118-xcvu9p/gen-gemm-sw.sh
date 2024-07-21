@@ -34,6 +34,7 @@ for length in 32 64 128 256 512 1024
 do
     # Bare metal
     GEMM_LEN=$length ENABLE_SM=0 IS_ESP=1 COH_MODE=0 make gemm_stratus-baremetal-clean gemm_stratus-baremetal
+    cp soft-build/ariane/baremetal/gemm_stratus.bin test/gemm-bm/gemm-bm-${length}.bin
     cp soft-build/ariane/baremetal/gemm_stratus.exe test/gemm-bm/gemm-bm-${length}.exe
 
     # OS
