@@ -7,7 +7,7 @@ counter=0
 echo ""
 echo "Synthetic CFA-large: SW"
 echo ""
-./tiled_app_stratus_cfa_MESI.exe 1  1024 1024 1500 1024 5;
+./tiled_app_stratus_cfa_MESI.exe 1  2048 512 1500 512 5;
                            
 #OS
 echo ""
@@ -17,7 +17,7 @@ set -- 1 3 5 7 10 12 13 14 15
 counter=0
 while [ "$counter" -lt 9 ]; do                                    
 : $((counter+=1))
-./tiled_app_stratus_cfa_MESI.exe $1  1024 1024 $((1500/$1)) 1024 0;
+./tiled_app_stratus_cfa_MESI.exe $1  2048 512 $((1500/$1)) 512 0;
 shift 
 done  
                              
@@ -29,7 +29,7 @@ set -- 1 3 5 7 10 12 13 14 15
 counter=0
 while [ "$counter" -lt 9 ]; do                                    
 : $((counter+=1))
-./tiled_app_stratus_cfa_MESI.exe $1  1024 1024 $((1500/$1)) 1024 1;
+./tiled_app_stratus_cfa_MESI.exe $1  2048 512 $((1500/$1)) 512 1;
 shift 
 done                          
                  
@@ -41,7 +41,7 @@ set -- 1 3 5 7 10 12 13 14 15
 counter=0
 while [ "$counter" -lt 9 ]; do
 : $((counter+=1))
-./tiled_app_stratus_cfa_DMA.exe $1  1024 1024 $((1500/$1)) 1024 1;
+./tiled_app_stratus_cfa_DMA.exe $1  2048 512 $((1500/$1)) 512 1;
 shift                        
 done     
                               
@@ -53,7 +53,7 @@ set -- 1 3 5 7 10 12 13 14 15
 counter=0
 while [ "$counter" -lt 9 ]; do
 : $((counter+=1))
-./tiled_app_stratus_cfa_MESI.exe $1  1024 1024 $((1500/$1)) 1024 2;
+./tiled_app_stratus_cfa_MESI.exe $1  2048 512 $((1500/$1)) 512 2;
 shift                        
 done     
                               
@@ -65,6 +65,6 @@ set -- 1 3 5 7 10 12 13 14 15
 counter=0
 while [ "$counter" -lt 9 ]; do
 : $((counter+=1))
-./tiled_app_stratus_cfa_DMA.exe $1  1024 1024 $((1500/$1)) 1024 2;
+./tiled_app_stratus_cfa_DMA.exe $1  2048 512 $((1500/$1)) 512 2;
 shift                        
 done     
