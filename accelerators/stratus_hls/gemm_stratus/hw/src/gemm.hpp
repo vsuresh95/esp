@@ -31,6 +31,7 @@ public:
 	, output_done("output_done")
 	, load_compute_cfg_done("load_compute_cfg_done")
 	, load_store_cfg_done("load_store_cfg_done")
+        , load_next_tile("load_next_tile")
 #else
     gemm(const sc_module_name& name)
 	: esp_accelerator_3P<DMA_WIDTH>(name)
@@ -43,6 +44,8 @@ public:
             // Signal binding
 #ifndef  ENABLE_SM
             cfg.bind_with(*this);
+#else
+	    load_next_tile.bind_with<DMA_WIDTH>(*this);
 #endif
 	    output_done.bind_with<DMA_WIDTH>(*this);
 	    load_compute_cfg_done.bind_with<DMA_WIDTH>(*this);
@@ -76,6 +79,8 @@ public:
     // Configure gemm
 #ifndef  ENABLE_SM
     esp_config_proc cfg;
+#else
+    handshake_t load_next_tile;  
 #endif
 
     // Custom handshakes
