@@ -62,21 +62,6 @@ static inline native_t accumulate(native_t *res, int len){
 #ifdef FCN
 
 
-// static inline void set_offsets(int num_devices, int in1_len, int in_len, int out_len){
-
-// 	int32_t tile_len = in1_len + in_len;
-
-//     for(int dev_id = 0; dev_id < num_devices; dev_id++){
-// 		accel_prod_valid_offset[dev_id] = dev_id*(tile_size + INPUT_OFFSET) + CONS_VALID_OFFSET;
-// 		accel_cons_ready_offset[dev_id] = dev_id*(tile_size + INPUT_OFFSET) + tile_len +CONS_READY_OFFSET;
-// 		accel_prod_ready_offset[dev_id] = dev_id*(tile_size + INPUT_OFFSET) + tile_len + CONS_READY_OFFSET;
-// 		accel_cons_valid_offset[dev_id] = dev_id*(tile_size + INPUT_OFFSET) + CONS_VALID_OFFSET;
-// 		input_buffer_offset[dev_id]  	= dev_id*(tile_size + INPUT_OFFSET);
-// 		output_buffer_offset[dev_id] 	= dev_id*(tile_size + INPUT_OFFSET) + tile_len + INPUT_OFFSET;
-//     }
-// 	cpu_prod_ready_offset = &accel_cons_ready_offset[num_devices-1];
-// 	cpu_prod_valid_offset = &accel_cons_valid_offset[num_devices-1];
-// }
 
 #ifdef FCN
 
@@ -110,17 +95,6 @@ void update_gemm_cfg(int num_devices,unsigned coherence,  spandex_config_t spand
 	for(dev_id = 0; dev_id < 3; dev_id++)
 	{
 		/* <<--descriptor-->> */
-		// gemm_cfg_000[dev_id].do_relu = DO_RELU;
-		// gemm_cfg_000[dev_id].transpose = TRANSPOSE;
-		// gemm_cfg_000[dev_id].ninputs = NINPUTS;
-		// gemm_cfg_000[dev_id].d3 = D3;
-		// gemm_cfg_000[dev_id].d2 = D2;
-		// gemm_cfg_000[dev_id].d1 = D1;
-		// gemm_cfg_000[dev_id].st_offset = ST_OFFSET0;
-		// gemm_cfg_000[dev_id].ld_offset1 = LD_OFFSET1;
-		// gemm_cfg_000[dev_id].ld_offset2 = LD_OFFSET2;
-		// gemm_cfg_000[dev_id].src_offset = 0;
-		// gemm_cfg_000[dev_id].dst_offset = 0;
 		gemm_cfg_000[dev_id].esp = esp;
 		gemm_cfg_000[dev_id].esp.coherence = coherence;
 		#ifndef ENABLE_SM
@@ -130,11 +104,6 @@ void update_gemm_cfg(int num_devices,unsigned coherence,  spandex_config_t spand
 		#endif
 
 		gemm_cfg_000[dev_id].spandex_conf = spandex_config.spandex_reg;
-		//gemm_cfg_000[dev_id].input_offset = input_buffer_offset[dev_id];
-		// gemm_cfg_000[dev_id].cons_valid_offset = accel_cons_valid_offset[dev_id];
-		// gemm_cfg_000[dev_id].prod_rdy_offset = accel_prod_ready_offset[dev_id];
-		// gemm_cfg_000[dev_id].cons_rdy_offset = accel_cons_ready_offset[dev_id];
-		// gemm_cfg_000[dev_id].prod_valid_offset = accel_prod_valid_offset[dev_id];
 
 		cfg_000[dev_id].run = true;
 		#ifdef ENABLE_SM
@@ -183,19 +152,11 @@ static void init_buf_output (int ninput, int offset2, int len, token_t *res, nat
     int i;
 #ifdef __FIXED
 
-	int offset = offset2;//+ninput*(round_up(size_mat_out, DMA_WORD_PER_BEAT(sizeof(token_t))));
-
-	// #ifdef __linux__
-	// printf("output tile O[%d - %d]\n", offset, len);
-	// #endif
+	int offset = offset2;
 	#ifdef __FIXED
 	for (i = 0; i < len; i+=2) { //round_up(len, DMA_WORD_PER_BEAT(sizeof(token_t)))
 		spandex_token_t val;
 		val.value_64 = read_mem_reqodata(res + i);
-		// out_arr[offset+i] = fx2float(res[i], FX_IL);
-		// out_arr[offset+i] = fx2float(val.value_32_1, FX_IL);
-		// out_arr[offset+i+1] = fx2float(val.value_32_2, FX_IL);
-		// printf("res[%d] = %u (%d)\n", i, res[i], (int)out_arr[offset+i]);
     }
 	#else
 	for (i = 0; i < len; i++)
@@ -213,9 +174,6 @@ static void init_weights(token_t *sw_buf, token_t *sw_buf1,token_t *sw_buf2,unsi
     // printf("  Initialize inputs\n");
 
     for (i = 0; i < in_len; i+=2) {
-	// for (i = 0; i < matsize; i+=1) {
-		// in[i] = float2fx(sw_buf[ninput + offset+ i], FX_IL); 
-		// in[i] = float2fx(2.0, FX_IL); 
 		int32_t temp = float2fx(2.0, FX_IL); 
 		spandex_token_t val;
 		val.value_32_1 = temp;
@@ -224,9 +182,6 @@ static void init_weights(token_t *sw_buf, token_t *sw_buf1,token_t *sw_buf2,unsi
     	// printf("in2[%d] = %d, sw[%d] = %d\n", mat1size+i, in[mat1size+i], ninput*d2*d3 + offset2+ i, (int)sw_buf2[ninput*d2*d3 + offset2+ i]);
     }
     for (i = 0; i < in_len; i+=2) {
-	// for (i = 0; i < matsize; i+=1) {
-		// in[i] = float2fx(sw_buf[ninput + offset+ i], FX_IL); 
-		// in[i] = float2fx(2.0, FX_IL); 
 		int32_t temp = float2fx(2.0, FX_IL); 
 		spandex_token_t val;
 		val.value_32_1 = temp;
@@ -235,9 +190,6 @@ static void init_weights(token_t *sw_buf, token_t *sw_buf1,token_t *sw_buf2,unsi
     	// printf("in2[%d] = %d, sw[%d] = %d\n", mat1size+i, in[mat1size+i], ninput*d2*d3 + offset2+ i, (int)sw_buf2[ninput*d2*d3 + offset2+ i]);
     }
     for (i = 0; i < in_len; i+=2) {
-	// for (i = 0; i < matsize; i+=1) {
-		// in[i] = float2fx(sw_buf[ninput + offset+ i], FX_IL); 
-		// in[i] = float2fx(2.0, FX_IL); 
 		int32_t temp = float2fx(2.0, FX_IL); 
 		spandex_token_t val;
 		val.value_32_1 = temp;
@@ -246,92 +198,6 @@ static void init_weights(token_t *sw_buf, token_t *sw_buf1,token_t *sw_buf2,unsi
     	// printf("in2[%d] = %d, sw[%d] = %d\n", mat1size+i, in[mat1size+i], ninput*d2*d3 + offset2+ i, (int)sw_buf2[ninput*d2*d3 + offset2+ i]);
     }
 }
-
-// static inline void in_main(int ninputs, int d1, int d2, int d3, int transpose, int do_relu, int ld_offset2, token_t* acc_buf,native_t *sw_buf, native_t * out_arr)
-// {
-	// UpdateSync((void*) &acc_buf[cpu_prod_ready_offset], 1);
-
-	// SpinSync((void*) &acc_buf[cpu_cons_ready_offset], 1); // wait for cons ready
-	// //update weights at init
-	// init_weights(&acc_buf[input_buffer_offset[0]+64], &acc_buf[input_buffer_offset[1]+64],&acc_buf[input_buffer_offset[1]+64],64*64); //hardcoded temporarily since we are doing fcnn over 1x64x64
-		
-	// int tinput = 0;
-	// // printf("  Poll Cons Rdy...\n");
-	// #if (COMP_MODE==MODE_PIPE)
-	// //fill pipe
-	// for(tinput = 0; tinput<2; tinput++){
-	// 	start_counter();
-	// 	SpinSync((void*) &acc_buf[cpu_cons_ready_offset], 1); // wait for cons ready
-	// 	// printf("  Found Cons Rdy...\n");
-
-	// 	//write input
-	// 	init_buffer(&acc_buf[INPUT_OFFSET], sw_buf, 64);
-		
-
-	// 	// printf("  Provided config. Update Cons Rdy and last...\n");
-	// 	asm volatile ("fence w, w");	//release semantics
-	// 	UpdateSync((void*) &acc_buf[cpu_cons_ready_offset], 0);
-	// 	UpdateSync((void*) &acc_buf[cpu_cons_valid_offset], 1);
-	// 	t_cpu_write += end_counter();
-	// }
-	// #endif
-
-	// hw_write_time = 0;
-	// hw_read_time = 0;
-	// // int out_iters = ((d1*d3)/mat_chk_out);
-	// // int in_iters = (d2*d3/(loadable_chunk));
-	// while(tinput<ninputs){
-		
-	// 	start_counter();
-	// 	SpinSync((void*) &acc_buf[cpu_cons_ready_offset], 1); // wait for cons ready
-	// 	// printf("  Found Cons Rdy...\n");
-
-	// 	//write input
-	// 	init_buffer(&acc_buf[INPUT_OFFSET], sw_buf, 64);
-		
-
-	// 	// printf("  Provided config. Update Cons Rdy and last...\n");
-	// 	asm volatile ("fence w, w");	//release semantics
-	// 	UpdateSync((void*) &acc_buf[cpu_cons_ready_offset], 0);
-	// 	UpdateSync((void*) &acc_buf[cpu_cons_valid_offset], 1);
-	// 	t_cpu_write += end_counter();
-	// 	start_counter();
-	// 	// Inform the accelerator - ready for next iteration.
-	// 	UpdateSync((void*) &acc_buf[cpu_prod_ready_offset], 1);
-	// 	// Wait for the accelerator to send output.
-	// 	RevSpinSync((void*) &acc_buf[cpu_prod_valid_offset], 0);
-		
-	// 	// Reset flag for next iteration.
-	// 	//printf("Prod Valid : iteration %d: %d\n", i, acc_buf[cpu_prod_valid_offset]);
-	
-	// 	t_gemm += end_counter();
-	     
-	// 	start_counter();
-	// 	err += validate_buffer(&acc_buf[st_offset], &sw_buf[in_len], out_len);		
-	// 	t_cpu_read += end_counter();	
-	// 	UpdateSync((void*) &acc_buf[cpu_prod_valid_offset], 0);
-	// 	UpdateSync((void*) &acc_buf[cpu_prod_ready_offset], 1);
-			
-	// 	tinput++;
-	// }
-
-	// #if (COMP_MODE==MODE_PIPE)
-	// for(tinput = 0; tinput<2; tinput++){
-	// 	RevSpinSync((void*) &acc_buf[cpu_prod_valid_offset], 0);
-		
-	// 	// Reset flag for next iteration.
-	// 	//printf("Prod Valid : iteration %d: %d\n", i, acc_buf[cpu_prod_valid_offset]);
-	
-	// 	t_gemm += end_counter();
-	     
-	// 	start_counter();
-	// 	err += validate_buffer(&acc_buf[st_offset], &sw_buf[in_len], out_len);		
-	// 	t_cpu_read += end_counter();	
-	// 	UpdateSync((void*) &acc_buf[cpu_prod_valid_offset], 0);
-	// 	UpdateSync((void*) &acc_buf[cpu_prod_ready_offset], 1);
-	// }
-	// #endif
-// }
 
 #endif
 
@@ -424,31 +290,10 @@ static void init_parameters(int test, int32_t do_relu, int32_t transpose, int32_
         gemm_cfg_000[dev_id].ld_offset1 = input_buffer_offset[dev_id] ;
         gemm_cfg_000[dev_id].ld_offset2 = input_buffer_offset[dev_id]+ *in1_len;
         gemm_cfg_000[dev_id].st_offset = output_buffer_offset[dev_id] ;
-	
-
-    // print test info
-    // printf("  Prepare hw %d parameters\n", dev_id);
-    // printf("    .do_relu = %d\n", gemm_cfg_000[dev_id].do_relu);
-    // printf("    .transpose = %d\n", gemm_cfg_000[dev_id].transpose);
-    // printf("    .ninputs = %d\n", gemm_cfg_000[dev_id].ninputs);
-    // printf("    .d3 = %d\n", gemm_cfg_000[dev_id].d3);
-    // printf("    .d2 = %d\n", gemm_cfg_000[dev_id].d2);
-    // printf("    .d1 = %d\n", gemm_cfg_000[dev_id].d1);
-    // printf("    .st_offset = %d\n", gemm_cfg_000[dev_id].st_offset);
-    // printf("    .ld_offset1 = %d\n", gemm_cfg_000[dev_id].ld_offset1);
-    // printf("    .ld_offset2 = %d\n", gemm_cfg_000[dev_id].ld_offset2);
-    // printf("    .prod_valid_offset = %d\n", gemm_cfg_000[dev_id].prod_valid_offset);
-    // printf("    .prod_ready_offset = %d\n", gemm_cfg_000[dev_id].prod_ready_offset);
-    // printf("    .cons_valid_offset = %d\n", gemm_cfg_000[dev_id].cons_valid_offset);
-    // printf("    .cons_ready_offset = %d\n", gemm_cfg_000[dev_id].cons_ready_offset);
     }
 	cpu_prod_ready_offset = &accel_cons_ready_offset[NUM_DEVICES-1];
 	cpu_prod_valid_offset = &accel_cons_valid_offset[NUM_DEVICES-1];
 
-	// printf("cpu_prod_ready_offset=%d\n",*cpu_prod_ready_offset);
-	// printf("cpu_prod_valid_offset=%d\n",*cpu_prod_valid_offset);
-	// printf("cpu_cons_ready_offset=%d\n",*cpu_cons_ready_offset);
-	// printf("cpu_cons_valid_offset=%d\n",*cpu_cons_valid_offset);
 
 
 	
@@ -459,17 +304,6 @@ static void init_parameters(int test, int32_t do_relu, int32_t transpose, int32_
 	//printf("Sw_buf[%d] = %x\n", i, (int) sw_buf[i]);
     }
 
-    // print test info
-    // printf("  Prepare test %d parameters\n", test);
-    // printf("    .do_relu = %d\n", do_relu);
-    // printf("    .transpose = %d\n", transpose);
-    // printf("    .ninputs = %d\n", ninputs);
-    // printf("    .d3 = %d\n", d3);
-    // printf("    .d2 = %d\n", d2);
-    // printf("    .d1 = %d\n", d1);
-    // printf("    .st_offset = %d\n", *st_offset);
-    // printf("    .ld_offset1 = %d\n", ld_offset1);
-    // printf("    .ld_offset2 = %d\n", ld_offset2);
 }
 
 static void init_weight_buffer(native_t *sw_buf, native_t *sw_buf1,native_t *sw_buf2,unsigned in_len)
@@ -498,15 +332,8 @@ static inline void init_buf_input1 (int ninput, token_t *in, int matsize, native
 {
     int i;
 #ifdef __FIXED
-	// // *offset_n = offset + mat1size; 
-	// for (i = 0; i < matsize; i++) {
-	// 	in[i] = float2fx(2.0, FX_IL); 
-    // }
 
 	for (i = 0; i < matsize; i+=2) {
-	// for (i = 0; i < matsize; i+=1) {
-		// in[i] = float2fx(sw_buf[ninput + offset+ i], FX_IL); 
-		// in[i] = float2fx(2.0, FX_IL); 
 		int32_t temp = float2fx(2.0, FX_IL); 
 		spandex_token_t val;
 		val.value_32_1 = temp;
@@ -518,24 +345,11 @@ static inline void init_buf_input1 (int ninput, token_t *in, int matsize, native
 #include "gold.h"
 // #include "fcn_gold.h"
 #endif
-	// tile_num++;
 }
 
 static void init_buffer(token_t *acc_buf, native_t *sw_buf, unsigned in_len)
 {
     int i;
-
-    // printf("  Initialize inputs\n");
-
-//     for (i = 0; i < in_len; i++) {
-// 	native_t val = i % 17 - 8;
-// #ifdef __FIXED
-//         acc_buf[i] = float2fx(val, FX_IL);
-// #else
-//         acc_buf[i] = val;
-// #endif
-//      // sw_buf[i] = val;
-//     }
 
     spandex_native_t gold_data;
     spandex_token_t in_data;
