@@ -1,0 +1,1 @@
+source ./gen-synth-sw.sh

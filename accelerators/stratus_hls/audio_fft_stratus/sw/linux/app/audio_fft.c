@@ -6,18 +6,6 @@
 
 const float ERR_TH = 0.05;
 
-#define ENABLE_SM
-#define SPX
-
-#ifdef SPX
-	#define COH_MODE 2
-#else
-	#define IS_ESP 1
-	#define COH_MODE 1
-#endif
-
-#define ITERATIONS 1000
-
 #include "coh_func.h"
 #include "sm.h"
 
@@ -148,7 +136,7 @@ static void init_parameters()
 	out_offset = in_len;
 	size = (out_offset * sizeof(token_t)) + out_size;
 
-	printf("ilen %u isize %u o_off %u olen %u osize %u msize %u\n", in_len, out_len, in_size, out_size, out_offset, size);
+	// printf("ilen %u isize %u o_off %u olen %u osize %u msize %u\n", in_len, out_len, in_size, out_size, out_offset, size);
 }
 
 int main(int argc, char **argv)
@@ -169,9 +157,9 @@ int main(int argc, char **argv)
     audio_fft_cfg_000[0].esp.coherence = coherence;
 	audio_fft_cfg_000[0].spandex_conf = spandex_config.spandex_reg;
 
-    printf("\n====== %s ======\n\n", cfg_000[0].devname);
-	printf("	Coherence = %s\n", CohPrintHeader);
-	printf("	ITERATIONS = %u\n", ITERATIONS);
+    // printf("\n====== %s ======\n\n", cfg_000[0].devname);
+	// printf("	Coherence = %s\n", CohPrintHeader);
+	// printf("	ITERATIONS = %u\n", ITERATIONS);
 
 	init_parameters();
 
@@ -189,18 +177,20 @@ int main(int argc, char **argv)
 	audio_fft_cfg_000[0].output_offset = in_len + SYNC_VAR_SIZE;
 
     // allocations
-    printf("  Allocations\n");
+    // printf("  Allocations\n");
 	const unsigned num_samples = (1 << logn_samples);
     mem = (token_t *) esp_alloc(size);
     gold = (native_t*) esp_alloc(2 * num_samples);
     cfg_000[0].hw_buf = mem;
 
-	for (i = 0; i < ITERATIONS/10; i++)
+	const unsigned sw_iterations = ((ENABLE_SM == 1) ? 1 : (ITERATIONS / ((logn_samples > 10) ? 10 : 1)));
+
+	for (i = 0; i < ITERATIONS; i++)
 	{
 		sw_run(gold);
 	}
 
-#ifdef ENABLE_SM
+#if (ENABLE_SM == 1)
 	// Reset all sync variables to default values.
 	UpdateSync((void*) &mem[local_cons_vld_flag_offset], 0);
 	UpdateSync((void*) &mem[local_cons_rdy_flag_offset], 1);
@@ -262,14 +252,38 @@ int main(int argc, char **argv)
     esp_free(mem);
     esp_free(gold);
 
-	printf("  Software Input = %lu\n", t_sw_input/(ITERATIONS/10));
-	printf("  Software = %lu\n", t_sw/(ITERATIONS/10));
-	printf("  Software Output = %lu\n", t_sw_output/(ITERATIONS/10));
-	printf("  Accel Input = %lu\n", t_acc_input/ITERATIONS);
-	printf("  Accel = %lu\n", t_acc/ITERATIONS);
-	printf("  Accel Output = %lu\n", t_acc_output/ITERATIONS);
+#if (ENABLE_SM == 0)
+	printf("Result: FFT SW %d = %lu\n", 2 * num_samples, (t_sw_input+t_sw+t_sw_output)/sw_iterations);
+	printf("Result: FFT Linux %d Total = %lu\n\n", 2 * num_samples, (t_acc_input + t_acc + t_acc_output)/ITERATIONS);
+#else
+	#if (IS_ESP == 1)
+		#if (COH_MODE == ESP_COHERENT_DMA)
+			printf("Result: FFT ASI %d DMA CPU_Write = %lu\n", 2 * num_samples, (t_acc_input)/ITERATIONS);
+			printf("Result: FFT ASI %d DMA CPU_Read = %lu\n", 2 * num_samples, (t_acc_output)/ITERATIONS);
+			printf("Result: FFT ASI %d DMA Acc = %lu\n\n", 2 * num_samples, (t_acc)/ITERATIONS);
+		#else
+			printf("Result: FFT ASI %d MESI CPU_Write = %lu\n", 2 * num_samples, (t_acc_input)/ITERATIONS);
+			printf("Result: FFT ASI %d MESI CPU_Read = %lu\n", 2 * num_samples, (t_acc_output)/ITERATIONS);
+			printf("Result: FFT ASI %d MESI Acc = %lu\n", 2 * num_samples, (t_acc)/ITERATIONS);
+			printf("Result: FFT ASI %d MESI Total = %lu\n\n", 2 * num_samples, (t_acc_input+t_acc+t_acc_output)/ITERATIONS);
+		#endif
+	#else
+		#if (COH_MODE == SPX_WRITE_THROUGH_FWD)
+			printf("Result: FFT ASI %d Spandex CPU_Write = %lu\n", 2 * num_samples, (t_acc_input)/ITERATIONS);
+			printf("Result: FFT ASI %d Spandex CPU_Read = %lu\n", 2 * num_samples, (t_acc_output)/ITERATIONS);
+			printf("Result: FFT ASI %d Spandex Acc = %lu\n\n", 2 * num_samples, (t_acc)/ITERATIONS);
+		#endif
+	#endif
+#endif
 
-    printf("\n====== %s ======\n\n", cfg_000[0].devname);
+	// printf("  Software Input = %lu\n", t_sw_input/(ITERATIONS/10));
+	// printf("  Software = %lu\n", t_sw/(ITERATIONS/10));
+	// printf("  Software Output = %lu\n", t_sw_output/(ITERATIONS/10));
+	// printf("  Accel Input = %lu\n", t_acc_input/ITERATIONS);
+	// printf("  Accel = %lu\n", t_acc/ITERATIONS);
+	// printf("  Accel Output = %lu\n", t_acc_output/ITERATIONS);
+
+    // printf("\n====== %s ======\n\n", cfg_000[0].devname);
 
 	return errors;
 }
