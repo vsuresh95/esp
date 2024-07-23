@@ -3,7 +3,9 @@
 #define __ESP_GEMM_DIR_H__
 
 #define MAX_DEVICES 3
+#ifdef FCN
 #define NUM_DEVICES 3
+#endif
 #define ITERATIONS 1000
 
 // Comp Mode 0: Reg Inv
@@ -13,7 +15,7 @@
 #define MODE_CHAIN 1
 #define MODE_PIPE 2
 
-#define COMP_MODE MODE_PIPE
+//#define COMP_MODE MODE_PIPE
 
 // Load configuration
 #define LESS_THAN_ROW 0

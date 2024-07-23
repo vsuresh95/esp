@@ -6,6 +6,17 @@
 #include "libesp.h"
 #include "gemm_stratus.h"
 
+#define MAX_DEVICES 3
+// #define NUM_DEVICES 3
+#define ITERATIONS 1000
+
+// Comp Mode 0: Reg Inv
+// Comp Mode 1: Chaining
+// Comp Mode 2: Pipelining
+#define MODE_REG_INV 0
+#define MODE_CHAIN 1
+#define MODE_PIPE 2
+
 #define SYNC_VAR_SIZE 6
 #define UPDATE_VAR_SIZE 2
 #define VALID_FLAG_OFFSET 0
@@ -89,7 +100,7 @@ typedef float native_t;
 
 #ifdef FCN
 
-struct gemm_stratus_access gemm_cfg_000[MAX_DEVICES];
+struct gemm_stratus_access gemm_cfg_000[MAX_DEVICES]; 
 struct esp_access esp ={
 	.coherence = ACC_COH_FULL,
 	.p2p_store = 0,
@@ -110,55 +121,6 @@ esp_thread_info_t cfg_000[MAX_DEVICES];
 
 int mode = COMP_MODE;
 
-void update_gemm_cfg(int num_devices){
-	int dev_id;
-	for(dev_id = 0; dev_id < num_devices; dev_id++)
-	{
-		/* <<--descriptor-->> */
-		gemm_cfg_000[dev_id].do_relu = DO_RELU;
-		gemm_cfg_000[dev_id].transpose = TRANSPOSE;
-		gemm_cfg_000[dev_id].ninputs = NINPUTS;
-		gemm_cfg_000[dev_id].d3 = D3;
-		gemm_cfg_000[dev_id].d2 = D2;
-		gemm_cfg_000[dev_id].d1 = D1;
-		gemm_cfg_000[dev_id].st_offset = ST_OFFSET0;
-		gemm_cfg_000[dev_id].ld_offset1 = LD_OFFSET1;
-		gemm_cfg_000[dev_id].ld_offset2 = LD_OFFSET2;
-		gemm_cfg_000[dev_id].src_offset = 0;
-		gemm_cfg_000[dev_id].dst_offset = 0;
-		gemm_cfg_000[dev_id].esp = esp;
-		gemm_cfg_000[dev_id].esp.coherence = coherence;
-		if(mode==MODE_REG_INV)
-			gemm_cfg_000[dev_id].esp.start_stop = 0;
-
-		gemm_cfg_000[dev_id].spandex_conf = spandex_config.spandex_reg;
-		//gemm_cfg_000[dev_id].input_offset = input_buffer_offset[dev_id];
-		gemm_cfg_000[dev_id].cons_valid_offset = accel_cons_valid_offset[dev_id];
-		gemm_cfg_000[dev_id].prod_rdy_offset = accel_prod_ready_offset[dev_id];
-		gemm_cfg_000[dev_id].cons_rdy_offset = accel_cons_ready_offset[dev_id];
-		gemm_cfg_000[dev_id].prod_valid_offset = accel_prod_valid_offset[dev_id];
-
-		cfg_000[dev_id].run = true;
-		#ifdef ENABLE_SM
-		if(dev_id == 0)
-			cfg_000[dev_id].devname = "gemm_stratus.0";
-		if(dev_id == 1)
-			cfg_000[dev_id].devname = "gemm_stratus.1";
-		if(dev_id == 2)
-			cfg_000[dev_id].devname = "gemm_stratus.2";
-		#else
-		if(dev_id == 0)
-			cfg_000[dev_id].devname = "gemm_stratus.3";
-		if(dev_id == 1)
-			cfg_000[dev_id].devname = "gemm_stratus.4";
-		if(dev_id == 2)
-			cfg_000[dev_id].devname = "gemm_stratus.5";
-		#endif
-		cfg_000[dev_id].ioctl_req = GEMM_STRATUS_IOC_ACCESS;
-		cfg_000[dev_id].esp_desc = &(gemm_cfg_000[dev_id].esp);
-		cfg_000[dev_id].hw_buf = acc_buf;
-	}
-};
 
 #else
 
@@ -207,7 +169,7 @@ struct gemm_stratus_access gemm_cfg_000[] = {
 esp_thread_info_t cfg_000[] = {
 	{
 		.run = true,
-		.devname = "gemm_stratus.0",
+		.devname = "gemm_stratus.2",
 		.ioctl_req = GEMM_STRATUS_IOC_ACCESS,
 		.esp_desc = &(gemm_cfg_000[0].esp),
 	}
@@ -218,7 +180,7 @@ esp_thread_info_t cfg_000[] = {
 esp_thread_info_t cfg_001[] = {
 {
 	.run = true,
-	.devname = "gemm_stratus.4",
+	.devname = "gemm_stratus.3",
 	.ioctl_req = GEMM_STRATUS_IOC_ACCESS,
 	.esp_desc = &(gemm_cfg_000[0].esp),
 }
