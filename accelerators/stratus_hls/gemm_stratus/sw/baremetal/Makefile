@@ -5,6 +5,10 @@ APPNAME := gemm
 COH_MODE ?= 0
 COMP_MODE ?= 1
 NUM_DEVICES ?= 1
+D3 ?= 16
+D2 ?= 16
+D1 ?= 16
+
 
 ifneq ("$(SPX)", "")
         EXTRA_CFLAGS+=-DSPX=1

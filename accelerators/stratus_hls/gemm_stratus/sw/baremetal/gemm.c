@@ -2,12 +2,12 @@
 //#define ENABLE_SM
 //#define SPX
 
-#ifdef SPX
-	#define COH_MODE 2
-#else
-	#define IS_ESP 1
-	#define COH_MODE 0 
-#endif
+//#ifdef SPX
+//	#define COH_MODE 2
+//#else
+//	#define IS_ESP 1
+//	#define COH_MODE 0 
+//#endif
 
 //#define ENABLE_SM
 #define SYNC_VAR_LEN 0x4
@@ -93,12 +93,12 @@ typedef float native_t;
 #include "sw_func.h"
 
 #define NINPUTS 1
-#define D 64  
-#define Dx2 (D*2)
-#define D3 D
-#define D2 D
-#define D1 D
-#define T 0
+//#define D 64  
+//#define Dx2 (D*2)
+//#define D3 D
+//#define D2 D
+//#define D1 1
+#define T 1
 #define ITERATIONS 1000
 //10
 
@@ -232,36 +232,6 @@ static int validate_buf(token_t *out, native_t *gold)
 		//out_data.value_64 = read_mem_reqv(dst);
 		out_data.value_64 = read_mem_reqodata(dst);
 		//errors += out_data.value_64;
-#if 0
-		gold_data.value_64 = read_mem_reqv(src);
-#ifdef __FIXED
-	native_t val = fx2float(out_data.value_32_1, FX_IL);
-	if ((int)val != (int)gold_data.value_32_1) {
-//	if (fabs((double)((int)val - (int)gold_data.value_32_1)) > 0.0001f) {
-            ++errors;
-//             printf("sw_buf[%d] = %d; acc_buf[%d] = %d;\n", j, (int) out_data.value_32_1, j, (int) val);
-//             printf("sw_buf[%d] = %x; acc_buf[%d] = %x;\n", j,  out_data.value_32_1, j,  val);
-        }
-        val = fx2float(out_data.value_32_2, FX_IL);
-	if ((int)val != (int)gold_data.value_32_2) {
-       // if (fabs((double)((int)val - (int)gold_data.value_32_2)) > 0.001f) {
-            ++errors;
-//             printf("sw_buf[%d] = %d; acc_buf[%d] = %d;\n", j + 1, (int) out_data.value_32_2, j + 1, (int) val);
-//             printf("sw_buf[%d] = %x; acc_buf[%d] = %x;\n", j + 1, out_data.value_32_2, j + 1, val);
-        }
-#else
-		native_t val = out_data.value_32_1;
-        if (val != gold_data.value_32_1) {
-            ++errors;
-            // printf("sw_buf[%d] = %d; acc_buf[%d] = %d;\n", j, (int) val, j, (int) out_data.value_32_1);
-        }
-        val = out_data.value_32_2;
-        if (val != gold_data.value_32_2) {
-            ++errors;
-            // printf("sw_buf[%d] = %d; acc_buf[%d] = %d;\n", j + 1, (int) val, j + 1, (int) out_data.value_32_2);
-        }
-#endif
-#endif
 	}
 
 	return errors;
@@ -272,16 +242,7 @@ static void init_buf (token_t *in, native_t * gold)
 {
     int i;
 
-// #include "input.h"
-
-// #ifdef __FIXED
-//     for (i = 0; i < ninputs * (d1*d2 + d2*d3); i++) {
-//         in[i] = float2fx(in[i], FX_IL);
-//     }
-// #endif
-
-// #include "gold.h"
-	spandex_native_t gold_data;
+    spandex_native_t gold_data;
     spandex_token_t in_data;
     void* src;  
     void* dst;
@@ -293,19 +254,6 @@ static void init_buf (token_t *in, native_t * gold)
 	in_data.value_32_1 = i % 17 - 8;
 	in_data.value_32_2 = (i+1) % 17 - 8;
 
-#if 0
-        gold_data.value_64 = read_mem_reqv(src);
-#ifdef __FIXED
-        in_data.value_32_1 = float2fx(gold_data.value_32_1, FX_IL);
-        in_data.value_32_2 = float2fx(gold_data.value_32_2, FX_IL);
-        //printf("gold[%d] = %x; gold[%d] = %x;\n", i, (int) gold_data.value_32_1, i + 1, (int) gold_data.value_32_2);
-#else
-        in_data.value_32_1 = (token_t) gold_data.value_32_1;
-        in_data.value_32_2 = (token_t) gold_data.value_32_2;
-#endif
-        //printf("sw_buff[%d] = %x; sw_buff[%d] = %x;\n", i, in_data.value_32_1, i + 1,  in_data.value_32_2);
-        //printf("%x: %llx \n", dst, in_data.value_64);
-#endif
         write_mem_wtfwd(dst, in_data.value_64);
     }
 }
@@ -322,14 +270,7 @@ int main(int argc, char * argv[])
 	token_t *mem;
 	native_t *gold;
 	unsigned errors = 0;
-	// unsigned coherence;
-
-	// #ifdef ENABLE_SM
-	// st_offset = OUTPUT_OFFSET;
-	// #else
-	// st_offset = ninputs * (d1 * d2 + d2 * d3);
-	// #endif
-
+	
 	ld_offset2 = ld_offset1+ ninputs * (d1 * d2);
 	
 	if (DMA_WORD_PER_BEAT(sizeof(token_t)) <= 1) {
@@ -358,7 +299,7 @@ int main(int argc, char * argv[])
 	const int cons_vld_offset = CONS_VALID_OFFSET;
 
 	// Search for the device
-	printf("Scanning device tree... \n");
+	//printf("Scanning device tree... \n");
 
 	ndev = probe(&espdevs, VENDOR_SLD, SLD_GEMM, DEV_NAME);
 	if (ndev == 0) {
@@ -366,16 +307,19 @@ int main(int argc, char * argv[])
 		return 0;
 	}
 
-	printf("Test parameters: [D, T, NINPUTS] = [%u %u %u, %u, %u]\n\n", d1,d2,d3, T, NINPUTS);
+	//printf("Test parameters: [D, T, NINPUTS] = [%u %u %u, %u, %u]\n\n", d1,d2,d3, T, NINPUTS);
+	// #ifdef ENABLE_SM
+	// printf("ASI mode\n");
+	// #endif
 
-	// for (n = 0; n < ndev; n++) 
+	//for (n = 0; n < 3; n++) 
 	#ifdef ENABLE_SM
-	n = 0;//1; //0;
-	#else
-	n = 0; //(ndev==2)?1 : 0;// 0;// (ndev==2)?1 : 0;
+	 n = 0;
+	 #else
+	 n = 3; 
 	#endif
 	{
-		printf("**************** %s.%d ****************\n", DEV_NAME, n);
+		//printf("**************** %s.%d ****************\n", DEV_NAME, n);
 
 		dev = &espdevs[n];
 
@@ -393,28 +337,28 @@ int main(int argc, char * argv[])
 		// Allocate memory
 		gold = aligned_malloc(in_len * sizeof(native_t) + out_len * sizeof(native_t));
 		mem = aligned_malloc(mem_size);
-		printf("  memory buffer base-address = %p\n", mem);
-		printf("  memory buffer base-address for gold = %p\n", gold);
-		printf("  coherence = %u\n", coherence);
-		printf("  Coherence Mode: %s\n", CohPrintHeader);
+		// printf("  memory buffer base-address = %p\n", mem);
+		// printf("  memory buffer base-address for gold = %p\n", gold);
+		// printf("  coherence = %u\n", coherence);
+		// printf("  Coherence Mode: %s\n", CohPrintHeader);
 
 		// Allocate and populate page table
 		ptable = aligned_malloc(NCHUNK(mem_size) * sizeof(unsigned *));
 		for (i = 0; i < NCHUNK(mem_size); i++)
 			ptable[i] = (unsigned *) &mem[i * (CHUNK_SIZE / sizeof(token_t))];
 
-		printf("  ptable = %p\n", ptable);
-		printf("  nchunk = %lu\n", NCHUNK(mem_size));
+		// printf("  ptable = %p\n", ptable);
+		// printf("  nchunk = %lu\n", NCHUNK(mem_size));
 
 #ifndef __riscv
-		for (coherence = ACC_COH_NONE; coherence <= ACC_COH_FULL; coherence++) {
+//		for (coherence = ACC_COH_NONE; coherence <= ACC_COH_FULL; coherence++) {
 #else
 		{
 			/* TODO: Restore full test once ESP caches are integrated */
 			// coherence = ACC_COH_NONE;
 #endif
 		
-			printf("  Generate input...\n");
+			// printf("  Generate input...\n");
 
 			// Pass common configuration parameters
 			iowrite32(dev, SPANDEX_REG, spandex_config.spandex_reg);
@@ -449,10 +393,7 @@ int main(int argc, char * argv[])
 			iowrite32(dev, PROD_READY_OFFSET_REG, CONS_READY_OFFSET);
 			iowrite32(dev, CONS_VALID_OFFSET_REG, PROD_VALID_OFFSET);
 			iowrite32(dev, CONS_READY_OFFSET_REG, PROD_READY_OFFSET);
-			//iowrite32(dev, PROD_VALID_OFFSET_REG, cons_vld_offset);
-			//iowrite32(dev, PROD_READY_OFFSET_REG, cons_rdy_offset);
-			//iowrite32(dev, CONS_VALID_OFFSET_REG, prod_vld_offset);
-			//iowrite32(dev, CONS_READY_OFFSET_REG, prod_rdy_offset);
+			
 
 			// Flush (customize coherence model here)
 #ifdef ENABLE_SM
@@ -470,10 +411,6 @@ int main(int argc, char * argv[])
 				write_mem_wtfwd(&mem[PROD_READY_OFFSET],1);//write producer ready
 				asm volatile ("fence w, rw");
 				
-				//indicate ownership of memory regions	
-				//int64_t temp = read_mem_reqodata(&mem[CONS_READY_OFFSET]);
-				//temp = read_mem_reqodata(&mem[PROD_VALID_OFFSET]);
-				//validate_buf(&mem[out_offset], &gold[in_len]);
 #endif
 			esp_flush(coherence);
 
@@ -486,14 +423,6 @@ int main(int argc, char * argv[])
 				gold[i] = i % 17 - 8;
 			//	printf("gold[%d] = %d\n", i, (int) gold[i]);
 			}
-
-			for (i = 0; i < ITERATIONS; ++i) {
-				start_counter();
-				//sw_run(0, transpose, NINPUTS, d3, d2, d1, gold, &gold[in2_words_adj], &gold[out_offset]);
-				sw_run(0, transpose, NINPUTS, d3, d2, d1, gold, &gold[in2_words_adj], &gold[in_len]);
-				t_sw_gemm += end_counter();
-			}
-
 			// Start accelerators
 
 			for (i = 0; i < ITERATIONS; ++i) {
@@ -573,10 +502,11 @@ int main(int argc, char * argv[])
 			// 	printf("  ... PASS\n");
 
 			// printf("	Errors = %u\n", errors);
-			printf("	SW Time = %lu\n", t_sw_gemm);
-			printf("	CPU Write Time = %lu\n", t_cpu_write);
-			printf("	GEMM Time = %lu\n", t_gemm);
-			printf("	CPU Read Time = %lu\n", t_cpu_read);
+			// printf("	SW Time = %lu\n", t_sw_gemm);
+			//printf("	CPU Write Time = %lu\n", t_cpu_write);
+			//printf("	GEMM Time = %lu\n", t_gemm);
+			//printf("	CPU Read Time = %lu\n", t_cpu_read);
+			printf("Result: GEMM baremetal %dx%dx%d %s Total = %lu\n", d1,d2,d3,CohPrintHeader, (t_gemm+t_cpu_write+t_cpu_read));
 
 		}
 		aligned_free(ptable);
