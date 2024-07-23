@@ -206,6 +206,7 @@ void tiled_app::store_output()
 
         output_ready.ack.reset_ack();
         store_done.req.reset_req();
+
 #ifdef SYNTH_APP_CFA
         load_next_tile.req.reset_req();
 #endif
@@ -330,6 +331,7 @@ void tiled_app::store_output()
 		    this->end_store_asi_handshake();
                     wait();
 // jul14
+
 #ifdef SYNTH_APP_CFA
 		    load_next_tile.req.req();
                     wait();
@@ -339,6 +341,8 @@ void tiled_app::store_output()
 	
     }
 }
+
+
 
 
 
@@ -356,6 +360,7 @@ void tiled_app::compute_kernel()
        // compute_done.req.reset_req();
         output_ready.req.reset_req();
         compute0_state_dbg.write(0);
+
         //load_next_tile.req.reset_req();
 
     }
@@ -445,6 +450,7 @@ void tiled_app::compute_kernel()
 
                 compute0_state_dbg.write(3);
                 wait();
+
 		//load_next_tile.req.req();
                 //wait();
                 //this->compute_done_req();

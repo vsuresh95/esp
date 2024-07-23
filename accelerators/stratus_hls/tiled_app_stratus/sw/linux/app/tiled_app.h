@@ -315,6 +315,7 @@ void synth_accel_asi(int mode){
 
 
 		total_time_start = get_counter();
+
 		// Fill pipeline first
 		int tile = 0;
 	 	for(; tile < pipeline_depth; tile++){
@@ -356,12 +357,18 @@ void synth_accel_asi(int mode){
 			temp2 = get_counter();
 			t_acc += (temp2-accel_time_start);
 
+
+//#if defined(ESP) && (COH_MODE==1)
+//			asm volatile ("fence rw, w");
+//#endif
+
 			temp = get_counter();
 			write_to_cons();
 
 			//printf("Write to Consumer %d\n", tile);
 
 #if defined(ESP) 
+
 			asm volatile ("fence rw, rw");
 #endif
 
@@ -370,6 +377,7 @@ void synth_accel_asi(int mode){
 			int last = 0;
 			if(tile==local_num_tiles-1)
 				last = 1;
+
 
 			update_cons_rdy();
 
@@ -402,6 +410,7 @@ void synth_accel_asi(int mode){
 
 			//printf("Consumed output %d\n", tile);
 
+
 #if defined(ESP) && (COH_MODE==1)
 			asm volatile ("fence rw, w");
 #endif
@@ -429,6 +438,7 @@ void synth_accel_asi(int mode){
 #if defined(ESP) && (COH_MODE==1)
 			asm volatile ("fence rw, rw");
 #endif
+
 			//printf("Drained output %d\n", tile-pipeline_depth);
 
 	 		temp = get_counter();
@@ -446,6 +456,7 @@ void synth_accel_asi(int mode){
 			//print_flags();
 		}
 	//		printf("drained pipeline\n");
+
 
 	} // end of else (Reg Inv)
 

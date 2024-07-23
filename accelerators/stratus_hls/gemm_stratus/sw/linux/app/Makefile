@@ -16,6 +16,12 @@ endif
 ifneq ("$(FCN)", "")
         EXTRA_CFLAGS+=-DFCN=1
 endif
+ifneq ("$(ENABLE_SM)", "")
+        EXTRA_CFLAGS+=-DENABLE_SM=1
+endif
+ifneq ("$(COMP_MODE)", "0")
+        EXTRA_CFLAGS+=-DENABLE_SM=1
+endif
 
 EXTRA_CFLAGS += -DCOH_MODE=$(COH_MODE)
 EXTRA_CFLAGS += -DCOMP_MODE=$(COMP_MODE)

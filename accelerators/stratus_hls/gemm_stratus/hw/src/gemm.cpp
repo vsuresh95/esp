@@ -48,6 +48,9 @@ void gemm::load_input()
 	this->reset_load_input();
 	load_compute_cfg_done.req.reset_req();
 	load_store_cfg_done.req.reset_req();
+#ifdef ENABLE_SM
+        load_next_tile.ack.reset_ack();
+#endif
 
 	// PLM memories reset
 
@@ -155,11 +158,15 @@ void gemm::load_input()
     	index_d1 = index_d1_n;
 #ifdef  ENABLE_SM
             // Addition for ASI
+    	{
+    	    HLS_DEFINE_PROTOCOL("asi-config-start");
             printf("LOAD hit Start-load-asi handshake... DMA_WORD_PER_BEAT=%d\n", (int)(DMA_WORD_PER_BEAT));
             this->start_load_asi_handshake();
+            wait();
             load_req_dma_read.write(1);
             wait();
             while(dma_read_arbiter.read() != LOAD_UNIT ) wait();
+	}
 #endif
     	for (uint24_t d1 = 0; d1 < matrix_d1; d1 += loadable_rows)
     	{
@@ -343,8 +350,13 @@ void gemm::load_input()
     	    index_d1 += index_d1_incr;
     	}
 #ifdef  ENABLE_SM
+    {
+	HLS_DEFINE_PROTOCOL("load-done");
             load_req_dma_read.write(0);// load relinquishes dma read
             this->end_load_asi_handshake();
+	    wait();
+	    this->load_next_tile.ack.ack();
+    }
 #else
     	index_d2 += size_matrix2;
     	index_d1_n += size_matrix1;
@@ -380,7 +392,9 @@ void gemm::store_output()
     	this->reset_store_output();
         output_done.req.reset_req();
 	load_store_cfg_done.ack.reset_ack();
-
+#ifdef ENABLE_SM
+        load_next_tile.req.reset_req();
+#endif
     	// PLM memories reset
 
     	// User-defined reset code
@@ -450,8 +464,11 @@ void gemm::store_output()
     {
 #ifdef  ENABLE_SM
             //Addition for ASI
+    {
+	HLS_DEFINE_PROTOCOL("store-dma-data");
             printf("STORE hit the start store asi handshake... DMA_WORD_PER_BEAT=%d\n", (int)(DMA_WORD_PER_BEAT));
             this->start_store_asi_handshake();
+    }
 #endif
     	uint32_t index_d1 = index_a;
     	for (uint24_t d1 = 0; d1 < matrix_d1; d1 += loadable_rows)
@@ -483,9 +500,12 @@ void gemm::store_output()
     			// ESP_REPORT_INFO("STORE: after compute hs %u %u %u %u",
     			// 		(unsigned) d1, (unsigned) d2, (unsigned) d1i, (unsigned) chk);
 #ifdef  ENABLE_SM
+    {
+	HLS_DEFINE_PROTOCOL("sm-store-dma");
             store_req_dma_write.write(1);
             wait();
             while(dma_write_arbiter.read() != STORE_UNIT ) wait();
+    }
 #endif
 
     			{
@@ -527,8 +547,11 @@ void gemm::store_output()
     			}
 
 #ifdef  ENABLE_SM
+    {
+	HLS_DEFINE_PROTOCOL("store-done-1");
             store_req_dma_write.write(0);
-    				wait(); 
+    				wait();
+	} 
 #endif
 
 			// toggle pingpong
@@ -545,8 +568,13 @@ void gemm::store_output()
     	}
 #ifdef  ENABLE_SM
         // Addition for ASI 
+    {
+	HLS_DEFINE_PROTOCOL("store-done-done");
         printf("STORE hit the end-store handshake...\n");
         this->end_store_asi_handshake();
+	wait();
+	load_next_tile.req.req();
+    }
 #else
     	index_a += (size_matrix_out / ninputs);
 #endif

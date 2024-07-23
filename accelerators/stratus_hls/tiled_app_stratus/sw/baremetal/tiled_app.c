@@ -309,6 +309,7 @@ int main(int argc, char * argv[])
 	if(mode == 0)printf("Linux ");
 	else if (mode == 1) printf("Chaining ");
 	else if (mode == 2) printf("Pipelining ");
+
 	else if (mode == 5) printf("SW ");
 	
 	if(comparison_val*comp_intensity>500) printf("Large ");
