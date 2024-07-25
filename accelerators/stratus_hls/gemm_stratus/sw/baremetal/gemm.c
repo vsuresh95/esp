@@ -506,13 +506,15 @@ int main(int argc, char * argv[])
 			//printf("	CPU Write Time = %lu\n", t_cpu_write);
 			//printf("	GEMM Time = %lu\n", t_gemm);
 			//printf("	CPU Read Time = %lu\n", t_cpu_read);
-			printf("Result: GEMM baremetal %dx%dx%d %s Total = %lu\n", d1,d2,d3,CohPrintHeader, (t_gemm+t_cpu_write+t_cpu_read));
+			printf("Result: GEMM Baremetal %dx%dx%d Total = %lu\n", d1,d2,d3,t_gemm+t_cpu_write+t_cpu_read);
 
 		}
 		aligned_free(ptable);
 		aligned_free(mem);
 		aligned_free(gold);
 	}
+
+	while(1);
 
 	return errors;
 }

@@ -197,9 +197,10 @@ for(int test = 0; test < 2*INPUT_OFFSET + num_inp_output; test++) acc_buf[test] 
 		t_cpu_read += end_counter();
 	}
 
-	printf("Result: GEMM ASI %dx%dx%d %s CPU_WRITE = %lu\n", d1,d2,d3,CohPrintHeader, t_cpu_write);
-	printf("Result: GEMM ASI %dx%dx%d %s CPU_READ = %lu\n", d1,d2,d3,CohPrintHeader, t_cpu_read);
+	printf("Result: GEMM ASI %dx%dx%d %s CPU_Write = %lu\n", d1,d2,d3,CohPrintHeader, t_cpu_write);
+	printf("Result: GEMM ASI %dx%dx%d %s CPU_Read = %lu\n", d1,d2,d3,CohPrintHeader, t_cpu_read);
 	printf("Result: GEMM ASI %dx%dx%d %s Acc = %lu\n", d1,d2,d3,CohPrintHeader, t_gemm);
+	printf("Result: GEMM ASI %dx%dx%d %s Total = %lu\n", d1,d2,d3,CohPrintHeader, (t_cpu_write+t_gemm+t_cpu_read));
 	
 		
 #else
@@ -219,6 +220,7 @@ for(int test = 0; test < 2*INPUT_OFFSET + num_inp_output; test++) acc_buf[test] 
         err += validate_buffer(&acc_buf[in_len], &sw_buf[in_len], out_len);
         //t_cpu_read += end_counter();
     }
+	t_total+=end_counter();
 
     for (i = 0; i < ITERATIONS; ++i) {
         start_counter();
@@ -227,7 +229,6 @@ for(int test = 0; test < 2*INPUT_OFFSET + num_inp_output; test++) acc_buf[test] 
         t_sw_gemm += end_counter();
         // printf("Iteration %d\n", i);
     }
-	t_total+=end_counter();
     //printf("\n====== %s ======\n\n", cfg_001[0].devname);
 
 	printf("Result: GEMM SW %dx%dx%d = %lu\n", d1,d2,d3,t_sw_gemm);
