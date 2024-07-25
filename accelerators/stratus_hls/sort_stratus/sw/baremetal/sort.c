@@ -171,7 +171,7 @@ int main(int argc, char * argv[])
 				printf("  Error: unsopported configuration parameters for %s.%d\n", DEV_NAME, n);
 				printf("         device can sort up to %d fp-vectors of size [%d, %d]\n",
 					sort_batch_max, sort_len_min, sort_len_max);
-				break;
+				return 0;
 			}
 
 			// Check if scatter-gather DMA is disabled
@@ -183,7 +183,7 @@ int main(int argc, char * argv[])
 			if (scatter_gather)
 				if (ioread32(dev, PT_NCHUNK_MAX_REG) < NCHUNK) {
 				    printf("  -> Not enough TLB entries available. Abort.\n");
-				    break;
+					return 0;
 				}
 
 			// Allocate memory (will be contigous anyway in baremetal)

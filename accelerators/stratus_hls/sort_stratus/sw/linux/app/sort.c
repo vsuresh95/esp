@@ -120,7 +120,7 @@ int main(int argc, char *argv[])
 	sort_cfg_000[0].cons_valid_offset = SYNC_VAR_SIZE + SORT_LEN + VALID_FLAG_OFFSET;
 	sort_cfg_000[0].cons_ready_offset = SYNC_VAR_SIZE + SORT_LEN + READY_FLAG_OFFSET;
 
-	printf("\n====== %s ======\n\n", cfg_000[0].devname);
+	// printf("\n====== %s ======\n\n", cfg_000[0].devname);
 
 	for (i = 0; i < ITERATIONS; ++i) {
 		// srand(time(NULL));
