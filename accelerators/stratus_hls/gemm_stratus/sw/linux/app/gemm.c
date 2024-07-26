@@ -220,14 +220,16 @@ for(int test = 0; test < 2*INPUT_OFFSET + num_inp_output; test++) acc_buf[test] 
         //t_cpu_read += end_counter();
     }
 
-    for (i = 0; i < ITERATIONS; ++i) {
+	t_total+=end_counter();
         start_counter();
+    for (i = 0; i < ITERATIONS; ++i) {
         //sw_run(0, 0, NINPUTS, D, D, D, sw_buf, &sw_buf[in1_len], &sw_buf[in_len]);
+        init_buffer(acc_buf, sw_buf, in_len);
         sw_run(0, 0, NINPUTS, d1, d2, d3, sw_buf, &sw_buf[in1_len], &sw_buf[in_len]);
-        t_sw_gemm += end_counter();
+        err += validate_buffer(&acc_buf[in_len], &sw_buf[in_len], out_len);
         // printf("Iteration %d\n", i);
     }
-	t_total+=end_counter();
+    	t_sw_gemm += end_counter();
     //printf("\n====== %s ======\n\n", cfg_001[0].devname);
 
 	printf("Result: GEMM SW %dx%dx%d = %lu\n", d1,d2,d3,t_sw_gemm);
@@ -256,7 +258,8 @@ for(int test = 0; test < 2*INPUT_OFFSET + num_inp_output; test++) acc_buf[test] 
     token_t *acc_buf;
     native_t *sw_buf;
     native_t *out_arr;
-	sw_buf = esp_alloc(MAX_SIZE);
+	//sw_buf = esp_alloc(MAX_SIZE);
+	sw_buf = esp_alloc(3*(d1*d2+d2*d3+d3*d1));
     test = 1;
 	t_cpu_read = 0;
 	t_cpu_write = 0;
@@ -421,19 +424,21 @@ start_counter();
 	t_total+=end_counter();
 
     start_counter();
-	for(int iter = 0; iter < ITERATIONS; iter++){
+ 	sw_fcn(ITERATIONS,  d1, d2,  d3,transpose,  do_relu, sw_buf);
+
+	//for(int iter = 0; iter < ITERATIONS; iter++){
 	// sw_run(do_relu[test], transpose[test], ninputs[test], d3[test], d2[test], d1[test],
 
         // read_mem_reqodata(sw_buf, in_len);
-        sw_run(do_relu, transpose, ninputs, d3, d2, d1,
-                sw_buf, &sw_buf[in1_len], &sw_buf[in_len]);
+        //sw_run(do_relu, transpose, ninputs, d3, d2, d1,
+        //        sw_buf, &sw_buf[in1_len], &sw_buf[in_len]);
 
        // start_counter();
         for(int i = 0; i<size_mat_out; i+=2){
             spandex_native_t val;
             val.value_64 = read_mem_reqodata(&sw_buf[in_len+i]);
         }
-    }
+    	//}
     sw_read += end_counter();
 	//#endif
 	//validate_buffer(&acc_buf[in_len], &sw_buf[in_len], round_up(ninputs * d1 * d3, DMA_WORD_PER_BEAT(sizeof(token_t))));
