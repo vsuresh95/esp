@@ -386,7 +386,7 @@ static inline void sw_fcn(int ninputs, int d1, int d2, int d3, int transpose, in
 	sw_comp_time = 0;
 	init_weight_buffer(&sw_buf[in1_len], &sw_buf[in_len+out_len+in1_len], &sw_buf[2*(in_len+out_len)+in1_len], d2*d3);
 	while(tinput < ninputs){
-		init_buffer(NULL, sw_buf, in1_len);
+		init_buffer(sw_buf, sw_buf, in1_len);
 		int64_t sw_comp_start = get_counter();
 		sw_run(1, transpose, 1, d3, d2, d1, sw_buf, &sw_buf[in1_len], &sw_buf[in_len]);
 		sw_run(1, transpose, 1, d3, d2, d1, &sw_buf[in_len], &sw_buf[in_len+out_len+in1_len], &sw_buf[2*(in_len)+out_len]);
