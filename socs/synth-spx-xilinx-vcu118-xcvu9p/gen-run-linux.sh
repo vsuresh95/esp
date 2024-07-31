@@ -7,6 +7,7 @@ make socketgen-distclean socketgen
 # Untar pre-generated sysroot
 tar -xvf ../sysroot.tar
 cp -rf sysroot/ ../../soft/ariane
+cp -rf sysroot/ ./soft-build/ariane
 rm -rf sysroot
 
 # Build Linux to run the experiments
