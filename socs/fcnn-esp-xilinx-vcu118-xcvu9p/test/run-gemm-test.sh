@@ -1,26 +1,38 @@
-# OS
-for length in 32 64 128 256 512 1024 # TODO
-do
-    echo ""
-    echo "GEMM: OS; Length=${length}" # TODO
-    echo ""
-    ./gemm-os/gemm-os-${length}.exe
-done
+#!/bin/sh
+# for SW and Linux
+echo ""
+echo "GEMM: OS"
+echo ""
+./gemm/gemm-os.exe 64 64 1; 
+./gemm/gemm-os.exe 8; 
+./gemm/gemm-os.exe 16; 
+./gemm/gemm-os.exe 16 32 16; 
+./gemm/gemm-os.exe 32; 
+./gemm/gemm-os.exe 32 64 32; 
+./gemm/gemm-os.exe 64; 
 
-# MESI
-for length in 32 64 128 256 512 1024 # TODO
-do
-    echo ""
-    echo "GEMM: MESI; Length=${length}" # TODO
-    echo ""
-    ./gemm-mesi/gemm-mesi-${length}.exe
-done
 
-# DMA
-for length in 32 64 128 256 512 1024 # TODO
-do
-    echo ""
-    echo "GEMM: DMA; Length=${length}" # TODO
-    echo ""
-    ./gemm-dma/gemm-dma-${length}.exe
-done
+# ASI MESI
+echo ""
+echo "GEMM: ASI MESI"
+echo ""
+./gemm/gemm-chaining-mesi.exe 64 64 1
+./gemm/gemm-chaining-mesi.exe 8
+./gemm/gemm-chaining-mesi.exe 16
+./gemm/gemm-chaining-mesi.exe 16 32 16
+./gemm/gemm-chaining-mesi.exe 32
+./gemm/gemm-chaining-mesi.exe 32 64 32
+./gemm/gemm-chaining-mesi.exe 64
+
+
+# ASI DMA
+echo ""
+echo "GEMM: ASI DMA"
+echo ""
+./gemm/gemm-chaining-dma.exe 64 64 1
+./gemm/gemm-chaining-dma.exe 8
+./gemm/gemm-chaining-dma.exe 16
+./gemm/gemm-chaining-dma.exe 16 32 16
+./gemm/gemm-chaining-dma.exe 32
+./gemm/gemm-chaining-dma.exe 32 64 32
+./gemm/gemm-chaining-dma.exe 64

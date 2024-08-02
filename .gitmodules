@@ -55,9 +55,9 @@
 	url = https://gitlab.com/libeigen/eigen.git
 [submodule "soft/ariane/mini-era"]
 	path = soft/ariane/mini-era
-	url = git@github.com:vsuresh95/mini-era.git
-	branch = f_sensor_dev
+	url = https://github.com/vsuresh95/mini-era.git
+	branch = f_hw_asi
 [submodule "soft/ariane/audio_pipeline"]
 	path = soft/ariane/audio_pipeline
-	url = git@github.com:vsuresh95/audio_pipeline.git
-	branch = f_baremetal
+	url = https://github.com/vsuresh95/audio_pipeline.git
+	branch = f_spx_evaluation

@@ -33,7 +33,7 @@ struct sort_test {
 
 struct sort_stratus_access sort_cfg_000[] = {
     {
-        .size = SORT_LEN,
+        .size = 32,
         .batch = 1,
         .input_offset = 0,
         .output_offset = 0,

@@ -185,7 +185,7 @@ int main(int argc, char **argv)
 
 	const unsigned sw_iterations = ((ENABLE_SM == 1) ? 1 : (ITERATIONS / ((logn_samples > 10) ? 10 : 1)));
 
-	for (i = 0; i < ITERATIONS; i++)
+	for (i = 0; i < sw_iterations; i++)
 	{
 		sw_run(gold);
 	}

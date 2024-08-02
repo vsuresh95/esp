@@ -1,6 +1,13 @@
+# repopulate pre-generate socgen folder
+tar -xvf socgen.tar
+
+# generate wrappers
+make socketgen-distclean socketgen
+
 # Untar pre-generated sysroot
 tar -xvf ../sysroot.tar
 cp -rf sysroot/ ../../soft/ariane
+cp -rf sysroot/ ./soft-build/ariane
 rm -rf sysroot
 
 # Build Linux to run the experiments
@@ -12,4 +19,4 @@ cp -r test/ soft-build/ariane/sysroot/applications/
 make linux
 
 cp riscv.dts socgen/esp/riscv.dts
-make soft fpga-program fpga-run-linux
+make soft # fpga-program fpga-run-linux

@@ -129,9 +129,15 @@ typedef double token_t;
 #define NINPUTS 1
 //(1000/D_COMMON)
 
+#ifndef D3
 #define D3 D3_VAL
+#endif
+#ifndef D2
 #define D2 D2_VAL
+#endif
+#ifndef D1
 #define D1 D1_VAL
+#endif
 #define ST_OFFSET0 (NINPUTS * (D1 * D2 + D2 * D3))
 #define LD_OFFSET1 0
 #define LD_OFFSET2 (NINPUTS * (D1 * D2))

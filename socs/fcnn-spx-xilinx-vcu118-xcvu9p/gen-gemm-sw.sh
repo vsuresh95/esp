@@ -5,18 +5,13 @@ then
 fi
 
 # Spandex
-if [ ! -d test/gemm-spx/ ]
+if [ ! -d test/gemm/ ]
 then
-    mkdir test/gemm-spx/
+    mkdir test/gemm/
 fi
 
-# GEMM
-# TODO
-for length in 32 64 128 256 512 1024
-do
-    # Spandex
-    GEMM_LEN=$length ENABLE_SM=1 IS_ESP=0 COH_MODE=2 make gemm_stratus-app-clean gemm_stratus-app
-    cp soft-build/ariane/sysroot/applications/test/gemm_stratus.exe test/gemm-spx/gemm-spx-${length}.exe
-
-done
+# Chaining
+# SPANDEX
+ENABLE_SM=1 SPX=1  COH_MODE=2 COMP_MODE=1 make gemm_stratus-app-clean gemm_stratus-app
+cp soft-build/ariane/sysroot/applications/test/gemm_stratus.exe test/gemm/gemm-chaining-spx.exe
 
