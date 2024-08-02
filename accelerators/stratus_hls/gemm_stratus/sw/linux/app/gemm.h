@@ -293,6 +293,7 @@ static void init_parameters(int test, int32_t do_relu, int32_t transpose, int32_
     }
 	cpu_prod_ready_offset = &accel_cons_ready_offset[NUM_DEVICES-1];
 	cpu_prod_valid_offset = &accel_cons_valid_offset[NUM_DEVICES-1];
+	*st_offset = output_buffer_offset[NUM_DEVICES - 1 ];
 
 
 

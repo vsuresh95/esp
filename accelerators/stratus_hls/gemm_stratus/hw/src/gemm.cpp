@@ -952,13 +952,18 @@ void gemm::compute_kernel()
     		}
     	    }
     	}
+#ifndef ENABLE_SM
     }
+#endif
 
     // Force to store the last chunk
     if (store_count) {
     	store_count = OUT_DMA_CHUNK - 1;
     	sync_compute_store(store_count, 1, load_cfg, loadable_rows, pingpong_out);
     }
+#ifdef ENABLE_SM
+    }
+#endif
 
     // Conclude
     {
