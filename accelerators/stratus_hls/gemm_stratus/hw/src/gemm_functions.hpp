@@ -31,7 +31,11 @@ inline void gemm::calculate_config(uint24_t ninputs,
 {
     size_matrix1 = matrix_d1 * matrix_d2;
     size_matrix2 = matrix_d2 * matrix_d3;
+    #ifdef ENABLE_SM
+    size_matrix_out = matrix_d1 * matrix_d3;
+    #else
     size_matrix_out = matrix_d1 * matrix_d3 * ninputs;
+    #endif
 
     m2_loop_iters = 1;
     m2_plm_incr = 1;

@@ -124,7 +124,7 @@ int main(int argc, char **argv)
 	unsigned st_offset;
 #ifdef ENABLE_SM
     gemm_cfg_000[0].esp.start_stop = 1;
-    init_parameters(0, 0, transpose, ITERATIONS, d1, d2, d3, &in_len, &in1_len, &out_len, &in_size, &out_size, &size, sw_buf, INPUT_OFFSET, &st_offset);
+    init_parameters(0, 0, transpose, ITERATIONS, d3, d2, d1, &in_len, &in1_len, &out_len, &in_size, &out_size, &size, sw_buf, INPUT_OFFSET, &st_offset);
     acc_buf = (token_t *) esp_alloc( (2*INPUT_OFFSET + num_inp_output) * sizeof(token_t)) ;   // Remember to change the size when adding the synchronization variables
 	// printf("acc buf size = %d\n\n",(int)(2*INPUT_OFFSET + num_inp_output));
     // printf("\n====== %s ======\n\n", cfg_000[0].devname);
@@ -141,7 +141,7 @@ int main(int argc, char **argv)
 for(int test = 0; test < 2*INPUT_OFFSET + num_inp_output; test++) acc_buf[test] = 0;
 	cfg_000[0].hw_buf = acc_buf;
 #else
-    init_parameters(0, 0, 0, NINPUTS, d1, d2, d3, &in_len, &in1_len, &out_len, &in_size, &out_size, &size, sw_buf, INPUT_OFFSET, &st_offset);
+    init_parameters(0, 0, 0, NINPUTS, d3, d2, d1, &in_len, &in1_len, &out_len, &in_size, &out_size, &size, sw_buf, INPUT_OFFSET, &st_offset);
     acc_buf = (token_t *) esp_alloc( (in_len + out_len) * sizeof(token_t)) ;   // Remember to change the size when adding the synchronization variables
     //printf("\n====== %s ======\n\n", cfg_001[0].devname);
 	cfg_001[0].hw_buf = acc_buf;
@@ -222,7 +222,8 @@ for(int test = 0; test < 2*INPUT_OFFSET + num_inp_output; test++) acc_buf[test] 
     }
 	t_total+=end_counter();
 
-        start_counter();
+
+     start_counter();
     for (i = 0; i < ITERATIONS; ++i) {
         //sw_run(0, 0, NINPUTS, D, D, D, sw_buf, &sw_buf[in1_len], &sw_buf[in_len]);
         init_buffer(acc_buf, sw_buf, in_len);
@@ -249,7 +250,7 @@ for(int test = 0; test < 2*INPUT_OFFSET + num_inp_output; test++) acc_buf[test] 
 	unsigned st_offset;
 
 	int32_t do_relu = 1;
-    int32_t transpose = 0; 
+    int32_t transpose = 1; 
     int32_t ninputs = 1; 
     int32_t d3  = 64;
     int32_t d2  = 64;
@@ -291,7 +292,7 @@ for(int test = 0; test < 2*INPUT_OFFSET + num_inp_output; test++) acc_buf[test] 
 	#ifdef ENABLE_SM
 	start_counter();
 	init_weights(&acc_buf[input_buffer_offset[0]+in1_len], &acc_buf[input_buffer_offset[1]+in1_len],
-		&acc_buf[input_buffer_offset[1]+in1_len],d2*d3); //hardcoded temporarily since we are doing fcnn over 1x64x64
+		&acc_buf[input_buffer_offset[2]+in1_len],d2*d3); //hardcoded temporarily since we are doing fcnn over 1x64x64
 	// start_counter();
 	// esp_run(cfg_000, NACC);
 
@@ -405,10 +406,11 @@ for(int test = 0; test < 2*INPUT_OFFSET + num_inp_output; test++) acc_buf[test] 
 	int64_t sw_write = 0;
     int64_t sw_read = 0;
 start_counter();
-	for(int iter = 0; iter < ITERATIONS; iter++){ 
-		init_weights(&acc_buf[in1_len], &acc_buf[size+in1_len],
+init_weights(&acc_buf[in1_len], &acc_buf[size+in1_len],
 		&acc_buf[2*size+in1_len],d2*d3); //hardcoded temporarily since we are doing fcnn over 1x64x64
-	
+
+	for(int iter = 0; iter < ITERATIONS; iter++){ 
+			
 		init_buffer(acc_buf, sw_buf, in1_len);
         //t_cpu_write += end_counter();
 
