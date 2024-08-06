@@ -444,7 +444,9 @@ void gemm::store_output()
     	if (load_cfg == LESS_THAN_MATRIX2 && loadable_rows != 1) {
     	    matrix_chk_out = 1;
     	} else {
+	#ifndef ENABLE_SM
     	    ninputs = 1;
+	#endif
     	    matrix_d1 = 1;
     	    matrix_d3 = 1;
     	    loadable_rows = 1;
@@ -558,6 +560,9 @@ void gemm::store_output()
 			pingpong = !pingpong;
 
     			// update the index
+#ifdef  ENABLE_SM
+		    if(matrix_chk_out>1)
+#endif
     			index_simple += length;
     		    }
     		    index_d1i += matrix_d3;
