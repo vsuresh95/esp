@@ -365,6 +365,7 @@ architecture rtl of l2_wrapper is
     addr     : line_addr_t;
     line     : line_t;
     word_cnt : natural range 0 to 3;
+    word_mask  : word_mask_t;
     asserts  : asserts_rsp_out_t;
   end record rsp_out_reg_type;
 
@@ -374,6 +375,7 @@ architecture rtl of l2_wrapper is
     addr     => (others => '0'),
     line     => (others => '0'),
     word_cnt => 0,
+    word_mask  => (others => '0'),
     asserts  => (others => '0'));
 
   signal rsp_out_reg      : rsp_out_reg_type;
@@ -1709,7 +1711,7 @@ begin  -- architecture rtl of l2_wrapper
                                                      cache_x, cache_y, rsp_out_data_word_mask);
             reg.state := send_addr;
 
-            word_mask := rsp_out_data_word_mask;
+            reg.word_mask := rsp_out_data_word_mask;
 
           end if;
         end if;
@@ -1729,7 +1731,7 @@ begin  -- architecture rtl of l2_wrapper
             mix_msg := '0' & reg.coh_msg;
           end if;
 
-          if mix_msg = RSP_O and word_mask = "00" then
+          if mix_msg = RSP_O and reg.word_mask = "00" then
 
             coherence_rsp_snd_data_in(NOC_FLIT_SIZE - 1 downto NOC_FLIT_SIZE - PREAMBLE_WIDTH) <= PREAMBLE_BODY;
             coherence_rsp_snd_data_in(GLOB_PHYS_ADDR_BITS - 1 downto 0) <= reg.addr & empty_offset;
