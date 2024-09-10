@@ -313,7 +313,7 @@ int main(int argc, char * argv[])
 		// Reset flag for next iteration.
 		UpdateSync(FltRdyFlag, 0);
 		// // Write input data for FIR filters.
-		// init_buf_filters((mem + 5 * acc_offset) /* in_filter */, (int64_t*) fxp_filters /* gold_filter */);
+		init_buf_filters((mem + 5 * acc_offset) /* in_filter */, (int64_t*) fxp_filters /* gold_filter */);
 		// Inform FIR (consumer) of filters ready.
 		UpdateSync(FltVldFlag, 1);
 		// Inform FFT (consumer) to start.

@@ -15,12 +15,16 @@ struct audio_fft_stratus_access fft_cfg_000[] = {
 		.logn_samples = LOG_LEN,
 		.do_inverse = 0,
 		.do_shift = 0,
+
+		.prod_valid_offset = 0,
+		.prod_ready_offset = 0,
+		.cons_valid_offset = 0,
+		.cons_ready_offset = 0,
+		.input_offset = 0,
+		.output_offset = 0,
+
 		.src_offset = 0,
 		.dst_offset = 0,
-		.esp.coherence = ACC_COH_FULL,
-		.esp.p2p_store = 0,
-		.esp.p2p_nsrcs = 0,
-		.esp.p2p_srcs = {"", "", "", ""},
 	}
 };
 
@@ -30,12 +34,16 @@ struct audio_fft_stratus_access fft_cfg_001[] = {
 		.logn_samples = LOG_LEN,
 		.do_inverse = 1,
 		.do_shift = 0,
+
+		.prod_valid_offset = 0,
+		.prod_ready_offset = 0,
+		.cons_valid_offset = 0,
+		.cons_ready_offset = 0,
+		.input_offset = 0,
+		.output_offset = 0,
+
 		.src_offset = 0,
 		.dst_offset = 0,
-		.esp.coherence = ACC_COH_FULL,
-		.esp.p2p_store = 0,
-		.esp.p2p_nsrcs = 0,
-		.esp.p2p_srcs = {"", "", "", ""},
 	}
 };
 
@@ -45,12 +53,20 @@ struct audio_fir_stratus_access fir_cfg_000[] = {
 		.logn_samples = LOG_LEN,
 		.do_inverse = 0,
 		.do_shift = 0,
+
+    	.prod_valid_offset = 0,
+    	.prod_ready_offset = 0,
+    	.flt_prod_valid_offset = 0,
+    	.flt_prod_ready_offset = 0,
+    	.cons_valid_offset = 0,
+    	.cons_ready_offset = 0,
+    	.input_offset = 0,
+    	.flt_input_offset = 0,
+    	.twd_input_offset = 0,
+    	.output_offset = 0,
+
 		.src_offset = 0,
 		.dst_offset = 0,
-		.esp.coherence = ACC_COH_FULL,
-		.esp.p2p_store = 0,
-		.esp.p2p_nsrcs = 0,
-		.esp.p2p_srcs = {"", "", "", ""},
 	}
 };
 

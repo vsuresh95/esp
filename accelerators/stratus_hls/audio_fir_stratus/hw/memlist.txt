@@ -1,3 +1,3 @@
-audio_fir_plm_block_in_dma64 2048 32 2w:0r 0w:2r
-audio_fir_plm_block_flt_dma64 2050 32 2w:0r 0w:2r
-audio_fir_plm_block_twd_dma64 1024 32 2w:0r 0w:2r
+audio_fir_plm_block_in_dma64 32768 32 2w:0r 0w:2r
+audio_fir_plm_block_flt_dma64 32800 32 2w:0r 0w:2r
+audio_fir_plm_block_twd_dma64 16384 32 2w:0r 0w:2r

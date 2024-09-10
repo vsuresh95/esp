@@ -197,14 +197,37 @@ int main(int argc, char **argv)
 	cfg_002[0].hw_buf = buf;
 
 	fft_cfg_000[0].esp.coherence = coherence;
-
-	fir_cfg_000[0].src_offset = acc_size;
-	fir_cfg_000[0].dst_offset = acc_size;
 	fir_cfg_000[0].esp.coherence = coherence;
-
-	fft_cfg_001[0].src_offset = 2 * acc_size;
-	fft_cfg_001[0].dst_offset = 2 * acc_size;
 	fft_cfg_001[0].esp.coherence = coherence;
+
+	fft_cfg_000[0].spandex_conf = spandex_config.spandex_reg;
+	fir_cfg_000[0].spandex_conf = spandex_config.spandex_reg;
+	fft_cfg_001[0].spandex_conf = spandex_config.spandex_reg;
+
+	fft_cfg_000[0].prod_valid_offset = VALID_FLAG_OFFSET;
+	fft_cfg_000[0].prod_ready_offset = READY_FLAG_OFFSET;
+	fft_cfg_000[0].cons_valid_offset = acc_len + VALID_FLAG_OFFSET;
+	fft_cfg_000[0].cons_ready_offset = acc_len + READY_FLAG_OFFSET;
+	fft_cfg_000[0].input_offset = SYNC_VAR_SIZE;
+	fft_cfg_000[0].output_offset = acc_len + SYNC_VAR_SIZE;
+
+	fir_cfg_000[0].prod_valid_offset = acc_len + VALID_FLAG_OFFSET;
+	fir_cfg_000[0].prod_ready_offset = acc_len + READY_FLAG_OFFSET;
+	fir_cfg_000[0].flt_prod_valid_offset = acc_len + FLT_VALID_FLAG_OFFSET;
+	fir_cfg_000[0].flt_prod_ready_offset = acc_len + FLT_READY_FLAG_OFFSET;
+	fir_cfg_000[0].cons_valid_offset = (2 * acc_len) + VALID_FLAG_OFFSET;
+	fir_cfg_000[0].cons_ready_offset = (2 * acc_len) + READY_FLAG_OFFSET;
+	fir_cfg_000[0].input_offset = acc_len + SYNC_VAR_SIZE;
+	fir_cfg_000[0].flt_input_offset = 5 * acc_len;
+	fir_cfg_000[0].twd_input_offset = 7 * acc_len;
+	fir_cfg_000[0].output_offset = (2 * acc_len) + SYNC_VAR_SIZE;
+
+	fft_cfg_001[0].prod_valid_offset = (2 * acc_len) + VALID_FLAG_OFFSET;
+	fft_cfg_001[0].prod_ready_offset = (2 * acc_len) + READY_FLAG_OFFSET;
+	fft_cfg_001[0].cons_valid_offset = (3 * acc_len) + VALID_FLAG_OFFSET;
+	fft_cfg_001[0].cons_ready_offset = (3 * acc_len) + READY_FLAG_OFFSET;
+	fft_cfg_001[0].input_offset = (2 * acc_len) + SYNC_VAR_SIZE;
+	fft_cfg_001[0].output_offset = (3 * acc_len) + SYNC_VAR_SIZE;
 
     volatile token_t* sm_sync = (volatile token_t*) buf;
 
