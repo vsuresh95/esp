@@ -10,14 +10,9 @@
 #include <esp_probe.h>
 #include <fixed_point.h>
 
-#define SOC_COLS 2
-#define SOC_ROWS 4
-#define REQ_PLANE 0
-#define FWD_PLANE 1
-#define RSP_PLANE 2
-
-typedef int64_t token_t;
-
+///////////////////////////////////////////////////////////////
+// Helper unions
+///////////////////////////////////////////////////////////////
 typedef union
 {
   struct
@@ -35,73 +30,131 @@ typedef union
   uint32_t spandex_reg;
 } spandex_config_t;
 
+typedef int64_t token_t;
+
+///////////////////////////////////////////////////////////////
+// Choosing the read, write code and coherence register config
+///////////////////////////////////////////////////////////////
+#define QUAUX(X) #X
+#define QU(X) QUAUX(X)
+
+#if (IS_ESP == 1)
+// ESP COHERENCE PROTOCOLS
+#define READ_CODE 0x0002B30B
+#define WRITE_CODE 0x0062B02B
+const spandex_config_t spandex_config = {.spandex_reg = 0};
+
+#if (COH_MODE == 3)
+const unsigned coherence = ACC_COH_NONE;
+const char print_coh[] = "Non-Coherent DMA";
+#elif (COH_MODE == 2)
+const unsigned coherence = ACC_COH_LLC;
+const char print_coh[] = "LLC-Coherent DMA";
+#elif (COH_MODE == 1)
+const unsigned coherence = ACC_COH_RECALL;
+const char print_coh[] = "Coherent DMA";
+#else
+const unsigned coherence = ACC_COH_FULL;
+const char print_coh[] = "Baseline MESI";
+#endif
+
+#else
+//SPANDEX COHERENCE PROTOCOLS
+const unsigned coherence = ACC_COH_FULL;
+#if (COH_MODE == 3)
+// Owner Prediction
+#define READ_CODE 0x4002B30B
+#define WRITE_CODE 0x2262B82B
+const spandex_config_t spandex_config = {.spandex_reg = 0, .r_en = 1, .r_type = 2, .w_en = 1, .w_op = 1, .w_type = 1};
+const char print_coh[] = "Owner Prediction";
+#elif (COH_MODE == 2)
+// Write-through forwarding
+#define READ_CODE 0x4002B30B
+#define WRITE_CODE 0x2062B02B
+const spandex_config_t spandex_config = {.spandex_reg = 0, .r_en = 1, .r_type = 2, .w_en = 1, .w_type = 1};
+const char print_coh[] = "Write-through forwarding";
+#elif (COH_MODE == 1)
+// Baseline Spandex
+#define READ_CODE 0x2002B30B
+#define WRITE_CODE 0x0062B02B
+const spandex_config_t spandex_config = {.spandex_reg = 0, .r_en = 1, .r_type = 1};
+const char print_coh[] = "Baseline Spandex (ReqV)";
+#else
+// Fully Coherent MESI
+#define READ_CODE 0x0002B30B
+#define WRITE_CODE 0x0062B02B
+const spandex_config_t spandex_config = {.spandex_reg = 0};
+const char print_coh[] = "Baseline Spandex";
+#endif
+#endif
+
+static inline void write_mem (void* dst, int64_t value_64)
+{
+	asm volatile (
+		"mv t0, %0;"
+		"mv t1, %1;"
+		".word " QU(WRITE_CODE)
+		:
+		: "r" (dst), "r" (value_64)
+		: "t0", "t1", "memory"
+	);
+}
+
+static inline int64_t read_mem (void* dst)
+{
+	int64_t value_64;
+
+	asm volatile (
+		"mv t0, %1;"
+		".word " QU(READ_CODE) ";"
+		"mv %0, t1"
+		: "=r" (value_64)
+		: "r" (dst)
+		: "t0", "t1", "memory"
+	);
+
+	return value_64;
+}
+
 static unsigned DMA_WORD_PER_BEAT(unsigned _st)
 {
         return (sizeof(void *) / _st);
 }
 
-static void start_network_counter()
-{
-    uint64_t tile_id;
-    for (tile_id = 0; tile_id < SOC_COLS * SOC_ROWS; tile_id++)
-    {
-        volatile void* monitor_base = (volatile void*)(0x60090000 + 0x200 * tile_id);
-        volatile uint32_t* control = ((volatile uint32_t*)monitor_base) + 1; // ctrl_window_size_offset
-        *control = 0xffffffff;
-    }
+///////////////////////////////////////////////////////////////
+// Timer unions
+///////////////////////////////////////////////////////////////
+static uint64_t t_start = 0;
+static uint64_t t_stop = 0;
+
+uint64_t t_cpu_write;
+uint64_t t_acc_read;
+uint64_t t_acc_write;
+uint64_t t_cpu_read;
+
+static inline void start_counter() {
+	asm volatile (
+		"li t0, 0;"
+		"csrr t0, mcycle;"
+		"mv %0, t0"
+		: "=r" (t_start)
+		:
+		: "t0"
+	);
 }
 
-static uint32_t get_network_counter(int x, int y, int plane)
-{
-    uint64_t tile_id = x + y * SOC_COLS;
-    volatile void* monitor_base = (volatile void*)(0x60090000 + 0x200 * tile_id);
-    volatile uint32_t* mon_register = ((volatile uint32_t*)monitor_base) + 4 + 22 + plane;
-    return *mon_register;
+static inline uint64_t end_counter() {
+	asm volatile (
+		"li t0, 0;"
+		"csrr t0, mcycle;"
+		"mv %0, t0"
+		: "=r" (t_stop)
+		:
+		: "t0"
+	);
+
+	return (t_stop - t_start);
 }
-
-static uint64_t get_counter() {
-  uint64_t counter;
-  asm volatile (
-    "li t0, 0;"
-    "csrr t0, mcycle;"
-    "mv %0, t0"
-    : "=r" ( counter )
-    :
-    : "t0"
-  );
-
-  return counter;
-}
-
-uint64_t start_write;
-uint64_t stop_write;
-uint64_t intvl_write;
-uint64_t start_read;
-uint64_t stop_read;
-uint64_t intvl_read;
-
-uint64_t start_acc_write;
-uint64_t stop_acc_write;
-uint64_t intvl_acc_write;
-uint64_t start_acc_read;
-uint64_t stop_acc_read;
-uint64_t intvl_acc_read;
-
-uint64_t start_network_cpu[3];
-uint64_t stop_network_cpu[3];
-uint64_t intvl_network_cpu[3];
-uint64_t start_network_acc[3];
-uint64_t stop_network_acc[3];
-uint64_t intvl_network_acc[3];
-uint64_t start_network_llc[3];
-uint64_t stop_network_llc[3];
-uint64_t intvl_network_llc[3];
-
-#define ITERATIONS 1000
-#define ESP
-#define COH_MODE 0
-/* 3 - Owner Prediction, 2 - Write-through forwarding, 1 - Baseline Spandex (ReqV), 0 - Baseline Spandex (MESI) */
-/* 3 - Non-Coherent DMA, 2 - LLC Coherent DMA, 1 - Coherent DMA, 0 - Fully Coherent MESI */
 
 #define SLD_SENSOR_DMA 0x050
 #define DEV_NAME "sld,sensor_dma_stratus"
@@ -135,10 +188,9 @@ int main(int argc, char * argv[])
 	token_t *mem;
 	token_t *gold;
 	unsigned errors = 0;
-	unsigned coherence;
 
-    unsigned mem_words = 2048; 
-    unsigned mem_size = mem_words*sizeof(token_t); 
+    unsigned mem_words = 1 << LOG_LEN; 
+    unsigned mem_size = 2 * mem_words * sizeof(token_t); 
 
 	// Search for the device
 	ndev = probe(&espdevs, VENDOR_SLD, SLD_SENSOR_DMA, DEV_NAME);
@@ -161,60 +213,31 @@ int main(int argc, char * argv[])
 	}
 
 	// Allocate memory
-	mem = (token_t *) aligned_malloc(2*mem_size);
+	mem = (token_t *) aligned_malloc(mem_size);
 	gold = mem + mem_words;
-	printf("  memory = %p\n", mem);
-	printf("  gold = %p\n", gold);
 		
 	// Alocate and populate page table
-	ptable = aligned_malloc(NCHUNK(2*mem_size) * sizeof(unsigned *));
-	for (i = 0; i < NCHUNK(2*mem_size); i++)
+	ptable = aligned_malloc(NCHUNK(mem_size) * sizeof(unsigned *));
+	for (i = 0; i < NCHUNK(mem_size); i++)
 		ptable[i] = (unsigned *) &mem[i * (CHUNK_SIZE / sizeof(token_t))];
-
-	printf("  ptable = %p\n", ptable);
-	printf("  nchunk = %lu\n", NCHUNK(2*mem_size));
 
     asm volatile ("fence rw, rw");
 
-#ifndef ESP
-	spandex_config_t spandex_config;
-	
-#if (COH_MODE == 3)
-	/* ********************************************************** */
-	/* Owner Prediction */
-	/* ********************************************************** */
-	printf("Owner Prediction\n");
+	t_cpu_write = 0;
+	t_acc_read = 0;
+	t_acc_write = 0;
+	t_cpu_read = 0;
 
-	spandex_config.spandex_reg = 0;
-	spandex_config.r_en = 1;
-	spandex_config.r_type = 2;
-	spandex_config.w_en = 1;
-	spandex_config.w_op = 1;
-	spandex_config.w_type = 1;
-	iowrite32(dev, SPANDEX_REG, spandex_config.spandex_reg);
-
-	intvl_write = 0;
-	intvl_acc_write = 0;
-	intvl_read = 0;
-	intvl_acc_read = 0;
-
-	for (j = 0; j < 3; j++) {
-		intvl_network_cpu[j] = 0;
-		intvl_network_llc[j] = 0;
-		intvl_network_acc[j] = 0;
-	}
+	printf("%s\n", print_coh);
 
 	for (i = 0; i < ITERATIONS; i++)
 	{
-		/* TODO: Restore full test once ESP caches are integrated */
-		coherence = ACC_COH_FULL;
-
 		// Pass common configuration parameters 
 		iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
 		iowrite32(dev, COHERENCE_REG, coherence);
 
 		iowrite32(dev, PT_ADDRESS_REG, (unsigned long) ptable);
-		iowrite32(dev, PT_NCHUNK_REG, NCHUNK(2*mem_size));
+		iowrite32(dev, PT_NCHUNK_REG, NCHUNK(mem_size));
 		iowrite32(dev, PT_SHIFT_REG, CHUNK_SHIFT);
 
 		// Use the following if input and output data are not allocated at the default offsets
@@ -223,54 +246,29 @@ int main(int argc, char * argv[])
 
 		// Pass accelerator-specific configuration parameters
 		/* <<--regs-config-->> */
+		iowrite32(dev, SPANDEX_REG, spandex_config.spandex_reg);
+
+  		void* dst = (void*)(mem);
+		int64_t value_64;
+
+		// Start CPU write
+		start_counter();
+    	for (j = 0; j < mem_words; j++, dst+=8)
+    	{
+			value_64 = j+1;
+			write_mem (dst, value_64);
+    	}
+    	asm volatile ("fence w, w");
+      	t_cpu_write += end_counter();
+
 	    iowrite32(dev, SENSOR_DMA_RD_SP_OFFSET_REG, 0);
 	    iowrite32(dev, SENSOR_DMA_RD_WR_ENABLE_REG, 0);
 	    iowrite32(dev, SENSOR_DMA_RD_SIZE_REG, mem_words);
 	    iowrite32(dev, SENSOR_DMA_SRC_OFFSET_REG, 0);
 
-  		void* dst = (void*)(mem);
-		int64_t value_64 = 123;
-
-		// for (j = 0; j < 3; j++) {
-		// 	start_network_cpu[j] = get_network_counter(1,1,j);
-		// 	start_network_acc[j] = get_network_counter(1,0,j);
-		// 	start_network_llc[j] = get_network_counter(0,0,j);
-		// }
-
-      	start_write = get_counter();
-
-    	for (j = 0; j < mem_words; j++)
-    	{
-			asm volatile (
-				"mv t0, %0;"
-				"mv t1, %1;"
-				".word 0x2262B82B"
-				: 
-				: "r" (dst), "r" (value_64)
-				: "t0", "t1", "memory"
-			);
-
-			dst += 8;
-    	}
-
-      	stop_write = get_counter();
-		intvl_write += stop_write - start_write;
-
-		// for (j = 0; j < 3; j++) {
-		// 	stop_network_cpu[j] = get_network_counter(1,1,j);
-		// 	stop_network_llc[j] = get_network_counter(0,0,j);
-		// 	stop_network_acc[j] = get_network_counter(1,0,j);
-		// 	intvl_network_cpu[j] += stop_network_cpu[j] - start_network_cpu[j];
-		// 	intvl_network_llc[j] += stop_network_llc[j] - start_network_llc[j];
-		// 	intvl_network_acc[j] += stop_network_acc[j] - start_network_acc[j];
-		// }
-
-		// if(i == 2) printf("CPU write %d = %lu\n", i, stop_write - start_write);
-
-		// Start accelerators
+		// Start ACC read
+		start_counter();
 		iowrite32(dev, CMD_REG, CMD_MASK_START);
-
-      	start_acc_read = get_counter();
 
 		// Wait for completion
 		done = 0;
@@ -279,22 +277,17 @@ int main(int argc, char * argv[])
 			done &= STATUS_MASK_DONE;
 		}
 
-      	stop_acc_read = get_counter();
-		intvl_acc_read += stop_acc_read - start_acc_read;
-
-		// if(i == 2) printf("ACC read %d = %lu\n", i, stop_acc_read - start_acc_read);
-
 		iowrite32(dev, CMD_REG, 0x0);
+      	t_acc_read += end_counter();
 
 	    iowrite32(dev, SENSOR_DMA_RD_WR_ENABLE_REG, 1);
 	    iowrite32(dev, SENSOR_DMA_WR_SIZE_REG, mem_words);
 	    iowrite32(dev, SENSOR_DMA_WR_SP_OFFSET_REG, 0);
 	    iowrite32(dev, SENSOR_DMA_DST_OFFSET_REG, mem_words);
 
-		// Start accelerators
+		// Start ACC write
+		start_counter();
 		iowrite32(dev, CMD_REG, CMD_MASK_START);
-
-      	start_acc_write = get_counter();
 
 		// Wait for completion
 		done = 0;
@@ -303,1007 +296,32 @@ int main(int argc, char * argv[])
 			done &= STATUS_MASK_DONE;
 		}
 
-      	stop_acc_write = get_counter();
-		intvl_acc_write += stop_acc_write - start_acc_write;
-
-		// if(i == 2) printf("ACC write %d = %lu\n", i, stop_acc_write - start_acc_write);
-
 		iowrite32(dev, CMD_REG, 0x0);
+      	t_acc_write += end_counter();
 
   		dst = (void*)(gold);
 
-      	start_read = get_counter();
-
- 	   	for (j = 0; j < mem_words; j++)
+		// Start CPU read
+		start_counter();
+ 	   	for (j = 0; j < mem_words; j++, dst+=8)
  	   	{
-			asm volatile (
-				"mv t0, %1;"
-				".word 0x4002B30B;"
-				"mv %0, t1"
-				: "=r" (value_64)
-				: "r" (dst)
-				: "t0", "t1", "memory"
-			);
-
-			dst += 8;
+			value_64 = read_mem(dst);
+			if (value_64 == 22412.12412) j = 0;
  	   	}
-
-      	stop_read = get_counter();
-		intvl_read += stop_read - start_read;
-
-		// if(i == 2) printf("CPU read %d = %lu\n", i, stop_read - start_read);
+      	t_cpu_read += end_counter();
 	}
 
-	printf("CPU write = %lu\n", intvl_write/ITERATIONS);
-	printf("ACC read = %lu\n", intvl_acc_read/ITERATIONS);
-	printf("ACC write = %lu\n", intvl_acc_write/ITERATIONS);
-	printf("CPU read = %lu\n", intvl_read/ITERATIONS);
-	printf("Total time = %lu\n", (intvl_write + intvl_acc_read + intvl_acc_write + intvl_read)/ITERATIONS);
-
-	// printf("REQ Plane:\n");
-	// printf("CPU = %lu\n", intvl_network_cpu[0]);
-	// printf("LLC = %lu\n", intvl_network_llc[0]);
-	// printf("ACC = %lu\n", intvl_network_acc[0]);
-	// printf("FWD Plane:\n");
-	// printf("CPU = %lu\n", intvl_network_cpu[1]);
-	// printf("LLC = %lu\n", intvl_network_llc[1]);
-	// printf("ACC = %lu\n", intvl_network_acc[1]);
-	// printf("RSP Plane:\n");
-	// printf("CPU = %lu\n", intvl_network_cpu[2]);
-	// printf("LLC = %lu\n", intvl_network_llc[2]);
-	// printf("ACC = %lu\n", intvl_network_acc[2]);
-
-#elif (COH_MODE == 2)
-	/* ********************************************************** */
-	/* Write-through forwarding */
-	/* ********************************************************** */
-	printf("Write-through forwarding\n");
-
-	spandex_config.spandex_reg = 0;
-	spandex_config.r_en = 1;
-	spandex_config.r_type = 2;
-	spandex_config.w_en = 1;
-	spandex_config.w_type = 1;
-	iowrite32(dev, SPANDEX_REG, spandex_config.spandex_reg);
-
-	intvl_write = 0;
-	intvl_acc_write = 0;
-	intvl_read = 0;
-	intvl_acc_read = 0;
-
-	for (i = 0; i < ITERATIONS; i++)
-	{
-		/* TODO: Restore full test once ESP caches are integrated */
-		coherence = ACC_COH_FULL;
-
-		// Pass common configuration parameters 
-		iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
-		iowrite32(dev, COHERENCE_REG, coherence);
-
-		iowrite32(dev, PT_ADDRESS_REG, (unsigned long) ptable);
-		iowrite32(dev, PT_NCHUNK_REG, NCHUNK(2*mem_size));
-		iowrite32(dev, PT_SHIFT_REG, CHUNK_SHIFT);
-
-		// Use the following if input and output data are not allocated at the default offsets
-		iowrite32(dev, SRC_OFFSET_REG, 0);
-		iowrite32(dev, DST_OFFSET_REG, 0);
-
-		// Pass accelerator-specific configuration parameters
-		/* <<--regs-config-->> */
-	    iowrite32(dev, SENSOR_DMA_RD_SP_OFFSET_REG, 0);
-	    iowrite32(dev, SENSOR_DMA_RD_WR_ENABLE_REG, 0);
-	    iowrite32(dev, SENSOR_DMA_RD_SIZE_REG, mem_words);
-	    iowrite32(dev, SENSOR_DMA_SRC_OFFSET_REG, 0);
-
-  		void* dst = (void*)(mem);
-		int64_t value_64 = 123;
-
-      	start_write = get_counter();
-
-    	for (j = 0; j < mem_words; j++)
-    	{
-			asm volatile (
-				"mv t0, %0;"
-				"mv t1, %1;"
-				".word 0x2062B02B"
-				: 
-				: "r" (dst), "r" (value_64)
-				: "t0", "t1", "memory"
-			);
-
-			dst += 8;
-    	}
-
-      	stop_write = get_counter();
-		intvl_write += stop_write - start_write;
-
-		// if(i == 2) printf("CPU write %d = %lu\n", i, stop_write - start_write);
-
-		// Start accelerators
-		iowrite32(dev, CMD_REG, CMD_MASK_START);
-
-      	start_acc_read = get_counter();
-
-		// Wait for completion
-		done = 0;
-		while (!done) {
-			done = ioread32(dev, STATUS_REG);
-			done &= STATUS_MASK_DONE;
-		}
-
-      	stop_acc_read = get_counter();
-		intvl_acc_read += stop_acc_read - start_acc_read;
-
-		// if(i == 2) printf("ACC read %d = %lu\n", i, stop_acc_read - start_acc_read);
-
-		iowrite32(dev, CMD_REG, 0x0);
-
-	    iowrite32(dev, SENSOR_DMA_RD_WR_ENABLE_REG, 1);
-	    iowrite32(dev, SENSOR_DMA_WR_SIZE_REG, mem_words);
-	    iowrite32(dev, SENSOR_DMA_WR_SP_OFFSET_REG, 0);
-	    iowrite32(dev, SENSOR_DMA_DST_OFFSET_REG, mem_words);
-
-		// Start accelerators
-		iowrite32(dev, CMD_REG, CMD_MASK_START);
-
-      	start_acc_write = get_counter();
-
-		// Wait for completion
-		done = 0;
-		while (!done) {
-			done = ioread32(dev, STATUS_REG);
-			done &= STATUS_MASK_DONE;
-		}
-
-      	stop_acc_write = get_counter();
-		intvl_acc_write += stop_acc_write - start_acc_write;
-
-		// if(i == 2) printf("ACC write %d = %lu\n", i, stop_acc_write - start_acc_write);
-
-		iowrite32(dev, CMD_REG, 0x0);
-
-  		dst = (void*)(gold);
-
-      	start_read = get_counter();
-
- 	   	for (j = 0; j < mem_words; j++)
- 	   	{
-			asm volatile (
-				"mv t0, %1;"
-				".word 0x4002B30B;"
-				"mv %0, t1"
-				: "=r" (value_64)
-				: "r" (dst)
-				: "t0", "t1", "memory"
-			);
-
-			dst += 8;
- 	   	}
-
-      	stop_read = get_counter();
-		intvl_read += stop_read - start_read;
-
-		// if(i == 2) printf("CPU read %d = %lu\n", i, stop_read - start_read);
-	}
-
-	printf("CPU write = %lu\n", intvl_write/ITERATIONS);
-	printf("ACC read = %lu\n", intvl_acc_read/ITERATIONS);
-	printf("ACC write = %lu\n", intvl_acc_write/ITERATIONS);
-	printf("CPU read = %lu\n", intvl_read/ITERATIONS);
-	printf("Total time = %lu\n", (intvl_write + intvl_acc_read + intvl_acc_write + intvl_read)/ITERATIONS);
-
-#elif (COH_MODE == 1)
-	/* ********************************************************** */
-	/* Baseline Spandex (ReqV) */
-	/* ********************************************************** */
-	printf("Baseline Spandex (ReqV)\n");
-
-	spandex_config.spandex_reg = 0;
-	spandex_config.r_en = 1;
-	spandex_config.r_type = 1;
-	iowrite32(dev, SPANDEX_REG, spandex_config.spandex_reg);
-
-	intvl_write = 0;
-	intvl_acc_write = 0;
-	intvl_read = 0;
-	intvl_acc_read = 0;
-
-	for (i = 0; i < ITERATIONS; i++)
-	{
-		/* TODO: Restore full test once ESP caches are integrated */
-		coherence = ACC_COH_FULL;
-
-		// Pass common configuration parameters 
-		iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
-		iowrite32(dev, COHERENCE_REG, coherence);
-
-		iowrite32(dev, PT_ADDRESS_REG, (unsigned long) ptable);
-		iowrite32(dev, PT_NCHUNK_REG, NCHUNK(2*mem_size));
-		iowrite32(dev, PT_SHIFT_REG, CHUNK_SHIFT);
-
-		// Use the following if input and output data are not allocated at the default offsets
-		iowrite32(dev, SRC_OFFSET_REG, 0);
-		iowrite32(dev, DST_OFFSET_REG, 0);
-
-		// Pass accelerator-specific configuration parameters
-		/* <<--regs-config-->> */
-	    iowrite32(dev, SENSOR_DMA_RD_SP_OFFSET_REG, 0);
-	    iowrite32(dev, SENSOR_DMA_RD_WR_ENABLE_REG, 0);
-	    iowrite32(dev, SENSOR_DMA_RD_SIZE_REG, mem_words);
-	    iowrite32(dev, SENSOR_DMA_SRC_OFFSET_REG, 0);
-
-  		void* dst = (void*)(mem);
-		int64_t value_64 = 123;
-
-      	start_write = get_counter();
-
-    	for (j = 0; j < mem_words; j++)
-    	{
-			asm volatile (
-				"mv t0, %0;"
-				"mv t1, %1;"
-				".word 0x0062B02B"
-				: 
-				: "r" (dst), "r" (value_64)
-				: "t0", "t1", "memory"
-			);
-
-			dst += 8;
-    	}
-
-      	stop_write = get_counter();
-		intvl_write += stop_write - start_write;
-
-		// if(i == 2) printf("CPU write %d = %lu\n", i, stop_write - start_write);
-
-		// Start accelerators
-		iowrite32(dev, CMD_REG, CMD_MASK_START);
-
-      	start_acc_read = get_counter();
-
-		// Wait for completion
-		done = 0;
-		while (!done) {
-			done = ioread32(dev, STATUS_REG);
-			done &= STATUS_MASK_DONE;
-		}
-
-      	stop_acc_read = get_counter();
-		intvl_acc_read += stop_acc_read - start_acc_read;
-
-		// if(i == 2) printf("ACC read %d = %lu\n", i, stop_acc_read - start_acc_read);
-
-		iowrite32(dev, CMD_REG, 0x0);
-
-	    iowrite32(dev, SENSOR_DMA_RD_WR_ENABLE_REG, 1);
-	    iowrite32(dev, SENSOR_DMA_WR_SIZE_REG, mem_words);
-	    iowrite32(dev, SENSOR_DMA_WR_SP_OFFSET_REG, 0);
-	    iowrite32(dev, SENSOR_DMA_DST_OFFSET_REG, mem_words);
-
-		// Start accelerators
-		iowrite32(dev, CMD_REG, CMD_MASK_START);
-
-      	start_acc_write = get_counter();
-
-		asm volatile ("fence r, r");
-
-		// Wait for completion
-		done = 0;
-		while (!done) {
-			done = ioread32(dev, STATUS_REG);
-			done &= STATUS_MASK_DONE;
-		}
-
-      	stop_acc_write = get_counter();
-		intvl_acc_write += stop_acc_write - start_acc_write;
-
-		// if(i == 2) printf("ACC write %d = %lu\n", i, stop_acc_write - start_acc_write);
-
-		iowrite32(dev, CMD_REG, 0x0);
-
-  		dst = (void*)(gold);
-
-      	start_read = get_counter();
-
- 	   	for (j = 0; j < mem_words; j++)
- 	   	{
-			asm volatile (
-				"mv t0, %1;"
-				".word 0x2002B30B;"
-				"mv %0, t1"
-				: "=r" (value_64)
-				: "r" (dst)
-				: "t0", "t1", "memory"
-			);
-
-			dst += 8;
- 	   	}
-
-      	stop_read = get_counter();
-		intvl_read += stop_read - start_read;
-
-		// if(i == 2) printf("CPU read %d = %lu\n", i, stop_read - start_read);
-	}
-
-	printf("CPU write = %lu\n", intvl_write/ITERATIONS);
-	printf("ACC read = %lu\n", intvl_acc_read/ITERATIONS);
-	printf("ACC write = %lu\n", intvl_acc_write/ITERATIONS);
-	printf("CPU read = %lu\n", intvl_read/ITERATIONS);
-	printf("Total time = %lu\n", (intvl_write + intvl_acc_read + intvl_acc_write + intvl_read)/ITERATIONS);
-
-#else
-	/* ********************************************************** */
-	/* Baseline Spandex (MESI) */
-	/* ********************************************************** */
-	printf("Baseline Spandex (MESI)\n");
-
-	spandex_config.spandex_reg = 0;
-	iowrite32(dev, SPANDEX_REG, spandex_config.spandex_reg);
-
-	intvl_write = 0;
-	intvl_acc_write = 0;
-	intvl_read = 0;
-	intvl_acc_read = 0;
-
-	for (i = 0; i < ITERATIONS; i++)
-	{
-		/* TODO: Restore full test once ESP caches are integrated */
-		coherence = ACC_COH_FULL;
-
-		// Pass common configuration parameters 
-		iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
-		iowrite32(dev, COHERENCE_REG, coherence);
-
-		iowrite32(dev, PT_ADDRESS_REG, (unsigned long) ptable);
-		iowrite32(dev, PT_NCHUNK_REG, NCHUNK(2*mem_size));
-		iowrite32(dev, PT_SHIFT_REG, CHUNK_SHIFT);
-
-		// Use the following if input and output data are not allocated at the default offsets
-		iowrite32(dev, SRC_OFFSET_REG, 0);
-		iowrite32(dev, DST_OFFSET_REG, 0);
-
-		// Pass accelerator-specific configuration parameters
-		/* <<--regs-config-->> */
-	    iowrite32(dev, SENSOR_DMA_RD_SP_OFFSET_REG, 0);
-	    iowrite32(dev, SENSOR_DMA_RD_WR_ENABLE_REG, 0);
-	    iowrite32(dev, SENSOR_DMA_RD_SIZE_REG, mem_words);
-	    iowrite32(dev, SENSOR_DMA_SRC_OFFSET_REG, 0);
-
-  		void* dst = (void*)(mem);
-		int64_t value_64 = 123;
-
-      	start_write = get_counter();
-
-    	for (j = 0; j < mem_words; j++)
-    	{
-			asm volatile (
-				"mv t0, %0;"
-				"mv t1, %1;"
-				".word 0x0062B02B"
-				: 
-				: "r" (dst), "r" (value_64)
-				: "t0", "t1", "memory"
-			);
-
-			dst += 8;
-    	}
-
-      	stop_write = get_counter();
-		intvl_write += stop_write - start_write;
-
-		// if(i == 2) printf("CPU write %d = %lu\n", i, stop_write - start_write);
-
-		// Start accelerators
-		iowrite32(dev, CMD_REG, CMD_MASK_START);
-
-      	start_acc_read = get_counter();
-
-		// Wait for completion
-		done = 0;
-		while (!done) {
-			done = ioread32(dev, STATUS_REG);
-			done &= STATUS_MASK_DONE;
-		}
-
-      	stop_acc_read = get_counter();
-		intvl_acc_read += stop_acc_read - start_acc_read;
-
-		// if(i == 2) printf("ACC read %d = %lu\n", i, stop_acc_read - start_acc_read);
-
-		iowrite32(dev, CMD_REG, 0x0);
-
-	    iowrite32(dev, SENSOR_DMA_RD_WR_ENABLE_REG, 1);
-	    iowrite32(dev, SENSOR_DMA_WR_SIZE_REG, mem_words);
-	    iowrite32(dev, SENSOR_DMA_WR_SP_OFFSET_REG, 0);
-	    iowrite32(dev, SENSOR_DMA_DST_OFFSET_REG, mem_words);
-
-		// Start accelerators
-		iowrite32(dev, CMD_REG, CMD_MASK_START);
-
-      	start_acc_write = get_counter();
-
-		// Wait for completion
-		done = 0;
-		while (!done) {
-			done = ioread32(dev, STATUS_REG);
-			done &= STATUS_MASK_DONE;
-		}
-
-      	stop_acc_write = get_counter();
-		intvl_acc_write += stop_acc_write - start_acc_write;
-
-		// if(i == 2) printf("ACC write %d = %lu\n", i, stop_acc_write - start_acc_write);
-
-		iowrite32(dev, CMD_REG, 0x0);
-
-  		dst = (void*)(gold);
-
-      	start_read = get_counter();
-
- 	   	for (j = 0; j < mem_words; j++)
- 	   	{
-			asm volatile (
-				"mv t0, %1;"
-				".word 0x0002B30B;"
-				"mv %0, t1"
-				: "=r" (value_64)
-				: "r" (dst)
-				: "t0", "t1", "memory"
-			);
-
-			dst += 8;
- 	   	}
-
-      	stop_read = get_counter();
-		intvl_read += stop_read - start_read;
-
-		// if(i == 2) printf("CPU read %d = %lu\n", i, stop_read - start_read);
-	}
-
-	printf("CPU write = %lu\n", intvl_write/ITERATIONS);
-	printf("ACC read = %lu\n", intvl_acc_read/ITERATIONS);
-	printf("ACC write = %lu\n", intvl_acc_write/ITERATIONS);
-	printf("CPU read = %lu\n", intvl_read/ITERATIONS);
-	printf("Total time = %lu\n", (intvl_write + intvl_acc_read + intvl_acc_write + intvl_read)/ITERATIONS);
-#endif
-#else
-#if (COH_MODE == 3)
-
-	/* ********************************************************** */
-	/* Non-Coherent DMA */
-	/* ********************************************************** */
-	printf("Non-Coherent DMA\n");
-	intvl_write = 0;
-	intvl_acc_write = 0;
-	intvl_read = 0;
-	intvl_acc_read = 0;
-
-	for (i = 0; i < ITERATIONS; i++)
-	{
-		/* TODO: Restore full test once ESP caches are integrated */
-		coherence = ACC_COH_NONE;
-
-		// Pass common configuration parameters 
-		iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
-		iowrite32(dev, COHERENCE_REG, coherence);
-
-		iowrite32(dev, PT_ADDRESS_REG, (unsigned long) ptable);
-		iowrite32(dev, PT_NCHUNK_REG, NCHUNK(2*mem_size));
-		iowrite32(dev, PT_SHIFT_REG, CHUNK_SHIFT);
-
-		// Use the following if input and output data are not allocated at the default offsets
-		iowrite32(dev, SRC_OFFSET_REG, 0);
-		iowrite32(dev, DST_OFFSET_REG, 0);
-
-		// Pass accelerator-specific configuration parameters
-		/* <<--regs-config-->> */
-	    iowrite32(dev, SENSOR_DMA_RD_SP_OFFSET_REG, 0);
-	    iowrite32(dev, SENSOR_DMA_RD_WR_ENABLE_REG, 0);
-	    iowrite32(dev, SENSOR_DMA_RD_SIZE_REG, mem_words);
-	    iowrite32(dev, SENSOR_DMA_SRC_OFFSET_REG, 0);
-
-  		void* dst = (void*)(mem);
-		int64_t value_64 = 123;
-
-      	start_write = get_counter();
-
-    	for (j = 0; j < mem_words; j++)
-    	{
-			asm volatile (
-				"mv t0, %0;"
-				"mv t1, %1;"
-				".word 0x0062B02B"
-				: 
-				: "r" (dst), "r" (value_64)
-				: "t0", "t1", "memory"
-			);
-
-			dst += 8;
-    	}
-
-		esp_flush(coherence);
-
-      	stop_write = get_counter();
-		intvl_write += stop_write - start_write;
-
-		// if(i == 2) printf("CPU write %d = %lu\n", i, stop_write - start_write);
-
-		// Start accelerators
-		iowrite32(dev, CMD_REG, CMD_MASK_START);
-
-      	start_acc_read = get_counter();
-
-		// Wait for completion
-		done = 0;
-		while (!done) {
-			done = ioread32(dev, STATUS_REG);
-			done &= STATUS_MASK_DONE;
-		}
-
-      	stop_acc_read = get_counter();
-		intvl_acc_read += stop_acc_read - start_acc_read;
-
-		// if(i == 2) printf("ACC read %d = %lu\n", i, stop_acc_read - start_acc_read);
-
-		iowrite32(dev, CMD_REG, 0x0);
-
-	    iowrite32(dev, SENSOR_DMA_RD_WR_ENABLE_REG, 1);
-	    iowrite32(dev, SENSOR_DMA_WR_SIZE_REG, mem_words);
-	    iowrite32(dev, SENSOR_DMA_WR_SP_OFFSET_REG, 0);
-	    iowrite32(dev, SENSOR_DMA_DST_OFFSET_REG, mem_words);
-
-		// Start accelerators
-		iowrite32(dev, CMD_REG, CMD_MASK_START);
-
-      	start_acc_write = get_counter();
-
-		// Wait for completion
-		done = 0;
-		while (!done) {
-			done = ioread32(dev, STATUS_REG);
-			done &= STATUS_MASK_DONE;
-		}
-
-      	stop_acc_write = get_counter();
-		intvl_acc_write += stop_acc_write - start_acc_write;
-
-		// if(i == 2) printf("ACC write %d = %lu\n", i, stop_acc_write - start_acc_write);
-
-		iowrite32(dev, CMD_REG, 0x0);
-
-  		dst = (void*)(gold);
-
-      	start_read = get_counter();
-
- 	   	for (j = 0; j < mem_words; j++)
- 	   	{
-			asm volatile (
-				"mv t0, %1;"
-				".word 0x0002B30B;"
-				"mv %0, t1"
-				: "=r" (value_64)
-				: "r" (dst)
-				: "t0", "t1", "memory"
-			);
-
-			dst += 8;
- 	   	}
-
-      	stop_read = get_counter();
-		intvl_read += stop_read - start_read;
-
-		// if(i == 2) printf("CPU read %d = %lu\n", i, stop_read - start_read);
-	}
-
-	printf("CPU write = %lu\n", intvl_write/ITERATIONS);
-	printf("ACC read = %lu\n", intvl_acc_read/ITERATIONS);
-	printf("ACC write = %lu\n", intvl_acc_write/ITERATIONS);
-	printf("CPU read = %lu\n", intvl_read/ITERATIONS);
-	printf("Total time = %lu\n", (intvl_write + intvl_acc_read + intvl_acc_write + intvl_read)/ITERATIONS);
-
-#elif (COH_MODE == 2)
-	/* ********************************************************** */
-	/* LLC Coherent DMA */
-	/* ********************************************************** */
-	printf("LLC Coherent DMA\n");
-	intvl_write = 0;
-	intvl_acc_write = 0;
-	intvl_read = 0;
-	intvl_acc_read = 0;
-
-	for (i = 0; i < ITERATIONS; i++)
-	{
-		/* TODO: Restore full test once ESP caches are integrated */
-		coherence = ACC_COH_LLC;
-
-		// Pass common configuration parameters 
-		iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
-		iowrite32(dev, COHERENCE_REG, coherence);
-
-		iowrite32(dev, PT_ADDRESS_REG, (unsigned long) ptable);
-		iowrite32(dev, PT_NCHUNK_REG, NCHUNK(2*mem_size));
-		iowrite32(dev, PT_SHIFT_REG, CHUNK_SHIFT);
-
-		// Use the following if input and output data are not allocated at the default offsets
-		iowrite32(dev, SRC_OFFSET_REG, 0);
-		iowrite32(dev, DST_OFFSET_REG, 0);
-
-		// Pass accelerator-specific configuration parameters
-		/* <<--regs-config-->> */
-	    iowrite32(dev, SENSOR_DMA_RD_SP_OFFSET_REG, 0);
-	    iowrite32(dev, SENSOR_DMA_RD_WR_ENABLE_REG, 0);
-	    iowrite32(dev, SENSOR_DMA_RD_SIZE_REG, mem_words);
-	    iowrite32(dev, SENSOR_DMA_SRC_OFFSET_REG, 0);
-
-  		void* dst = (void*)(mem);
-		int64_t value_64 = 123;
-
-      	start_write = get_counter();
-
-    	for (j = 0; j < mem_words; j++)
-    	{
-			asm volatile (
-				"mv t0, %0;"
-				"mv t1, %1;"
-				".word 0x0062B02B"
-				: 
-				: "r" (dst), "r" (value_64)
-				: "t0", "t1", "memory"
-			);
-
-			dst += 8;
-    	}
-
-		esp_flush(coherence);
-
-      	stop_write = get_counter();
-		intvl_write += stop_write - start_write;
-
-		// if(i == 2) printf("CPU write %d = %lu\n", i, stop_write - start_write);
-
-		// Start accelerators
-		iowrite32(dev, CMD_REG, CMD_MASK_START);
-
-      	start_acc_read = get_counter();
-
-		// Wait for completion
-		done = 0;
-		while (!done) {
-			done = ioread32(dev, STATUS_REG);
-			done &= STATUS_MASK_DONE;
-		}
-
-      	stop_acc_read = get_counter();
-		intvl_acc_read += stop_acc_read - start_acc_read;
-
-		// if(i == 2) printf("ACC read %d = %lu\n", i, stop_acc_read - start_acc_read);
-
-		iowrite32(dev, CMD_REG, 0x0);
-
-	    iowrite32(dev, SENSOR_DMA_RD_WR_ENABLE_REG, 1);
-	    iowrite32(dev, SENSOR_DMA_WR_SIZE_REG, mem_words);
-	    iowrite32(dev, SENSOR_DMA_WR_SP_OFFSET_REG, 0);
-	    iowrite32(dev, SENSOR_DMA_DST_OFFSET_REG, mem_words);
-
-		// Start accelerators
-		iowrite32(dev, CMD_REG, CMD_MASK_START);
-
-      	start_acc_write = get_counter();
-
-		// Wait for completion
-		done = 0;
-		while (!done) {
-			done = ioread32(dev, STATUS_REG);
-			done &= STATUS_MASK_DONE;
-		}
-
-      	stop_acc_write = get_counter();
-		intvl_acc_write += stop_acc_write - start_acc_write;
-
-		// if(i == 2) printf("ACC write %d = %lu\n", i, stop_acc_write - start_acc_write);
-
-		iowrite32(dev, CMD_REG, 0x0);
-
-  		dst = (void*)(gold);
-
-      	start_read = get_counter();
-
- 	   	for (j = 0; j < mem_words; j++)
- 	   	{
-			asm volatile (
-				"mv t0, %1;"
-				".word 0x0002B30B;"
-				"mv %0, t1"
-				: "=r" (value_64)
-				: "r" (dst)
-				: "t0", "t1", "memory"
-			);
-
-			dst += 8;
- 	   	}
-
-      	stop_read = get_counter();
-		intvl_read += stop_read - start_read;
-
-		// if(i == 2) printf("CPU read %d = %lu\n", i, stop_read - start_read);
-	}
-
-	printf("CPU write = %lu\n", intvl_write/ITERATIONS);
-	printf("ACC read = %lu\n", intvl_acc_read/ITERATIONS);
-	printf("ACC write = %lu\n", intvl_acc_write/ITERATIONS);
-	printf("CPU read = %lu\n", intvl_read/ITERATIONS);
-	printf("Total time = %lu\n", (intvl_write + intvl_acc_read + intvl_acc_write + intvl_read)/ITERATIONS);
-
-#elif (COH_MODE == 1)
-	/* ********************************************************** */
-	/* Coherent DMA */
-	/* ********************************************************** */
-	printf("Coherent DMA\n");
-	intvl_write = 0;
-	intvl_acc_write = 0;
-	intvl_read = 0;
-	intvl_acc_read = 0;
-
-	for (i = 0; i < ITERATIONS; i++)
-	{
-		/* TODO: Restore full test once ESP caches are integrated */
-		coherence = ACC_COH_RECALL;
-
-		// Pass common configuration parameters 
-		iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
-		iowrite32(dev, COHERENCE_REG, coherence);
-
-		iowrite32(dev, PT_ADDRESS_REG, (unsigned long) ptable);
-		iowrite32(dev, PT_NCHUNK_REG, NCHUNK(2*mem_size));
-		iowrite32(dev, PT_SHIFT_REG, CHUNK_SHIFT);
-
-		// Use the following if input and output data are not allocated at the default offsets
-		iowrite32(dev, SRC_OFFSET_REG, 0);
-		iowrite32(dev, DST_OFFSET_REG, 0);
-
-		// Pass accelerator-specific configuration parameters
-		/* <<--regs-config-->> */
-	    iowrite32(dev, SENSOR_DMA_RD_SP_OFFSET_REG, 0);
-	    iowrite32(dev, SENSOR_DMA_RD_WR_ENABLE_REG, 0);
-	    iowrite32(dev, SENSOR_DMA_RD_SIZE_REG, mem_words);
-	    iowrite32(dev, SENSOR_DMA_SRC_OFFSET_REG, 0);
-
-  		void* dst = (void*)(mem);
-		int64_t value_64 = 123;
-
-      	start_write = get_counter();
-
-    	for (j = 0; j < mem_words; j++)
-    	{
-			asm volatile (
-				"mv t0, %0;"
-				"mv t1, %1;"
-				".word 0x0062B02B"
-				: 
-				: "r" (dst), "r" (value_64)
-				: "t0", "t1", "memory"
-			);
-
-			dst += 8;
-    	}
-
-      	stop_write = get_counter();
-		intvl_write += stop_write - start_write;
-
-		// if(i == 2) printf("CPU write %d = %lu\n", i, stop_write - start_write);
-
-		// Start accelerators
-		iowrite32(dev, CMD_REG, CMD_MASK_START);
-
-      	start_acc_read = get_counter();
-
-		// Wait for completion
-		done = 0;
-		while (!done) {
-			done = ioread32(dev, STATUS_REG);
-			done &= STATUS_MASK_DONE;
-		}
-
-      	stop_acc_read = get_counter();
-		intvl_acc_read += stop_acc_read - start_acc_read;
-
-		// if(i == 2) printf("ACC read %d = %lu\n", i, stop_acc_read - start_acc_read);
-
-		iowrite32(dev, CMD_REG, 0x0);
-
-	    iowrite32(dev, SENSOR_DMA_RD_WR_ENABLE_REG, 1);
-	    iowrite32(dev, SENSOR_DMA_WR_SIZE_REG, mem_words);
-	    iowrite32(dev, SENSOR_DMA_WR_SP_OFFSET_REG, 0);
-	    iowrite32(dev, SENSOR_DMA_DST_OFFSET_REG, mem_words);
-
-		// Start accelerators
-		iowrite32(dev, CMD_REG, CMD_MASK_START);
-
-      	start_acc_write = get_counter();
-
-		// Wait for completion
-		done = 0;
-		while (!done) {
-			done = ioread32(dev, STATUS_REG);
-			done &= STATUS_MASK_DONE;
-		}
-
-      	stop_acc_write = get_counter();
-		intvl_acc_write += stop_acc_write - start_acc_write;
-
-		// if(i == 2) printf("ACC write %d = %lu\n", i, stop_acc_write - start_acc_write);
-
-		iowrite32(dev, CMD_REG, 0x0);
-
-  		dst = (void*)(gold);
-
-      	start_read = get_counter();
-
- 	   	for (j = 0; j < mem_words; j++)
- 	   	{
-			asm volatile (
-				"mv t0, %1;"
-				".word 0x0002B30B;"
-				"mv %0, t1"
-				: "=r" (value_64)
-				: "r" (dst)
-				: "t0", "t1", "memory"
-			);
-
-			dst += 8;
- 	   	}
-
-      	stop_read = get_counter();
-		intvl_read += stop_read - start_read;
-
-		// if(i == 2) printf("CPU read %d = %lu\n", i, stop_read - start_read);
-	}
-
-	printf("CPU write = %lu\n", intvl_write/ITERATIONS);
-	printf("ACC read = %lu\n", intvl_acc_read/ITERATIONS);
-	printf("ACC write = %lu\n", intvl_acc_write/ITERATIONS);
-	printf("CPU read = %lu\n", intvl_read/ITERATIONS);
-	printf("Total time = %lu\n", (intvl_write + intvl_acc_read + intvl_acc_write + intvl_read)/ITERATIONS);
-
-#else
-	/* ********************************************************** */
-	/* Fully Coherent MESI */
-	/* ********************************************************** */
-	printf("Fully Coherent MESI\n");
-	intvl_write = 0;
-	intvl_acc_write = 0;
-	intvl_read = 0;
-	intvl_acc_read = 0;
-
-	for (i = 0; i < ITERATIONS; i++)
-	{
-		/* TODO: Restore full test once ESP caches are integrated */
-		coherence = ACC_COH_FULL;
-
-		// Pass common configuration parameters 
-		iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
-		iowrite32(dev, COHERENCE_REG, coherence);
-
-		iowrite32(dev, PT_ADDRESS_REG, (unsigned long) ptable);
-		iowrite32(dev, PT_NCHUNK_REG, NCHUNK(2*mem_size));
-		iowrite32(dev, PT_SHIFT_REG, CHUNK_SHIFT);
-
-		// Use the following if input and output data are not allocated at the default offsets
-		iowrite32(dev, SRC_OFFSET_REG, 0);
-		iowrite32(dev, DST_OFFSET_REG, 0);
-
-		// Pass accelerator-specific configuration parameters
-		/* <<--regs-config-->> */
-	    iowrite32(dev, SENSOR_DMA_RD_SP_OFFSET_REG, 0);
-	    iowrite32(dev, SENSOR_DMA_RD_WR_ENABLE_REG, 0);
-	    iowrite32(dev, SENSOR_DMA_RD_SIZE_REG, mem_words);
-	    iowrite32(dev, SENSOR_DMA_SRC_OFFSET_REG, 0);
-
-  		void* dst = (void*)(mem);
-		int64_t value_64 = 123;
-
-      	start_write = get_counter();
-
-    	for (j = 0; j < mem_words; j++)
-    	{
-			asm volatile (
-				"mv t0, %0;"
-				"mv t1, %1;"
-				".word 0x0062B02B"
-				: 
-				: "r" (dst), "r" (value_64)
-				: "t0", "t1", "memory"
-			);
-
-			dst += 8;
-    	}
-
-      	stop_write = get_counter();
-		intvl_write += stop_write - start_write;
-
-		// if(i == 2) printf("CPU write %d = %lu\n", i, stop_write - start_write);
-
-		// Start accelerators
-		iowrite32(dev, CMD_REG, CMD_MASK_START);
-
-      	start_acc_read = get_counter();
-
-		// Wait for completion
-		done = 0;
-		while (!done) {
-			done = ioread32(dev, STATUS_REG);
-			done &= STATUS_MASK_DONE;
-		}
-
-      	stop_acc_read = get_counter();
-		intvl_acc_read += stop_acc_read - start_acc_read;
-
-		// if(i == 2) printf("ACC read %d = %lu\n", i, stop_acc_read - start_acc_read);
-
-		iowrite32(dev, CMD_REG, 0x0);
-
-	    iowrite32(dev, SENSOR_DMA_RD_WR_ENABLE_REG, 1);
-	    iowrite32(dev, SENSOR_DMA_WR_SIZE_REG, mem_words);
-	    iowrite32(dev, SENSOR_DMA_WR_SP_OFFSET_REG, 0);
-	    iowrite32(dev, SENSOR_DMA_DST_OFFSET_REG, mem_words);
-
-		// Start accelerators
-		iowrite32(dev, CMD_REG, CMD_MASK_START);
-
-      	start_acc_write = get_counter();
-
-		// Wait for completion
-		done = 0;
-		while (!done) {
-			done = ioread32(dev, STATUS_REG);
-			done &= STATUS_MASK_DONE;
-		}
-
-      	stop_acc_write = get_counter();
-		intvl_acc_write += stop_acc_write - start_acc_write;
-
-		// if(i == 2) printf("ACC write %d = %lu\n", i, stop_acc_write - start_acc_write);
-
-		iowrite32(dev, CMD_REG, 0x0);
-
-  		dst = (void*)(gold);
-
-      	start_read = get_counter();
-
- 	   	for (j = 0; j < mem_words; j++)
- 	   	{
-			asm volatile (
-				"mv t0, %1;"
-				".word 0x0002B30B;"
-				"mv %0, t1"
-				: "=r" (value_64)
-				: "r" (dst)
-				: "t0", "t1", "memory"
-			);
-
-			dst += 8;
- 	   	}
-
-      	stop_read = get_counter();
-		intvl_read += stop_read - start_read;
-
-		// if(i == 2) printf("CPU read %d = %lu\n", i, stop_read - start_read);
-	}
-
-	printf("CPU write = %lu\n", intvl_write/ITERATIONS);
-	printf("ACC read = %lu\n", intvl_acc_read/ITERATIONS);
-	printf("ACC write = %lu\n", intvl_acc_write/ITERATIONS);
-	printf("CPU read = %lu\n", intvl_read/ITERATIONS);
-	printf("Total time = %lu\n", (intvl_write + intvl_acc_read + intvl_acc_write + intvl_read)/ITERATIONS);
-
-#endif
-#endif
+	printf("CPU write = %lu\n", t_cpu_write/ITERATIONS);
+	printf("ACC read = %lu\n", t_acc_read/ITERATIONS);
+	printf("ACC write = %lu\n", t_acc_write/ITERATIONS);
+	printf("CPU read = %lu\n", t_cpu_read/ITERATIONS);
+	printf("Total time = %lu\n\n", (t_cpu_write + t_acc_read + t_acc_write + t_cpu_read)/ITERATIONS);
 	
 	aligned_free(ptable);
 	aligned_free(mem);
 	aligned_free(gold);
 
-	// while(1);
+	while(1);
 
 	return 0;
 }
