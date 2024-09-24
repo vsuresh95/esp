@@ -8,6 +8,7 @@ from tkinter import messagebox
 import os.path
 import glob
 import sys
+import re
 
 import NoCConfiguration as ncfg
 
@@ -95,7 +96,7 @@ class SoC_Config():
   FPGA_BOARD = "xilinx-vc707-xc7vx485t"
   DMA_WIDTH = 32
 
-  def changed(self, *args): 
+  def changed(self, *args):
     if self.cache_impl.get() == "ESP RTL":
       self.acc_l2_ways.set(self.l2_ways.get())
       self.acc_l2_sets.set(self.l2_sets.get())
@@ -108,7 +109,7 @@ class SoC_Config():
       self.acc_l2_ways.set(self.l2_ways.get())
       self.acc_l2_sets.set(self.l2_sets.get())
       self.cache_rtl.set(1)
-      self.cache_spandex.set(1)      
+      self.cache_spandex.set(1)
     else:
       self.cache_rtl.set(0)
       self.cache_spandex.set(1)
@@ -163,6 +164,8 @@ class SoC_Config():
     line = fp.readline()
     item = line.split()
     cols = int(item[2])
+    # top is an empty string
+    self.noc.top = self.root
     self.noc.create_topology(self.noc.top, rows, cols)
     # CONFIG_CPU_CACHES = L2_SETS L2_WAYS LLC_SETS LLC_WAYS
     line = fp.readline()
@@ -460,7 +463,7 @@ class SoC_Config():
   def set_IP(self):
     self.IP_ADDR = str(int('0x' + self.dsu_ip[:2], 16)) + "." + str(int('0x' + self.dsu_ip[2:4], 16)) + "." + str(int('0x' + self.dsu_ip[4:6], 16)) + "." + str(int('0x' + self.dsu_ip[6:], 16))
 
-  def __init__(self, DMA_WIDTH, TECH, LINUX_MAC, LEON3_STACK, FPGA_BOARD, EMU_TECH, EMU_FREQ, temporary):
+  def __init__(self, DMA_WIDTH, TECH, LINUX_MAC, LEON3_STACK, FPGA_BOARD, EMU_TECH, EMU_FREQ, temporary, root):
     self.DMA_WIDTH = DMA_WIDTH
     self.TECH = TECH
     self.LINUX_MAC = LINUX_MAC
@@ -493,6 +496,7 @@ class SoC_Config():
     # Debug Link
     self.dsu_ip = ""
     self.dsu_eth = ""
+    self.root = root
 
     # Define whether SGMII has to be used or not: it is not used for ProFPGA boards
     if self.FPGA_BOARD.find("profpga") != -1:

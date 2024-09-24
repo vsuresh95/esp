@@ -156,8 +156,10 @@ static void handle_edcl_message(edcl_snd_t *snd, edcl_rcv_t *rcv)
 	int i = 0;
 #endif
 	int iter = 0;
-	u8 *buf_snd = malloc(BUFSIZE_MAX_SND * sizeof(u8));
-	u8 *buf_rcv = malloc(BUFSIZE_MAX_RCV * sizeof(u8));
+	// u8 *buf_snd = malloc(BUFSIZE_MAX_SND * sizeof(u8));
+	// u8 *buf_rcv = malloc(BUFSIZE_MAX_RCV * sizeof(u8));
+	u8 *buf_snd = calloc(BUFSIZE_MAX_SND, sizeof(u8));
+	u8 *buf_rcv = calloc(BUFSIZE_MAX_RCV, sizeof(u8));
 	socklen_t clen = sizeof(struct sockaddr_in);
 
 	// Prepare Ethernet packet payload
@@ -171,6 +173,7 @@ static void handle_edcl_message(edcl_snd_t *snd, edcl_rcv_t *rcv)
 			printf("%02x ", buf_snd[i]);
 		printf("\n");
 #endif
+retry:
 		//send the message
 		if (sendto(s, buf_snd, snd->msglen , 0 , (struct sockaddr *) &serv_addr, sizeof(struct sockaddr_in)) == -1)
 			die("sendto()");
@@ -180,8 +183,14 @@ static void handle_edcl_message(edcl_snd_t *snd, edcl_rcv_t *rcv)
 			memset(buf_rcv,'\0', BUFSIZE_MAX_RCV);
 
 			//try to receive some data, this is a blocking call
-			if (recvfrom(s, buf_rcv, BUFSIZE_MAX_RCV, 0, (struct sockaddr *) &cli_addr, &clen) == -1)
-				die("recvfrom()");
+			if (recvfrom(s, buf_rcv, BUFSIZE_MAX_RCV, 0, (struct sockaddr *) &cli_addr, &clen) == -1) {
+				if (errno == EAGAIN || errno == EWOULDBLOCK) {
+					printf("\ntimeout, retrying...\n");
+					goto retry;
+				} else {
+					die("recvfrom()");
+				}
+			}
 
 			get_edcl_msg(buf_rcv, rcv);
 
@@ -239,6 +248,12 @@ void connect_edcl(const char *server)
 	// Open socket
 	if ( (s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
 		die("socket");
+
+	struct timeval tv;
+	tv.tv_sec = 3;
+	tv.tv_usec = 0;
+	if (setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0)
+		die("setsockopt");
 
 	// Configure EDCL server address
 	memset((char *) &serv_addr, 0, sizeof(struct sockaddr_in));
