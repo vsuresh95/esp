@@ -116,22 +116,22 @@ void nerf_mlp::load_input()
         offset += len; 
  
         // Load layer 4 weights
-        len = round_up(LAYER_4_INPUTS*LAYER_4_OUTPUTS, DMA_WORD_PER_BEAT);
+        len = round_up(LAYER_N_DIMS*LAYER_N_DIMS, DMA_WORD_PER_BEAT);
         load_input_dma(len, offset, plm_wgt_4);
         offset += len;
 
         // Load layer 4 biases
-        len = round_up(LAYER_4_OUTPUTS, DMA_WORD_PER_BEAT);
+        len = round_up(LAYER_N_DIMS, DMA_WORD_PER_BEAT);
         load_input_dma(len, offset, plm_bias_4);
         offset += len; 
  
         // Load layer 5 weights
-        len = round_up(LAYER_N_DIMS*LAYER_N_DIMS, DMA_WORD_PER_BEAT);
+        len = round_up(LAYER_5_INPUTS*LAYER_5_OUTPUTS, DMA_WORD_PER_BEAT);
         load_input_dma(len, offset, plm_wgt_5);
         offset += len;
 
         // Load layer 5 biases
-        len = round_up(LAYER_N_DIMS, DMA_WORD_PER_BEAT);
+        len = round_up(LAYER_5_OUTPUTS, DMA_WORD_PER_BEAT);
         load_input_dma(len, offset, plm_bias_5);
         offset += len; 
  
@@ -156,12 +156,12 @@ void nerf_mlp::load_input()
         offset += len; 
  
         // Load layer 8 weights
-        len = round_up(LAYER_8_INPUTS*LAYER_8_OUTPUTS, DMA_WORD_PER_BEAT);
+        len = round_up(LAYER_N_DIMS*LAYER_N_DIMS, DMA_WORD_PER_BEAT);
         load_input_dma(len, offset, plm_wgt_8);
         offset += len;
 
         // Load layer 8 biases
-        len = round_up(LAYER_8_OUTPUTS, DMA_WORD_PER_BEAT);
+        len = round_up(LAYER_N_DIMS, DMA_WORD_PER_BEAT);
         load_input_dma(len, offset, plm_bias_8);
         offset += len; 
  
@@ -181,17 +181,27 @@ void nerf_mlp::load_input()
         offset += len;
 
         // Load layer 10 biases
-        len = round_up(LAYER_10_OUTPUTS, DMA_WORD_PER_BEAT);
+        len = round_up(LAYER_10_OUTPUTS_ROUND, DMA_WORD_PER_BEAT);
         load_input_dma(len, offset, plm_bias_10);
         offset += len; 
 
+        // Load layer 11 weights
+        len = round_up(LAYER_11_INPUTS*LAYER_11_OUTPUTS, DMA_WORD_PER_BEAT);
+        load_input_dma(len, offset, plm_wgt_11);
+        offset += len;
+
+        // Load layer 11 biases
+        len = round_up(LAYER_11_OUTPUTS_ROUND, DMA_WORD_PER_BEAT);
+        load_input_dma(len, offset, plm_bias_11);
+        offset += len; 
+
         // Load input position vectors
-        len = round_up(LAYER_0_INPUTS, DMA_WORD_PER_BEAT);
+        len = round_up(LAYER_0_INPUTS_ROUND, DMA_WORD_PER_BEAT); // TODO
         load_input_dma(len, offset, plm_pos);
         offset += len; 
 
         // Load input direction vectors
-        len = round_up(LAYER_8_INPUTS-LAYER_N_DIMS, DMA_WORD_PER_BEAT);
+        len = round_up(LAYER_9_INPUTS_ROUND-LAYER_N_DIMS, DMA_WORD_PER_BEAT); // TODO
         load_input_dma(len, offset, plm_dir);
         offset += len;
 
@@ -243,21 +253,22 @@ void nerf_mlp::store_output()
         /* layer 1 */    LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS + 
         /* layer 2 */    LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS + 
         /* layer 3 */    LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS + 
-        /* layer 4 */    LAYER_4_INPUTS*LAYER_4_OUTPUTS + LAYER_4_OUTPUTS + 
-        /* layer 5 */    LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS + 
+        /* layer 4 */    LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS + 
+        /* layer 5 */    LAYER_5_INPUTS*LAYER_5_OUTPUTS + LAYER_5_OUTPUTS + 
         /* layer 6 */    LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS + 
         /* layer 7 */    LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS + 
-        /* layer 8 */    LAYER_8_INPUTS*LAYER_8_OUTPUTS + LAYER_8_OUTPUTS + 
+        /* layer 8 */    LAYER_N_DIMS*LAYER_N_DIMS + LAYER_N_DIMS + 
         /* layer 9 */    LAYER_9_INPUTS*LAYER_9_OUTPUTS + LAYER_9_OUTPUTS + 
-        /* layer 10 */   LAYER_10_INPUTS*LAYER_10_OUTPUTS + LAYER_10_OUTPUTS +
-        /* pos inputs */ LAYER_0_INPUTS +
-        /* dir inputs */ (LAYER_8_INPUTS-LAYER_N_DIMS);
+        /* layer 10 */   LAYER_10_INPUTS*LAYER_10_OUTPUTS + LAYER_10_OUTPUTS_ROUND +
+        /* layer 11 */   LAYER_11_INPUTS*LAYER_11_OUTPUTS + LAYER_11_OUTPUTS_ROUND +
+        /* pos inputs */ LAYER_0_INPUTS_ROUND +
+        /* dir inputs */ (LAYER_9_INPUTS_ROUND-LAYER_N_DIMS); // TODO
 
         uint32_t offset = round_up(output_offset, DMA_WORD_PER_BEAT) * 1;
 
         wait();
 
-        uint32_t len = round_up(LAYER_10_OUTPUTS, DMA_WORD_PER_BEAT);
+        uint32_t len = round_up(LAYER_10_OUTPUTS+LAYER_11_OUTPUTS, DMA_WORD_PER_BEAT);
 
         this->store_compute_handshake();
 
@@ -344,7 +355,7 @@ void nerf_mlp::compute_kernel()
         {
             uint32_t col_wgt_offset = col_wgt*LAYER_0_INPUTS;
 
-            int64_t partial_sum = plm_bias_0[col_wgt];
+            int32_t partial_sum = plm_bias_0[col_wgt];
 
             // Loop across the weight row
             row_loop_0: for (uint16_t row_wgt = 0; row_wgt < LAYER_0_INPUTS; row_wgt++)
@@ -368,7 +379,7 @@ void nerf_mlp::compute_kernel()
         {
             uint32_t col_wgt_offset = col_wgt*LAYER_N_DIMS;
 
-            int64_t partial_sum = plm_bias_1[col_wgt];
+            int32_t partial_sum = plm_bias_1[col_wgt];
 
             // Loop across the weight row
             row_loop_1: for (uint16_t row_wgt = 0; row_wgt < LAYER_N_DIMS; row_wgt++)
@@ -392,7 +403,7 @@ void nerf_mlp::compute_kernel()
         {
             uint32_t col_wgt_offset = col_wgt*LAYER_N_DIMS;
 
-            int64_t partial_sum = plm_bias_2[col_wgt];
+            int32_t partial_sum = plm_bias_2[col_wgt];
 
             // Loop across the weight row
             row_loop_2: for (uint16_t row_wgt = 0; row_wgt < LAYER_N_DIMS; row_wgt++)
@@ -416,7 +427,7 @@ void nerf_mlp::compute_kernel()
         {
             uint32_t col_wgt_offset = col_wgt*LAYER_N_DIMS;
 
-            int64_t partial_sum = plm_bias_3[col_wgt];
+            int32_t partial_sum = plm_bias_3[col_wgt];
 
             // Loop across the weight row
             row_loop_3: for (uint16_t row_wgt = 0; row_wgt < LAYER_N_DIMS; row_wgt++)
@@ -435,21 +446,15 @@ void nerf_mlp::compute_kernel()
     // Layer 4 1x316 x 316x256
     ///////////////////////////////// 
     {
-        // Read from Layer 0 inputs from scratchpad
-        input_loop_4: for (uint16_t elem_in = LAYER_N_DIMS; elem_in < LAYER_4_INPUTS; elem_in++)
-        {
-            plm_act_4[elem_in] = plm_pos[elem_in-LAYER_N_DIMS];
-        }
-
         // Loop across the weight column
-        col_loop_4: for (uint16_t col_wgt = 0; col_wgt < LAYER_4_OUTPUTS; col_wgt++)
+        col_loop_4: for (uint16_t col_wgt = 0; col_wgt < LAYER_N_DIMS; col_wgt++)
         {
-            uint32_t col_wgt_offset = col_wgt*LAYER_4_INPUTS;
+            uint32_t col_wgt_offset = col_wgt*LAYER_N_DIMS;
 
-            int64_t partial_sum = plm_bias_4[col_wgt];
+            int32_t partial_sum = plm_bias_4[col_wgt];
 
             // Loop across the weight row
-            row_loop_4: for (uint16_t row_wgt = 0; row_wgt < LAYER_4_INPUTS; row_wgt++)
+            row_loop_4: for (uint16_t row_wgt = 0; row_wgt < LAYER_N_DIMS; row_wgt++)
             {
                 partial_sum = partial_sum + (plm_wgt_4[col_wgt_offset + row_wgt] * plm_act_4[row_wgt]);
             }
@@ -465,15 +470,21 @@ void nerf_mlp::compute_kernel()
     // Layer 5 1x256 x 256x256
     ///////////////////////////////// 
     {
-        // Loop across the weight column
-        col_loop_5: for (uint16_t col_wgt = 0; col_wgt < LAYER_N_DIMS; col_wgt++)
+        // Read from Layer 0 inputs from scratchpad
+        input_loop_5: for (uint16_t elem_in = LAYER_N_DIMS; elem_in < LAYER_5_INPUTS; elem_in++)
         {
-            uint32_t col_wgt_offset = col_wgt*LAYER_N_DIMS;
+            plm_act_5[elem_in] = plm_pos[elem_in-LAYER_N_DIMS];
+        }
 
-            int64_t partial_sum = plm_bias_5[col_wgt];
+        // Loop across the weight column
+        col_loop_5: for (uint16_t col_wgt = 0; col_wgt < LAYER_5_OUTPUTS; col_wgt++)
+        {
+            uint32_t col_wgt_offset = col_wgt*LAYER_5_INPUTS;
+
+            int32_t partial_sum = plm_bias_5[col_wgt];
 
             // Loop across the weight row
-            row_loop_5: for (uint16_t row_wgt = 0; row_wgt < LAYER_N_DIMS; row_wgt++)
+            row_loop_5: for (uint16_t row_wgt = 0; row_wgt < LAYER_5_INPUTS; row_wgt++)
             {
                 partial_sum = partial_sum + (plm_wgt_5[col_wgt_offset + row_wgt] * plm_act_5[row_wgt]);
             }
@@ -494,7 +505,7 @@ void nerf_mlp::compute_kernel()
         {
             uint32_t col_wgt_offset = col_wgt*LAYER_N_DIMS;
 
-            int64_t partial_sum = plm_bias_6[col_wgt];
+            int32_t partial_sum = plm_bias_6[col_wgt];
 
             // Loop across the weight row
             row_loop_6: for (uint16_t row_wgt = 0; row_wgt < LAYER_N_DIMS; row_wgt++)
@@ -518,7 +529,7 @@ void nerf_mlp::compute_kernel()
         {
             uint32_t col_wgt_offset = col_wgt*LAYER_N_DIMS;
 
-            int64_t partial_sum = plm_bias_7[col_wgt];
+            int32_t partial_sum = plm_bias_7[col_wgt];
 
             // Loop across the weight row
             row_loop_7: for (uint16_t row_wgt = 0; row_wgt < LAYER_N_DIMS; row_wgt++)
@@ -526,38 +537,31 @@ void nerf_mlp::compute_kernel()
                 partial_sum = partial_sum + (plm_wgt_7[col_wgt_offset + row_wgt] * plm_act_7[row_wgt]);
             }
 
-            plm_act_8[col_wgt] = partial_sum;
+            if (partial_sum > 0)
+                plm_act_8[col_wgt] = partial_sum;
+            else
+                plm_act_8[col_wgt] = 0;
         }
-
-        // NOTE: NO RELU
     }
 
     /////////////////////////////////
     // Layer 8 1x280 x 256x256
     ///////////////////////////////// 
     {
-        input_loop_8: for (uint16_t elem_in = LAYER_N_DIMS; elem_in < LAYER_8_INPUTS; elem_in++)
-        {
-            plm_act_8[elem_in] = plm_dir[elem_in-LAYER_N_DIMS];
-        }
-
         // Loop across the weight column
-        col_loop_8: for (uint16_t col_wgt = 0; col_wgt < LAYER_8_OUTPUTS; col_wgt++)
+        col_loop_8: for (uint16_t col_wgt = 0; col_wgt < LAYER_N_DIMS; col_wgt++)
         {
-            uint32_t col_wgt_offset = col_wgt*LAYER_8_INPUTS;
+            uint32_t col_wgt_offset = col_wgt*LAYER_N_DIMS;
 
-            int64_t partial_sum = plm_bias_8[col_wgt];
+            int32_t partial_sum = plm_bias_8[col_wgt];
 
             // Loop across the weight row
-            row_loop_8: for (uint16_t row_wgt = 0; row_wgt < LAYER_8_INPUTS; row_wgt++)
+            row_loop_8: for (uint16_t row_wgt = 0; row_wgt < LAYER_N_DIMS; row_wgt++)
             {
                 partial_sum = partial_sum + (plm_wgt_8[col_wgt_offset + row_wgt] * plm_act_8[row_wgt]);
             }
-
-            if (partial_sum > 0)
-                plm_act_9[col_wgt] = partial_sum;
-            else
-                plm_act_9[col_wgt] = 0;
+            
+            plm_act_9[col_wgt] = partial_sum;
         }
     }
 
@@ -565,12 +569,17 @@ void nerf_mlp::compute_kernel()
     // Layer 9 1x256 x 256x128
     ///////////////////////////////// 
     {
+        input_loop_9: for (uint16_t elem_in = LAYER_N_DIMS; elem_in < LAYER_9_INPUTS; elem_in++)
+        {
+            plm_act_9[elem_in] = plm_dir[elem_in-LAYER_N_DIMS];
+        }
+
         // Loop across the weight column
         col_loop_9: for (uint16_t col_wgt = 0; col_wgt < LAYER_9_OUTPUTS; col_wgt++)
         {
             uint32_t col_wgt_offset = col_wgt*LAYER_9_INPUTS;
 
-            int64_t partial_sum = plm_bias_9[col_wgt];
+            int32_t partial_sum = plm_bias_9[col_wgt];
 
             // Loop across the weight row
             row_loop_9: for (uint16_t row_wgt = 0; row_wgt < LAYER_9_INPUTS; row_wgt++)
@@ -594,7 +603,7 @@ void nerf_mlp::compute_kernel()
         {
             uint32_t col_wgt_offset = col_wgt*LAYER_10_INPUTS;
 
-            int64_t partial_sum = plm_bias_10[col_wgt];
+            int32_t partial_sum = plm_bias_10[col_wgt];
 
             // Loop across the weight row
             row_loop_10: for (uint16_t row_wgt = 0; row_wgt < LAYER_10_INPUTS; row_wgt++)
@@ -603,6 +612,30 @@ void nerf_mlp::compute_kernel()
             }
 
             plm_out[col_wgt] = partial_sum;
+        }
+
+        // NO RELU
+
+    }
+
+    /////////////////////////////////
+    // Layer 11 1x256 x 1x256
+    ///////////////////////////////// 
+    {
+        // Loop across the weight column
+        col_loop_11: for (uint16_t col_wgt = 0; col_wgt < LAYER_11_OUTPUTS; col_wgt++)
+        {
+            uint32_t col_wgt_offset = col_wgt*LAYER_11_INPUTS;
+
+            int32_t partial_sum = plm_bias_11[col_wgt];
+
+            // Loop across the weight row
+            row_loop_11: for (uint16_t row_wgt = 0; row_wgt < LAYER_11_INPUTS; row_wgt++)
+            {
+                partial_sum = partial_sum + (plm_wgt_11[col_wgt_offset + row_wgt] * plm_act_8[row_wgt]);
+            }
+
+            plm_out[LAYER_10_OUTPUTS + col_wgt] = partial_sum;
         }
 
         // NO RELU

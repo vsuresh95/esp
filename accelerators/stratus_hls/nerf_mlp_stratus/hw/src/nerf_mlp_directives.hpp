@@ -9,7 +9,7 @@
 #define DMA_WORD_PER_BEAT 0
 #elif (DMA_WIDTH == 64)
 #define DMA_BEAT_PER_WORD 1
-#define DMA_WORD_PER_BEAT 1
+#define DMA_WORD_PER_BEAT 2
 #endif
 
 #define PLM_WGT_0_NAME "nerf_plm_wgt_0"
@@ -23,6 +23,7 @@
 #define PLM_WGT_8_NAME "nerf_plm_wgt_8"
 #define PLM_WGT_9_NAME "nerf_plm_wgt_9"
 #define PLM_WGT_10_NAME "nerf_plm_wgt_10"
+#define PLM_WGT_11_NAME "nerf_plm_wgt_11"
 
 #define PLM_BIAS_0_NAME "nerf_plm_bias_0"
 #define PLM_BIAS_1_NAME "nerf_plm_bias_1"
@@ -35,6 +36,7 @@
 #define PLM_BIAS_8_NAME "nerf_plm_bias_8"
 #define PLM_BIAS_9_NAME "nerf_plm_bias_9"
 #define PLM_BIAS_10_NAME "nerf_plm_bias_10"
+#define PLM_BIAS_11_NAME "nerf_plm_bias_11"
 
 #define PLM_ACT_1_NAME "nerf_plm_act_1"
 #define PLM_ACT_2_NAME "nerf_plm_act_2"
