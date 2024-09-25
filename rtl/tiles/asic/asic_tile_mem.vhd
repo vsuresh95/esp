@@ -633,6 +633,7 @@ begin
       tile_rst           => tile_rst,
       refclk             => ext_clk,
       clk                => dco_clk,
+      llc_clk            => dco_clk,
       pllbypass          => ext_clk_sel_default,  --ext_clk_sel,
       pllclk             => clk_div,
       dco_clk            => dco_clk,

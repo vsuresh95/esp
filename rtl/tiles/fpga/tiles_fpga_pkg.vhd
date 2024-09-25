@@ -368,6 +368,7 @@ package tiles_fpga_pkg is
       rst                : in  std_ulogic;
       refclk             : in  std_ulogic;
       clk                : in  std_ulogic;
+      llc_clk            : in  std_ulogic;
       pllbypass          : in  std_ulogic;
       pllclk             : out std_ulogic;
       dco_clk            : out std_ulogic;

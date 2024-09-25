@@ -44,6 +44,7 @@ entity fpga_tile_mem is
     rst                : in  std_ulogic;
     refclk             : in  std_ulogic;
     clk                : in  std_ulogic;
+    llc_clk            : in  std_ulogic;
     pllbypass          : in  std_ulogic;
     pllclk             : out std_ulogic;
     dco_clk            : out std_ulogic;
@@ -635,6 +636,7 @@ begin
       tile_rst           => rst,
       refclk             => refclk,
       clk                => clk,
+      llc_clk            => llc_clk,
       pllbypass          => pllbypass, 
       pllclk             => pllclk,
       dco_clk            => dco_clk,

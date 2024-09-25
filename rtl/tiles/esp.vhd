@@ -882,6 +882,7 @@ begin
 	rst                => rst_int,
         refclk             => '0',
 	clk                => sys_clk_int(tile_mem_id(i)),
+	llc_clk            => refclk,
         pllbypass          => '0',
         pllclk             => open,
         dco_clk            => open,

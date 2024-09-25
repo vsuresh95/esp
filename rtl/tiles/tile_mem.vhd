@@ -38,12 +38,14 @@ entity tile_mem is
     SIMULATION   : boolean := false;
     this_has_dco : integer range 0 to 1 := 0;
     this_has_ddr : integer range 0 to 1 := 1;
-    dco_rst_cfg  : std_logic_vector(30 downto 0) := (others => '0'));
+    dco_rst_cfg  : std_logic_vector(30 downto 0) := (others => '0');
+    USE_SYS_CLK  : integer range 0 to 1 := 0);
   port (
     raw_rstn           : in  std_ulogic;
     tile_rst           : in  std_ulogic;
     refclk             : in  std_ulogic;
     clk                : in  std_ulogic;
+    llc_clk            : in  std_ulogic;
     pllbypass          : in  std_ulogic;
     pllclk             : out std_ulogic;
     dco_clk            : out std_ulogic;
@@ -251,6 +253,38 @@ architecture rtl of tile_mem is
 
   signal this_local_y      : local_yx;
   signal this_local_x      : local_yx;
+
+  signal coherence_req_we_i, coherence_req_rd_i : std_logic;
+  signal coherence_req_wr_full_o, coherence_req_rd_empty_o : std_logic;
+  signal coherence_req_data_out_sync : noc_flit_type;
+
+  signal coherence_fwd_we_i, coherence_fwd_rd_i : std_logic;
+  signal coherence_fwd_wr_full_o, coherence_fwd_rd_empty_o : std_logic;
+  signal coherence_fwd_data_in_sync : noc_flit_type;
+
+  signal coherence_rsp_snd_we_i, coherence_rsp_snd_rd_i : std_logic;
+  signal coherence_rsp_snd_wr_full_o, coherence_rsp_snd_rd_empty_o : std_logic;
+  signal coherence_rsp_snd_data_in_sync : noc_flit_type;
+
+  signal coherence_rsp_rcv_we_i, coherence_rsp_rcv_rd_i : std_logic;
+  signal coherence_rsp_rcv_wr_full_o, coherence_rsp_rcv_rd_empty_o : std_logic;
+  signal coherence_rsp_rcv_data_out_sync : noc_flit_type;
+
+  signal coherent_dma_we_i, coherent_dma_rd_i : std_logic;
+  signal coherent_dma_wr_full_o, coherent_dma_rd_empty_o : std_logic;
+  signal coherent_dma_data_out_sync : noc_flit_type;
+
+  signal coherent_dma_snd_we_i, coherent_dma_snd_rd_i : std_logic;
+  signal coherent_dma_snd_wr_full_o, coherent_dma_snd_rd_empty_o : std_logic;
+  signal coherent_dma_snd_data_in_sync : noc_flit_type;
+
+  signal llc_ext_req_ready_sync, llc_ext_req_valid_sync : std_logic;
+  signal llc_ext_req_wr_full_o, llc_ext_req_rd_empty_o : std_logic;
+  signal llc_ext_req_data_sync : std_logic_vector(ARCH_BITS - 1 downto 0);
+
+  signal llc_ext_rsp_ready_sync, llc_ext_rsp_valid_sync : std_logic;
+  signal llc_ext_rsp_wr_full_o, llc_ext_rsp_rd_empty_o : std_logic;
+  signal llc_ext_rsp_data_sync : std_logic_vector(ARCH_BITS - 1 downto 0);
 
   constant this_local_apb_en : std_logic_vector(0 to NAPBSLV - 1) := (
     0 => '1',                           -- CSRs
@@ -515,6 +549,209 @@ begin
       apbo => apbo(0)
     );
 
+  inferred_async_fifos_gen: if USE_SYS_CLK /= 0 generate
+    begin
+
+      -- NoC1->tile
+      coherence_req_rdreq <= not coherence_req_wr_full_o;
+      coherence_req_we_i <= not coherence_req_empty;
+
+      inferred_async_fifo_1: inferred_async_fifo
+        generic map (
+          g_data_width => NOC_FLIT_SIZE,
+          g_size       => 2)
+        port map (
+          rst_wr_n_i => llc_rstn,
+          clk_wr_i   => clk,
+          we_i       => coherence_req_we_i,
+          d_i        => coherence_req_data_out,
+          wr_full_o  => coherence_req_wr_full_o,
+          rst_rd_n_i => llc_rstn,
+          clk_rd_i   => llc_clk,
+          rd_i       => coherence_req_rd_i,
+          q_o        => coherence_req_data_out_sync,
+          rd_empty_o => coherence_req_rd_empty_o);
+
+      -- tile->NoC2
+      coherence_fwd_wrreq <= not coherence_fwd_rd_empty_o;
+      coherence_fwd_rd_i <= not coherence_fwd_full;
+      
+      inferred_async_fifo_2: inferred_async_fifo
+        generic map (
+          g_data_width => NOC_FLIT_SIZE,
+          g_size       => 2)
+        port map (
+          rst_wr_n_i => llc_rstn,
+          clk_wr_i   => llc_clk,
+          we_i       => coherence_fwd_we_i,
+          d_i        => coherence_fwd_data_in_sync,
+          wr_full_o  => coherence_fwd_wr_full_o,
+          rst_rd_n_i => llc_rstn,
+          clk_rd_i   => clk,
+          rd_i       => coherence_fwd_rd_i,
+          q_o        => coherence_fwd_data_in,
+          rd_empty_o => coherence_fwd_rd_empty_o);  
+
+      -- tile->NoC3
+      coherence_rsp_snd_wrreq <= not coherence_rsp_snd_wr_full_o;
+      coherence_rsp_snd_we_i <= not coherence_rsp_snd_full;
+
+      inferred_async_fifo_3: inferred_async_fifo
+        generic map (
+          g_data_width => NOC_FLIT_SIZE,
+          g_size       => 2)
+        port map (
+          rst_wr_n_i => llc_rstn,
+          clk_wr_i   => llc_clk,
+          we_i       => coherence_rsp_snd_we_i,
+          d_i        => coherence_rsp_snd_data_in_sync,
+          wr_full_o  => coherence_rsp_snd_wr_full_o,
+          rst_rd_n_i => llc_rstn,
+          clk_rd_i   => clk,
+          rd_i       => coherence_rsp_snd_rd_i,
+          q_o        => coherence_rsp_snd_data_in,
+          rd_empty_o => coherence_rsp_snd_rd_empty_o);  
+          
+      -- NoC3->tile
+      coherence_rsp_rcv_rdreq <= not coherence_rsp_rcv_wr_full_o;
+      coherence_rsp_rcv_we_i <= not coherence_rsp_rcv_empty;
+
+      inferred_async_fifo_4: inferred_async_fifo
+        generic map (
+          g_data_width => NOC_FLIT_SIZE,
+          g_size       => 2)
+        port map (
+          rst_wr_n_i => llc_rstn,
+          clk_wr_i   => clk,
+          we_i       => coherence_rsp_rcv_we_i,
+          d_i        => coherence_rsp_rcv_data_out,
+          wr_full_o  => coherence_rsp_rcv_wr_full_o,
+          rst_rd_n_i => llc_rstn,
+          clk_rd_i   => llc_clk,
+          rd_i       => coherence_rsp_rcv_rd_i,
+          q_o        => coherence_rsp_rcv_data_out_sync,
+          rd_empty_o => coherence_rsp_rcv_rd_empty_o);  
+          
+      -- NoC4->tile
+      coherent_dma_rcv_rdreq <= not coherent_dma_wr_full_o;
+      coherent_dma_we_i <= not coherent_dma_rcv_empty;
+
+      inferred_async_fifo_5: inferred_async_fifo
+        generic map (
+          g_data_width => NOC_FLIT_SIZE,
+          g_size       => 2)
+        port map (
+          rst_wr_n_i => llc_rstn,
+          clk_wr_i   => clk,
+          we_i       => coherent_dma_we_i,
+          d_i        => coherent_dma_rcv_data_out,
+          wr_full_o  => coherent_dma_wr_full_o,
+          rst_rd_n_i => llc_rstn,
+          clk_rd_i   => llc_clk,
+          rd_i       => coherent_dma_rd_i,
+          q_o        => coherent_dma_data_out_sync,
+          rd_empty_o => coherent_dma_rd_empty_o);  
+          
+      -- tile->NoC6
+      coherent_dma_snd_wrreq <= not coherence_rsp_snd_wr_full_o;
+      coherence_rsp_snd_we_i <= not coherent_dma_snd_full;
+
+      inferred_async_fifo_6: inferred_async_fifo
+        generic map (
+          g_data_width => NOC_FLIT_SIZE,
+          g_size       => 2)
+        port map (
+          rst_wr_n_i => llc_rstn,
+          clk_wr_i   => llc_clk,
+          we_i       => coherent_dma_snd_we_i,
+          d_i        => coherent_dma_snd_data_in_sync,
+          wr_full_o  => coherent_dma_snd_wr_full_o,
+          rst_rd_n_i => llc_rstn,
+          clk_rd_i   => clk,
+          rd_i       => coherent_dma_snd_rd_i,
+          q_o        => coherent_dma_snd_data_in,
+          rd_empty_o => coherent_dma_snd_rd_empty_o);  
+          
+      -- LLC->ext
+      llc_ext_req_valid <= not llc_ext_req_rd_empty_o;
+      llc_ext_req_ready_sync <= not llc_ext_req_wr_full_o;
+
+      inferred_async_fifo_7: inferred_async_fifo
+        generic map (
+          g_data_width => ARCH_BITS,
+          g_size       => 2)
+        port map (
+          rst_wr_n_i => llc_rstn,
+          clk_wr_i   => llc_clk,
+          we_i       => llc_ext_req_valid_sync,
+          d_i        => llc_ext_req_data_sync,
+          wr_full_o  => llc_ext_req_wr_full_o,
+          rst_rd_n_i => llc_rstn,
+          clk_rd_i   => clk,
+          rd_i       => llc_ext_req_ready,
+          q_o        => llc_ext_req_data,
+          rd_empty_o => llc_ext_req_rd_empty_o);  
+          
+      -- ext->LLC
+      llc_ext_rsp_valid_sync <= not llc_ext_rsp_rd_empty_o;
+      llc_ext_rsp_ready <= not llc_ext_rsp_wr_full_o;
+
+      inferred_async_fifo_8: inferred_async_fifo
+        generic map (
+          g_data_width => ARCH_BITS,
+          g_size       => 2)
+        port map (
+          rst_wr_n_i => llc_rstn,
+          clk_wr_i   => llc_clk,
+          we_i       => llc_ext_rsp_valid,
+          d_i        => llc_ext_rsp_data,
+          wr_full_o  => llc_ext_rsp_wr_full_o,
+          rst_rd_n_i => llc_rstn,
+          clk_rd_i   => clk,
+          rd_i       => llc_ext_rsp_ready_sync,
+          q_o        => llc_ext_rsp_data_sync,
+          rd_empty_o => llc_ext_rsp_rd_empty_o);  
+          
+  end generate inferred_async_fifos_gen;    
+
+  no_inferred_async_fifos_gen: if USE_SYS_CLK = 0 generate
+  begin
+
+    -- NoC1->tile
+    coherence_req_rdreq <= coherence_req_rd_i;
+    coherence_req_data_out_sync <= coherence_req_data_out;
+    coherence_req_rd_empty_o <= coherence_req_empty;
+    -- tile->NoC2
+    coherence_fwd_we_i <= coherence_fwd_wrreq;
+    coherence_fwd_data_in_sync <= coherence_fwd_data_in;
+    coherence_fwd_wr_full_o <= coherence_fwd_full;
+    -- tile->NoC3
+    coherence_rsp_snd_we_i <= coherence_rsp_snd_wrreq;
+    coherence_rsp_snd_data_in_sync <= coherence_rsp_snd_data_in;
+    coherence_rsp_snd_wr_full_o <= coherence_rsp_snd_full;
+    -- NoC3->tile
+    coherence_rsp_rcv_rd_i <= coherence_rsp_rcv_rdreq;
+    coherence_rsp_rcv_data_out_sync <= coherence_rsp_rcv_data_out;
+    coherence_rsp_rcv_rd_empty_o <= coherence_rsp_rcv_empty;
+    -- NoC4->tile
+    coherent_dma_rd_i <= coherent_dma_rcv_rdreq;
+    coherent_dma_data_out_sync <= coherent_dma_rcv_data_out;
+    coherent_dma_rd_empty_o <= coherent_dma_rcv_empty;
+    -- tile->NoC6
+    coherent_dma_snd_we_i <= coherent_dma_snd_wrreq;
+    coherent_dma_snd_data_in_sync <= coherent_dma_snd_data_in;
+    coherent_dma_snd_wr_full_o <= coherent_dma_snd_full;
+    -- LLC->ext
+    llc_ext_req_ready_sync <= llc_ext_req_ready;
+    llc_ext_req_valid_sync <= llc_ext_req_valid;
+    llc_ext_req_data_sync <= llc_ext_req_data;
+    -- ext->LLC
+    llc_ext_rsp_ready_sync <= llc_ext_rsp_ready;
+    llc_ext_rsp_valid_sync <= llc_ext_rsp_valid;
+    llc_ext_rsp_data_sync <= llc_ext_rsp_data;
+          
+  end generate no_inferred_async_fifos_gen;    
+
   -----------------------------------------------------------------------------
   -- Proxies
   -----------------------------------------------------------------------------
@@ -678,7 +915,7 @@ begin
         cache_x       => cache_x)
       port map (
         rst                        => llc_rstn,
-        clk                        => clk,
+        clk                        => llc_clk,
         local_y                    => this_local_y,
         local_x                    => this_local_x,
         pconfig                    => this_llc_pconfig,
@@ -687,37 +924,37 @@ begin
         apbi                       => apbi,
         apbo                       => apbo(1),
         -- NoC1->tile
-        coherence_req_rdreq        => coherence_req_rdreq,
-        coherence_req_data_out     => coherence_req_data_out,
-        coherence_req_empty        => coherence_req_empty,
+        coherence_req_rdreq        => coherence_req_rd_i,
+        coherence_req_data_out     => coherence_req_data_out_sync,
+        coherence_req_empty        => coherence_req_rd_empty_o,
         -- tile->NoC2
-        coherence_fwd_wrreq        => coherence_fwd_wrreq,
-        coherence_fwd_data_in      => coherence_fwd_data_in,
-        coherence_fwd_full         => coherence_fwd_full,
+        coherence_fwd_wrreq        => coherence_fwd_we_i,
+        coherence_fwd_data_in      => coherence_fwd_data_in_sync,
+        coherence_fwd_full         => coherence_fwd_wr_full_o,
         -- tile->NoC3
-        coherence_rsp_snd_wrreq    => coherence_rsp_snd_wrreq,
-        coherence_rsp_snd_data_in  => coherence_rsp_snd_data_in,
-        coherence_rsp_snd_full     => coherence_rsp_snd_full,
+        coherence_rsp_snd_wrreq    => coherence_rsp_snd_we_i,
+        coherence_rsp_snd_data_in  => coherence_rsp_snd_data_in_sync,
+        coherence_rsp_snd_full     => coherence_rsp_snd_wr_full_o,
         -- NoC3->tile
-        coherence_rsp_rcv_rdreq    => coherence_rsp_rcv_rdreq,
-        coherence_rsp_rcv_data_out => coherence_rsp_rcv_data_out,
-        coherence_rsp_rcv_empty    => coherence_rsp_rcv_empty,
+        coherence_rsp_rcv_rdreq    => coherence_rsp_rcv_rd_i,
+        coherence_rsp_rcv_data_out => coherence_rsp_rcv_data_out_sync,
+        coherence_rsp_rcv_empty    => coherence_rsp_rcv_rd_empty_o,
         -- NoC4->tile
-        dma_rcv_rdreq              => coherent_dma_rcv_rdreq,
-        dma_rcv_data_out           => coherent_dma_rcv_data_out,
-        dma_rcv_empty              => coherent_dma_rcv_empty,
+        dma_rcv_rdreq              => coherent_dma_rd_i,
+        dma_rcv_data_out           => coherent_dma_data_out_sync,
+        dma_rcv_empty              => coherent_dma_rd_empty_o,
         -- tile->NoC6
-        dma_snd_wrreq              => coherent_dma_snd_wrreq,
-        dma_snd_data_in            => coherent_dma_snd_data_in,
-        dma_snd_full               => coherent_dma_snd_full,
+        dma_snd_wrreq              => coherent_dma_snd_we_i,
+        dma_snd_data_in            => coherent_dma_snd_data_in_sync,
+        dma_snd_full               => coherent_dma_snd_wr_full_o,
         -- LLC->ext
-        ext_req_ready              => llc_ext_req_ready,
-        ext_req_valid              => llc_ext_req_valid,
-        ext_req_data               => llc_ext_req_data,
+        ext_req_ready              => llc_ext_req_ready_sync,
+        ext_req_valid              => llc_ext_req_valid_sync,
+        ext_req_data               => llc_ext_req_data_sync,
         -- ext->LLC
-        ext_rsp_ready              => llc_ext_rsp_ready,
-        ext_rsp_valid              => llc_ext_rsp_valid,
-        ext_rsp_data               => llc_ext_rsp_data,
+        ext_rsp_ready              => llc_ext_rsp_ready_sync,
+        ext_rsp_valid              => llc_ext_rsp_valid_sync,
+        ext_rsp_data               => llc_ext_rsp_data_sync,
         -- Monitor
         mon_cache                  => mon_cache_int
         );
