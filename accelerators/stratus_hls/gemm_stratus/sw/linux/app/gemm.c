@@ -1,245 +1,275 @@
-// Copyright (c) 2011-2023 Columbia University, System Level Design Group
+// Copyright (c) 2011-2022 Columbia University, System Level Design Group
 // SPDX-License-Identifier: Apache-2.0
-
 #include "libesp.h"
 #include "cfg.h"
+#include "utils/fft2_utils.h"
 
-static void validate_buffer(token_t *acc_buf, native_t *sw_buf, unsigned len)
-{
-    int i;
-    native_t val;
-    unsigned errors = 0;
+const float ERR_TH = 0.05;
 
-    printf("\nPrint output\n");
+#define ENABLE_SM
+#define SPX
 
-    for (i = 0; i < len; i++) {
-
-#ifdef __FIXED
-	val = fx2float(acc_buf[i], FX_IL);
+#ifdef SPX
+	#define COH_MODE 2
 #else
-	val = acc_buf[i];
+	#define IS_ESP 1
+	#define COH_MODE 1
 #endif
-	if (sw_buf[i] != val) {
-	    errors++;
-	    if (errors <= MAX_PRINTED_ERRORS)
-		printf("index %d : output %d : expected %d <-- ERROR\n", i, (int) val, (int) sw_buf[i]);
-	}
-    }
 
-    if (!errors)
-	printf("\n  ** Test PASSED! **\n");
-    else
-	printf("\n  ** Test FAILED! **\n");
+#define ITERATIONS 1000
+
+#include "coh_func.h"
+#include "sm.h"
+
+static uint64_t t_start = 0;
+static uint64_t t_end = 0;
+
+uint64_t t_sw_input;
+uint64_t t_sw;
+uint64_t t_sw_output;
+uint64_t t_acc_input;
+uint64_t t_acc;
+uint64_t t_acc_output;
+
+static unsigned in_words_adj;
+static unsigned out_words_adj;
+static unsigned in_len;
+static unsigned out_len;
+static unsigned in_size;
+static unsigned out_size;
+static unsigned out_offset;
+static unsigned size;
+
+// static inline
+void start_counter() {
+    asm volatile (
+		"li t0, 0;"
+		"csrr t0, cycle;"
+		"mv %0, t0"
+		: "=r" (t_start)
+		:
+		: "t0"
+	);
 }
 
+// static inline
+uint64_t end_counter() {
+	asm volatile (
+		"li t0, 0;"
+		"csrr t0, cycle;"
+		"mv %0, t0"
+		: "=r" (t_end)
+		:
+		: "t0"
+	);
+
+	return (t_end - t_start);
+}
+
+void sw_run(float *gold)
+{
+	int j;
+	unsigned len = 2 * (1 << logn_samples);
+
+    spandex_token_t gold_data;
+    void* src = (void*) gold;
+
+	start_counter();
+	for (j = 0; j < len; j+=2, src+=8) {
+		gold_data.value_32_1 = j % 100;
+		gold_data.value_32_2 = j % 100;
+        write_mem(src, gold_data.value_64);
+	}
+	t_sw_input += end_counter();
+
+	// Compute golden output
+	start_counter();
+	fft2_comp(gold, 1, 1 << logn_samples, logn_samples, do_inverse, do_shift);
+	t_sw += end_counter();
+
+	start_counter();
+	for (j = 0; j < len; j+=2, src+=8) {
+        gold_data.value_64 = read_mem(src);
+	}
+	t_sw_output += end_counter();
+}
 
 /* User-defined code */
-static void init_buffer(token_t *acc_buf, native_t *sw_buf, unsigned in_len)
+int validate_buffer(token_t *mem, native_t *gold)
 {
-    int i;
+	int j;
+	unsigned errors = 0;
+	unsigned len = 2 * (1 << logn_samples);
 
-    printf("  Initialize inputs\n");
+    spandex_token_t out_data;
+    void* src = (void*) mem;
 
-    for (i = 0; i < in_len; i++) {
-	native_t val = i % 17 - 8;
-#ifdef __FIXED
-        acc_buf[i] = float2fx(val, FX_IL);
-#else
-        acc_buf[i] = val;
-#endif
-	sw_buf[i] = val;
-    }
+	for (j = 0; j < len; j+=2, src+=8) {
+        out_data.value_64 = read_mem_reqodata(src);
+		if (fx2float(out_data.value_32_1, FX_IL) == 0x11223344) errors++;
+		if (fx2float(out_data.value_32_2, FX_IL) == 0x11223344) errors++;
+	}
+
+	return errors;
 }
-
 
 /* User-defined code */
-static void init_parameters(int test, int32_t do_relu, int32_t transpose, int32_t ninputs,
-			    int32_t d3, int32_t d2, int32_t d1,
-			    unsigned *in_len, unsigned *in1_len, unsigned *out_len,
-			    unsigned *in_size, unsigned *out_size, unsigned *size)
+void init_buffer(token_t *mem, native_t *gold)
 {
-    int32_t ld_offset1, ld_offset2, st_offset;
-    unsigned in2_len;
-    
-    *in1_len = round_up(ninputs * d1 * d2, DMA_WORD_PER_BEAT(sizeof(token_t)));
-    in2_len = round_up(ninputs * d2 * d3, DMA_WORD_PER_BEAT(sizeof(token_t)));
-    *in_len = *in1_len + in2_len;
-    *out_len = round_up(ninputs * d1 * d3, DMA_WORD_PER_BEAT(sizeof(token_t)));
-    *in_size = *in_len * sizeof(token_t);
-    *out_size = *out_len * sizeof(token_t);
-    *size = *in_size + *out_size;
+	int j;
+	unsigned len = 2 * (1 << logn_samples);
 
-    ld_offset1 = 0;
-    ld_offset2 = *in1_len;
-    st_offset = *in_len;
+    spandex_token_t in_data;
+    void* src = (void*) mem;
 
-    gemm_cfg_000[0].do_relu = do_relu;
-    gemm_cfg_000[0].transpose = transpose;
-    gemm_cfg_000[0].ninputs = ninputs;
-    gemm_cfg_000[0].d1 = d1;
-    gemm_cfg_000[0].d2 = d2;
-    gemm_cfg_000[0].d3 = d3;
-    gemm_cfg_000[0].ld_offset1 = ld_offset1;
-    gemm_cfg_000[0].ld_offset2 = ld_offset2;
-    gemm_cfg_000[0].st_offset = st_offset;
-
-    // print test info
-    printf("  Prepare test %d parameters\n", test);
-    printf("    .do_relu = %d\n", do_relu);
-    printf("    .transpose = %d\n", transpose);
-    printf("    .ninputs = %d\n", ninputs);
-    printf("    .d3 = %d\n", d3);
-    printf("    .d2 = %d\n", d2);
-    printf("    .d1 = %d\n", d1);
-    printf("    .st_offset = %d\n", st_offset);
-    printf("    .ld_offset1 = %d\n", ld_offset1);
-    printf("    .ld_offset2 = %d\n", ld_offset2);
+	for (j = 0; j < len; j+=2, src+=8) {
+		in_data.value_32_1 = float2fx((native_t) (j % 100), FX_IL);
+		in_data.value_32_2 = float2fx((native_t) (j % 100), FX_IL);
+        write_mem_wtfwd(src, in_data.value_64);
+	}
 }
 
-static void sw_run(int32_t do_relu, int32_t transpose, int32_t ninputs,
-		   int32_t d3, int32_t d2, int32_t d1,
-		   native_t *in1, native_t *in2, native_t *out)
+/* User-defined code */
+static void init_parameters()
 {
-    int i, j, k, l;
-    struct timespec th_start, th_end;
-    native_t *in1_l, *in2_l, *out_l;
+	const unsigned num_samples = (1 << logn_samples);
 
-    gettime(&th_start);
-
-    for (l = 0; l < ninputs; ++l)
-    {
-	in1_l = &in1[l * d1 * d2];
-	in2_l = &in2[l * d2 * d3];
-	out_l = &out[l * d1 * d3];
-
-	for (i = 0; i < d1; ++i)
-	{
-	    for (j = 0; j < d3; ++j)
-	    {
-		native_t accumulator = 0.0;
-
-		for (k = 0; k < d2; ++k)
-		{
-		    int mtx_in1_i = i * d2 + k;
-		    int mtx_in2_i = transpose ? (j * d2 + k) : (k * d3 + j);
-
-		    accumulator += in1_l[mtx_in1_i] * in2_l[mtx_in2_i];
-		}
-
-		out_l[i * d3 + j] = accumulator;
-	    }
+	if (DMA_WORD_PER_BEAT(sizeof(token_t)) == 0) {
+		in_words_adj = (2 * num_samples) + SYNC_VAR_SIZE;
+		out_words_adj = (2 * num_samples) + SYNC_VAR_SIZE;
+	} else {
+		in_words_adj = round_up((2 * num_samples) + SYNC_VAR_SIZE, DMA_WORD_PER_BEAT(sizeof(token_t)));
+		out_words_adj = round_up((2 * num_samples) + SYNC_VAR_SIZE, DMA_WORD_PER_BEAT(sizeof(token_t)));
 	}
-    }
+	in_len = in_words_adj;
+	out_len =  out_words_adj;
+	in_size = in_len * sizeof(token_t);
+	out_size = out_len * sizeof(token_t);
+	out_offset = in_len;
+	size = (out_offset * sizeof(token_t)) + out_size;
 
-    gettime(&th_end);
-
-    unsigned long long hw_ns = ts_subtract(&th_start, &th_end);
-    printf("    Software execution time: %llu ns\n", hw_ns);
+	printf("ilen %u isize %u o_off %u olen %u osize %u msize %u\n", in_len, out_len, in_size, out_size, out_offset, size);
 }
 
 int main(int argc, char **argv)
 {
-    int test, n_tests, start_test = 1;
+	int i;
+	int errors = 0;
 
-    unsigned in_len;
-    unsigned in1_len;
-    unsigned out_len;
-    unsigned in_size;
-    unsigned out_size;
-    unsigned size;
+    native_t *gold;
+    token_t *mem;
 
-    token_t *acc_buf;
-    native_t *sw_buf;
+	t_sw_input = 0;
+	t_sw = 0;
+	t_sw_output = 0;
+	t_acc_input = 0;
+	t_acc = 0;
+	t_acc_output = 0;
 
-    int32_t do_relu  [MAX_TESTS] = {   0,  0,  0,    0,   0,  0,   0,   0,   0,    0,
-				       0,  0,  0,    0,   0,  0,   0,   0,   0,    0,
-				       0,  0,  0,    0,   0,  0,   0,   0,   0,    0};
-
-    int32_t transpose[MAX_TESTS] = {   1,  1,  0,    1,   1,  0,   1,   1,   0,    1,
-				       1,  1,  0,    0,   1,  1,   1,   1,   1,    1,
-				       0,  0,  0,    0,   1,  0,   0,   1,   1,    1};
-
-    int32_t ninputs  [MAX_TESTS] = {   2, 32,  4,    1,   8,  1,   1, 128,   1,    1,
-				       1,  2,  1,    1,   1,  1,   4,   8,   2,    2,
-				       2,  2,  2,    1, 128,  1,   4,   2,   2,    2};
-
-    int32_t d3       [MAX_TESTS] = {   8,  8,  8,   32,  32, 32, 128, 128, 128,    1,
-				       1, 20,  2,    2,  64, 64,  11,  18,  18,   21,
-				      11, 18, 18,   21, 128,  8,   8,   8,   8,   21};
-
-    int32_t d2       [MAX_TESTS] = {   8,  8,  8,   32,  32, 32, 128, 128, 128, 2048,
-				    2048, 16, 64, 2048,   1,  2,  246,  25,  14,   14,
-				      26, 25, 14,   14, 128,  8,   8,   8,   8,   14};
-
-    int32_t d1       [MAX_TESTS] = {   8,  8,  8,   32,  32, 32, 128, 128, 128,    1,
-				       8,  1, 10,    1,  64, 64,  21,  22,  31,   22,
-				       21,22, 31,   22, 128,  8,   8,   8,   8,   11};
+    gemm_cfg_000[0].esp.coherence = coherence;
+	gemm_cfg_000[0].spandex_conf = spandex_config.spandex_reg;
 
     printf("\n====== %s ======\n\n", cfg_000[0].devname);
+	printf("	Coherence = %s\n", CohPrintHeader);
+	printf("	ITERATIONS = %u\n", ITERATIONS);
 
-    // command line arguments
-    if (argc < 3) {
-	n_tests = 1;
-    } else if (argc == 3) {
-	n_tests = strtol(argv[1], NULL, 10);
-	if (n_tests > MAX_TESTS) {
-	    printf("Wrong input arguments!");
-	    return 1;
-	}
-	start_test = strtol(argv[2], NULL, 10);
-	if (start_test > MAX_TESTS) {
-	    printf("Wrong input arguments!");
-	    return 1;
-	}
+	init_parameters();
 
-    } else {
-	printf("Wrong input arguments!");
-	return 1;
-    }
-    printf("  Executing %d tests\n", n_tests);
+	// Program sync flags
+	unsigned local_cons_rdy_flag_offset = 0*in_len + READY_FLAG_OFFSET;
+	unsigned local_cons_vld_flag_offset = 0*in_len + VALID_FLAG_OFFSET;
+	unsigned local_prod_rdy_flag_offset = 1*in_len + READY_FLAG_OFFSET;
+	unsigned local_prod_vld_flag_offset = 1*in_len + VALID_FLAG_OFFSET;
+
+	gemm_cfg_000[0].prod_valid_offset = local_cons_vld_flag_offset;
+	gemm_cfg_000[0].prod_ready_offset = local_cons_rdy_flag_offset;
+	gemm_cfg_000[0].cons_valid_offset = local_prod_vld_flag_offset;
+	gemm_cfg_000[0].cons_ready_offset = local_prod_rdy_flag_offset;
+	gemm_cfg_000[0].input_offset = SYNC_VAR_SIZE;
+	gemm_cfg_000[0].output_offset = in_len + SYNC_VAR_SIZE;
 
     // allocations
     printf("  Allocations\n");
+	const unsigned num_samples = (1 << logn_samples);
+    mem = (token_t *) esp_alloc(size);
+    gold = (native_t*) esp_alloc(2 * num_samples);
+    cfg_000[0].hw_buf = mem;
 
-    acc_buf = (token_t *) esp_alloc(MAX_SIZE);
-    cfg_000[0].hw_buf = acc_buf;
+	for (i = 0; i < ITERATIONS/10; i++)
+	{
+		sw_run(gold);
+	}
 
-    sw_buf = malloc(MAX_SIZE);
+#ifdef ENABLE_SM
+	// Reset all sync variables to default values.
+	UpdateSync((void*) &mem[local_cons_vld_flag_offset], 0);
+	UpdateSync((void*) &mem[local_cons_rdy_flag_offset], 1);
+	UpdateSync((void*) &mem[END_FLAG_OFFSET], 0);
+	UpdateSync((void*) &mem[local_prod_vld_flag_offset], 0);
+	UpdateSync((void*) &mem[local_prod_rdy_flag_offset], 1);
 
-    for (test = start_test - 1; test < n_tests + start_test - 1; ++test) {
-
-	printf("\n\n-------------------\n");
-	printf("TEST #%d\n", test + 1);
-
-	// calculate test parameters
-	init_parameters(test,
-			do_relu[test], transpose[test], ninputs[test], d3[test], d2[test], d1[test],
-			&in_len, &in1_len, &out_len, &in_size, &out_size, &size);
-
-	// initialize input data
-	init_buffer(acc_buf, sw_buf, in_len);
-
-	// hardware execution
-	printf("  Start accelerator execution\n");
+    gemm_cfg_000[0].esp.start_stop = 1;
 	esp_run(cfg_000, NACC);
-	printf("  Completed accelerator execution\n");
 
-	// software execution
-	printf("  Start software execution\n");
-	sw_run(do_relu[test], transpose[test], ninputs[test], d3[test], d2[test], d1[test],
-	       sw_buf, &sw_buf[in1_len], &sw_buf[in_len]);
-	printf("  Completed software execution\n");
+	for (i = 0; i < ITERATIONS; ++i) {
+		// printf("SM Enabled\n");
+		start_counter();
+		// Wait for the accelerator to be ready
+		SpinSync((void*) &mem[local_cons_rdy_flag_offset], 1);
+		// Reset flag for the next iteration
+		UpdateSync((void*) &mem[local_cons_rdy_flag_offset], 0);
+		// When the accelerator is ready, we write the input data to it
+		init_buffer(&mem[SYNC_VAR_SIZE], gold);
 
-	// validation
-	// errors = print_input(buf, gold);
-	validate_buffer(&acc_buf[in_len], &sw_buf[in_len], out_len);
+		if (i == ITERATIONS - 1) {
+			UpdateSync((void*) &mem[END_FLAG_OFFSET], 1);
+		}
+
+		// Inform the accelerator to start.
+		UpdateSync((void*) &mem[local_cons_vld_flag_offset], 1);
+		t_acc_input += end_counter();
+
+		start_counter();
+		// Wait for the accelerator to send output.
+		SpinSync((void*) &mem[local_prod_vld_flag_offset], 1);
+		// Reset flag for next iteration.
+		UpdateSync((void*) &mem[local_prod_vld_flag_offset], 0);
+		t_acc += end_counter();
+
+		start_counter();
+		errors += validate_buffer(&mem[in_len + SYNC_VAR_SIZE], gold);
+		// Inform the accelerator - ready for next iteration.
+		UpdateSync((void*) &mem[local_prod_rdy_flag_offset], 1);
+		t_acc_output += end_counter();
+	}
+#else
+    for (i = 0; i < ITERATIONS; ++i) {
+        start_counter();
+        init_buffer(&mem[SYNC_VAR_SIZE], gold);
+        t_acc_input += end_counter();
+
+        start_counter();
+        esp_run(cfg_000, NACC);
+        t_acc += end_counter();
+
+        start_counter();
+		errors += validate_buffer(&mem[in_len + SYNC_VAR_SIZE], gold);
+        t_acc_output += end_counter();
     }
+#endif
 
     // free
-    esp_free(acc_buf);
-    free(sw_buf);
+    esp_free(mem);
+    esp_free(gold);
+
+	printf("  Software Input = %lu\n", t_sw_input/(ITERATIONS/10));
+	printf("  Software = %lu\n", t_sw/(ITERATIONS/10));
+	printf("  Software Output = %lu\n", t_sw_output/(ITERATIONS/10));
+	printf("  Accel Input = %lu\n", t_acc_input/ITERATIONS);
+	printf("  Accel = %lu\n", t_acc/ITERATIONS);
+	printf("  Accel Output = %lu\n", t_acc_output/ITERATIONS);
 
     printf("\n====== %s ======\n\n", cfg_000[0].devname);
 
-    return 0;
+	return errors;
 }

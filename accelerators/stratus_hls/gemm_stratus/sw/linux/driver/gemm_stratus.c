@@ -1,3 +1,5 @@
+// Copyright (c) 2011-2022 Columbia University, System Level Design Group
+// SPDX-License-Identifier: Apache-2.0
 #include <linux/of_device.h>
 #include <linux/mm.h>
 
@@ -11,15 +13,16 @@
 #define DRV_NAME	"gemm_stratus"
 
 /* <<--regs-->> */
-#define GEMM_TRANSPOSE_REG 0x60
-#define GEMM_DO_RELU_REG 0x5c
-#define GEMM_ST_OFFSET_REG 0x58
-#define GEMM_LD_OFFSET2_REG 0x54
-#define GEMM_LD_OFFSET1_REG 0x50
-#define GEMM_D3_REG 0x4c
-#define GEMM_D2_REG 0x48
-#define GEMM_D1_REG 0x44
-#define GEMM_NINPUTS_REG 0x40
+#define GEMM_DO_INVERSE_REG 0x48
+#define GEMM_LOGN_SAMPLES_REG 0x44
+#define GEMM_DO_SHIFT_REG 0x40
+
+#define GEMM_PROD_VALID_OFFSET 0x4C
+#define GEMM_PROD_READY_OFFSET 0x50
+#define GEMM_CONS_VALID_OFFSET 0x54
+#define GEMM_CONS_READY_OFFSET 0x58
+#define GEMM_INPUT_OFFSET 0x5C
+#define GEMM_OUTPUT_OFFSET 0x60
 
 struct gemm_stratus_device {
 	struct esp_device esp;
@@ -32,7 +35,7 @@ static struct of_device_id gemm_device_ids[] = {
 		.name = "SLD_GEMM_STRATUS",
 	},
 	{
-		.name = "eb_051",
+		.name = "eb_063",
 	},
 	{
 		.compatible = "sld,gemm_stratus",
@@ -52,17 +55,21 @@ static void gemm_prep_xfer(struct esp_device *esp, void *arg)
 	struct gemm_stratus_access *a = arg;
 
 	/* <<--regs-config-->> */
-	iowrite32be(a->do_relu, esp->iomem + GEMM_DO_RELU_REG);
-	iowrite32be(a->transpose, esp->iomem + GEMM_TRANSPOSE_REG);
-	iowrite32be(a->ninputs, esp->iomem + GEMM_NINPUTS_REG);
-	iowrite32be(a->d3, esp->iomem + GEMM_D3_REG);
-	iowrite32be(a->d2, esp->iomem + GEMM_D2_REG);
-	iowrite32be(a->d1, esp->iomem + GEMM_D1_REG);
-	iowrite32be(a->st_offset, esp->iomem + GEMM_ST_OFFSET_REG);
-	iowrite32be(a->ld_offset1, esp->iomem + GEMM_LD_OFFSET1_REG);
-	iowrite32be(a->ld_offset2, esp->iomem + GEMM_LD_OFFSET2_REG);
+	iowrite32be(a->do_inverse, esp->iomem + GEMM_DO_INVERSE_REG);
+	iowrite32be(a->logn_samples, esp->iomem + GEMM_LOGN_SAMPLES_REG);
+	iowrite32be(a->do_shift, esp->iomem + GEMM_DO_SHIFT_REG);
+
+	iowrite32be(a->prod_valid_offset, esp->iomem + GEMM_PROD_VALID_OFFSET);
+	iowrite32be(a->prod_ready_offset, esp->iomem + GEMM_PROD_READY_OFFSET);
+	iowrite32be(a->cons_valid_offset, esp->iomem + GEMM_CONS_VALID_OFFSET);
+	iowrite32be(a->cons_ready_offset, esp->iomem + GEMM_CONS_READY_OFFSET);
+	iowrite32be(a->input_offset, esp->iomem + GEMM_INPUT_OFFSET);
+	iowrite32be(a->output_offset, esp->iomem + GEMM_OUTPUT_OFFSET);
+
 	iowrite32be(a->src_offset, esp->iomem + SRC_OFFSET_REG);
 	iowrite32be(a->dst_offset, esp->iomem + DST_OFFSET_REG);
+	iowrite32be(a->spandex_conf, esp->iomem + SPANDEX_REG);
+
 }
 
 static bool gemm_xfer_input_ok(struct esp_device *esp, void *arg)

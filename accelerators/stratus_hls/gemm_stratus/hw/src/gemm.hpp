@@ -1,52 +1,94 @@
-// Copyright (c) 2011-2023 Columbia University, System Level Design Group
+// Copyright (c) 2011-2022 Columbia University, System Level Design Group
 // SPDX-License-Identifier: Apache-2.0
 
 #ifndef __GEMM_HPP__
 #define __GEMM_HPP__
 
-#include "gemm_data.hpp"
 #include "fpdata.hpp"
 #include "gemm_conf_info.hpp"
 #include "gemm_debug_info.hpp"
+
 #include "esp_templates.hpp"
+
 #include "gemm_directives.hpp"
-#include "common.hpp"
 
 #define __round_mask(x, y) ((y)-1)
 #define round_up(x, y) ((((x)-1) | __round_mask(x, y))+1)
+/* <<--defines-->> */
+#define DATA_WIDTH 32
+#define DMA_SIZE SIZE_WORD
+#define BLOCK_SIZE 16
+
+#define PLM_IN_WORD 4096
+#define PLM_OUT_WORD 4096
+
+#define UPDATE_VAR_SIZE 2
+#define TEST_VAR_SIZE 2
+
+#define POLL_PROD_VALID_REQ 0
+#define POLL_CONS_READY_REQ 1
+#define LOAD_DATA_REQ 2
+#define UPDATE_PROD_VALID_REQ 0
+#define UPDATE_PROD_READY_REQ 1
+#define UPDATE_CONS_VALID_REQ 2
+#define UPDATE_CONS_READY_REQ 3
+#define STORE_DATA_REQ 4
+#define STORE_FENCE 5
+#define ACC_DONE 6
+#define COMPUTE 7
 
 class gemm : public esp_accelerator_3P<DMA_WIDTH>
 {
 public:
+    // Compute -> Load
+    handshake_t load_ready;
+
+    // Compute -> Store
+    handshake_t store_ready;
+
+    // Load -> Compute
+    handshake_t load_done;
+
+    // Store -> Compute
+    handshake_t store_done;
 
     // Constructor
     SC_HAS_PROCESS(gemm);
     gemm(const sc_module_name& name)
-	: esp_accelerator_3P<DMA_WIDTH>(name)
-	, cfg("config")
-	, output_done("output_done")
-	, load_compute_cfg_done("load_compute_cfg_done")
-	, load_store_cfg_done("load_store_cfg_done")
-        {
-            // Signal binding
-            cfg.bind_with(*this);
-	    output_done.bind_with<DMA_WIDTH>(*this);
-	    load_compute_cfg_done.bind_with<DMA_WIDTH>(*this);
-	    load_store_cfg_done.bind_with<DMA_WIDTH>(*this);
+    : esp_accelerator_3P<DMA_WIDTH>(name)
+        , cfg("config")
+        , load_ready("load_ready")
+        , store_ready("store_ready")
+        , load_done("load_done")
+        , store_done("store_done")
+    {
+        // Signal binding
+        cfg.bind_with(*this);
 
-	    // Flatten arrays
-	    HLS_FLATTEN_ARRAY(mult_out);
-	    HLS_FLATTEN_ARRAY(row);
-	    HLS_FLATTEN_ARRAY(col);
+        HLS_PRESERVE_SIGNAL(load_state_req_dbg, true);
+        HLS_PRESERVE_SIGNAL(store_state_req_dbg, true);
+        HLS_PRESERVE_SIGNAL(compute_state_req_dbg, true);
 
-	    // Map memories
-	    HLS_MAP_plm(input0, IN_PLM_NAME);
-	    HLS_MAP_plm(input1, IN_PLM_NAME);
-	    HLS_MAP_plm(input2, IN_PLM_NAME);
-	    HLS_MAP_plm(input3, IN_PLM_NAME);
-	    HLS_MAP_plm(output0, OUT_PLM_NAME);
-	    HLS_MAP_plm(output1, OUT_PLM_NAME);
-        }
+        // Map arrays to memories
+        /* <<--plm-bind-->> */
+        HLS_MAP_plm(plm_in_1, PLM_IN_NAME);
+        HLS_MAP_plm(plm_in_2, PLM_IN_NAME);
+        HLS_MAP_plm(plm_out, PLM_OUT_NAME);
+        
+        load_ready.bind_with(*this);
+        store_ready.bind_with(*this);
+        load_done.bind_with(*this);
+        store_done.bind_with(*this);
+    }
+
+    sc_signal< sc_int<32> > load_state_req_dbg;
+    sc_signal< sc_int<32> > store_state_req_dbg;
+    sc_signal< sc_int<32> > compute_state_req_dbg;
+
+    sc_int<32> load_state_req;
+    sc_int<32> store_state_req;
+
+    sc_int<32> last_task;
 
     // Processes
 
@@ -62,78 +104,21 @@ public:
     // Configure gemm
     esp_config_proc cfg;
 
-    // Custom handshakes
-    handshake_t output_done;
-    handshake_t load_compute_cfg_done;
-    handshake_t load_store_cfg_done;
-
-    // Functions
-
-    // Calculate the number of chunks and remaining cols
-    inline void calculate_config(uint24_t ninputs,
-				 uint24_t matrix_d1,
-				 uint24_t matrix_d2,
-				 uint24_t matrix_d3,
-				 bool transpose,
-				 uint32_t& size_matrix1,
-				 uint32_t& size_matrix2,
-				 uint32_t& size_matrix_out,
-				 uint24_t& matrix_chk_in,
-				 uint16_t& matrix_rem_in1,
-				 uint16_t& matrix_rem_in2,
-				 uint24_t& matrix_chk_out,
-				 uint16_t& matrix_rem_out,
-				 uint8_t& load_cfg,
-				 uint16_t& loadable_rows,
-				 uint16_t& loadable_chunk,
-				 uint16_t& index_d1_incr,
-				 uint16_t& m2_loop_iters,
-				 uint16_t& m2_plm_incr);
-    inline void calculate_chunks(uint24_t &matrix_chk, uint16_t &matrix_rem,
-				 uint32_t matrix_d2, bool in_or_out);
-
-    // Synchronize compute_kernel and store_output processes
-    inline void sync_compute_store(uint16_t &count, uint16_t loaded_rows,
-				   uint8_t load_cfg, uint16_t loadable_rows,
-				   bool &pingpong);
-
-    // Handshake callable from compute_kernel
-    inline void compute_store_2_handshake();
-
-    // Handshake callable from store_output
-    inline void store_compute_2_handshake();
-
-    // Configuration handshakes
-    inline void load_compute_cfg_handshake();
-    inline void compute_load_cfg_handshake();
-    inline void load_store_cfg_handshake();
-    inline void store_load_cfg_handshake();
-
     // Private local memories
-    PLM_WORD input0[DMA_CHUNK];
-    PLM_WORD input1[DMA_CHUNK];
-    PLM_WORD input2[DMA_CHUNK];
-    PLM_WORD input3[DMA_CHUNK];
-    PLM_WORD output0[OUT_DMA_CHUNK];
-    PLM_WORD output1[OUT_DMA_CHUNK];
-    FPDATA row[PARALLELISM];
-    FPDATA col[PARALLELISM];
-    FPDATA mult_out[PARALLELISM];
-    FPDATA accumulator;
+    sc_dt::sc_int<DATA_WIDTH> plm_in_1[PLM_IN_WORD];
+    sc_dt::sc_int<DATA_WIDTH> plm_in_2[PLM_IN_WORD];
+    sc_dt::sc_int<DATA_WIDTH> plm_out[PLM_OUT_WORD];
 
-    // Custom configuration signals
-    sc_signal<uint32_t> size_matrix_out_sig;
-    sc_signal<uint32_t> size_matrix1_sig;
-    sc_signal<uint32_t> size_matrix2_sig;
-    sc_signal<uint24_t> matrix_chk_in_sig;
-    sc_signal<uint16_t> matrix_rem_in1_sig;
-    sc_signal<uint16_t> matrix_rem_in2_sig;
-    sc_signal<uint24_t> matrix_chk_out_sig;
-    sc_signal<uint16_t> matrix_rem_out_sig;
-    sc_signal<uint8_t> load_cfg_sig;
-    sc_signal<uint16_t> loadable_rows_sig;
-    sc_signal<uint16_t> loadable_chunk_sig;
-    sc_signal<uint16_t> index_d1_incr_sig;
+    // Handshakes
+    inline void compute_load_ready_handshake();
+    inline void load_compute_ready_handshake();
+    inline void compute_store_ready_handshake();
+    inline void store_compute_ready_handshake();
+    inline void compute_load_done_handshake();
+    inline void load_compute_done_handshake();
+    inline void compute_store_done_handshake();
+    inline void store_compute_done_handshake();
 };
+
 
 #endif /* __GEMM_HPP__ */

@@ -1,161 +1,213 @@
-// Copyright (c) 2011-2023 Columbia University, System Level Design Group
+// Copyright (c) 2011-2019 Columbia University, System Level Design Group
 // SPDX-License-Identifier: Apache-2.0
 
-#include "gemm.hpp"
-
-// Optional application-specific helper functions
-
-//
-// Utility functions
-//
-
-inline void gemm::calculate_config(uint24_t ninputs,
-				   uint24_t matrix_d1,
-				   uint24_t matrix_d2,
-				   uint24_t matrix_d3,
-				   bool transpose,
-				   uint32_t& size_matrix1,
-				   uint32_t& size_matrix2,
-				   uint32_t& size_matrix_out,
-				   uint24_t& matrix_chk_in,
-				   uint16_t& matrix_rem_in1,
-				   uint16_t& matrix_rem_in2,
-				   uint24_t& matrix_chk_out,
-				   uint16_t& matrix_rem_out,
-				   uint8_t& load_cfg,
-				   uint16_t& loadable_rows,
-				   uint16_t& loadable_chunk,
-				   uint16_t& index_d1_incr,
-				   uint16_t& m2_loop_iters,
-				   uint16_t& m2_plm_incr)
+// complex number multiplication
+inline void compMul(const CompNum &x, const CompNum &y, CompNum &res)
 {
-    size_matrix1 = matrix_d1 * matrix_d2;
-    size_matrix2 = matrix_d2 * matrix_d3;
-    size_matrix_out = matrix_d1 * matrix_d3 * ninputs;
-
-    m2_loop_iters = 1;
-    m2_plm_incr = 1;
-
-    bool d3_odd = matrix_d3 % 2;
-    bool is_less_than_matrix2 = (size_matrix2 > DMA_CHUNK || !transpose);
-
-    if ((matrix_d2 > DMA_CHUNK) || (is_less_than_matrix2 && d3_odd)) {
-	load_cfg = LESS_THAN_ROW;
-	loadable_rows = 1;
-	loadable_chunk = DMA_CHUNK;
-	calculate_chunks(matrix_chk_in, matrix_rem_in1, matrix_d2, 0);
-	matrix_rem_in2 = matrix_rem_in1;
-	index_d1_incr = matrix_d2;
-    } else if (is_less_than_matrix2) {
-	load_cfg = LESS_THAN_MATRIX2;
-	if (size_matrix2 > DMA_CHUNK) {
-	    loadable_rows = DMA_CHUNK / matrix_d2;
-	    if (loadable_rows != 1)
-		loadable_rows = (loadable_rows >> 1) << 1;
-	} else {
-	    loadable_rows = matrix_d3;
-	}
-	loadable_chunk = loadable_rows * matrix_d2;
-	matrix_chk_in = 1;
-	matrix_rem_in1 = size_matrix1 % loadable_chunk;
-	matrix_rem_in2 = size_matrix2 % loadable_chunk;
-	index_d1_incr = loadable_chunk;
-	if (!transpose) {
-	    m2_loop_iters = matrix_d2;
-	    m2_plm_incr = matrix_d2;
-	}
-    } else {
-	load_cfg = MORE_THAN_MATRIX2;
-	loadable_rows = matrix_d3;
-	loadable_chunk = size_matrix2;
-	matrix_chk_in = 1;
-	matrix_rem_in1 = size_matrix1 % loadable_chunk;
-	matrix_rem_in2 = size_matrix2;
-	index_d1_incr = loadable_chunk;
-    }
-
-    calculate_chunks(matrix_chk_out, matrix_rem_out, size_matrix_out, 1);
+    res.re = x.re * y.re - x.im * y.im;
+    res.im = x.re * y.im + x.im * y.re;
 }
 
-inline void gemm::calculate_chunks(uint24_t  &matrix_chk,
-				   uint16_t &matrix_rem,
-				   uint32_t matrix_d2,
-				   bool in_or_out)
+// complex number addition
+inline void compAdd(const CompNum &x, const CompNum &y, CompNum &res)
 {
-     uint32_t matrix_mul;
-     {
-        HLS_CONSTRAIN_LATENCY(0, HLS_ACHIEVABLE, "calc-chunks");
-
-	if (!in_or_out) {
-	    // calculating the number of chunks (ceil)
-	    matrix_chk = matrix_d2 >> DMA_CHUNK_LOG;
-	    // calculating the number of cols (covered the by the chunks)
-	    matrix_mul = matrix_chk << DMA_CHUNK_LOG;
-	} else {
-	    // calculating the number of chunks (ceil)
-	    matrix_chk = matrix_d2 >> OUT_DMA_CHUNK_LOG;
-	    // calculating the number of cols (covered the by the chunks)
-	    matrix_mul = matrix_chk << OUT_DMA_CHUNK_LOG;
-	}
-
-        // calculating the remaining cols (size of the last chunk)
-        matrix_rem = matrix_d2 - matrix_mul;
-
-        // adding the last chunk if it is necessary
-        if (matrix_rem != 0) { ++matrix_chk; }
-    }
+    res.re = x.re + y.re;
+    res.im = x.im + y.im;
 }
 
-inline void gemm::sync_compute_store(uint16_t &count, uint16_t loaded_rows,
-				     uint8_t load_cfg, uint16_t loadable_rows,
-				     bool &pingpong)
+// complex number substraction
+inline void compSub(const CompNum &x, const CompNum &y, CompNum &res)
 {
-    count++;
-    if (load_cfg == LESS_THAN_MATRIX2 && loadable_rows != 1) {
-	if (count == loaded_rows) {
-            count = 0;
-	    // ESP_REPORT_INFO("COMPUTE2: before store hs %u", (unsigned) count);
-            // Call the store_output process
-            compute_store_handshake();
-	    // ESP_REPORT_INFO("COMPUTE2: after store hs %u", (unsigned) count);
-	    pingpong = !pingpong;
-	}
-    } else {
-        if (count == OUT_DMA_CHUNK) {
-            count = 0;
-	    // ESP_REPORT_INFO("COMPUTE: before store hs");
-            // Call the store_output process
-            compute_store_handshake();
-	    // ESP_REPORT_INFO("COMPUTE: after store hs");
-	    pingpong = !pingpong;
+    res.re = x.re - y.re;
+    res.im = x.im - y.im;
+}
+
+// bit reverse
+inline unsigned int fft2_rev(unsigned int v)
+{
+    unsigned int r = v;
+    int s = 31;
+    int i;
+
+    for (i = 0; i < 31; i++) {
+        HLS_UNROLL_N(8, "fft2-rev-unroll");
+        v >>= 1;
+        if (v != 0) {
+            r <<= 1;
+            r |= v & 1;
+            s--;
         }
     }
+
+    r <<= s;
+
+    return r;
 }
 
-inline void gemm::load_compute_cfg_handshake()
-{
-    HLS_DEFINE_PROTOCOL("load-compute-cfg-handshake");
 
-    load_compute_cfg_done.req.req();
+// These values are the same whether FFT or iFFT (i.e. indep of do_inverse)
+inline FPDATA myCos(int m)
+{
+	switch(m) {
+	case 1: return 2;
+	case 2: return 0.999999940395355;
+	case 3: return 0.292893260717392;
+	case 4: return 0.0761204659938812;
+	case 5: return 0.0192147195339203;
+	case 6: return 0.00481527345255017;
+	case 7: return 0.00120454386342317;
+	case 8: return 0.000301181309623644;
+	case 9: return 7.52981650293805e-05;
+	case 10: return 1.88247176993173e-05;
+	case 11: return 4.70619079351309e-06;
+	case 12: return 1.1765483804993e-06;
+	case 13: return 2.94137151968243e-07;
+	case 14: return 7.35342879920609e-08;
+	case 15: return 1.83835719980152e-08;
+	case 16: return 4.5958929995038e-09;
+	default: return 0.0;
+	}
 }
 
-inline void gemm::compute_load_cfg_handshake()
+// These are the SIGN=-1 values, use negative of these for SIGN = 1 (inverse)
+inline FPDATA mySin(int m)
 {
-    HLS_DEFINE_PROTOCOL("compute-load-cfg-handshake");
-
-    load_compute_cfg_done.ack.ack();
+	switch(m) {
+	case 1: return 8.74227765734759e-08;
+	case 2: return -1;
+	case 3: return -0.70710676908493;
+	case 4: return -0.382683455944061;
+	case 5: return -0.1950903236866;
+	case 6: return -0.0980171412229538;
+	case 7: return -0.0490676760673523;
+	case 8: return -0.0245412290096283;
+	case 9: return -0.0122715383768082;
+	case 10: return -0.00613588467240334;
+	case 11: return -0.00306795677170157;
+	case 12: return -0.00153398024849594;
+	case 13: return -0.000766990357078612;
+	case 14: return -0.000383495207643136;
+	case 15: return -0.000191747603821568;
+	case 16: return -9.58738019107841e-05;
+        default:  return 0.0;
+	}
 }
 
-inline void gemm::load_store_cfg_handshake()
-{
-    HLS_DEFINE_PROTOCOL("load-store-cfg-handshake");
 
-    load_store_cfg_done.req.req();
+inline FPDATA myInvCos(int m)
+{
+	switch(m) {
+	case 1: return 2;
+	case 2: return 0.999999940395355;
+	case 3: return 0.292893260717392;
+	case 4: return 0.0761204659938812;
+	case 5: return 0.0192147195339203;
+	case 6: return 0.00481527345255017;
+	case 7: return 0.00120454386342317;
+	case 8: return 0.000301181309623644;
+	case 9: return 7.52981650293805e-05;
+	case 10: return 1.88247176993173e-05;
+	case 11: return 4.70619079351309e-06;
+	case 12: return 1.1765483804993e-06;
+	case 13: return 2.94137151968243e-07;
+	case 14: return 7.35342879920609e-08;
+	case 15: return 1.83835719980152e-08;
+	case 16: return 4.5958929995038e-09;
+	default: return 0.0;
+	}
 }
 
-inline void gemm::store_load_cfg_handshake()
+inline FPDATA myInvSin(int m)
 {
-    HLS_DEFINE_PROTOCOL("store-load-cfg-handshake");
+	switch(m) {
+	case 1: return 8.74227765734759e-08;
+	case 2: return -1;
+	case 3: return -0.70710676908493;
+	case 4: return -0.382683455944061;
+	case 5: return -0.1950903236866;
+	case 6: return -0.0980171412229538;
+	case 7: return -0.0490676760673523;
+	case 8: return -0.0245412290096283;
+	case 9: return -0.0122715383768082;
+	case 10: return -0.00613588467240334;
+	case 11: return -0.00306795677170157;
+	case 12: return -0.00153398024849594;
+	case 13: return -0.000766990357078612;
+	case 14: return -0.000383495207643136;
+	case 15: return -0.000191747603821568;
+	case 16: return -9.58738019107841e-05;
+        default:  return 0.0;
+	}
+}
 
-    load_store_cfg_done.ack.ack();
+inline void gemm::compute_load_ready_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("compute-load-ready-handshake");
+
+        load_ready.req.req();
+    }
+}
+
+inline void gemm::load_compute_ready_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("load-compute-ready-handshake");
+
+        load_ready.ack.ack();
+    }
+}
+
+inline void gemm::compute_store_ready_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("compute-store-ready-handshake");
+
+        store_ready.req.req();
+    }
+}
+
+inline void gemm::store_compute_ready_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("store-compute-ready-handshake");
+
+        store_ready.ack.ack();
+    }
+}
+
+inline void gemm::compute_load_done_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("compute-load-done-handshake");
+
+        load_done.ack.ack();
+    }
+}
+
+inline void gemm::load_compute_done_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("load-compute-done-handshake");
+
+        load_done.req.req();
+    }
+}
+
+inline void gemm::compute_store_done_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("compute-store-done-handshake");
+
+        store_done.ack.ack();
+    }
+}
+
+inline void gemm::store_compute_done_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("store-compute-done-handshake");
+
+        store_done.req.req();
+    }
 }

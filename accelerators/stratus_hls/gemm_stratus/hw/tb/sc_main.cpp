@@ -1,4 +1,4 @@
-// Copyright (c) 2011-2023 Columbia University, System Level Design Group
+// Copyright (c) 2011-2022 Columbia University, System Level Design Group
 // SPDX-License-Identifier: Apache-2.0
 
 #include "system.hpp"
@@ -42,6 +42,7 @@ int sc_main(int argc, char *argv[])
 	sc_start();
 
 	esc_log_pass();
+        esc_cleanup();
 
 	return 0;
 }
