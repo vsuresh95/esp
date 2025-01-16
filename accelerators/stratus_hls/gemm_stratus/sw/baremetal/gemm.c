@@ -10,43 +10,30 @@
 #include <esp_probe.h>
 #include "utils/fft2_utils.h"
 
-typedef int token_t;
-typedef float native_t;
-#define fx2float fixed32_to_float
-#define float2fx float_to_fixed32
-#define FX_IL 14
-
-// #define ENABLE_SM
-// #define SPX
-
-#ifdef SPX
-	#define COH_MODE 2
-#else
-	#define IS_ESP 1
-	#define COH_MODE 0
-#endif
+#define COH_MODE 1
+#define IS_ESP 1
 
 #include "coh_func.h"
 #include "sm.h"
-
-const float ERR_TH = 0.05;
 
 static unsigned DMA_WORD_PER_BEAT(unsigned _st)
 {
         return (sizeof(void *) / _st);
 }
 
-#define SLD_GEMM 0x063
+#define SLD_GEMM 0x051
 #define DEV_NAME "sld,gemm_stratus"
 
 /* <<--params-->> */
-const int32_t logn_samples = 14;
-const int32_t num_samples = (1 << logn_samples);
-const int32_t do_inverse = 0;
-const int32_t do_shift = 0;
+const unsigned dim_m = 16;
+const unsigned dim_n = 16;
+const unsigned dim_k = 16;
 
-static unsigned in_words_adj;
+static unsigned in_1_words_adj;
+static unsigned in_2_words_adj;
 static unsigned out_words_adj;
+static unsigned in_1_len;
+static unsigned in_2_len;
 static unsigned in_len;
 static unsigned out_len;
 static unsigned in_size;
@@ -63,18 +50,19 @@ static unsigned mem_size;
 
 /* User defined registers */
 /* <<--regs-->> */
-#define GEMM_DO_INVERSE_REG 0x48
-#define GEMM_LOGN_SAMPLES_REG 0x44
-#define GEMM_DO_SHIFT_REG 0x40
+#define GEMM_DIMM_M_REG 0x40
+#define GEMM_DIMM_N_REG 0x44
+#define GEMM_DIMM_K_REG 0x48
 
 #define GEMM_PROD_VALID_OFFSET 0x4C
 #define GEMM_PROD_READY_OFFSET 0x50
 #define GEMM_CONS_VALID_OFFSET 0x54
 #define GEMM_CONS_READY_OFFSET 0x58
-#define GEMM_INPUT_OFFSET 0x5C
-#define GEMM_OUTPUT_OFFSET 0x60
+#define GEMM_INPUT_1_OFFSET 0x5C
+#define GEMM_INPUT_2_OFFSET 0x60
+#define GEMM_OUTPUT_OFFSET 0x64
 
-#define ITERATIONS 1000
+#define ITERATIONS 1
 
 static uint64_t t_start = 0;
 static uint64_t t_end = 0;
@@ -110,75 +98,91 @@ static inline uint64_t end_counter() {
 	return (t_end - t_start);
 }
 
-int validate_buf(token_t *out, float *gold)
+void sw_run(unsigned *gold)
+{
+	int j, m, n, k, m_, n_, k_;
+	spandex_token_t in_data;
+    void* src = (void*) gold;
+	const unsigned block_size = 16;
+
+	for (j = 0; j < dim_m * dim_k; j+=2, src+=8) {
+		in_data.value_32_1 = (j+1) % 100;
+		in_data.value_32_2 = (j+2) % 100;
+        write_mem_wtfwd(src, in_data.value_64);
+	}
+
+    src = (void*) (gold + in_1_words_adj);
+
+	for (j = 0; j < dim_n * dim_k; j+=2, src+=8) {
+		in_data.value_32_1 = (j+1) % 100;
+		in_data.value_32_2 = (j+2) % 100;
+        write_mem_wtfwd(src, in_data.value_64);
+	}
+
+	// Compute golden output
+	start_counter();
+	for (m = 0; m < dim_m/block_size; m++) {
+		unsigned in_1_offset = (m * block_size) * dim_k;
+		unsigned local_out_offset = in_1_words_adj + in_2_words_adj + (m * block_size) * dim_n;
+		for (n = 0; n < dim_n/block_size; n++) {
+			unsigned in_2_offset = in_1_words_adj + (n * block_size) * dim_k;
+			unsigned out_block_offset = local_out_offset + n * block_size;
+			for (k = 0; k < dim_k/block_size; k++) {
+				unsigned in_1_block_offset = in_1_offset + k * block_size;
+				unsigned in_2_block_offset = in_2_offset + k * block_size;
+				for (m_ = 0; m_ < block_size; m_++) {
+					unsigned in_1_elem_offset = in_1_block_offset + m_ * dim_k;
+					unsigned out_elem_offset = out_block_offset + m_ * dim_n;
+					for (n_ = 0; n_ < block_size; n_++) {
+						unsigned in_2_elem_offset = in_2_block_offset + n_ * dim_k;
+						for (k_ = 0; k_ < block_size; k_++) {
+							gold[out_elem_offset + n_] += gold[in_1_elem_offset + k_] * gold[in_2_elem_offset + k_];
+						}
+					}
+				}
+			}
+		}
+	}
+	t_sw += end_counter();
+}
+
+int validate_buf(unsigned *out, unsigned *gold)
 {
 	int j;
 	unsigned errors = 0;
-	unsigned len = 2 * num_samples;
 
-    spandex_token_t out_data;
+	spandex_token_t out_data;
     void* src = (void*) out;
 
-	start_counter();
-	for (j = 0; j < len; j+=2, src+=8) {
+	for (j = 0; j < dim_m * dim_n; j+=2, src+=8) {
         out_data.value_64 = read_mem_reqodata(src);
-		if (fx2float(out_data.value_32_1, FX_IL) == 0x11223344) errors++;
-		if (fx2float(out_data.value_32_2, FX_IL) == 0x11223344) errors++;
+		if (out_data.value_32_1 != gold[in_1_words_adj + in_2_words_adj + j]) errors++;
+		if (out_data.value_32_2 != gold[in_1_words_adj + in_2_words_adj + j + 1]) errors++;
 	}
-	t_acc_output += end_counter();
 
 	return errors;
 }
 
-void sw_run_1(float *gold)
+void init_buf(unsigned *in)
 {
 	int j;
-	unsigned len = 2 * num_samples;
-
-    spandex_token_t gold_data;
-    void* src = (void*) gold;
-
-	start_counter();
-	for (j = 0; j < len; j+=2, src+=8) {
-		gold_data.value_32_1 = j % 100;
-		gold_data.value_32_2 = j % 100;
-        write_mem(src, gold_data.value_64);
-	}
-	t_sw_input += end_counter();
-
-	// Compute golden output
-	fft2_comp(gold, 1, num_samples, logn_samples, do_inverse, do_shift);
-
-	start_counter();
-	for (j = 0; j < len; j+=2, src+=8) {
-        gold_data.value_64 = read_mem(src);
-	}
-	t_sw_output += end_counter();
-}
-
-void sw_run(float *gold)
-{
-	// Compute golden output
-	start_counter();
-	fft2_comp(gold, 1, num_samples, logn_samples, do_inverse, do_shift);
-	t_sw += end_counter();
-}
-
-void init_buf(token_t *in, float *gold)
-{
-	int j;
-	unsigned len = 2 * num_samples;
-
-    spandex_token_t in_data;
+	
+	spandex_token_t in_data;
     void* src = (void*) in;
 
-	start_counter();
-	for (j = 0; j < len; j+=2, src+=8) {
-		in_data.value_32_1 = float2fx((native_t) (j % 100), FX_IL);
-		in_data.value_32_2 = float2fx((native_t) (j % 100), FX_IL);
+	for (j = 0; j < dim_m * dim_k; j+=2, src+=8) {
+		in_data.value_32_1 = (j+1) % 100;
+		in_data.value_32_2 = (j+2) % 100;
         write_mem_wtfwd(src, in_data.value_64);
 	}
-	t_acc_input += end_counter();
+
+    src = (void*) (in + in_1_words_adj);
+
+	for (j = 0; j < dim_n * dim_k; j+=2, src+=8) {
+		in_data.value_32_1 = (j+1) % 100;
+		in_data.value_32_2 = (j+2) % 100;
+        write_mem_wtfwd(src, in_data.value_64);
+	}
 }
 
 int main(int argc, char * argv[])
@@ -191,27 +195,27 @@ int main(int argc, char * argv[])
 	unsigned done;
 	unsigned spin_ct;
 	unsigned **ptable = NULL;
-	token_t *mem;
-	float *gold;
+	unsigned *mem;
+	unsigned *gold;
 	unsigned errors = 0;
 	unsigned coherence;
-    const float ERROR_COUNT_TH = 0.001;
-	unsigned len = num_samples;
 
-	printf("logn %u nsmp %u nfft %u inv %u shft %u len %u\n", logn_samples, num_samples, 1, do_inverse, do_shift, len);
-	if (DMA_WORD_PER_BEAT(sizeof(token_t)) == 0) {
-		in_words_adj = 2 * len;
-		out_words_adj = 2 * len;
+	printf("dim_m %u dim_n %u dim_k %u\n", dim_m, dim_n, dim_k);
+	if (DMA_WORD_PER_BEAT(sizeof(unsigned)) == 0) {
+		in_1_words_adj = dim_m * dim_k;
+		in_2_words_adj = dim_n * dim_k;
+		out_words_adj = dim_m * dim_n;
 	} else {
-		in_words_adj = round_up(2 * len, DMA_WORD_PER_BEAT(sizeof(token_t)));
-		out_words_adj = round_up(2 * len, DMA_WORD_PER_BEAT(sizeof(token_t)));
+		in_1_words_adj = round_up(dim_m * dim_k, DMA_WORD_PER_BEAT(sizeof(unsigned)));
+		in_2_words_adj = round_up(dim_n * dim_k, DMA_WORD_PER_BEAT(sizeof(unsigned)));
+		out_words_adj = round_up(dim_m * dim_n, DMA_WORD_PER_BEAT(sizeof(unsigned)));
 	}
-	in_len = in_words_adj;
-	out_len = out_words_adj;
-	in_size = in_len * sizeof(token_t);
-	out_size = out_len * sizeof(token_t);
+	in_len = in_1_words_adj + in_2_words_adj + SYNC_VAR_SIZE;
+	out_len = out_words_adj + SYNC_VAR_SIZE;
+	in_size = in_len * sizeof(unsigned);
+	out_size = out_len * sizeof(unsigned);
 	out_offset  = in_len;
-	mem_size = (out_offset * sizeof(token_t)) + out_size;
+	mem_size = (out_offset * sizeof(unsigned)) + out_size;
 
 	printf("ilen %u isize %u o_off %u olen %u osize %u msize %u\n", in_len, out_len, in_size, out_size, out_offset, mem_size);
 	// Search for the device
@@ -227,6 +231,12 @@ int main(int argc, char * argv[])
 	t_acc_input = 0;
 	t_acc = 0;
 	t_acc_output = 0;
+
+	// Program sync flags
+	unsigned cons_rdy_flag_offset = 0*in_len + READY_FLAG_OFFSET;
+	unsigned cons_vld_flag_offset = 0*in_len + VALID_FLAG_OFFSET;
+	unsigned prod_rdy_flag_offset = 1*in_len + READY_FLAG_OFFSET;
+	unsigned prod_vld_flag_offset = 1*in_len + VALID_FLAG_OFFSET;
 
 	n = 0;
 	{
@@ -246,27 +256,26 @@ int main(int argc, char * argv[])
 		}
 
 		// Allocate memory
-		gold = aligned_malloc(out_len * sizeof(float));
+		gold = aligned_malloc((in_len + out_len) * sizeof(unsigned));
 		mem = aligned_malloc(mem_size);
 
 		// Allocate and populate page table
 		ptable = aligned_malloc(NCHUNK(mem_size) * sizeof(unsigned *));
 		for (i = 0; i < NCHUNK(mem_size); i++)
-			ptable[i] = (unsigned *) &mem[i * (CHUNK_SIZE / sizeof(token_t))];
+			ptable[i] = (unsigned *) &mem[i * (CHUNK_SIZE / sizeof(unsigned))];
 
-		sw_run_1(gold);
+		// Reset all sync variables to default values.
+		UpdateSync((void*) &mem[cons_vld_flag_offset], 0);
+		UpdateSync((void*) &mem[cons_rdy_flag_offset], 1);
+		UpdateSync((void*) &mem[END_FLAG_OFFSET], 0);
+		UpdateSync((void*) &mem[prod_vld_flag_offset], 0);
+		UpdateSync((void*) &mem[prod_rdy_flag_offset], 1);
 
-		for (i = 0; i < ITERATIONS/10; i++)
-		{
-			sw_run(gold);
-		}
+		sw_run(gold);
 
-		init_buf(mem, gold);
-
-		for (i = 0; i < ITERATIONS; i++)
 		{
 			/* TODO: Restore full test once ESP caches are integrated */
-			coherence = ACC_COH_FULL;
+			coherence = ACC_COH_RECALL;
 
 			// Pass common configuration parameters
 			start_counter();
@@ -283,22 +292,54 @@ int main(int argc, char * argv[])
 
 			// Pass accelerator-specific configuration parameters
 			/* <<--regs-config-->> */
-			iowrite32(dev, GEMM_LOGN_SAMPLES_REG, logn_samples);
-			iowrite32(dev, GEMM_DO_SHIFT_REG, do_shift);
-			iowrite32(dev, GEMM_DO_INVERSE_REG, do_inverse);
+			iowrite32(dev, GEMM_DIMM_M_REG, dim_m);
+			iowrite32(dev, GEMM_DIMM_N_REG, dim_n);
+			iowrite32(dev, GEMM_DIMM_K_REG, dim_k);
 
-			iowrite32(dev, GEMM_PROD_VALID_OFFSET, 0x0);
-			iowrite32(dev, GEMM_PROD_READY_OFFSET, 0x0);
-			iowrite32(dev, GEMM_CONS_VALID_OFFSET, 0x0);
-			iowrite32(dev, GEMM_CONS_READY_OFFSET, 0x0);
-			iowrite32(dev, GEMM_INPUT_OFFSET, 0x0);
-			iowrite32(dev, GEMM_OUTPUT_OFFSET, in_len);
+			iowrite32(dev, GEMM_PROD_VALID_OFFSET, cons_vld_flag_offset);
+			iowrite32(dev, GEMM_PROD_READY_OFFSET, cons_rdy_flag_offset);
+			iowrite32(dev, GEMM_CONS_VALID_OFFSET, prod_vld_flag_offset);
+			iowrite32(dev, GEMM_CONS_READY_OFFSET, prod_rdy_flag_offset);
+			iowrite32(dev, GEMM_INPUT_1_OFFSET, SYNC_VAR_SIZE);
+			iowrite32(dev, GEMM_INPUT_2_OFFSET, in_1_words_adj + SYNC_VAR_SIZE);
+			iowrite32(dev, GEMM_OUTPUT_OFFSET, in_len + SYNC_VAR_SIZE);
 
 			// Flush (customize coherence model here)
 			esp_flush(coherence);
 
 			// Start accelerators
 			iowrite32(dev, CMD_REG, CMD_MASK_START);
+
+			for (i = 0; i < ITERATIONS; i++)
+			{
+				// Wait for the accelerator to be ready
+				SpinSync((void*) &mem[cons_rdy_flag_offset], 1);
+				// Reset flag for the next iteration
+				UpdateSync((void*) &mem[cons_rdy_flag_offset], 0);
+				// When the accelerator is ready, we write the input data to it
+				init_buf(&mem[SYNC_VAR_SIZE]);
+
+				if (i == ITERATIONS - 1) {
+					UpdateSync((void*) &mem[END_FLAG_OFFSET], 1);
+				}
+
+				// Inform the accelerator to start.
+				UpdateSync((void*) &mem[cons_vld_flag_offset], 1);
+				t_acc_input += end_counter();
+
+				start_counter();
+				// Wait for the accelerator to send output.
+				SpinSync((void*) &mem[prod_vld_flag_offset], 1);
+				// Reset flag for next iteration.
+				UpdateSync((void*) &mem[prod_vld_flag_offset], 0);
+				t_acc += end_counter();
+
+				start_counter();
+				errors += validate_buf(&mem[in_len + SYNC_VAR_SIZE], gold);
+				// Inform the accelerator - ready for next iteration.
+				UpdateSync((void*) &mem[prod_rdy_flag_offset], 1);
+				t_acc_output += end_counter();
+			}
 
 			// Wait for completion
 			done = 0;
@@ -312,16 +353,14 @@ int main(int argc, char * argv[])
 			t_acc += end_counter();
 		}
 
-		/* Validation */
-		errors = validate_buf(&mem[out_offset], gold);
-
 		aligned_free(ptable);
 		aligned_free(mem);
 		aligned_free(gold);
 
-		printf("  Software Input = %lu\n", t_sw_input/(ITERATIONS/10));
-		printf("  Software = %lu\n", t_sw/(ITERATIONS/10));
-		printf("  Software Output = %lu\n", t_sw_output/(ITERATIONS/10));
+		printf("  Errors = %d\n", errors);
+		printf("  Software Input = %lu\n", t_sw_input);
+		printf("  Software = %lu\n", t_sw);
+		printf("  Software Output = %lu\n", t_sw_output);
 		printf("  Accel Input = %lu\n", t_acc_input/ITERATIONS);
 		printf("  Accel = %lu\n", t_acc/ITERATIONS);
 		printf("  Accel Output = %lu\n", t_acc_output/ITERATIONS);

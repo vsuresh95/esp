@@ -487,13 +487,13 @@ void gemm::compute_kernel()
             for (uint32_t m_block = 0; m_block < num_blocks_m; m_block++)
             {
                 uint32_t in_1_offset = (m_block * BLOCK_SIZE) * dim_k;
+                uint32_t out_offset = (m_block * BLOCK_SIZE) * dim_n;
 
                 // Iterate over register block across N dimension
                 for (uint32_t n_block = 0; n_block < num_blocks_n; n_block++)
                 {
                     uint32_t in_2_offset = (n_block * BLOCK_SIZE) * dim_k;
-
-                    uint32_t out_offset = (m_block * BLOCK_SIZE) * dim_n;
+                    uint32_t out_block_offset = out_offset + n_block * BLOCK_SIZE;
 
                     // Iterate over register block across K dimension
                     for (uint32_t k_block = 0; k_block < num_blocks_k; k_block++)
@@ -506,14 +506,14 @@ void gemm::compute_kernel()
                         HLS_FLATTEN_ARRAY(regs_2);
                         HLS_FLATTEN_ARRAY(regs_mul);
 
-                        in_1_offset += k_block * BLOCK_SIZE;
-                        in_2_offset += k_block * BLOCK_SIZE;
+                        uint32_t in_1_block_offset = in_1_offset + k_block * BLOCK_SIZE;
+                        uint32_t in_2_block_offset = in_2_offset + k_block * BLOCK_SIZE;
 
                         // Perform block-level multiply - M dimension
                         for (uint32_t row_m = 0; row_m < BLOCK_SIZE; row_m++)
                         {
-                            in_1_offset += row_m * dim_k;
-                            out_offset += row_m * dim_n;
+                            uint32_t in_1_elem_offset = in_1_block_offset + row_m * dim_k;
+                            uint32_t out_elem_offset = out_block_offset + row_m * dim_n;
 
                             // read Mth block across K dimension of matrix 1 from PLM into a register array
                             for (int elem_k = 0; elem_k < BLOCK_SIZE; elem_k++)
@@ -521,14 +521,14 @@ void gemm::compute_kernel()
                                 HLS_UNROLL_LOOP(ON, "read_plm_m");
                                 HLS_BREAK_ARRAY_DEPENDENCY(plm_in_1);
 
-                                uint32_t in_1_index = in_1_offset + elem_k;
+                                uint32_t in_1_index = in_1_elem_offset + elem_k;
                                 regs_1[elem_k] = plm_in_1[in_1_index];
                             }
 
                             // Perform block-level multiply - N dimension
                             for (uint32_t row_n = 0; row_n < BLOCK_SIZE; row_n++)
                             {
-                                in_2_offset += row_n * dim_k;
+                                uint32_t in_2_elem_offset = in_2_block_offset + row_n * dim_k;
 
                                 // read Nth block across K dimension of matrix 2 from PLM into a register array
                                 for (int elem_k = 0; elem_k < BLOCK_SIZE; elem_k++)
@@ -536,7 +536,7 @@ void gemm::compute_kernel()
                                     HLS_UNROLL_LOOP(ON, "read_plm_n");
                                     HLS_BREAK_ARRAY_DEPENDENCY(plm_in_2);
 
-                                    uint32_t in_2_index = in_2_offset + elem_k;
+                                    uint32_t in_2_index = in_2_elem_offset + elem_k;
                                     regs_2[elem_k] = plm_in_2[in_2_index];
                                 }
 
@@ -554,7 +554,7 @@ void gemm::compute_kernel()
                                 }
                                 else
                                 {
-                                    uint32_t out_index = out_offset + row_n;
+                                    uint32_t out_index = out_elem_offset + row_n;
                                     regs_acc = plm_out[out_index];
                                 }
 
@@ -567,7 +567,7 @@ void gemm::compute_kernel()
 
                                 // write the partial sum to PLM
                                 {
-                                    uint32_t out_index = out_offset + row_n;
+                                    uint32_t out_index = out_elem_offset + row_n;
                                     plm_out[out_index] = regs_acc;
                                 }
                             }                                  

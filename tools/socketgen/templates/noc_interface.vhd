@@ -347,6 +347,7 @@ begin
     coherence_fwd_snd_wrreq <= '0';
     coherence_fwd_snd_data_in <= (others => '0');
     mon_cache <= monitor_cache_none;
+    acc_fence_ready <= '1';
   end generate no_l2_gen;
 
 
