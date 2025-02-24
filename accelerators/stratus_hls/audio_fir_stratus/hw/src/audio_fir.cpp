@@ -32,15 +32,15 @@ void audio_fir::load_input()
     /* <<--params-->> */
     int32_t logn_samples;
     int32_t num_samples;
-    int32_t prod_valid_offset;
-    int32_t prod_ready_offset;
-    int32_t flt_prod_valid_offset;
-    int32_t flt_prod_ready_offset;
-    int32_t cons_valid_offset;
-    int32_t cons_ready_offset;
-    int32_t input_offset;
-    int32_t flt_input_offset;
-    int32_t twd_input_offset;
+    int32_t input_queue_base;
+    int32_t output_queue_base;
+    int32_t filter_queue_base;
+    int32_t input_valid_offset;
+    int32_t output_valid_offset;
+    int32_t filter_valid_offset;
+    int32_t input_payload_offset;
+    int32_t filter_payload_offset;
+    int32_t twiddle_payload_offset;
     int32_t output_offset;
     {
         HLS_PROTO("load-config");
@@ -53,17 +53,21 @@ void audio_fir::load_input()
         logn_samples = config.logn_samples;
         num_samples = 1 << logn_samples;
 
-        // Configured shared memory offsets for sync flags
-        prod_valid_offset = config.prod_valid_offset;
-        prod_ready_offset = config.prod_ready_offset;
-        flt_prod_valid_offset = config.flt_prod_valid_offset;
-        flt_prod_ready_offset = config.flt_prod_ready_offset;
-        cons_valid_offset = config.cons_valid_offset;
-        cons_ready_offset = config.cons_ready_offset;
-        input_offset = config.input_offset;
-        flt_input_offset = config.flt_input_offset;
-        twd_input_offset = config.twd_input_offset;
-        output_offset = config.output_offset;
+        // Configured shared memory base addresses for input and output queues
+        input_queue_base = config.input_queue_base;
+        output_queue_base = config.output_queue_base;
+        filter_queue_base = config.filter_queue_base;
+
+        // offsets for input valid and output valid based on preset values
+        input_valid_offset = input_queue_base + VALID_OFFSET;
+        output_valid_offset = output_queue_base + VALID_OFFSET;
+        filter_valid_offset = filter_queue_base + VALID_OFFSET;
+
+        // offsets for input valid and output payload based on preset values
+        input_payload_offset = input_queue_base + PAYLOAD_OFFSET;
+        filter_payload_offset = filter_queue_base + PAYLOAD_OFFSET;
+
+        twiddle_payload_offset = filter_payload_offset + 2 * (num_samples + 1);
     }
 
     // Load
@@ -80,63 +84,60 @@ void audio_fir::load_input()
         switch (load_state_req)
         {
 #ifdef ENABLE_SM
-            case POLL_PROD_VALID_REQ:
+            case POLL_INPUT_IS_FULL:
             {
-                dma_info_t dma_info(prod_valid_offset / DMA_WORD_PER_BEAT, 2 * TEST_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                dma_info_t dma_info(input_valid_offset / DMA_WORD_PER_BEAT, TEST_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
-                int32_t valid_task = 0;
+                int32_t input_is_full = 0;
 
                 wait();
 
                 // Wait for producer to send new data
-                while (valid_task != 1)
+                while (input_is_full != 1)
                 {
                     HLS_UNROLL_LOOP(OFF);
                     this->dma_read_ctrl.put(dma_info);
                     dataBv = this->dma_read_chnl.get();
                     wait();
-                    valid_task = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
-                    dataBv = this->dma_read_chnl.get();
-                    wait();
-                    last_task = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
+                    input_is_full = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
                 }
             }
             break;
-            case POLL_FLT_PROD_VALID_REQ:
+            case POLL_FILTER_IS_FULL:
             {
-                dma_info_t dma_info(flt_prod_valid_offset / DMA_WORD_PER_BEAT, TEST_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                dma_info_t dma_info(filter_valid_offset / DMA_WORD_PER_BEAT, TEST_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
-                int32_t valid_task = 0;
+                int32_t filter_is_full = 0;
 
                 wait();
 
                 // Wait for producer to send new data
-                while (valid_task != 1)
+                while (filter_is_full != 1)
                 {
                     HLS_UNROLL_LOOP(OFF);
                     this->dma_read_ctrl.put(dma_info);
                     dataBv = this->dma_read_chnl.get();
                     wait();
-                    valid_task = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
+                    filter_is_full = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
                 }
             }
             break;
-            case POLL_CONS_READY_REQ:
+            case POLL_OUTPUT_IS_EMPTY:
             {
-                dma_info_t dma_info(cons_ready_offset / DMA_WORD_PER_BEAT, TEST_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                dma_info_t dma_info(output_valid_offset / DMA_WORD_PER_BEAT, TEST_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
-                int32_t ready_for_task = 0;
+                int32_t output_is_empty = 0;
 
                 wait();
 
                 // Wait for consumer to accept new data
-                while (ready_for_task != 1)
+                while (output_is_empty != 1)
                 {
                     HLS_UNROLL_LOOP(OFF);
                     this->dma_read_ctrl.put(dma_info);
                     dataBv = this->dma_read_chnl.get();
                     wait();
-                    ready_for_task = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
+                    output_is_empty = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
                 }
             }
             break;
@@ -144,7 +145,7 @@ void audio_fir::load_input()
             case LOAD_DATA_REQ:
             // Load input data
             {
-                dma_info_t dma_info(input_offset / DMA_WORD_PER_BEAT, 2 * num_samples / DMA_WORD_PER_BEAT, DMA_SIZE);
+                dma_info_t dma_info(input_payload_offset / DMA_WORD_PER_BEAT, 2 * num_samples / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
 
                 wait();
@@ -166,7 +167,7 @@ void audio_fir::load_input()
             }
             // Load filters
             {
-                dma_info_t dma_info(flt_input_offset / DMA_WORD_PER_BEAT, 2 * (num_samples + 1) / DMA_WORD_PER_BEAT, DMA_SIZE);
+                dma_info_t dma_info(filter_payload_offset / DMA_WORD_PER_BEAT, 2 * (num_samples + 1) / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
 
                 wait();
@@ -188,7 +189,7 @@ void audio_fir::load_input()
             }
             // Load twiddle factors 
             {
-                dma_info_t dma_info(twd_input_offset / DMA_WORD_PER_BEAT, num_samples / DMA_WORD_PER_BEAT, DMA_SIZE);
+                dma_info_t dma_info(twiddle_payload_offset / DMA_WORD_PER_BEAT, num_samples / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
 
                 wait();
@@ -239,16 +240,13 @@ void audio_fir::store_output()
     /* <<--params-->> */
     int32_t logn_samples;
     int32_t num_samples;
-    int32_t prod_valid_offset;
-    int32_t prod_ready_offset;
-    int32_t flt_prod_valid_offset;
-    int32_t flt_prod_ready_offset;
-    int32_t cons_valid_offset;
-    int32_t cons_ready_offset;
-    int32_t input_offset;
-    int32_t flt_input_offset;
-    int32_t twd_input_offset;
-    int32_t output_offset;
+    int32_t input_queue_base;
+    int32_t output_queue_base;
+    int32_t filter_queue_base;
+    int32_t input_valid_offset;
+    int32_t output_valid_offset;
+    int32_t filter_valid_offset;
+    int32_t output_payload_offset;
     {
         HLS_PROTO("store-config");
 
@@ -261,17 +259,18 @@ void audio_fir::store_output()
         logn_samples = config.logn_samples;
         num_samples = 1 << logn_samples;
 
-        // Configured shared memory offsets for sync flags
-        prod_valid_offset = config.prod_valid_offset;
-        prod_ready_offset = config.prod_ready_offset;
-        flt_prod_valid_offset = config.flt_prod_valid_offset;
-        flt_prod_ready_offset = config.flt_prod_ready_offset;
-        cons_valid_offset = config.cons_valid_offset;
-        cons_ready_offset = config.cons_ready_offset;
-        input_offset = config.input_offset;
-        flt_input_offset = config.flt_input_offset;
-        twd_input_offset = config.twd_input_offset;
-        output_offset = config.output_offset;
+        // Configured shared memory base addresses for input and output queues
+        input_queue_base = config.input_queue_base;
+        output_queue_base = config.output_queue_base;
+        filter_queue_base = config.filter_queue_base;
+
+        // offsets for input valid and output valid based on preset values
+        input_valid_offset = input_queue_base + VALID_OFFSET;
+        output_valid_offset = output_queue_base + VALID_OFFSET;
+        filter_valid_offset = filter_queue_base + VALID_OFFSET;
+
+        // offsets for input valid and output payload based on preset values
+        output_payload_offset = output_queue_base + PAYLOAD_OFFSET;
     }
 
     // Store
@@ -288,41 +287,9 @@ void audio_fir::store_output()
         switch (store_state_req)
         {
 #ifdef ENABLE_SM
-            case UPDATE_PROD_READY_REQ:
+            case UPDATE_INPUT_IS_EMPTY:
             {
-                dma_info_t dma_info(prod_ready_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
-                sc_dt::sc_bv<DMA_WIDTH> dataBv;
-                dataBv.range(DMA_WIDTH - 1, 0) = 1;
-
-                this->dma_write_ctrl.put(dma_info);
-                wait();
-                this->dma_write_chnl.put(dataBv);
-                wait();
-
-                // Wait till the write is accepted at the cache (and previous fences)
-                while (!(this->dma_write_chnl.ready)) wait();
-                wait();
-            }
-            break;
-            case UPDATE_FLT_PROD_READY_REQ:
-            {
-                dma_info_t dma_info(flt_prod_ready_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
-                sc_dt::sc_bv<DMA_WIDTH> dataBv;
-                dataBv.range(DMA_WIDTH - 1, 0) = 1;
-
-                this->dma_write_ctrl.put(dma_info);
-                wait();
-                this->dma_write_chnl.put(dataBv);
-                wait();
-
-                // Wait till the write is accepted at the cache (and previous fences)
-                while (!(this->dma_write_chnl.ready)) wait();
-                wait();
-            }
-            break;
-            case UPDATE_PROD_VALID_REQ:
-            {
-                dma_info_t dma_info(prod_valid_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                dma_info_t dma_info(input_valid_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 dataBv.range(DMA_WIDTH - 1, 0) = 0;
 
@@ -336,9 +303,9 @@ void audio_fir::store_output()
                 wait();
             }
             break;
-            case UPDATE_FLT_PROD_VALID_REQ:
+            case UPDATE_FILTER_IS_EMPTY:
             {
-                dma_info_t dma_info(flt_prod_valid_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                dma_info_t dma_info(filter_valid_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 dataBv.range(DMA_WIDTH - 1, 0) = 0;
 
@@ -352,27 +319,11 @@ void audio_fir::store_output()
                 wait();
             }
             break;
-            case UPDATE_CONS_VALID_REQ:
+            case UPDATE_OUTPUT_IS_FULL:
             {
-                dma_info_t dma_info(cons_valid_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
+                dma_info_t dma_info(output_valid_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
                 dataBv.range(DMA_WIDTH - 1, 0) = 1;
-
-                this->dma_write_ctrl.put(dma_info);
-                wait();
-                this->dma_write_chnl.put(dataBv);
-                wait();
-
-                // Wait till the write is accepted at the cache (and previous fences)
-                while (!(this->dma_write_chnl.ready)) wait();
-                wait();
-            }
-            break;
-            case UPDATE_CONS_READY_REQ:
-            {
-                dma_info_t dma_info(cons_ready_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
-                sc_dt::sc_bv<DMA_WIDTH> dataBv;
-                dataBv.range(DMA_WIDTH - 1, 0) = 0;
 
                 this->dma_write_ctrl.put(dma_info);
                 wait();
@@ -387,7 +338,7 @@ void audio_fir::store_output()
 #endif
             case STORE_DATA_REQ:
             {
-                dma_info_t dma_info(output_offset / DMA_WORD_PER_BEAT, 2 * num_samples / DMA_WORD_PER_BEAT, DMA_SIZE);
+                dma_info_t dma_info(output_payload_offset / DMA_WORD_PER_BEAT, 2 * num_samples / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
 
                 wait();
@@ -480,13 +431,13 @@ void audio_fir::compute_kernel()
     while(true)
     {
 #ifdef ENABLE_SM
-        // Poll producer's valid for new task
+        // Poll input queue is full for new task
         {
-            HLS_PROTO("poll-prod-valid");
+            HLS_PROTO("poll-input-is-full");
 
-            load_state_req = POLL_PROD_VALID_REQ;
+            load_state_req = POLL_INPUT_IS_FULL;
 
-            compute_state_req_dbg.write(POLL_PROD_VALID_REQ);
+            compute_state_req_dbg.write(POLL_INPUT_IS_FULL);
 
             this->compute_load_ready_handshake();
             wait();
@@ -494,65 +445,17 @@ void audio_fir::compute_kernel()
             wait();
         }
 
-        // Reset producer's valid
+        // Poll filter queue is full for new task
         {
-            HLS_PROTO("update-prod-valid");
+            HLS_PROTO("poll-filter-is-full");
 
-            store_state_req = UPDATE_PROD_VALID_REQ;
+            load_state_req = POLL_FILTER_IS_FULL;
 
-            compute_state_req_dbg.write(UPDATE_PROD_VALID_REQ);
-
-            this->compute_store_ready_handshake();
-            wait();
-            this->compute_store_done_handshake();
-            wait();
-
-            // Wait for all writes to be done and then issue fence
-            store_state_req = STORE_FENCE;
-
-            compute_state_req_dbg.write(STORE_FENCE);
-
-            this->compute_store_ready_handshake();
-            wait();
-            this->compute_store_done_handshake();
-            wait();
-        }
-
-        // Poll filter producer's valid for new filters
-        {
-            HLS_PROTO("poll-flt-prod-valid");
-
-            load_state_req = POLL_FLT_PROD_VALID_REQ;
-
-            compute_state_req_dbg.write(POLL_FLT_PROD_VALID_REQ);
+            compute_state_req_dbg.write(POLL_FILTER_IS_FULL);
 
             this->compute_load_ready_handshake();
             wait();
             this->compute_load_done_handshake();
-            wait();
-        }
-
-        // Reset filter producer's valid
-        {
-            HLS_PROTO("update-flt-prod-valid");
-
-            store_state_req = UPDATE_FLT_PROD_VALID_REQ;
-
-            compute_state_req_dbg.write(UPDATE_FLT_PROD_VALID_REQ);
-
-            this->compute_store_ready_handshake();
-            wait();
-            this->compute_store_done_handshake();
-            wait();
-
-            // Wait for all writes to be done and then issue fence
-            store_state_req = STORE_FENCE;
-
-            compute_state_req_dbg.write(STORE_FENCE);
-
-            this->compute_store_ready_handshake();
-            wait();
-            this->compute_store_done_handshake();
             wait();
         }
 #endif
@@ -570,13 +473,13 @@ void audio_fir::compute_kernel()
             wait();
         }
 #ifdef ENABLE_SM
-        // update producer's ready to accept new data
+        // Update input queue to be empty
         {
-            HLS_PROTO("update-prod-ready");
+            HLS_PROTO("update-input-is-empty");
 
-            store_state_req = UPDATE_PROD_READY_REQ;
+            store_state_req = UPDATE_INPUT_IS_EMPTY;
 
-            compute_state_req_dbg.write(UPDATE_PROD_READY_REQ);
+            compute_state_req_dbg.write(UPDATE_INPUT_IS_EMPTY);
 
             this->compute_store_ready_handshake();
             wait();
@@ -594,13 +497,13 @@ void audio_fir::compute_kernel()
             wait();
         }
 
-        // update filter producer's ready to accept new filters
+        // Update filter queue to be empty
         {
-            HLS_PROTO("update-flt-prod-ready");
+            HLS_PROTO("update-filter-is-empty");
 
-            store_state_req = UPDATE_FLT_PROD_READY_REQ;
+            store_state_req = UPDATE_FILTER_IS_EMPTY;
 
-            compute_state_req_dbg.write(UPDATE_FLT_PROD_READY_REQ);
+            compute_state_req_dbg.write(UPDATE_FILTER_IS_EMPTY);
 
             this->compute_store_ready_handshake();
             wait();
@@ -616,8 +519,6 @@ void audio_fir::compute_kernel()
             wait();
             this->compute_store_done_handshake();
             wait();
-
-            compute_state_req_dbg.write(COMPUTE);
         }
 #endif
         // Compute
@@ -728,41 +629,17 @@ void audio_fir::compute_kernel()
             } // for (k = 0 .. num_samples)
         } // Compute
 #ifdef ENABLE_SM
-        // Poll consumer's ready to know if we can send new data
+        // Poll output queue is empty for new task
         {
-            HLS_PROTO("poll-for-cons-ready");
+            HLS_PROTO("poll-output-is-empty");
 
-            load_state_req = POLL_CONS_READY_REQ;
+            load_state_req = POLL_OUTPUT_IS_EMPTY;
 
-            compute_state_req_dbg.write(POLL_CONS_READY_REQ);
+            compute_state_req_dbg.write(POLL_OUTPUT_IS_EMPTY);
 
             this->compute_load_ready_handshake();
             wait();
             this->compute_load_done_handshake();
-            wait();
-        }
-
-        // Reset consumer's ready
-        {
-            HLS_PROTO("update-cons-ready");
-
-            store_state_req = UPDATE_CONS_READY_REQ;
-
-            compute_state_req_dbg.write(UPDATE_CONS_READY_REQ);
-
-            this->compute_store_ready_handshake();
-            wait();
-            this->compute_store_done_handshake();
-            wait();
-
-            // Wait for all writes to be done and then issue fence
-            store_state_req = STORE_FENCE;
-
-            compute_state_req_dbg.write(STORE_FENCE);
-
-            this->compute_store_ready_handshake();
-            wait();
-            this->compute_store_done_handshake();
             wait();
         }
 #endif
@@ -791,13 +668,13 @@ void audio_fir::compute_kernel()
             wait();
         }
 #ifdef ENABLE_SM
-        // update consumer's ready for new data available
+        // Update output queue to be full 
         {
-            HLS_PROTO("update-cons-valid");
+            HLS_PROTO("update-output-is-full");
 
-            store_state_req = UPDATE_CONS_VALID_REQ;
+            store_state_req = UPDATE_OUTPUT_IS_FULL;
 
-            compute_state_req_dbg.write(UPDATE_CONS_VALID_REQ);
+            compute_state_req_dbg.write(UPDATE_OUTPUT_IS_FULL);
 
             this->compute_store_ready_handshake();
             wait();
@@ -815,27 +692,6 @@ void audio_fir::compute_kernel()
             wait();
         }
 #endif
-        // End operation
-        {
-            HLS_PROTO("end-acc");
-
-#ifdef ENABLE_SM
-            if (last_task == 1)
-            {
-#endif
-                store_state_req = ACC_DONE;
-
-                compute_state_req_dbg.write(ACC_DONE);
-
-                this->compute_store_ready_handshake();
-                wait();
-                this->compute_store_done_handshake();
-                wait();
-                this->process_done();
-#ifdef ENABLE_SM
-            }
-#endif
-        }
     } // while (true)
 } // Function : compute_kernel
 

@@ -7,7 +7,7 @@
 const float ERR_TH = 0.05;
 
 #define ENABLE_SM
-#define SPX
+// #define SPX
 
 #ifdef SPX
 	#define COH_MODE 2
@@ -135,11 +135,11 @@ static void init_parameters()
 	const unsigned num_samples = (1 << logn_samples);
 
 	if (DMA_WORD_PER_BEAT(sizeof(token_t)) == 0) {
-		in_words_adj = (2 * num_samples) + SYNC_VAR_SIZE;
-		out_words_adj = (2 * num_samples) + SYNC_VAR_SIZE;
+		in_words_adj = (2 * num_samples) + PAYLOAD_OFFSET;
+		out_words_adj = (2 * num_samples) + PAYLOAD_OFFSET;
 	} else {
-		in_words_adj = round_up((2 * num_samples) + SYNC_VAR_SIZE, DMA_WORD_PER_BEAT(sizeof(token_t)));
-		out_words_adj = round_up((2 * num_samples) + SYNC_VAR_SIZE, DMA_WORD_PER_BEAT(sizeof(token_t)));
+		in_words_adj = round_up((2 * num_samples) + PAYLOAD_OFFSET, DMA_WORD_PER_BEAT(sizeof(token_t)));
+		out_words_adj = round_up((2 * num_samples) + PAYLOAD_OFFSET, DMA_WORD_PER_BEAT(sizeof(token_t)));
 	}
 	in_len = in_words_adj;
 	out_len =  out_words_adj;
@@ -176,17 +176,11 @@ int main(int argc, char **argv)
 	init_parameters();
 
 	// Program sync flags
-	unsigned local_cons_rdy_flag_offset = 0*in_len + READY_FLAG_OFFSET;
-	unsigned local_cons_vld_flag_offset = 0*in_len + VALID_FLAG_OFFSET;
-	unsigned local_prod_rdy_flag_offset = 1*in_len + READY_FLAG_OFFSET;
-	unsigned local_prod_vld_flag_offset = 1*in_len + VALID_FLAG_OFFSET;
+	unsigned input_valid_offset = 0*in_len + VALID_OFFSET;
+	unsigned output_valid_offset = 1*in_len + VALID_OFFSET;
 
-	audio_fft_cfg_000[0].prod_valid_offset = local_cons_vld_flag_offset;
-	audio_fft_cfg_000[0].prod_ready_offset = local_cons_rdy_flag_offset;
-	audio_fft_cfg_000[0].cons_valid_offset = local_prod_vld_flag_offset;
-	audio_fft_cfg_000[0].cons_ready_offset = local_prod_rdy_flag_offset;
-	audio_fft_cfg_000[0].input_offset = SYNC_VAR_SIZE;
-	audio_fft_cfg_000[0].output_offset = in_len + SYNC_VAR_SIZE;
+	audio_fft_cfg_000[0].input_queue_base = input_valid_offset;
+	audio_fft_cfg_000[0].output_queue_base = output_valid_offset;
 
     // allocations
     printf("  Allocations\n");
@@ -202,45 +196,29 @@ int main(int argc, char **argv)
 
 #ifdef ENABLE_SM
 	// Reset all sync variables to default values.
-	UpdateSync((void*) &mem[local_cons_vld_flag_offset], 0);
-	UpdateSync((void*) &mem[local_cons_rdy_flag_offset], 1);
-	UpdateSync((void*) &mem[END_FLAG_OFFSET], 0);
-	UpdateSync((void*) &mem[local_prod_vld_flag_offset], 0);
-	UpdateSync((void*) &mem[local_prod_rdy_flag_offset], 1);
+	UpdateSync((void*) &mem[input_valid_offset], 0);
+	UpdateSync((void*) &mem[output_valid_offset], 0);
 
     audio_fft_cfg_000[0].esp.start_stop = 1;
 	esp_run(cfg_000, NACC);
 
+	printf("Started accel\n");
+
 	for (i = 0; i < ITERATIONS; ++i) {
-		// printf("SM Enabled\n");
-		start_counter();
 		// Wait for the accelerator to be ready
-		SpinSync((void*) &mem[local_cons_rdy_flag_offset], 1);
-		// Reset flag for the next iteration
-		UpdateSync((void*) &mem[local_cons_rdy_flag_offset], 0);
+		SpinSync((void*) &mem[input_valid_offset], 0);
 		// When the accelerator is ready, we write the input data to it
-		init_buffer(&mem[SYNC_VAR_SIZE], gold);
-
-		if (i == ITERATIONS - 1) {
-			UpdateSync((void*) &mem[END_FLAG_OFFSET], 1);
-		}
-
+        init_buffer(&mem[PAYLOAD_OFFSET], gold);
 		// Inform the accelerator to start.
-		UpdateSync((void*) &mem[local_cons_vld_flag_offset], 1);
-		t_acc_input += end_counter();
+		UpdateSync((void*) &mem[input_valid_offset], 1);
 
-		start_counter();
 		// Wait for the accelerator to send output.
-		SpinSync((void*) &mem[local_prod_vld_flag_offset], 1);
-		// Reset flag for next iteration.
-		UpdateSync((void*) &mem[local_prod_vld_flag_offset], 0);
-		t_acc += end_counter();
+		SpinSync((void*) &mem[output_valid_offset], 1);
 
-		start_counter();
-		errors += validate_buffer(&mem[in_len + SYNC_VAR_SIZE], gold);
+		// When the output is ready, we read it
+		errors += validate_buffer(&mem[in_len + PAYLOAD_OFFSET], gold);
 		// Inform the accelerator - ready for next iteration.
-		UpdateSync((void*) &mem[local_prod_rdy_flag_offset], 1);
-		t_acc_output += end_counter();
+		UpdateSync((void*) &mem[output_valid_offset], 0);
 	}
 #else
     for (i = 0; i < ITERATIONS; ++i) {

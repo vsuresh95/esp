@@ -20,21 +20,12 @@
 struct audio_fir_stratus_access {
 	struct esp_access esp;
 	/* <<--regs-->> */
-	unsigned do_inverse;
 	unsigned logn_samples;
-	unsigned do_shift;
 
 	// ASI sync flag offsets
-	unsigned prod_valid_offset;
-	unsigned prod_ready_offset;
-	unsigned flt_prod_valid_offset;
-	unsigned flt_prod_ready_offset;
-	unsigned cons_valid_offset;
-	unsigned cons_ready_offset;
-	unsigned input_offset;
-	unsigned flt_input_offset;
-	unsigned twd_input_offset;
-	unsigned output_offset;
+    unsigned input_queue_base;
+    unsigned output_queue_base;
+    unsigned filter_queue_base;
 
 	unsigned src_offset;
 	unsigned dst_offset;

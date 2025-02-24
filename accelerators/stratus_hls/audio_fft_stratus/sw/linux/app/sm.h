@@ -1,9 +1,6 @@
 // Size and parameter defines
-#define SYNC_VAR_SIZE 10
-#define UPDATE_VAR_SIZE 2
-#define VALID_FLAG_OFFSET 0
-#define END_FLAG_OFFSET 2
-#define READY_FLAG_OFFSET 4
+#define VALID_OFFSET 0
+#define PAYLOAD_OFFSET 2
 
 static inline void write_mem (void* dst, int64_t value_64)
 {

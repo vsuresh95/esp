@@ -16,17 +16,9 @@
 #define AUDIO_FFI_DO_INVERSE_REG 0x48
 #define AUDIO_FFI_LOGN_SAMPLES_REG 0x44
 #define AUDIO_FFI_DO_SHIFT_REG 0x40
-
-#define AUDIO_FFI_PROD_VALID_OFFSET 0x4C
-#define AUDIO_FFI_PROD_READY_OFFSET 0x50
-#define AUDIO_FFI_FLT_PROD_VALID_OFFSET 0x54
-#define AUDIO_FFI_FLT_PROD_READY_OFFSET 0x58
-#define AUDIO_FFI_CONS_VALID_OFFSET 0x5C
-#define AUDIO_FFI_CONS_READY_OFFSET 0x60
-#define AUDIO_FFI_INPUT_OFFSET 0x64
-#define AUDIO_FFI_FLT_INPUT_OFFSET 0x68
-#define AUDIO_FFI_TWD_INPUT_OFFSET 0x6C
-#define AUDIO_FFI_OUTPUT_OFFSET 0x70
+#define AUDIO_FFI_INPUT_QUEUE_BASE 0X4C
+#define AUDIO_FFI_OUTPUT_QUEUE_BASE 0X50
+#define AUDIO_FFI_FILTER_QUEUE_BASE 0X54
 
 struct audio_ffi_stratus_device {
 	struct esp_device esp;
@@ -63,16 +55,9 @@ static void audio_ffi_prep_xfer(struct esp_device *esp, void *arg)
 	iowrite32be(a->logn_samples, esp->iomem + AUDIO_FFI_LOGN_SAMPLES_REG);
 	iowrite32be(a->do_shift, esp->iomem + AUDIO_FFI_DO_SHIFT_REG);
 
-	iowrite32be(a->prod_valid_offset, esp->iomem + AUDIO_FFI_PROD_VALID_OFFSET);
-	iowrite32be(a->prod_ready_offset, esp->iomem + AUDIO_FFI_PROD_READY_OFFSET);
-	iowrite32be(a->flt_prod_valid_offset, esp->iomem + AUDIO_FFI_FLT_PROD_VALID_OFFSET);
-	iowrite32be(a->flt_prod_ready_offset, esp->iomem + AUDIO_FFI_FLT_PROD_READY_OFFSET);
-	iowrite32be(a->cons_valid_offset, esp->iomem + AUDIO_FFI_CONS_VALID_OFFSET);
-	iowrite32be(a->cons_ready_offset, esp->iomem + AUDIO_FFI_CONS_READY_OFFSET);
-	iowrite32be(a->input_offset, esp->iomem + AUDIO_FFI_INPUT_OFFSET);
-	iowrite32be(a->flt_input_offset, esp->iomem + AUDIO_FFI_FLT_INPUT_OFFSET);
-	iowrite32be(a->twd_input_offset, esp->iomem + AUDIO_FFI_TWD_INPUT_OFFSET);
-	iowrite32be(a->output_offset, esp->iomem + AUDIO_FFI_OUTPUT_OFFSET);
+	iowrite32be(a->input_queue_base, esp->iomem + AUDIO_FFI_INPUT_QUEUE_BASE);
+	iowrite32be(a->output_queue_base, esp->iomem + AUDIO_FFI_OUTPUT_QUEUE_BASE);
+	iowrite32be(a->filter_queue_base, esp->iomem + AUDIO_FFI_FILTER_QUEUE_BASE);
 
 	iowrite32be(a->src_offset, esp->iomem + SRC_OFFSET_REG);
 	iowrite32be(a->dst_offset, esp->iomem + DST_OFFSET_REG);

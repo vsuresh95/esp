@@ -25,12 +25,8 @@ struct audio_fft_stratus_access {
 	unsigned do_shift;
 
 	// ASI sync flag offsets
-    unsigned prod_valid_offset;
-    unsigned prod_ready_offset;
-    unsigned cons_valid_offset;
-    unsigned cons_ready_offset;
-    unsigned input_offset;
-    unsigned output_offset;
+    unsigned input_queue_base;
+    unsigned output_queue_base;
 
 	unsigned src_offset;
 	unsigned dst_offset;

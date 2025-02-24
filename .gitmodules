@@ -61,3 +61,7 @@
 	path = soft/ariane/audio_pipeline
 	url = git@github.com:vsuresh95/audio_pipeline.git
 	branch = f_baremetal
+[submodule "soft/ariane/virtual-acc-app"]
+	path = soft/ariane/virtual-acc-app
+	url = git@github.com:vsuresh95/virtual-acc-app.git
+	branch = master

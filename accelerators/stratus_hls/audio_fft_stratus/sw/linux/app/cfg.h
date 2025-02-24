@@ -14,7 +14,7 @@ typedef float native_t;
 
 /* <<--params-def-->> */
 #define DO_INVERSE 0
-#define LOGN_SAMPLES 14
+#define LOGN_SAMPLES 6
 #define DO_SHIFT 0
 
 /* <<--params-->> */
@@ -32,12 +32,8 @@ struct audio_fft_stratus_access audio_fft_cfg_000[] = {
 		.logn_samples = LOGN_SAMPLES,
 		.do_shift = DO_SHIFT,
 
-		.prod_valid_offset = 0,
-		.prod_ready_offset = 0,
-		.cons_valid_offset = 0,
-		.cons_ready_offset = 0,
-		.input_offset = 0,
-		.output_offset = 0,
+		.input_queue_base = 0,
+		.output_queue_base = 0,
 		
 		.src_offset = 0,
 		.dst_offset = 0,

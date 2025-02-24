@@ -225,6 +225,15 @@ static void esp_run(struct esp_device *esp)
 	iowrite32be(0x1, esp->iomem + CMD_REG);
 }
 
+static void esp_halt(struct esp_device *esp)
+{
+	/* reset device and wait for it to complete */
+	iowrite32be(0x0, esp->iomem + CMD_REG);
+	while (ioread32be(esp->iomem + CMD_REG)){
+        cpu_relax();
+    }
+}
+
 static int esp_wait(struct esp_device *esp)
 {
 	/* Interrupt */
@@ -366,6 +375,8 @@ static int esp_access_ioctl(struct esp_device *esp, void __user *argp)
 		rc = -EINVAL;
 		goto out;
 	}
+
+	esp_halt(esp);
 
 	if (!esp_xfer_input_ok(esp, contig)) {
 		rc = -EINVAL;

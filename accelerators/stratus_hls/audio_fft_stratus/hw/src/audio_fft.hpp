@@ -23,18 +23,18 @@
 #define UPDATE_VAR_SIZE 2
 #define TEST_VAR_SIZE 2
 
-#define POLL_PROD_VALID_REQ 0
-#define POLL_CONS_READY_REQ 1
+#define POLL_INPUT_IS_FULL 0
+#define POLL_OUTPUT_IS_EMPTY 1
 #define LOAD_DATA_REQ 2
-#define UPDATE_PROD_VALID_REQ 0
-#define UPDATE_PROD_READY_REQ 1
-#define UPDATE_CONS_VALID_REQ 2
-#define UPDATE_CONS_READY_REQ 3
-#define STORE_DATA_REQ 4
-#define STORE_FENCE 5
-#define ACC_DONE 6
-#define COMPUTE 7
+#define UPDATE_INPUT_IS_EMPTY 0
+#define UPDATE_OUTPUT_IS_FULL 1
+#define STORE_DATA_REQ 2
+#define STORE_FENCE 3
+#define ACC_DONE 4
 
+#define VALID_OFFSET 0
+#define PAYLOAD_OFFSET 2
+ 
 class audio_fft : public esp_accelerator_3P<DMA_WIDTH>
 {
 public:

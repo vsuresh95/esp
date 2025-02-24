@@ -25,21 +25,20 @@
 #define UPDATE_VAR_SIZE 2
 #define TEST_VAR_SIZE 2
 
-#define TEST_PROD_VALID_REQ 0
-#define TEST_FLT_PROD_VALID_REQ 1
-#define TEST_CONS_READY_REQ 2
+#define TEST_INPUT_IS_FULL 0
+#define TEST_FILTER_IS_FULL 1
+#define TEST_OUTPUT_IS_EMPTY 2
 #define LOAD_DATA_REQ 3
 #define LOAD_FILTERS_REQ 4
-#define UPDATE_PROD_VALID_REQ 0
-#define UPDATE_FLT_PROD_VALID_REQ 1
-#define UPDATE_PROD_READY_REQ 2
-#define UPDATE_FLT_PROD_READY_REQ 3
-#define UPDATE_CONS_VALID_REQ 4
-#define UPDATE_CONS_READY_REQ 5
-#define STORE_DATA_REQ 6
-#define STORE_FENCE 7
-#define ACC_DONE 8
-#define COMPUTE 9
+#define UPDATE_INPUT_IS_EMPTY 0
+#define UPDATE_FILTER_IS_EMPTY 1
+#define UPDATE_OUTPUT_IS_FULL 2
+#define STORE_DATA_REQ 3
+#define STORE_FENCE 4
+#define ACC_DONE 5
+
+#define VALID_OFFSET 0
+#define PAYLOAD_OFFSET 2
 
 #define INPUT_ASI 1
 #define FILTERS_ASI 2
@@ -199,14 +198,9 @@ public:
     sc_int<32> store_state_req;
     sc_int<32> store_state_req_module;
 
-    sc_int<32> prod_valid;
-    sc_int<32> flt_valid;
-    sc_int<32> cons_ready;
-    sc_int<32> end_input_asi;
-    sc_int<32> end_fft;
-    sc_int<32> end_fir;
-    sc_int<32> end_ifft;
-    sc_int<32> end_output_asi;
+    sc_int<32> input_is_full;
+    sc_int<32> filter_is_full;
+    sc_int<32> output_is_empty;
 
     sc_int<32> input_load_req;
     sc_int<32> filters_load_req;
