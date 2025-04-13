@@ -216,8 +216,9 @@ static void esp_transfer(struct esp_device *esp, const struct contig_desc *conti
 	iowrite32be(contig_chunk_size_log, esp->iomem + PT_SHIFT_REG);
 	iowrite32be(contig->n, esp->iomem + PT_NCHUNK_REG);
 	iowrite32be(esp->coherence, esp->iomem + COHERENCE_REG);
-	iowrite32be(0x0, esp->iomem + SRC_OFFSET_REG);
-	iowrite32be(0x0, esp->iomem + DST_OFFSET_REG);
+	iowrite32be(esp->src_offset, esp->iomem + SRC_OFFSET_REG);
+	iowrite32be(esp->dst_offset, esp->iomem + DST_OFFSET_REG);
+	iowrite32be(esp->spandex_conf, esp->iomem + SPANDEX_REG);
 }
 
 static void esp_run(struct esp_device *esp)
@@ -398,9 +399,12 @@ static int esp_access_ioctl(struct esp_device *esp, void __user *argp)
 		goto out;
 
 	esp->coherence = access->coherence;
+	esp->src_offset = access->src_offset;
+	esp->dst_offset = access->dst_offset;
+	esp->spandex_conf = access->spandex_conf;
 	esp->footprint = access->footprint;
-        esp->alloc_policy = access->alloc_policy;
-        esp->ddr_node = access->ddr_node;
+    esp->alloc_policy = access->alloc_policy;
+    esp->ddr_node = access->ddr_node;
 	esp->in_place = access->in_place;
 	esp->reuse_factor = access->reuse_factor;
 

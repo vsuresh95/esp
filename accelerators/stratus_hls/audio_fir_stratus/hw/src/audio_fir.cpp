@@ -131,7 +131,7 @@ void audio_fir::load_input()
                 wait();
 
                 // Wait for consumer to accept new data
-                while (output_is_empty != 1)
+                while (output_is_empty != 0)
                 {
                     HLS_UNROLL_LOOP(OFF);
                     this->dma_read_ctrl.put(dma_info);

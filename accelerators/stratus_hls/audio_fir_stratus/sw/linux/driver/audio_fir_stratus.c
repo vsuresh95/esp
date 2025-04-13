@@ -54,11 +54,6 @@ static void audio_fir_prep_xfer(struct esp_device *esp, void *arg)
 	iowrite32be(a->input_queue_base, esp->iomem + AUDIO_FIR_INPUT_QUEUE_BASE);
 	iowrite32be(a->output_queue_base, esp->iomem + AUDIO_FIR_OUTPUT_QUEUE_BASE);
 	iowrite32be(a->filter_queue_base, esp->iomem + AUDIO_FIR_FILTER_QUEUE_BASE);
-
-	iowrite32be(a->src_offset, esp->iomem + SRC_OFFSET_REG);
-	iowrite32be(a->dst_offset, esp->iomem + DST_OFFSET_REG);
-	iowrite32be(a->spandex_conf, esp->iomem + SPANDEX_REG);
-
 }
 
 static bool audio_fir_xfer_input_ok(struct esp_device *esp, void *arg)

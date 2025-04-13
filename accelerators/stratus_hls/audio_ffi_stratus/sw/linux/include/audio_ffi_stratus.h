@@ -28,10 +28,6 @@ struct audio_ffi_stratus_access {
     unsigned input_queue_base;
     unsigned output_queue_base;
     unsigned filter_queue_base;
-	
-	unsigned src_offset;
-	unsigned dst_offset;
-    unsigned spandex_conf;
 };
 
 #define AUDIO_FFI_STRATUS_IOC_ACCESS	_IOW ('S', 0, struct audio_ffi_stratus_access)

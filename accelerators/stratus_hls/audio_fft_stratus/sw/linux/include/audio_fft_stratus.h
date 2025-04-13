@@ -27,10 +27,6 @@ struct audio_fft_stratus_access {
 	// ASI sync flag offsets
     unsigned input_queue_base;
     unsigned output_queue_base;
-
-	unsigned src_offset;
-	unsigned dst_offset;
-    unsigned spandex_conf;
 };
 
 #define AUDIO_FFT_STRATUS_IOC_ACCESS	_IOW ('S', 0, struct audio_fft_stratus_access)
