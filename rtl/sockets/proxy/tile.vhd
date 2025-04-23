@@ -771,6 +771,7 @@ package tile is
       acc_done                      : in  std_ulogic;
       flush                         : out std_ulogic;
       acc_flush_done                : in std_ulogic;
+      current_context               : in  std_logic_vector(1 downto 0);
       mon_dvfs_in                   : in  monitor_dvfs_type;
       mon_dvfs                      : out monitor_dvfs_type;
       llc_coherent_dma_rcv_rdreq    : out std_ulogic;
@@ -828,6 +829,7 @@ package tile is
       dma_tran_done        : in  std_ulogic;
       pending_dma_write    : out std_ulogic;
       pending_dma_read     : out std_ulogic;
+      current_context      : in  std_logic_vector(1 downto 0);
       tlb_empty            : out std_ulogic;
       tlb_clear            : in  std_ulogic;
       tlb_valid            : in  std_ulogic;

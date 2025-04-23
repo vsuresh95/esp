@@ -23,7 +23,7 @@
 #define UPDATE_VAR_SIZE 2
 #define TEST_VAR_SIZE 2
 
-#define POLL_INPUT_IS_FULL 0
+#define TEST_INPUT_IS_FULL 0
 #define POLL_OUTPUT_IS_EMPTY 1
 #define LOAD_DATA_REQ 2
 #define UPDATE_INPUT_IS_EMPTY 0
@@ -60,12 +60,18 @@ public:
         , load_done("load_done")
         , store_done("store_done")
     {
+        SC_CTHREAD(cycle_counter, this->clk.pos());
+        this->reset_signal_is(this->rst, false);
+
         // Signal binding
         cfg.bind_with(*this);
 
         HLS_PRESERVE_SIGNAL(load_state_req_dbg, true);
         HLS_PRESERVE_SIGNAL(store_state_req_dbg, true);
         HLS_PRESERVE_SIGNAL(compute_state_req_dbg, true);
+        HLS_PRESERVE_SIGNAL(accel_cycles_dbg, true);
+        HLS_PRESERVE_SIGNAL(current_context_int_dbg, true);
+        HLS_PRESERVE_SIGNAL(switch_context_dbg, true);
 
         // Map arrays to memories
         /* <<--plm-bind-->> */
@@ -80,11 +86,18 @@ public:
     sc_signal< sc_int<32> > load_state_req_dbg;
     sc_signal< sc_int<32> > store_state_req_dbg;
     sc_signal< sc_int<32> > compute_state_req_dbg;
+    sc_signal< sc_uint<32> > accel_cycles_dbg;
+    sc_signal< sc_uint<MAX_CONTEXTS_BITS> > current_context_int_dbg;
+    sc_signal< sc_int<1> > switch_context_dbg;
 
     sc_int<32> load_state_req;
     sc_int<32> store_state_req;
-
-    sc_int<32> last_task;
+    sc_int<32> input_is_full;
+    sc_uint<MAX_CONTEXTS_BITS> current_context_int;
+    sc_uint<32> accel_cycles;
+    
+    // Output signal for current context
+    sc_out< sc_uint<MAX_CONTEXTS_BITS> > current_context;
 
     // Processes
 
@@ -116,6 +129,25 @@ public:
     inline void load_compute_done_handshake();
     inline void compute_store_done_handshake();
     inline void store_compute_done_handshake();
+
+    void cycle_counter()
+    {
+        {
+            HLS_DEFINE_PROTOCOL("reset-counter");
+            accel_cycles = 0;
+            wait();
+        }        
+        
+        while(true)
+        {
+            {
+                HLS_DEFINE_PROTOCOL("counter-loop");
+                accel_cycles++;
+                accel_cycles_dbg.write(accel_cycles);
+                wait();
+            }
+        }
+    }
 };
 
 

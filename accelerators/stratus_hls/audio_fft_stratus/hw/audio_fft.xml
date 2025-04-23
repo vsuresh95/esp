@@ -1,10 +1,27 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <sld>
   <accelerator name="audio_fft" desc="Accelerator AUDIO_FFT" data_size="4" device_id="063" hls_tool="stratus_hls">
-    <param name="do_shift" desc="do_shift" />
-    <param name="logn_samples" desc="logn_samples" />
-    <param name="do_inverse" desc="do_inverse" />
-    <param name="input_queue_base" desc="input_queue_base" />
-    <param name="output_queue_base" desc="output_queue_base" />
+    <param name="do_shift_0" desc="do_shift_0" />
+    <param name="do_shift_1" desc="do_shift_1" />
+    <param name="do_shift_2" desc="do_shift_2" />
+    <param name="do_shift_3" desc="do_shift_3" />
+    <param name="logn_samples_0" desc="logn_samples_0" />
+    <param name="logn_samples_1" desc="logn_samples_1" />
+    <param name="logn_samples_2" desc="logn_samples_2" />
+    <param name="logn_samples_3" desc="logn_samples_3" />
+    <param name="do_inverse_0" desc="do_inverse_0" />
+    <param name="do_inverse_1" desc="do_inverse_1" />
+    <param name="do_inverse_2" desc="do_inverse_2" />
+    <param name="do_inverse_3" desc="do_inverse_3" />
+    <param name="input_queue_base_0" desc="input_queue_base_0" />
+    <param name="input_queue_base_1" desc="input_queue_base_1" />
+    <param name="input_queue_base_2" desc="input_queue_base_2" />
+    <param name="input_queue_base_3" desc="input_queue_base_3" />
+    <param name="output_queue_base_0" desc="output_queue_base_0" />
+    <param name="output_queue_base_1" desc="output_queue_base_1" />
+    <param name="output_queue_base_2" desc="output_queue_base_2" />
+    <param name="output_queue_base_3" desc="output_queue_base_3" />
+    <param name="context_quota" desc="context_quota" />
+    <param name="valid_contexts" desc="valid_contexts" />
   </accelerator>
 </sld>

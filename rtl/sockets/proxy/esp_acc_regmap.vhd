@@ -74,7 +74,10 @@ package esp_acc_regmap is
 
   -- bank(15)       : RESERVED
 
-  -- bank(16 to 63) : USR (user defined)
+  -- bank(14-17)       : SPANDEX_REG
+  constant PT_ADDRESS_REG_0 : integer range 0 to MAXREGNUM - 1 := 16;
+
+  -- bank(20 to 63) : USR (user defined)
 
   -- Re-enable the following 3 registers if adding an SRAM expanding the register bank
   -- -- bank(29)       : EXP_ADDR (bits 29:0 address an SRAM expanding the register bank)

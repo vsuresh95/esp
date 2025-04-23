@@ -25,6 +25,8 @@ void audio_fft::load_input()
         load_ready.ack.reset_ack();
         load_done.req.reset_req();
 
+        input_is_full = 0;
+
         wait();
     }
 
@@ -41,23 +43,8 @@ void audio_fft::load_input()
         HLS_PROTO("load-config");
 
         cfg.wait_for_config(); // config process
-        conf_info_t config = this->conf_info.read();
 
-        // User-defined config code
-        /* <<--local-params-->> */
-        logn_samples = config.logn_samples;
-        num_samples = 1 << logn_samples;
-
-        // Configured shared memory base addresses for input and output queues
-        input_queue_base = config.input_queue_base;
-        output_queue_base = config.output_queue_base;
-
-        // offsets for input valid and output valid based on preset values
-        input_valid_offset = input_queue_base + VALID_OFFSET;
-        output_valid_offset = output_queue_base + VALID_OFFSET;
-
-        // offsets for input valid and output payload based on preset values
-        input_payload_offset = input_queue_base + PAYLOAD_OFFSET;
+        wait();
     }
 
     // Load
@@ -71,26 +58,51 @@ void audio_fft::load_input()
 
         load_state_req_dbg.write(load_state_req);
 
+        // Read config information for current context
+        {
+            HLS_PROTO("read-load-config");
+
+            conf_info_t config = this->conf_info.read();        
+            HLS_FLATTEN_ARRAY(config.do_inverse);
+            HLS_FLATTEN_ARRAY(config.logn_samples);
+            HLS_FLATTEN_ARRAY(config.do_shift);
+            HLS_FLATTEN_ARRAY(config.input_queue_base);
+            HLS_FLATTEN_ARRAY(config.output_queue_base);
+
+            // User-defined config code
+            /* <<--local-params-->> */
+            logn_samples = config.logn_samples[current_context_int];
+            num_samples = 1 << logn_samples;
+
+            // Configured shared memory base addresses for input and output queues
+            input_queue_base = config.input_queue_base[current_context_int];
+            output_queue_base = config.output_queue_base[current_context_int];
+
+            // offsets for input valid and output valid based on preset values
+            input_valid_offset = input_queue_base + VALID_OFFSET;
+            output_valid_offset = output_queue_base + VALID_OFFSET;
+
+            // offsets for input valid and output payload based on preset values
+            input_payload_offset = input_queue_base + PAYLOAD_OFFSET;
+
+            wait();
+        }
+
         switch (load_state_req)
         {
 #ifdef ENABLE_SM
-            case POLL_INPUT_IS_FULL:
+            case TEST_INPUT_IS_FULL:
             {
                 dma_info_t dma_info(input_valid_offset / DMA_WORD_PER_BEAT, TEST_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
-                int32_t input_is_full = 0;
 
                 wait();
 
-                // Wait for producer to send new data
-                while (input_is_full != 1)
-                {
-                    HLS_UNROLL_LOOP(OFF);
-                    this->dma_read_ctrl.put(dma_info);
-                    dataBv = this->dma_read_chnl.get();
-                    wait();
-                    input_is_full = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
-                }
+                // Check if producer has new data
+                this->dma_read_ctrl.put(dma_info);
+                dataBv = this->dma_read_chnl.get();
+                wait();
+                input_is_full = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
             }
             break;
             case POLL_OUTPUT_IS_EMPTY:
@@ -176,23 +188,8 @@ void audio_fft::store_output()
         HLS_PROTO("store-config");
 
         cfg.wait_for_config(); // config process
-        conf_info_t config = this->conf_info.read();
 
-        // User-defined config code
-        /* <<--local-params-->> */
-        logn_samples = config.logn_samples;
-        num_samples = 1 << logn_samples;
-
-        // Configured shared memory base addresses for input and output queues
-        input_queue_base = config.input_queue_base;
-        output_queue_base = config.output_queue_base;
-
-        // offsets for input valid and output valid based on preset values
-        input_valid_offset = input_queue_base + VALID_OFFSET;
-        output_valid_offset = output_queue_base + VALID_OFFSET;
-
-        // offsets for input valid and output payload based on preset values
-        output_payload_offset = output_queue_base + PAYLOAD_OFFSET;
+        wait();
     }
 
     // Store
@@ -205,6 +202,36 @@ void audio_fft::store_output()
         this->store_compute_ready_handshake();
 
         store_state_req_dbg.write(store_state_req);
+
+        // Read config information for current context
+        {
+            HLS_PROTO("read-store-config");
+
+            conf_info_t config = this->conf_info.read();        
+            HLS_FLATTEN_ARRAY(config.do_inverse);
+            HLS_FLATTEN_ARRAY(config.logn_samples);
+            HLS_FLATTEN_ARRAY(config.do_shift);
+            HLS_FLATTEN_ARRAY(config.input_queue_base);
+            HLS_FLATTEN_ARRAY(config.output_queue_base);
+
+            // User-defined config code
+            /* <<--local-params-->> */
+            logn_samples = config.logn_samples[current_context_int];
+            num_samples = 1 << logn_samples;
+
+            // Configured shared memory base addresses for input and output queues
+            input_queue_base = config.input_queue_base[current_context_int];
+            output_queue_base = config.output_queue_base[current_context_int];
+
+            // offsets for input valid and output valid based on preset values
+            input_valid_offset = input_queue_base + VALID_OFFSET;
+            output_valid_offset = output_queue_base + VALID_OFFSET;
+
+            // offsets for input valid and output payload based on preset values
+            output_payload_offset = output_queue_base + PAYLOAD_OFFSET;
+
+            wait();
+        }
 
         switch (store_state_req)
         {
@@ -315,6 +342,13 @@ void audio_fft::compute_kernel()
         load_state_req = 0;
         store_state_req = 0;
 
+        current_context_int = 0;
+
+        switch_context_dbg.write(0);
+        current_context_int_dbg.write(0);
+
+        current_context.write(0);
+
         wait();
     }
 
@@ -324,35 +358,123 @@ void audio_fft::compute_kernel()
     int32_t num_samples;
     int32_t do_inverse;
     int32_t do_shift;
+    uint32_t context_quota;
+    uint32_t valid_contexts;
+    uint32_t start_cycles;
+    bool switch_context;
     {
         HLS_PROTO("compute-config");
 
         cfg.wait_for_config(); // config process
-        conf_info_t config = this->conf_info.read();
 
-        // User-defined config code
-        /* <<--local-params-->> */
-        logn_samples = config.logn_samples;
-        num_samples = 1 << logn_samples;
-        do_inverse = config.do_inverse;
-        do_shift = config.do_shift;
+        switch_context = false;
+        
+        wait();
     }
 
     while(true)
     {
 #ifdef ENABLE_SM
-        // Poll input queue is full for new task
+        // At the start of every iteration, check if there is a need to switch context
+        // This could be based on amount of time this context has already gotten, for starters.
+        // We need a way to check number of active contexts in the regbank and if it is > 1, then
+        // we can switch to another context in round robin manner. Limit the number of possible
+        // contexts to 4. DMA load and store must be overloaded to take ASID also. This ASID must
+        // be sent my esp_acc_dma wrapper to the TLB to get the translation. Need to check if 
+        // esp_acc_dma also caches the latest TLB entry used. If yes, that needs to be cleared
+        // and a TLB entry must be fetched again. If there is a TLB miss, a new memory access
+        // must be sent for the PT_ADDRESS location.
         {
-            HLS_PROTO("poll-input-is-full");
+            HLS_PROTO("check-new-context");
 
-            load_state_req = POLL_INPUT_IS_FULL;
+            // Is the quota of current context complete?
+            uint32_t cycles_elapsed = accel_cycles - start_cycles;
 
-            compute_state_req_dbg.write(POLL_INPUT_IS_FULL);
+            conf_info_t config = this->conf_info.read();        
+            HLS_FLATTEN_ARRAY(config.do_inverse);
+            HLS_FLATTEN_ARRAY(config.logn_samples);
+            HLS_FLATTEN_ARRAY(config.do_shift);
+            HLS_FLATTEN_ARRAY(config.input_queue_base);
+            HLS_FLATTEN_ARRAY(config.output_queue_base);
+            
+            context_quota = config.context_quota;
+            valid_contexts = config.valid_contexts;
+
+            wait();
+
+            if (cycles_elapsed > context_quota) {
+                sc_uint<MAX_CONTEXTS_BITS> v = valid_contexts;
+
+                if (current_context_int == v - 1) {
+                    current_context_int = 0;
+                } else {
+                    current_context_int++;
+                }
+
+                {
+                    HLS_PROTO("read-compute-config");
+                    // User-defined config code
+                    /* <<--local-params-->> */
+                    logn_samples = config.logn_samples[current_context_int];
+                    num_samples = 1 << logn_samples;
+                    do_inverse = config.do_inverse[current_context_int];
+                    do_shift = config.do_shift[current_context_int];
+
+                    // Set the start cycles for this context to current cycle value.
+                    start_cycles = accel_cycles;
+                    wait();
+                }
+            }
+
+            current_context_int_dbg.write(current_context_int);
+            current_context.write(current_context_int);
+            wait();
+        }
+
+        // Poll input queue is full for new task
+        while (1)
+        {
+            HLS_PROTO("test-input-is-full");
+
+            load_state_req = TEST_INPUT_IS_FULL;
+
+            compute_state_req_dbg.write(TEST_INPUT_IS_FULL);
 
             this->compute_load_ready_handshake();
             wait();
             this->compute_load_done_handshake();
             wait();
+
+            if (input_is_full == 1) {
+                input_is_full = 0;
+                break;
+            } else {              
+                // Is the quota of current context complete?
+                uint32_t cycles_elapsed = accel_cycles - start_cycles;
+
+                if (cycles_elapsed > context_quota) {
+                    HLS_PROTO("switch-context-1");
+                    switch_context = true;
+                    switch_context_dbg.write(1);
+                    wait();
+                    break;
+                } else {
+                    HLS_PROTO("no-switch-context");
+                    wait();
+                    continue;
+                }
+            }
+
+            // If input is not full and if quota is not exceeded, we will continue spinning.
+        }
+
+        // If spinning for long time, switch context
+        if (switch_context) {
+            HLS_PROTO("switch-context-0");
+            switch_context = false;
+            switch_context_dbg.write(0);
+            wait();
+            continue;
         }
 #endif
         // Load input data

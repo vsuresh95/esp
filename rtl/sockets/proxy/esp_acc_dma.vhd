@@ -101,6 +101,7 @@ entity esp_acc_dma is
     acc_done      : in  std_ulogic;
     flush         : out std_ulogic;
     acc_flush_done: in  std_ulogic;
+    current_context : in  std_logic_vector(1 downto 0);
     mon_dvfs_in   : in  monitor_dvfs_type;
     --Monitor signals
     mon_dvfs      : out monitor_dvfs_type;
@@ -257,7 +258,7 @@ architecture rtl of esp_acc_dma is
   -- TLB
   signal pending_dma_read, pending_dma_write : std_ulogic;
   signal tlb_valid, tlb_clear, tlb_empty, tlb_write : std_ulogic;
-  signal tlb_wr_address : std_logic_vector((log2xx(tlb_entries) -1) downto 0);
+  signal tlb_wr_address : std_logic_vector((log2xx(tlb_entries * 4) -1) downto 0);
   signal dma_address : addr_t;
   signal dma_length : std_logic_vector(31 downto 0);
 
@@ -295,9 +296,9 @@ architecture rtl of esp_acc_dma is
    attribute mark_debug of interrupt_full            : signal is "true";
    attribute mark_debug of interrupt_data_in         : signal is "true";
    attribute mark_debug of interrupt_wrreq           : signal is "true";
--- attribute mark_debug of dma_state : signal is "true";
-  -- attribute mark_debug of status : signal is "true";
-  -- attribute mark_debug of sample_status : signal is "true";
+  attribute mark_debug of dma_state : signal is "true";
+  attribute mark_debug of status : signal is "true";
+  attribute mark_debug of sample_status : signal is "true";
   -- attribute mark_debug of count                : signal is "true";
   -- attribute mark_debug of increment_count      : signal is "true";
   -- attribute mark_debug of clear_count          : signal is "true";
@@ -305,8 +306,8 @@ architecture rtl of esp_acc_dma is
   -- attribute mark_debug of dma_tran_header_sent : signal is "true";
   -- attribute mark_debug of dma_tran_start       : signal is "true";
   -- attribute mark_debug of dvfs_transient       : signal is "true";
-  -- attribute mark_debug of pending_dma_read : signal is "true";
-  -- attribute mark_debug of pending_dma_write : signal is "true";
+  attribute mark_debug of pending_dma_read : signal is "true";
+  attribute mark_debug of pending_dma_write : signal is "true";
   -- attribute mark_debug of tlb_valid : signal is "true";
   -- attribute mark_debug of tlb_clear : signal is "true";
   -- attribute mark_debug of tlb_empty : signal is "true";
@@ -314,16 +315,19 @@ architecture rtl of esp_acc_dma is
   -- attribute mark_debug of tlb_wr_address : signal is "true";
   -- attribute mark_debug of dma_address : signal is "true";
   -- attribute mark_debug of dma_length : signal is "true";
-  -- attribute mark_debug of pending_acc_done : signal is "true";
-  -- attribute mark_debug of clear_acc_done : signal is "true";
+  attribute mark_debug of pending_acc_done : signal is "true";
+  attribute mark_debug of clear_acc_done : signal is "true";
   -- attribute mark_debug of dma_snd_delay : signal is "true";
   -- attribute mark_debug of dma_rcv_delay : signal is "true";
   -- attribute mark_debug of read_burst : signal is "true";
   -- attribute mark_debug of write_burst : signal is "true";
   -- attribute mark_debug of noc_delay : signal is "true";
   -- attribute mark_debug of burst : signal is "true";
-  -- attribute mark_debug of acc_idle : signal is "true";
+  attribute mark_debug of acc_idle : signal is "true";
   -- attribute mark_debug of mon_dvfs_ctrl : signal is "true";
+  attribute mark_debug of bankreg : signal is "true";
+  attribute mark_debug of acc_rst_next : signal is "true";
+  attribute mark_debug of conf_done : signal is "true";
 
 begin  -- rtl
 
@@ -345,7 +349,7 @@ begin  -- rtl
       generic map (
         tech           => tech,
         scatter_gather => scatter_gather,
-        tlb_entries    => tlb_entries)
+        tlb_entries    => tlb_entries * 4)
       port map (
         clk                  => clk,
         rst                  => rst,
@@ -361,6 +365,7 @@ begin  -- rtl
         dma_tran_done        => dma_tran_done,
         pending_dma_write    => pending_dma_write,
         pending_dma_read     => pending_dma_read,
+        current_context      => current_context,
         tlb_empty            => tlb_empty,
         tlb_clear            => tlb_clear,
         tlb_valid            => tlb_valid,
@@ -676,7 +681,7 @@ begin  -- rtl
     clear_count <= '0';
     --TLB
     tlb_wr_address_next := count - 1;
-    tlb_wr_address <= tlb_wr_address_next(log2xx(tlb_entries) - 1 downto 0);
+    tlb_wr_address <= "00" & tlb_wr_address_next(log2xx(tlb_entries) - 1 downto 0);
     tlb_write <= '0';
     tlb_valid <= '0';
 

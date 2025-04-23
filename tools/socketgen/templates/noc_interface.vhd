@@ -220,6 +220,7 @@ end;
   signal acc_fence_valid            : std_ulogic;
   signal acc_fence_ready            : std_ulogic;
   signal acc_fence_data             : std_logic_vector(1 downto 0);
+  signal current_context            : std_logic_vector(1 downto 0);
   -- Register control, interrupt and monitor signals
   signal pllclk_int        : std_ulogic;
   signal mon_dvfs_feedthru : monitor_dvfs_type;
@@ -406,6 +407,7 @@ begin
       acc_done                      => acc_done,
       flush                         => flush,
       acc_flush_done                => acc_flush_done,
+      current_context               => current_context,
       mon_dvfs_in                   => mon_dvfs_in,
       mon_dvfs                      => mon_dvfs_feedthru,
       llc_coherent_dma_rcv_rdreq    => coherent_dma_rcv_rdreq,

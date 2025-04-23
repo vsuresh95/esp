@@ -57,11 +57,32 @@ static unsigned mem_size;
 
 /* User defined registers */
 /* <<--regs-->> */
-#define AUDIO_FFT_DO_INVERSE_REG 0x48
-#define AUDIO_FFT_LOGN_SAMPLES_REG 0x44
-#define AUDIO_FFT_DO_SHIFT_REG 0x40
-#define AUDIO_FFT_INPUT_QUEUE_BASE 0X4C
-#define AUDIO_FFT_OUTPUT_QUEUE_BASE 0X50
+#define PT_ADDRESS_REG_0 0x40
+#define PT_ADDRESS_REG_1 0x44
+#define PT_ADDRESS_REG_2 0x48
+#define PT_ADDRESS_REG_3 0x4C
+#define AUDIO_FFT_DO_SHIFT_REG_0 0x50
+#define AUDIO_FFT_DO_SHIFT_REG_1 0x54
+#define AUDIO_FFT_DO_SHIFT_REG_2 0x58
+#define AUDIO_FFT_DO_SHIFT_REG_3 0x5C
+#define AUDIO_FFT_LOGN_SAMPLES_REG_0 0x60
+#define AUDIO_FFT_LOGN_SAMPLES_REG_1 0x64
+#define AUDIO_FFT_LOGN_SAMPLES_REG_2 0x68
+#define AUDIO_FFT_LOGN_SAMPLES_REG_3 0x6C
+#define AUDIO_FFT_DO_INVERSE_REG_0 0x70
+#define AUDIO_FFT_DO_INVERSE_REG_1 0x74
+#define AUDIO_FFT_DO_INVERSE_REG_2 0x78
+#define AUDIO_FFT_DO_INVERSE_REG_3 0x7C
+#define AUDIO_FFT_INPUT_QUEUE_BASE_0 0x80
+#define AUDIO_FFT_INPUT_QUEUE_BASE_1 0x84
+#define AUDIO_FFT_INPUT_QUEUE_BASE_2 0x88
+#define AUDIO_FFT_INPUT_QUEUE_BASE_3 0x8C
+#define AUDIO_FFT_OUTPUT_QUEUE_BASE_0 0x90
+#define AUDIO_FFT_OUTPUT_QUEUE_BASE_1 0x94
+#define AUDIO_FFT_OUTPUT_QUEUE_BASE_2 0x98
+#define AUDIO_FFT_OUTPUT_QUEUE_BASE_3 0x9C
+#define AUDIO_FFT_CONTEXT_QUOTA 0xA0
+#define AUDIO_FFT_VALID_CONTEXTS 0xA4
 
 static uint64_t t_start = 0;
 static uint64_t t_end = 0;
@@ -159,7 +180,7 @@ int main(int argc, char * argv[])
 	in_size = in_len * sizeof(token_t);
 	out_size = out_len * sizeof(token_t);
 	out_offset  = in_len;
-	mem_size = (out_offset * sizeof(token_t)) + out_size;
+	mem_size = 4 * ((out_offset * sizeof(token_t)) + out_size);
 
 	// printf("ilen %u isize %u o_off %u olen %u osize %u msize %u\n", in_len, out_len, in_size, out_size, out_offset, mem_size);
 	// Search for the device
@@ -203,12 +224,28 @@ int main(int argc, char * argv[])
 			ptable[i] = (unsigned *) &mem[i * (CHUNK_SIZE / sizeof(token_t))];
 			
 		// Program sync flags
-		unsigned input_valid_offset = 0*in_len + VALID_OFFSET;
-		unsigned output_valid_offset = 1*in_len + VALID_OFFSET;
+		unsigned input_valid_offset_0 = 0*in_len + VALID_OFFSET;
+		unsigned input_data_offset_0 = 0*in_len + PAYLOAD_OFFSET;
+		unsigned output_valid_offset_0 = 1*in_len + VALID_OFFSET;
+		unsigned output_data_offset_0 = 1*in_len + PAYLOAD_OFFSET;
+
+		unsigned input_valid_offset_1 = 2*in_len + VALID_OFFSET;
+		unsigned input_data_offset_1 = 2*in_len + PAYLOAD_OFFSET;
+		unsigned output_valid_offset_1 = 3*in_len + VALID_OFFSET;
+		unsigned output_data_offset_1 = 3*in_len + PAYLOAD_OFFSET;
+
+		unsigned input_valid_offset_2 = 4*in_len + VALID_OFFSET;
+		unsigned input_data_offset_2 = 4*in_len + PAYLOAD_OFFSET;
+		unsigned output_valid_offset_2 = 5*in_len + VALID_OFFSET;
+		unsigned output_data_offset_2 = 5*in_len + PAYLOAD_OFFSET;
 
 		// Reset all sync variables to default values.
-		UpdateSync((void*) &mem[input_valid_offset], 0);
-		UpdateSync((void*) &mem[output_valid_offset], 0);
+		UpdateSync((void*) &mem[input_valid_offset_0], 0);
+		UpdateSync((void*) &mem[output_valid_offset_0], 0);
+		UpdateSync((void*) &mem[input_valid_offset_1], 0);
+		UpdateSync((void*) &mem[output_valid_offset_1], 0);
+		UpdateSync((void*) &mem[input_valid_offset_2], 0);
+		UpdateSync((void*) &mem[output_valid_offset_2], 0);
 
 		// Initialize registers of accelerator and start it.
 		iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
@@ -223,107 +260,202 @@ int main(int argc, char * argv[])
 		iowrite32(dev, SRC_OFFSET_REG, 0x0);
 		iowrite32(dev, DST_OFFSET_REG, 0x0);
 
-		// Pass accelerator-specific configuration parameters
-		/* <<--regs-config-->> */
-		iowrite32(dev, AUDIO_FFT_LOGN_SAMPLES_REG, logn_samples);
-		iowrite32(dev, AUDIO_FFT_DO_SHIFT_REG, do_shift);
-		iowrite32(dev, AUDIO_FFT_DO_INVERSE_REG, do_inverse);
-
-		iowrite32(dev, AUDIO_FFT_INPUT_QUEUE_BASE, input_valid_offset);
-		iowrite32(dev, AUDIO_FFT_OUTPUT_QUEUE_BASE, output_valid_offset);
-
 		// Flush (customize coherence model here)
 		esp_flush(coherence);
+
+		///////////////////////////////////////////////////////
+		/// Configure first context
+		///////////////////////////////////////////////////////
+		iowrite32(dev, AUDIO_FFT_LOGN_SAMPLES_REG_0, logn_samples);
+		iowrite32(dev, AUDIO_FFT_DO_SHIFT_REG_0, do_shift);
+		iowrite32(dev, AUDIO_FFT_DO_INVERSE_REG_0, do_inverse);
+		iowrite32(dev, AUDIO_FFT_INPUT_QUEUE_BASE_0, input_valid_offset_0);
+		iowrite32(dev, AUDIO_FFT_OUTPUT_QUEUE_BASE_0, output_valid_offset_0);
+		iowrite32(dev, AUDIO_FFT_CONTEXT_QUOTA, 50000);
+		iowrite32(dev, AUDIO_FFT_VALID_CONTEXTS, 1);
+
+		printf("First context configured\n");
 
 		// Start accelerator
 		iowrite32(dev, CMD_REG, CMD_MASK_START);
 
-		for (i = 0; i < ITERATIONS; ++i) {
-			// Wait for the accelerator to be ready
-			SpinSync((void*) &mem[input_valid_offset], 0);
-			// When the accelerator is ready, we write the input data to it
-			init_buf(&mem[PAYLOAD_OFFSET], gold);
-			// Inform the accelerator to start.
-			UpdateSync((void*) &mem[input_valid_offset], 1);
+		///////////////////////////////////////////////////////
+		/// Send first context task
+		///////////////////////////////////////////////////////
+		// Wait for the accelerator to be ready
+		SpinSync((void*) &mem[input_valid_offset_0], 0);
+		// When the accelerator is ready, we write the input data to it
+		init_buf(&mem[input_data_offset_0], gold);
+		// Inform the accelerator to start.
+		UpdateSync((void*) &mem[input_valid_offset_0], 1);
 
-			// Wait for the accelerator to send output.
-			SpinSync((void*) &mem[output_valid_offset], 1);
+		printf("First context task sent\n");
 
-			// When the output is ready, we read it
-			errors += validate_buf(&mem[in_len + PAYLOAD_OFFSET], gold);
-			// Inform the accelerator - ready for next iteration.
-			UpdateSync((void*) &mem[output_valid_offset], 0);
+		///////////////////////////////////////////////////////
+		/// Configure second context
+		///////////////////////////////////////////////////////
+		iowrite32(dev, AUDIO_FFT_LOGN_SAMPLES_REG_1, logn_samples);
+		iowrite32(dev, AUDIO_FFT_DO_SHIFT_REG_1, do_shift);
+		iowrite32(dev, AUDIO_FFT_DO_INVERSE_REG_1, do_inverse);
+		iowrite32(dev, AUDIO_FFT_INPUT_QUEUE_BASE_1, input_valid_offset_1);
+		iowrite32(dev, AUDIO_FFT_OUTPUT_QUEUE_BASE_1, output_valid_offset_1);
+		iowrite32(dev, AUDIO_FFT_VALID_CONTEXTS, 2);
+
+		printf("Second context configured\n");
+
+		///////////////////////////////////////////////////////
+		/// Get first context output
+		///////////////////////////////////////////////////////
+		// Wait for the accelerator to send output
+		SpinSync((void*) &mem[output_valid_offset_0], 1);
+
+		// When the output is ready, we read it
+		errors += validate_buf(&mem[output_data_offset_0], gold);
+		// Inform the accelerator - ready for next iteration.
+		UpdateSync((void*) &mem[output_valid_offset_0], 0);
+
+		printf("First context task done\n");
+
+		///////////////////////////////////////////////////////
+		/// Send second context task
+		///////////////////////////////////////////////////////
+		// Wait for the accelerator to be ready
+		SpinSync((void*) &mem[input_valid_offset_1], 0);
+		// When the accelerator is ready, we write the input data to it
+		init_buf(&mem[input_data_offset_1], gold);
+		// Inform the accelerator to start.
+		UpdateSync((void*) &mem[input_valid_offset_1], 1);
+
+		printf("Second context task sent\n");
+
+		///////////////////////////////////////////////////////
+		/// Configure third context
+		///////////////////////////////////////////////////////
+		iowrite32(dev, AUDIO_FFT_LOGN_SAMPLES_REG_2, logn_samples);
+		iowrite32(dev, AUDIO_FFT_DO_SHIFT_REG_2, do_shift);
+		iowrite32(dev, AUDIO_FFT_DO_INVERSE_REG_2, do_inverse);
+		iowrite32(dev, AUDIO_FFT_INPUT_QUEUE_BASE_2, input_valid_offset_2);
+		iowrite32(dev, AUDIO_FFT_OUTPUT_QUEUE_BASE_2, output_valid_offset_2);
+		iowrite32(dev, AUDIO_FFT_VALID_CONTEXTS, 3);
+
+		printf("Third context configured\n");
+
+		///////////////////////////////////////////////////////
+		/// Send first context task
+		///////////////////////////////////////////////////////
+		// Wait for the accelerator to be ready
+		SpinSync((void*) &mem[input_valid_offset_0], 0);
+		// When the accelerator is ready, we write the input data to it
+		init_buf(&mem[input_data_offset_0], gold);
+		// Inform the accelerator to start.
+		UpdateSync((void*) &mem[input_valid_offset_0], 1);
+
+		printf("First context task sent\n");
+
+		///////////////////////////////////////////////////////
+		/// Get second context output
+		///////////////////////////////////////////////////////
+		// Wait for the accelerator to send output
+		SpinSync((void*) &mem[output_valid_offset_1], 1);
+
+		// When the output is ready, we read it
+		errors += validate_buf(&mem[output_data_offset_1], gold);
+		// Inform the accelerator - ready for next iteration.
+		UpdateSync((void*) &mem[output_valid_offset_1], 0);
+
+		printf("Second context task done\n");
+
+		///////////////////////////////////////////////////////
+		/// Get first context output
+		///////////////////////////////////////////////////////
+		// Wait for the accelerator to send output
+		SpinSync((void*) &mem[output_valid_offset_0], 1);
+
+		// When the output is ready, we read it
+		errors += validate_buf(&mem[output_data_offset_0], gold);
+		// Inform the accelerator - ready for next iteration.
+		UpdateSync((void*) &mem[output_valid_offset_0], 0);
+
+		printf("First context task done\n");
+
+		///////////////////////////////////////////////////////
+		/// Send first context task
+		///////////////////////////////////////////////////////
+		// Wait for the accelerator to be ready
+		SpinSync((void*) &mem[input_valid_offset_0], 0);
+		// When the accelerator is ready, we write the input data to it
+		init_buf(&mem[input_data_offset_0], gold);
+		// Inform the accelerator to start.
+		UpdateSync((void*) &mem[input_valid_offset_0], 1);
+
+		printf("First context task sent\n");
+
+		///////////////////////////////////////////////////////
+		/// Send second context task
+		///////////////////////////////////////////////////////
+		// Wait for the accelerator to be ready
+		SpinSync((void*) &mem[input_valid_offset_1], 0);
+		// When the accelerator is ready, we write the input data to it
+		init_buf(&mem[input_data_offset_1], gold);
+		// Inform the accelerator to start.
+		UpdateSync((void*) &mem[input_valid_offset_1], 1);
+
+		printf("Second context task sent\n");
+
+		///////////////////////////////////////////////////////
+		/// Send third context task
+		///////////////////////////////////////////////////////
+		// Wait for the accelerator to be ready
+		SpinSync((void*) &mem[input_valid_offset_2], 0);
+		// When the accelerator is ready, we write the input data to it
+		init_buf(&mem[input_data_offset_2], gold);
+		// Inform the accelerator to start.
+		UpdateSync((void*) &mem[input_valid_offset_2], 1);
+
+		printf("Third context task sent\n");
+
+		///////////////////////////////////////////////////////
+		/// Get all contexts output
+		///////////////////////////////////////////////////////
+		// Check for the accelerator to send output
+		bool context_0_done = false;
+		bool context_1_done = false;
+		bool context_2_done = false;
+		while (!(context_0_done & context_1_done & context_2_done)) {
+			bool context_0_ready = TestSync((void*) &mem[output_valid_offset_0], 1);
+			bool context_1_ready = TestSync((void*) &mem[output_valid_offset_1], 1);
+			bool context_2_ready = TestSync((void*) &mem[output_valid_offset_2], 1);
+
+			if (context_0_ready) {
+				// When the output is ready, we read it
+				errors += validate_buf(&mem[output_data_offset_0], gold);
+				// Inform the accelerator - ready for next iteration.
+				UpdateSync((void*) &mem[output_valid_offset_0], 0);
+
+				context_0_done = true;
+
+				printf("First context task done\n");
+			} else if (context_1_ready) {
+				// When the output is ready, we read it
+				errors += validate_buf(&mem[output_data_offset_1], gold);
+				// Inform the accelerator - ready for next iteration.
+				UpdateSync((void*) &mem[output_valid_offset_1], 0);
+
+				context_1_done = true;
+
+				printf("Second context task done\n");
+			} else if (context_2_ready) {
+				// When the output is ready, we read it
+				errors += validate_buf(&mem[output_data_offset_2], gold);
+				// Inform the accelerator - ready for next iteration.
+				UpdateSync((void*) &mem[output_valid_offset_2], 0);
+
+				context_2_done = true;
+
+				printf("Third context task done\n");
+			}
 		}
-
-		// // Wait for completion
-		// done = 0;
-		// spin_ct = 0;
-		// while (!done) {
-		// 	done = ioread32(dev, STATUS_REG);
-		// 	done &= STATUS_MASK_DONE;
-		// 	spin_ct++;
-		// }
-		iowrite32(dev, CMD_REG, 0x0);
-
-		printf("Result: First test done\n");
 		
-		// Reset all sync variables to default values.
-		UpdateSync((void*) &mem[input_valid_offset], 0);
-		UpdateSync((void*) &mem[output_valid_offset], 0);
-
-		// Initialize registers of accelerator and start it.
-		iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
-		iowrite32(dev, COHERENCE_REG, coherence);
-		iowrite32(dev, SPANDEX_REG, spandex_config.spandex_reg);
-
-		iowrite32(dev, PT_ADDRESS_REG, (unsigned long long) ptable);
-		iowrite32(dev, PT_NCHUNK_REG, NCHUNK(mem_size));
-		iowrite32(dev, PT_SHIFT_REG, CHUNK_SHIFT);
-
-		// Use the following if input and output data are not allocated at the default offsets
-		iowrite32(dev, SRC_OFFSET_REG, 0x0);
-		iowrite32(dev, DST_OFFSET_REG, 0x0);
-
-		// Pass accelerator-specific configuration parameters
-		/* <<--regs-config-->> */
-		iowrite32(dev, AUDIO_FFT_LOGN_SAMPLES_REG, logn_samples);
-		iowrite32(dev, AUDIO_FFT_DO_SHIFT_REG, do_shift);
-		iowrite32(dev, AUDIO_FFT_DO_INVERSE_REG, do_inverse);
-
-		iowrite32(dev, AUDIO_FFT_INPUT_QUEUE_BASE, input_valid_offset);
-		iowrite32(dev, AUDIO_FFT_OUTPUT_QUEUE_BASE, output_valid_offset);
-
-		// Flush (customize coherence model here)
-		esp_flush(coherence);
-
-		// Start accelerator
-		iowrite32(dev, CMD_REG, CMD_MASK_START);
-
-		for (i = 0; i < ITERATIONS; ++i) {
-			// Wait for the accelerator to be ready
-			SpinSync((void*) &mem[input_valid_offset], 0);
-			// When the accelerator is ready, we write the input data to it
-			init_buf(&mem[PAYLOAD_OFFSET], gold);
-			// Inform the accelerator to start.
-			UpdateSync((void*) &mem[input_valid_offset], 1);
-
-			// Wait for the accelerator to send output.
-			SpinSync((void*) &mem[output_valid_offset], 1);
-
-			// When the output is ready, we read it
-			errors += validate_buf(&mem[in_len + PAYLOAD_OFFSET], gold);
-			// Inform the accelerator - ready for next iteration.
-			UpdateSync((void*) &mem[output_valid_offset], 0);
-		}
-
-		// // Wait for completion
-		// done = 0;
-		// spin_ct = 0;
-		// while (!done) {
-		// 	done = ioread32(dev, STATUS_REG);
-		// 	done &= STATUS_MASK_DONE;
-		// 	spin_ct++;
-		// }
 		iowrite32(dev, CMD_REG, 0x0);
 		
 		aligned_free(ptable);
@@ -340,6 +472,6 @@ int main(int argc, char * argv[])
 		// printf("  Accel Output = %lu\n", t_acc_output/ITERATIONS);
 	}
 
-	while(1);
-	// return 0;
+	// while(1);
+	return 0;
 }

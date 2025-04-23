@@ -81,6 +81,7 @@ entity esp_acc_tlb is
     dma_tran_done        : in  std_ulogic;
     pending_dma_write    : out std_ulogic;
     pending_dma_read     : out std_ulogic;
+    current_context      : in  std_logic_vector(1 downto 0);
     tlb_empty            : out std_ulogic;
     tlb_clear            : in  std_ulogic;
     tlb_valid            : in  std_ulogic;
