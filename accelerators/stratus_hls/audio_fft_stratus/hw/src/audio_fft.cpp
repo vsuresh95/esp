@@ -376,14 +376,6 @@ void audio_fft::compute_kernel()
     {
 #ifdef ENABLE_SM
         // At the start of every iteration, check if there is a need to switch context
-        // This could be based on amount of time this context has already gotten, for starters.
-        // We need a way to check number of active contexts in the regbank and if it is > 1, then
-        // we can switch to another context in round robin manner. Limit the number of possible
-        // contexts to 4. DMA load and store must be overloaded to take ASID also. This ASID must
-        // be sent my esp_acc_dma wrapper to the TLB to get the translation. Need to check if 
-        // esp_acc_dma also caches the latest TLB entry used. If yes, that needs to be cleared
-        // and a TLB entry must be fetched again. If there is a TLB miss, a new memory access
-        // must be sent for the PT_ADDRESS location.
         {
             HLS_PROTO("check-new-context");
 
@@ -403,12 +395,15 @@ void audio_fft::compute_kernel()
             wait();
 
             if (cycles_elapsed > context_quota) {
-                sc_uint<MAX_CONTEXTS_BITS> v = valid_contexts;
+                sc_uint<MAX_CONTEXTS> v = valid_contexts;
+                sc_uint<MAX_CONTEXTS_BITS> idx = current_context_int + 1;
 
-                if (current_context_int == v - 1) {
-                    current_context_int = 0;
-                } else {
-                    current_context_int++;
+                for (int i = 0; i < MAX_CONTEXTS; i++) {
+                    if (v[idx] == 1) {
+                        current_context_int = idx;
+                        break;
+                    }
+                    idx++;
                 }
 
                 {

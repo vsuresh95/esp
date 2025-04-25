@@ -152,6 +152,10 @@ end;
     P2P_REG            => '1',
     YX_REG             => '1',
     SPANDEX_REG        => '1',
+    PT_ADDRESS_REG_0   => '1',
+    PT_ADDRESS_REG_1   => '1',
+    PT_ADDRESS_REG_2   => '1',
+    PT_ADDRESS_REG_3   => '1',
     -- <<user_mask>>
     others             => '0');
 

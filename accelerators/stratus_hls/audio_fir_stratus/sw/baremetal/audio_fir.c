@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2022 Columbia University, System Level Design Group */
+/* Copyright (c) 2011-2019 Columbia University, System Level Design Group */
 /* SPDX-License-Identifier: Apache-2.0 */
 
 #include <stdio.h>
@@ -8,30 +8,44 @@
 
 #include <esp_accelerator.h>
 #include <esp_probe.h>
-#include <fixed_point.h>
+#include "utils/fft2_utils.h"
 
-typedef int32_t token_t;
+typedef int token_t;
+typedef float native_t;
+#define fx2float fixed32_to_float
+#define float2fx float_to_fixed32
+#define FX_IL 14
+
+#define ITERATIONS 5
+#define COH_MODE 1
+#define IS_ESP 1
+
+#include "coh_func.h"
+#include "sm.h"
+
+const float ERR_TH = 0.05;
 
 static unsigned DMA_WORD_PER_BEAT(unsigned _st)
 {
         return (sizeof(void *) / _st);
 }
 
-
 #define SLD_AUDIO_FIR 0x064
 #define DEV_NAME "sld,audio_fir_stratus"
 
 /* <<--params-->> */
-const int32_t do_inverse = 1;
-const int32_t logn_samples = 11;
-const int32_t do_shift = 1;
+const int32_t logn_samples = 6;
+const int32_t num_samples = (1 << logn_samples);
 
 static unsigned in_words_adj;
 static unsigned out_words_adj;
+static unsigned flt_words_adj;
 static unsigned in_len;
 static unsigned out_len;
+static unsigned flt_len;
 static unsigned in_size;
 static unsigned out_size;
+static unsigned flt_size;
 static unsigned out_offset;
 static unsigned mem_size;
 
@@ -44,40 +58,110 @@ static unsigned mem_size;
 
 /* User defined registers */
 /* <<--regs-->> */
-#define AUDIO_FIR_DO_INVERSE_REG 0x48
-#define AUDIO_FIR_LOGN_SAMPLES_REG 0x44
-#define AUDIO_FIR_DO_SHIFT_REG 0x40
+#define PT_ADDRESS_REG_0 0x40
+#define PT_ADDRESS_REG_1 0x44
+#define PT_ADDRESS_REG_2 0x48
+#define PT_ADDRESS_REG_3 0x4C
+#define AUDIO_FIR_LOGN_SAMPLES_REG_0 0x50
+#define AUDIO_FIR_LOGN_SAMPLES_REG_1 0x54
+#define AUDIO_FIR_LOGN_SAMPLES_REG_2 0x58
+#define AUDIO_FIR_LOGN_SAMPLES_REG_3 0x5C
+#define AUDIO_FIR_INPUT_QUEUE_BASE_0 0x60
+#define AUDIO_FIR_INPUT_QUEUE_BASE_1 0x64
+#define AUDIO_FIR_INPUT_QUEUE_BASE_2 0x68
+#define AUDIO_FIR_INPUT_QUEUE_BASE_3 0x6C
+#define AUDIO_FIR_OUTPUT_QUEUE_BASE_0 0x70
+#define AUDIO_FIR_OUTPUT_QUEUE_BASE_1 0x74
+#define AUDIO_FIR_OUTPUT_QUEUE_BASE_2 0x78
+#define AUDIO_FIR_OUTPUT_QUEUE_BASE_3 0x7C
+#define AUDIO_FIR_FILTER_QUEUE_BASE_0 0x80
+#define AUDIO_FIR_FILTER_QUEUE_BASE_1 0x84
+#define AUDIO_FIR_FILTER_QUEUE_BASE_2 0x88
+#define AUDIO_FIR_FILTER_QUEUE_BASE_3 0x8C
+#define AUDIO_FIR_CONTEXT_QUOTA 0x90
+#define AUDIO_FIR_VALID_CONTEXTS 0x94
 
+static uint64_t t_start = 0;
+static uint64_t t_end = 0;
 
-static int validate_buf(token_t *out, token_t *gold)
+uint64_t t_sw_input;
+uint64_t t_sw;
+uint64_t t_sw_output;
+uint64_t t_acc_input;
+uint64_t t_acc;
+uint64_t t_acc_output;
+
+static inline void start_counter() {
+	asm volatile (
+		"li t0, 0;"
+		"csrr t0, mcycle;"
+		"mv %0, t0"
+		: "=r" (t_start)
+		:
+		: "t0"
+	);
+}
+
+static inline uint64_t end_counter() {
+	asm volatile (
+		"li t0, 0;"
+		"csrr t0, mcycle;"
+		"mv %0, t0"
+		: "=r" (t_end)
+		:
+		: "t0"
+	);
+
+	return (t_end - t_start);
+}
+
+int validate_buf(token_t *out, float *gold)
 {
-	int i;
 	int j;
 	unsigned errors = 0;
+	unsigned len = 2 * num_samples;
 
-	for (i = 0; i < 1; i++)
-		for (j = 0; j < do_shift; j++)
-			if (gold[i * out_words_adj + j] != out[i * out_words_adj + j])
-				errors++;
+    spandex_token_t out_data;
+    void* src = (void*) out;
+
+	for (j = 0; j < len; j+=2, src+=8) {
+        out_data.value_64 = read_mem_reqodata(src);
+		if (fx2float(out_data.value_32_1, FX_IL) == 0x11223344) errors++;
+		if (fx2float(out_data.value_32_2, FX_IL) == 0x11223344) errors++;
+	}
 
 	return errors;
 }
 
-
-static void init_buf (token_t *in, token_t * gold)
+void init_buf(token_t *in, float *gold)
 {
-	int i;
 	int j;
+	unsigned len = 2 * num_samples;
 
-	for (i = 0; i < 1; i++)
-		for (j = 0; j < do_shift; j++)
-			in[i * in_words_adj + j] = (token_t) j;
+    spandex_token_t in_data;
+    void* src = (void*) in;
 
-	for (i = 0; i < 1; i++)
-		for (j = 0; j < do_shift; j++)
-			gold[i * out_words_adj + j] = (token_t) j;
+	for (j = 0; j < len; j+=2, src+=8) {
+		in_data.value_32_1 = float2fx((native_t) (j % 100), FX_IL);
+		in_data.value_32_2 = float2fx((native_t) (j % 100), FX_IL);
+        write_mem_wtfwd(src, in_data.value_64);
+	}
 }
 
+void init_flt(token_t *in, float *gold)
+{
+	int j;
+	unsigned len = 2 * (num_samples+1) + num_samples;
+
+    spandex_token_t in_data;
+    void* src = (void*) in;
+
+	for (j = 0; j < len; j+=2, src+=8) {
+		in_data.value_32_1 = float2fx((native_t) (j % 100), FX_IL);
+		in_data.value_32_2 = float2fx((native_t) (j % 100), FX_IL);
+        write_mem_wtfwd(src, in_data.value_64);
+	}
+}
 
 int main(int argc, char * argv[])
 {
@@ -87,38 +171,52 @@ int main(int argc, char * argv[])
 	struct esp_device *espdevs;
 	struct esp_device *dev;
 	unsigned done;
-	unsigned **ptable;
+	unsigned spin_ct;
+	unsigned **ptable0 = NULL;
+	unsigned **ptable1 = NULL;
+	unsigned **ptable2 = NULL;
 	token_t *mem;
-	token_t *gold;
+	float *gold;
 	unsigned errors = 0;
-	unsigned coherence;
+    const float ERROR_COUNT_TH = 0.001;
+	unsigned len = num_samples;
 
+	// printf("logn %u nsmp %u nfft %u inv %u shft %u len %u\n", logn_samples, num_samples, 1, do_inverse, do_shift, len);
 	if (DMA_WORD_PER_BEAT(sizeof(token_t)) == 0) {
-		in_words_adj = do_shift;
-		out_words_adj = do_shift;
+		in_words_adj = (2 * len) + PAYLOAD_OFFSET;
+		out_words_adj = (2 * len) + PAYLOAD_OFFSET;
+		flt_words_adj = ((2 * (len+1)) + len) + PAYLOAD_OFFSET;
 	} else {
-		in_words_adj = round_up(do_shift, DMA_WORD_PER_BEAT(sizeof(token_t)));
-		out_words_adj = round_up(do_shift, DMA_WORD_PER_BEAT(sizeof(token_t)));
+		in_words_adj = round_up((2 * len) + PAYLOAD_OFFSET, DMA_WORD_PER_BEAT(sizeof(token_t)));
+		out_words_adj = round_up((2 * len) + PAYLOAD_OFFSET, DMA_WORD_PER_BEAT(sizeof(token_t)));
+		flt_words_adj = round_up(((2 * (len+1)) + len) + PAYLOAD_OFFSET, DMA_WORD_PER_BEAT(sizeof(token_t)));
 	}
-	in_len = in_words_adj * (1);
-	out_len = out_words_adj * (1);
+	in_len = in_words_adj;
+	out_len = out_words_adj;
+	flt_len = flt_words_adj;
 	in_size = in_len * sizeof(token_t);
 	out_size = out_len * sizeof(token_t);
+	flt_size = flt_len * sizeof(token_t);
 	out_offset  = in_len;
-	mem_size = (out_offset * sizeof(token_t)) + out_size;
+	mem_size = 4 * ((out_offset * sizeof(token_t)) + out_size + flt_size);
 
-
+	// printf("ilen %u isize %u o_off %u olen %u osize %u msize %u\n", in_len, out_len, in_size, out_size, out_offset, mem_size);
 	// Search for the device
-	printf("Scanning device tree... \n");
-
 	ndev = probe(&espdevs, VENDOR_SLD, SLD_AUDIO_FIR, DEV_NAME);
 	if (ndev == 0) {
-		printf("audio_fir not found\n");
+		printf("%s not found\n", DEV_NAME);
 		return 0;
 	}
 
-	for (n = 0; n < ndev; n++) {
+	t_sw_input = 0;
+	t_sw = 0;
+	t_sw_output = 0;
+	t_acc_input = 0;
+	t_acc = 0;
+	t_acc_output = 0;
 
+	n = 0;
+	{
 		printf("**************** %s.%d ****************\n", DEV_NAME, n);
 
 		dev = &espdevs[n];
@@ -135,81 +233,301 @@ int main(int argc, char * argv[])
 		}
 
 		// Allocate memory
-		gold = aligned_malloc(out_size);
+		gold = aligned_malloc(out_len * sizeof(float));
 		mem = aligned_malloc(mem_size);
-		printf("  memory buffer base-address = %p\n", mem);
 
-		// Alocate and populate page table
-		ptable = aligned_malloc(NCHUNK(mem_size) * sizeof(unsigned *));
+		// Allocate and populate page table
+		ptable0 = aligned_malloc(NCHUNK(mem_size) * sizeof(unsigned *));
 		for (i = 0; i < NCHUNK(mem_size); i++)
-			ptable[i] = (unsigned *) &mem[i * (CHUNK_SIZE / sizeof(token_t))];
+			ptable0[i] = (unsigned *) &mem[i * (CHUNK_SIZE / sizeof(token_t))];
+			
+		ptable1 = aligned_malloc(NCHUNK(mem_size) * sizeof(unsigned *));
+		for (i = 0; i < NCHUNK(mem_size); i++)
+			ptable1[i] = (unsigned *) &mem[i * (CHUNK_SIZE / sizeof(token_t))];
+			
+		ptable2 = aligned_malloc(NCHUNK(mem_size) * sizeof(unsigned *));
+		for (i = 0; i < NCHUNK(mem_size); i++)
+			ptable2[i] = (unsigned *) &mem[i * (CHUNK_SIZE / sizeof(token_t))];
+			
+		// Program sync flags
+		unsigned input_valid_offset_0 = 0*in_len + VALID_OFFSET;
+		unsigned input_data_offset_0 = 0*in_len + PAYLOAD_OFFSET;
+		unsigned output_valid_offset_0 = 1*in_len + VALID_OFFSET;
+		unsigned output_data_offset_0 = 1*in_len + PAYLOAD_OFFSET;
+		unsigned filter_valid_offset_0 = 2*in_len + VALID_OFFSET;
+		unsigned filter_data_offset_0 = 2*in_len + PAYLOAD_OFFSET;
 
-		printf("  ptable = %p\n", ptable);
-		printf("  nchunk = %lu\n", NCHUNK(mem_size));
+		unsigned input_valid_offset_1 = 4*in_len + VALID_OFFSET;
+		unsigned input_data_offset_1 = 4*in_len + PAYLOAD_OFFSET;
+		unsigned output_valid_offset_1 = 5*in_len + VALID_OFFSET;
+		unsigned output_data_offset_1 = 5*in_len + PAYLOAD_OFFSET;
+		unsigned filter_valid_offset_1 = 6*in_len + VALID_OFFSET;
+		unsigned filter_data_offset_1 = 6*in_len + PAYLOAD_OFFSET;
 
-#ifndef __riscv
-		for (coherence = ACC_COH_NONE; coherence <= ACC_COH_RECALL; coherence++) {
-#else
-		{
-			/* TODO: Restore full test once ESP caches are integrated */
-			coherence = ACC_COH_NONE;
-#endif
-			printf("  --------------------\n");
-			printf("  Generate input...\n");
-			init_buf(mem, gold);
+		unsigned input_valid_offset_2 = 8*in_len + VALID_OFFSET;
+		unsigned input_data_offset_2 = 8*in_len + PAYLOAD_OFFSET;
+		unsigned output_valid_offset_2 = 9*in_len + VALID_OFFSET;
+		unsigned output_data_offset_2 = 9*in_len + PAYLOAD_OFFSET;
+		unsigned filter_valid_offset_2 = 10*in_len + VALID_OFFSET;
+		unsigned filter_data_offset_2 = 10*in_len + PAYLOAD_OFFSET;
 
-			// Pass common configuration parameters
+		// Reset all sync variables to default values.
+		UpdateSync((void*) &mem[input_valid_offset_0], 0);
+		UpdateSync((void*) &mem[output_valid_offset_0], 0);
+		UpdateSync((void*) &mem[filter_valid_offset_0], 0);
+		UpdateSync((void*) &mem[input_valid_offset_1], 0);
+		UpdateSync((void*) &mem[output_valid_offset_1], 0);
+		UpdateSync((void*) &mem[filter_valid_offset_1], 0);
+		UpdateSync((void*) &mem[input_valid_offset_2], 0);
+		UpdateSync((void*) &mem[output_valid_offset_2], 0);
+		UpdateSync((void*) &mem[filter_valid_offset_2], 0);
 
-			iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
-			iowrite32(dev, COHERENCE_REG, coherence);
+		// Initialize registers of accelerator and start it.
+		iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
+		iowrite32(dev, COHERENCE_REG, coherence);
+		iowrite32(dev, SPANDEX_REG, spandex_config.spandex_reg);
 
-#ifndef __sparc
-			iowrite32(dev, PT_ADDRESS_REG, (unsigned long long) ptable);
-#else
-			iowrite32(dev, PT_ADDRESS_REG, (unsigned) ptable);
-#endif
-			iowrite32(dev, PT_NCHUNK_REG, NCHUNK(mem_size));
-			iowrite32(dev, PT_SHIFT_REG, CHUNK_SHIFT);
+		iowrite32(dev, PT_ADDRESS_REG, (unsigned long long) ptable0);
+		iowrite32(dev, PT_NCHUNK_REG, NCHUNK(mem_size));
+		iowrite32(dev, PT_SHIFT_REG, CHUNK_SHIFT);
 
-			// Use the following if input and output data are not allocated at the default offsets
-			iowrite32(dev, SRC_OFFSET_REG, 0x0);
-			iowrite32(dev, DST_OFFSET_REG, 0x0);
+		// Use the following if input and output data are not allocated at the default offsets
+		iowrite32(dev, SRC_OFFSET_REG, 0x0);
+		iowrite32(dev, DST_OFFSET_REG, 0x0);
 
-			// Pass accelerator-specific configuration parameters
-			/* <<--regs-config-->> */
-		iowrite32(dev, AUDIO_FIR_DO_INVERSE_REG, do_inverse);
-		iowrite32(dev, AUDIO_FIR_LOGN_SAMPLES_REG, logn_samples);
-		iowrite32(dev, AUDIO_FIR_DO_SHIFT_REG, do_shift);
+		// Flush (customize coherence model here)
+		esp_flush(coherence);
 
-			// Flush (customize coherence model here)
-			esp_flush(coherence);
+		///////////////////////////////////////////////////////
+		/// Configure first context
+		///////////////////////////////////////////////////////
+		iowrite32(dev, AUDIO_FIR_LOGN_SAMPLES_REG_0, logn_samples);
+		iowrite32(dev, AUDIO_FIR_INPUT_QUEUE_BASE_0, input_valid_offset_0);
+		iowrite32(dev, AUDIO_FIR_OUTPUT_QUEUE_BASE_0, output_valid_offset_0);
+		iowrite32(dev, AUDIO_FIR_FILTER_QUEUE_BASE_0, filter_valid_offset_0);
+		iowrite32(dev, AUDIO_FIR_CONTEXT_QUOTA, 50000);
+		iowrite32(dev, AUDIO_FIR_VALID_CONTEXTS, 0x1);
+		iowrite32(dev, PT_ADDRESS_REG_0, (unsigned long long) ptable0);
 
-			// Start accelerators
-			printf("  Start...\n");
-			iowrite32(dev, CMD_REG, CMD_MASK_START);
+		printf("First context configured\n");
 
-			// Wait for completion
-			done = 0;
-			while (!done) {
-				done = ioread32(dev, STATUS_REG);
-				done &= STATUS_MASK_DONE;
-			}
-			iowrite32(dev, CMD_REG, 0x0);
+		init_flt(&mem[filter_data_offset_0], gold);
 
-			printf("  Done\n");
-			printf("  validating...\n");
+		// Start accelerator
+		iowrite32(dev, CMD_REG, CMD_MASK_START);
 
-			/* Validation */
-			errors = validate_buf(&mem[out_offset], gold);
-			if (errors)
-				printf("  ... FAIL\n");
-			else
-				printf("  ... PASS\n");
+		///////////////////////////////////////////////////////
+		/// Send first context task
+		///////////////////////////////////////////////////////
+		// Wait for the accelerator to be ready
+		SpinSync((void*) &mem[input_valid_offset_0], 0);
+		// When the accelerator is ready, we write the input data to it
+		init_buf(&mem[input_data_offset_0], gold);
+		// Inform the accelerator to start.
+		UpdateSync((void*) &mem[input_valid_offset_0], 1);
+		UpdateSync((void*) &mem[filter_valid_offset_0], 1);
+
+		printf("First context task sent\n");
+
+		printf("PT_ADDRESS_REG_0 = %x\n", ioread32(dev, PT_ADDRESS_REG_0));
+
+		for (i = 0; i < 3; i++) {
+			iowrite32(dev, PT_ADDRESS_REG_0, (unsigned long long) ptable1);
+			printf("PT_ADDRESS_REG_0 = %x\n", ioread32(dev, PT_ADDRESS_REG_0));
 		}
-		aligned_free(ptable);
+
+		///////////////////////////////////////////////////////
+		/// Configure second context
+		///////////////////////////////////////////////////////
+		iowrite32(dev, AUDIO_FIR_LOGN_SAMPLES_REG_1, logn_samples);
+		iowrite32(dev, AUDIO_FIR_INPUT_QUEUE_BASE_1, input_valid_offset_1);
+		iowrite32(dev, AUDIO_FIR_OUTPUT_QUEUE_BASE_1, output_valid_offset_1);
+		iowrite32(dev, AUDIO_FIR_FILTER_QUEUE_BASE_1, filter_valid_offset_1);
+		iowrite32(dev, AUDIO_FIR_VALID_CONTEXTS, 0x3);
+		iowrite32(dev, PT_ADDRESS_REG_1, (unsigned long long) ptable1);
+
+		printf("Second context configured\n");
+
+		init_flt(&mem[filter_data_offset_1], gold);
+
+		///////////////////////////////////////////////////////
+		/// Get first context output
+		///////////////////////////////////////////////////////
+		// Wait for the accelerator to send output
+		SpinSync((void*) &mem[output_valid_offset_0], 1);
+
+		// When the output is ready, we read it
+		errors += validate_buf(&mem[output_data_offset_0], gold);
+		// Inform the accelerator - ready for next iteration.
+		UpdateSync((void*) &mem[output_valid_offset_0], 0);
+
+		printf("First context task done\n");
+
+		///////////////////////////////////////////////////////
+		/// Send second context task
+		///////////////////////////////////////////////////////
+		// Wait for the accelerator to be ready
+		SpinSync((void*) &mem[input_valid_offset_1], 0);
+		// When the accelerator is ready, we write the input data to it
+		init_buf(&mem[input_data_offset_1], gold);
+		// Inform the accelerator to start.
+		UpdateSync((void*) &mem[input_valid_offset_1], 1);
+		UpdateSync((void*) &mem[filter_valid_offset_1], 1);
+
+		printf("Second context task sent\n");
+
+		///////////////////////////////////////////////////////
+		/// Configure third context
+		///////////////////////////////////////////////////////
+		iowrite32(dev, AUDIO_FIR_LOGN_SAMPLES_REG_2, logn_samples);
+		iowrite32(dev, AUDIO_FIR_INPUT_QUEUE_BASE_2, input_valid_offset_2);
+		iowrite32(dev, AUDIO_FIR_OUTPUT_QUEUE_BASE_2, output_valid_offset_2);
+		iowrite32(dev, AUDIO_FIR_FILTER_QUEUE_BASE_2, filter_valid_offset_2);
+		iowrite32(dev, AUDIO_FIR_VALID_CONTEXTS, 0x7);
+		iowrite32(dev, PT_ADDRESS_REG_2, (unsigned long long) ptable2);
+
+		printf("Third context configured\n");
+
+		init_flt(&mem[filter_data_offset_2], gold);
+
+		///////////////////////////////////////////////////////
+		/// Send first context task
+		///////////////////////////////////////////////////////
+		// Wait for the accelerator to be ready
+		SpinSync((void*) &mem[input_valid_offset_0], 0);
+		// When the accelerator is ready, we write the input data to it
+		init_buf(&mem[input_data_offset_0], gold);
+		// Inform the accelerator to start.
+		UpdateSync((void*) &mem[input_valid_offset_0], 1);
+		UpdateSync((void*) &mem[filter_valid_offset_0], 1);
+
+		printf("First context task sent\n");
+
+		///////////////////////////////////////////////////////
+		/// Get second context output
+		///////////////////////////////////////////////////////
+		// Wait for the accelerator to send output
+		SpinSync((void*) &mem[output_valid_offset_1], 1);
+
+		// When the output is ready, we read it
+		errors += validate_buf(&mem[output_data_offset_1], gold);
+		// Inform the accelerator - ready for next iteration.
+		UpdateSync((void*) &mem[output_valid_offset_1], 0);
+
+		printf("Second context task done\n");
+
+		///////////////////////////////////////////////////////
+		/// Get first context output
+		///////////////////////////////////////////////////////
+		// Wait for the accelerator to send output
+		SpinSync((void*) &mem[output_valid_offset_0], 1);
+
+		// When the output is ready, we read it
+		errors += validate_buf(&mem[output_data_offset_0], gold);
+		// Inform the accelerator - ready for next iteration.
+		UpdateSync((void*) &mem[output_valid_offset_0], 0);
+
+		printf("First context task done\n");
+
+		///////////////////////////////////////////////////////
+		/// Send first context task
+		///////////////////////////////////////////////////////
+		// Wait for the accelerator to be ready
+		SpinSync((void*) &mem[input_valid_offset_0], 0);
+		// When the accelerator is ready, we write the input data to it
+		init_buf(&mem[input_data_offset_0], gold);
+		// Inform the accelerator to start.
+		UpdateSync((void*) &mem[input_valid_offset_0], 1);
+		UpdateSync((void*) &mem[filter_valid_offset_0], 1);
+
+		printf("First context task sent\n");
+
+		///////////////////////////////////////////////////////
+		/// Send second context task
+		///////////////////////////////////////////////////////
+		// Wait for the accelerator to be ready
+		SpinSync((void*) &mem[input_valid_offset_1], 0);
+		// When the accelerator is ready, we write the input data to it
+		init_buf(&mem[input_data_offset_1], gold);
+		// Inform the accelerator to start.
+		UpdateSync((void*) &mem[input_valid_offset_1], 1);
+		UpdateSync((void*) &mem[filter_valid_offset_1], 1);
+
+		printf("Second context task sent\n");
+
+		///////////////////////////////////////////////////////
+		/// Send third context task
+		///////////////////////////////////////////////////////
+		// Wait for the accelerator to be ready
+		SpinSync((void*) &mem[input_valid_offset_2], 0);
+		// When the accelerator is ready, we write the input data to it
+		init_buf(&mem[input_data_offset_2], gold);
+		// Inform the accelerator to start.
+		UpdateSync((void*) &mem[input_valid_offset_2], 1);
+		UpdateSync((void*) &mem[filter_valid_offset_2], 1);
+
+		printf("Third context task sent\n");
+
+		///////////////////////////////////////////////////////
+		/// Get all contexts output
+		///////////////////////////////////////////////////////
+		// Check for the accelerator to send output
+		bool context_0_done = false;
+		bool context_1_done = false;
+		bool context_2_done = false;
+		while (!(context_0_done & context_1_done & context_2_done)) {
+			bool context_0_ready = TestSync((void*) &mem[output_valid_offset_0], 1);
+			bool context_1_ready = TestSync((void*) &mem[output_valid_offset_1], 1);
+			bool context_2_ready = TestSync((void*) &mem[output_valid_offset_2], 1);
+
+			if (context_0_ready) {
+				// When the output is ready, we read it
+				errors += validate_buf(&mem[output_data_offset_0], gold);
+				// Inform the accelerator - ready for next iteration.
+				UpdateSync((void*) &mem[output_valid_offset_0], 0);
+
+				context_0_done = true;
+
+				printf("First context task done\n");
+			} else if (context_1_ready) {
+				// When the output is ready, we read it
+				errors += validate_buf(&mem[output_data_offset_1], gold);
+				// Inform the accelerator - ready for next iteration.
+				UpdateSync((void*) &mem[output_valid_offset_1], 0);
+
+				context_1_done = true;
+
+				printf("Second context task done\n");
+			} else if (context_2_ready) {
+				// When the output is ready, we read it
+				errors += validate_buf(&mem[output_data_offset_2], gold);
+				// Inform the accelerator - ready for next iteration.
+				UpdateSync((void*) &mem[output_valid_offset_2], 0);
+
+				context_2_done = true;
+
+				printf("Third context task done\n");
+			}
+		}
+		
+		iowrite32(dev, CMD_REG, 0x0);
+		
+		aligned_free(ptable0);
+		aligned_free(ptable1);
+		aligned_free(ptable2);
 		aligned_free(mem);
 		aligned_free(gold);
+
+		printf("DONE!\n\n");
+
+		// printf("  Software Input = %lu\n", t_sw_input/(ITERATIONS/10));
+		// printf("  Software = %lu\n", t_sw/(ITERATIONS/10));
+		// printf("  Software Output = %lu\n", t_sw_output/(ITERATIONS/10));
+		// printf("  Accel Input = %lu\n", t_acc_input/ITERATIONS);
+		// printf("  Accel = %lu\n", t_acc/ITERATIONS);
+		// printf("  Accel Output = %lu\n", t_acc_output/ITERATIONS);
 	}
 
+	// while(1);
 	return 0;
 }

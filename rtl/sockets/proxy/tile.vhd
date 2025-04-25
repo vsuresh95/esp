@@ -830,9 +830,9 @@ package tile is
       pending_dma_write    : out std_ulogic;
       pending_dma_read     : out std_ulogic;
       current_context      : in  std_logic_vector(1 downto 0);
-      tlb_empty            : out std_ulogic;
-      tlb_clear            : in  std_ulogic;
-      tlb_valid            : in  std_ulogic;
+      tlb_empty            : out std_logic_vector(3 downto 0);
+      tlb_clear            : in  std_logic_vector(3 downto 0);
+      tlb_valid            : in  std_logic_vector(3 downto 0);
       tlb_write            : in  std_ulogic;
       tlb_wr_address       : in  std_logic_vector((log2xx(tlb_entries) -1) downto 0);
       tlb_datain           : in  std_logic_vector(GLOB_PHYS_ADDR_BITS - 1 downto 0);

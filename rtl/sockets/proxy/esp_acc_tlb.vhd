@@ -82,9 +82,9 @@ entity esp_acc_tlb is
     pending_dma_write    : out std_ulogic;
     pending_dma_read     : out std_ulogic;
     current_context      : in  std_logic_vector(1 downto 0);
-    tlb_empty            : out std_ulogic;
-    tlb_clear            : in  std_ulogic;
-    tlb_valid            : in  std_ulogic;
+    tlb_empty            : out std_logic_vector(3 downto 0);
+    tlb_clear            : in  std_logic_vector(3 downto 0);
+    tlb_valid            : in  std_logic_vector(3 downto 0);
     tlb_write            : in  std_ulogic;
     tlb_wr_address       : in  std_logic_vector((log2xx(tlb_entries) -1) downto 0);
     tlb_datain           : in  std_logic_vector(GLOB_PHYS_ADDR_BITS - 1 downto 0);
@@ -136,7 +136,7 @@ architecture tlb of esp_acc_tlb is
   signal tlb_dataout         : std_logic_vector(GLOB_PHYS_ADDR_BITS - 1 downto 0);
   signal tlb_enable          : std_ulogic;
   signal tlb_read            : std_ulogic;
-  signal tlb_empty_int       : std_ulogic;
+  signal tlb_empty_int       : std_logic_vector(3 downto 0);
 
   -- DMA FSM handshake
   signal dma_write_done      : std_ulogic;
@@ -173,7 +173,7 @@ begin  -- tlb
     dma_tran_start <= '1';
     pending_dma_read <= rd_request;
     pending_dma_write <= wr_request and (not rd_request);
-    tlb_empty_int <= '0';
+    tlb_empty_int <= "0000";
   end generate no_scatter_gather;
 
   w_scatter_gather: if scatter_gather /= 0 generate
@@ -219,7 +219,9 @@ begin  -- tlb
   tlb_fsm_proc: process(tlb_fsm_current, rd_request, wr_request, tlb_empty_int,
                         dma_tran_done, dma_tran_header_sent, remaining_length,
                         src_is_p2p, dst_is_p2p, is_p2p)
+    variable cur_ctxt : integer range 0 to 3;
   begin  -- process tlb_fsm_proc
+    cur_ctxt := conv_integer(current_context(1 downto 0));
     pt_fsm_sample_0 <= '0';
     pt_fsm_sample_1 <= '0';
     pt_fsm_sample_2 <= '0';
@@ -235,7 +237,7 @@ begin  -- tlb
     is_p2p_in <= '0';
     case tlb_fsm_current is
       when tlb_init =>
-        if tlb_empty_int = '0' then
+        if tlb_empty_int(cur_ctxt) = '0' then
           tlb_fsm_next <= tlb_s0;
         end if;
       when tlb_s0 =>
@@ -294,7 +296,9 @@ begin  -- tlb
   end process tlb_fsm_proc;
 
   address_resolve_pipeline: process (clk, rst)
+    variable cur_ctxt : integer range 0 to 3;
   begin  -- process address_resolve_pipeline
+    cur_ctxt := conv_integer(current_context(1 downto 0));
     if rst = '0' then                   -- asynchronous reset (active low)
       tlb_fsm_current <= tlb_init;
       pending_dma_read <= '0';
@@ -312,7 +316,7 @@ begin  -- tlb
       dma_length_int <= (others => '0');
       is_p2p <= '0';
     elsif clk'event and clk = '1' then  -- rising clock edge
-      if tlb_empty_int = '1' then
+      if tlb_empty_int(cur_ctxt) = '1' then
         tlb_fsm_current <= tlb_init;
       else
         tlb_fsm_current <= tlb_fsm_next;
@@ -357,18 +361,20 @@ begin  -- tlb
 
   -- Read during TLB FSM Stage 2
   tlb_status_register: process (clk, rst)
+    variable cur_ctxt : integer range 0 to 3;
   begin  -- process tlb_status_register
+    cur_ctxt := conv_integer(current_context(1 downto 0));
     if rst = '0' then                   -- asynchronous reset (active low)
-      tlb_empty_int <= '1';
+      tlb_empty_int <= "1111";
     elsif clk'event and clk = '1' then  -- rising clock edge
       if (src_is_p2p and dst_is_p2p) = '1' then
-        tlb_empty_int <= '0';
+        tlb_empty_int(cur_ctxt) <= '0';
       else
-        if tlb_valid = '1' then
-          tlb_empty_int <= '0';
+        if tlb_valid(cur_ctxt) = '1' then
+          tlb_empty_int(cur_ctxt) <= '0';
         end if;
-        if tlb_clear = '1' then
-          tlb_empty_int <= '1';
+        if tlb_clear(cur_ctxt) = '1' then
+          tlb_empty_int(cur_ctxt) <= '1';
         end if;
       end if;
     end if;

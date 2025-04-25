@@ -76,6 +76,9 @@ package esp_acc_regmap is
 
   -- bank(14-17)       : SPANDEX_REG
   constant PT_ADDRESS_REG_0 : integer range 0 to MAXREGNUM - 1 := 16;
+  constant PT_ADDRESS_REG_1 : integer range 0 to MAXREGNUM - 1 := 17;
+  constant PT_ADDRESS_REG_2 : integer range 0 to MAXREGNUM - 1 := 18;
+  constant PT_ADDRESS_REG_3 : integer range 0 to MAXREGNUM - 1 := 19;
 
   -- bank(20 to 63) : USR (user defined)
 

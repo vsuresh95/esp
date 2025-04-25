@@ -1,9 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <sld>
   <accelerator name="audio_fir" desc="Accelerator AUDIO_FIR" data_size="4" device_id="064" hls_tool="stratus_hls">
-    <param name="logn_samples" desc="logn_samples" />
-    <param name="input_queue_base" desc="input_queue_base" />
-    <param name="output_queue_base" desc="output_queue_base" />
-    <param name="filter_queue_base" desc="filter_queue_base" />
+    <param name="logn_samples_0" desc="logn_samples_0" />
+    <param name="logn_samples_1" desc="logn_samples_1" />
+    <param name="logn_samples_2" desc="logn_samples_2" />
+    <param name="logn_samples_3" desc="logn_samples_3" />
+    <param name="input_queue_base_0" desc="input_queue_base_0" />
+    <param name="input_queue_base_1" desc="input_queue_base_1" />
+    <param name="input_queue_base_2" desc="input_queue_base_2" />
+    <param name="input_queue_base_3" desc="input_queue_base_3" />
+    <param name="output_queue_base_0" desc="output_queue_base_0" />
+    <param name="output_queue_base_1" desc="output_queue_base_1" />
+    <param name="output_queue_base_2" desc="output_queue_base_2" />
+    <param name="output_queue_base_3" desc="output_queue_base_3" />
+    <param name="filter_queue_base_0" desc="filter_queue_base_0" />
+    <param name="filter_queue_base_1" desc="filter_queue_base_1" />
+    <param name="filter_queue_base_2" desc="filter_queue_base_2" />
+    <param name="filter_queue_base_3" desc="filter_queue_base_3" />
+    <param name="context_quota" desc="context_quota" />
+    <param name="valid_contexts" desc="valid_contexts" />
   </accelerator>
 </sld>

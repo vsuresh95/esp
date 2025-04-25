@@ -94,43 +94,43 @@ set FX_IL "-DFX32_IL=14 -DFX64_IL=42"
 #     }
 # }
 
-# # With ASI
-# foreach dma [list 64] {
-#     define_io_config * IOCFG_DMA$dma\_SM -DDMA_WIDTH=$dma -DENABLE_SM -DFX_WIDTH=32
-
-#     define_system_config tb TESTBENCH_DMA$dma\_SM -io_config IOCFG_DMA$dma\_SM
-
-#     define_sim_config "BEHAV_DMA$dma\_SM" "audio_ffi BEH" "tb TESTBENCH_DMA$dma\_SM" -io_config IOCFG_DMA$dma\_SM -argv $DEFAULT_ARGV
-
-#     foreach cfg [list BASIC] {
-# 	set cname $cfg\_DMA$dma\_SM
-# 	define_hls_config audio_ffi $cname -io_config IOCFG_DMA$dma\_SM --clock_period=$CLOCK_PERIOD $COMMON_HLS_FLAGS -DHLS_DIRECTIVES_$cfg
-# 	if {$TECH_IS_XILINX == 1} {
-# 	    define_sim_config "$cname\_V" "audio_ffi RTL_V $cname" "tb TESTBENCH_DMA$dma\_SM" -io_config IOCFG_DMA$dma\_SM -argv $DEFAULT_ARGV -verilog_top_modules glbl
-# 	} else {
-# 	    define_sim_config "$cname\_V" "audio_ffi RTL_V $cname" "tb TESTBENCH_DMA$dma\_SM" -io_config IOCFG_DMA$dma\_SM -argv $DEFAULT_ARGV
-# 	}
-#     }
-# }
-
-# With ASI and internal pipelining
+# With ASI
 foreach dma [list 64] {
-    define_io_config * IOCFG_DMA$dma\_PP -DDMA_WIDTH=$dma -DENABLE_PP -DFX_WIDTH=32
+    define_io_config * IOCFG_DMA$dma\_SM -DDMA_WIDTH=$dma -DENABLE_SM -DFX_WIDTH=32
 
-    define_system_config tb TESTBENCH_DMA$dma\_PP -io_config IOCFG_DMA$dma\_PP
+    define_system_config tb TESTBENCH_DMA$dma\_SM -io_config IOCFG_DMA$dma\_SM
 
-    define_sim_config "BEHAV_DMA$dma\_PP" "audio_ffi BEH" "tb TESTBENCH_DMA$dma\_PP" -io_config IOCFG_DMA$dma\_PP -argv $DEFAULT_ARGV
+    define_sim_config "BEHAV_DMA$dma\_SM" "audio_ffi BEH" "tb TESTBENCH_DMA$dma\_SM" -io_config IOCFG_DMA$dma\_SM -argv $DEFAULT_ARGV
 
     foreach cfg [list BASIC] {
-	set cname $cfg\_DMA$dma\_PP
-	define_hls_config audio_ffi $cname -io_config IOCFG_DMA$dma\_PP --clock_period=$CLOCK_PERIOD $COMMON_HLS_FLAGS -DHLS_DIRECTIVES_$cfg
+	set cname $cfg\_DMA$dma\_SM
+	define_hls_config audio_ffi $cname -io_config IOCFG_DMA$dma\_SM --clock_period=$CLOCK_PERIOD $COMMON_HLS_FLAGS -DHLS_DIRECTIVES_$cfg
 	if {$TECH_IS_XILINX == 1} {
-	    define_sim_config "$cname\_V" "audio_ffi RTL_V $cname" "tb TESTBENCH_DMA$dma\_PP" -io_config IOCFG_DMA$dma\_PP -argv $DEFAULT_ARGV -verilog_top_modules glbl
+	    define_sim_config "$cname\_V" "audio_ffi RTL_V $cname" "tb TESTBENCH_DMA$dma\_SM" -io_config IOCFG_DMA$dma\_SM -argv $DEFAULT_ARGV -verilog_top_modules glbl
 	} else {
 	    define_sim_config "$cname\_V" "audio_ffi RTL_V $cname" "tb TESTBENCH_DMA$dma\_SM" -io_config IOCFG_DMA$dma\_SM -argv $DEFAULT_ARGV
 	}
     }
 }
+
+# # With ASI and internal pipelining
+# foreach dma [list 64] {
+#     define_io_config * IOCFG_DMA$dma\_PP -DDMA_WIDTH=$dma -DENABLE_PP -DFX_WIDTH=32
+
+#     define_system_config tb TESTBENCH_DMA$dma\_PP -io_config IOCFG_DMA$dma\_PP
+
+#     define_sim_config "BEHAV_DMA$dma\_PP" "audio_ffi BEH" "tb TESTBENCH_DMA$dma\_PP" -io_config IOCFG_DMA$dma\_PP -argv $DEFAULT_ARGV
+
+#     foreach cfg [list BASIC] {
+# 	set cname $cfg\_DMA$dma\_PP
+# 	define_hls_config audio_ffi $cname -io_config IOCFG_DMA$dma\_PP --clock_period=$CLOCK_PERIOD $COMMON_HLS_FLAGS -DHLS_DIRECTIVES_$cfg
+# 	if {$TECH_IS_XILINX == 1} {
+# 	    define_sim_config "$cname\_V" "audio_ffi RTL_V $cname" "tb TESTBENCH_DMA$dma\_PP" -io_config IOCFG_DMA$dma\_PP -argv $DEFAULT_ARGV -verilog_top_modules glbl
+# 	} else {
+# 	    define_sim_config "$cname\_V" "audio_ffi RTL_V $cname" "tb TESTBENCH_DMA$dma\_SM" -io_config IOCFG_DMA$dma\_SM -argv $DEFAULT_ARGV
+# 	}
+#     }
+# }
 
 #
 # Compile Flags

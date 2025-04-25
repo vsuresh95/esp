@@ -20,7 +20,6 @@
 struct audio_ffi_stratus_access {
 	struct esp_access esp;
 	/* <<--regs-->> */
-	unsigned do_inverse;
 	unsigned logn_samples;
 	unsigned do_shift;
 

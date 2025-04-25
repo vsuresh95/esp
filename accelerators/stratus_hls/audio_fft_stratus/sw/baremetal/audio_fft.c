@@ -160,7 +160,9 @@ int main(int argc, char * argv[])
 	struct esp_device *dev;
 	unsigned done;
 	unsigned spin_ct;
-	unsigned **ptable = NULL;
+	unsigned **ptable0 = NULL;
+	unsigned **ptable1 = NULL;
+	unsigned **ptable2 = NULL;
 	token_t *mem;
 	float *gold;
 	unsigned errors = 0;
@@ -219,9 +221,17 @@ int main(int argc, char * argv[])
 		mem = aligned_malloc(mem_size);
 
 		// Allocate and populate page table
-		ptable = aligned_malloc(NCHUNK(mem_size) * sizeof(unsigned *));
+		ptable0 = aligned_malloc(NCHUNK(mem_size) * sizeof(unsigned *));
 		for (i = 0; i < NCHUNK(mem_size); i++)
-			ptable[i] = (unsigned *) &mem[i * (CHUNK_SIZE / sizeof(token_t))];
+			ptable0[i] = (unsigned *) &mem[i * (CHUNK_SIZE / sizeof(token_t))];
+			
+		ptable1 = aligned_malloc(NCHUNK(mem_size) * sizeof(unsigned *));
+		for (i = 0; i < NCHUNK(mem_size); i++)
+			ptable1[i] = (unsigned *) &mem[i * (CHUNK_SIZE / sizeof(token_t))];
+			
+		ptable2 = aligned_malloc(NCHUNK(mem_size) * sizeof(unsigned *));
+		for (i = 0; i < NCHUNK(mem_size); i++)
+			ptable2[i] = (unsigned *) &mem[i * (CHUNK_SIZE / sizeof(token_t))];
 			
 		// Program sync flags
 		unsigned input_valid_offset_0 = 0*in_len + VALID_OFFSET;
@@ -252,7 +262,7 @@ int main(int argc, char * argv[])
 		iowrite32(dev, COHERENCE_REG, coherence);
 		iowrite32(dev, SPANDEX_REG, spandex_config.spandex_reg);
 
-		iowrite32(dev, PT_ADDRESS_REG, (unsigned long long) ptable);
+		iowrite32(dev, PT_ADDRESS_REG, (unsigned long long) ptable0);
 		iowrite32(dev, PT_NCHUNK_REG, NCHUNK(mem_size));
 		iowrite32(dev, PT_SHIFT_REG, CHUNK_SHIFT);
 
@@ -272,7 +282,8 @@ int main(int argc, char * argv[])
 		iowrite32(dev, AUDIO_FFT_INPUT_QUEUE_BASE_0, input_valid_offset_0);
 		iowrite32(dev, AUDIO_FFT_OUTPUT_QUEUE_BASE_0, output_valid_offset_0);
 		iowrite32(dev, AUDIO_FFT_CONTEXT_QUOTA, 50000);
-		iowrite32(dev, AUDIO_FFT_VALID_CONTEXTS, 1);
+		iowrite32(dev, AUDIO_FFT_VALID_CONTEXTS, 0x1);
+		iowrite32(dev, PT_ADDRESS_REG_0, (unsigned long long) ptable0);
 
 		printf("First context configured\n");
 
@@ -291,6 +302,13 @@ int main(int argc, char * argv[])
 
 		printf("First context task sent\n");
 
+		printf("PT_ADDRESS_REG_0 = %x\n", ioread32(dev, PT_ADDRESS_REG_0));
+
+		for (i = 0; i < 3; i++) {
+			iowrite32(dev, PT_ADDRESS_REG_0, (unsigned long long) ptable1);
+			printf("PT_ADDRESS_REG_0 = %x\n", ioread32(dev, PT_ADDRESS_REG_0));
+		}
+
 		///////////////////////////////////////////////////////
 		/// Configure second context
 		///////////////////////////////////////////////////////
@@ -299,7 +317,8 @@ int main(int argc, char * argv[])
 		iowrite32(dev, AUDIO_FFT_DO_INVERSE_REG_1, do_inverse);
 		iowrite32(dev, AUDIO_FFT_INPUT_QUEUE_BASE_1, input_valid_offset_1);
 		iowrite32(dev, AUDIO_FFT_OUTPUT_QUEUE_BASE_1, output_valid_offset_1);
-		iowrite32(dev, AUDIO_FFT_VALID_CONTEXTS, 2);
+		iowrite32(dev, AUDIO_FFT_VALID_CONTEXTS, 0x3);
+		iowrite32(dev, PT_ADDRESS_REG_1, (unsigned long long) ptable1);
 
 		printf("Second context configured\n");
 
@@ -336,7 +355,8 @@ int main(int argc, char * argv[])
 		iowrite32(dev, AUDIO_FFT_DO_INVERSE_REG_2, do_inverse);
 		iowrite32(dev, AUDIO_FFT_INPUT_QUEUE_BASE_2, input_valid_offset_2);
 		iowrite32(dev, AUDIO_FFT_OUTPUT_QUEUE_BASE_2, output_valid_offset_2);
-		iowrite32(dev, AUDIO_FFT_VALID_CONTEXTS, 3);
+		iowrite32(dev, AUDIO_FFT_VALID_CONTEXTS, 0x7);
+		iowrite32(dev, PT_ADDRESS_REG_2, (unsigned long long) ptable2);
 
 		printf("Third context configured\n");
 
@@ -458,7 +478,9 @@ int main(int argc, char * argv[])
 		
 		iowrite32(dev, CMD_REG, 0x0);
 		
-		aligned_free(ptable);
+		aligned_free(ptable0);
+		aligned_free(ptable1);
+		aligned_free(ptable2);
 		aligned_free(mem);
 		aligned_free(gold);
 

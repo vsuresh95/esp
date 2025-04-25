@@ -257,10 +257,12 @@ architecture rtl of esp_acc_dma is
 
   -- TLB
   signal pending_dma_read, pending_dma_write : std_ulogic;
-  signal tlb_valid, tlb_clear, tlb_empty, tlb_write : std_ulogic;
+  signal tlb_valid, tlb_clear, tlb_empty : std_logic_vector(3 downto 0);
+  signal tlb_write : std_ulogic;
   signal tlb_wr_address : std_logic_vector((log2xx(tlb_entries * 4) -1) downto 0);
   signal dma_address : addr_t;
   signal dma_length : std_logic_vector(31 downto 0);
+  signal current_context_int : std_logic_vector(1 downto 0);
 
   -- Sample acc_done:
   signal pending_acc_done, clear_acc_done : std_ulogic;
@@ -382,7 +384,7 @@ begin  -- rtl
     pending_dma_write <= '0';
     pending_dma_read <= '0';
     -- Skip page-table fetch into the TLB
-    tlb_empty <= '0';
+    tlb_empty <= "0000";
     -- Don't care
     dma_address <= (others => '0');
     dma_length <= (others => '0');
@@ -445,7 +447,7 @@ begin  -- rtl
   p2p_dst_y <= get_origin_y(NOC_FLIT_SIZE, p2p_req_rcv_data_out);
   p2p_dst_x <= get_origin_x(NOC_FLIT_SIZE, p2p_req_rcv_data_out);
 
-  make_packet: process (bankreg, pending_dma_write, tlb_empty, dma_address, dma_length,
+  make_packet: process (bankreg, pending_dma_write, tlb_empty, dma_address, dma_length, current_context,
                         p2p_src_index_r, p2p_dst_y, p2p_dst_x, coherence, local_y, local_x)
     variable msg_type : noc_msg_type;
     variable header_v : noc_flit_type;
@@ -456,18 +458,20 @@ begin  -- rtl
     variable is_p2p : std_ulogic;
     variable p2p_src_x, p2p_src_y : local_yx;
     variable p2p_header_v : noc_flit_type;
+    variable cur_ctxt : integer range 0 to 3;
   begin  -- process make_packet
 
     is_p2p := '0';
+    cur_ctxt := conv_integer(current_context(1 downto 0));
 
-    if tlb_empty = '1' then
+    if tlb_empty(cur_ctxt) = '1' then
       -- fetch page table
       if GLOB_PHYS_ADDR_BITS > 32 then
         tmp(63 downto 32) := bankreg(PT_ADDRESS_EXTENDED_REG);
       else
         tmp(63 downto 32) := (others => '0');
       end if;
-      tmp(31 downto 0) := bankreg(PT_ADDRESS_REG);
+      tmp(31 downto 0) := bankreg(PT_ADDRESS_REG_0 + cur_ctxt);
       address := tmp(GLOB_PHYS_ADDR_BITS - 1 downto 0);
       length  := bankreg(PT_NCHUNK_REG);
       if coherence = ACC_COH_LLC or coherence = ACC_COH_RECALL then
@@ -664,14 +668,17 @@ begin  -- rtl
                           header_r, payload_address_r, payload_length_r,
                           dma_tran_start, tlb_empty, pending_dma_write,
                           pending_dma_read, coherent_dma_ready, dvfs_transient,
-                          size_r, coherence,
+                          size_r, coherence, current_context,
                           p2p_req_rcv_empty, p2p_req_rcv_data_out, p2p_rsp_snd_full, acc_flush_done)
     variable payload_data : noc_flit_type;
     variable preamble : noc_preamble_type;
     variable msg : noc_msg_type;
     variable len : std_logic_vector(31 downto 0);
     variable tlb_wr_address_next : std_logic_vector(31 downto 0);
+    variable cur_ctxt : integer range 0 to 3;
   begin  -- process dma_roundtrip
+
+    cur_ctxt := conv_integer(current_context(1 downto 0));
 
     dma_next <= dma_state;
     sample_flits <= '0';
@@ -681,9 +688,9 @@ begin  -- rtl
     clear_count <= '0';
     --TLB
     tlb_wr_address_next := count - 1;
-    tlb_wr_address <= "00" & tlb_wr_address_next(log2xx(tlb_entries) - 1 downto 0);
+    tlb_wr_address <= current_context & tlb_wr_address_next(log2xx(tlb_entries) - 1 downto 0);
     tlb_write <= '0';
-    tlb_valid <= '0';
+    tlb_valid <= "0000";
 
     -- Change DMA status
     status <= (others => '0');
@@ -743,14 +750,14 @@ begin  -- rtl
         -- There is no need to check the status register, because whenever the
         -- FSM returns to idle, the status register is set to zero.
         clear_acc_done <= '1';
-        if bankreg(CMD_REG)(CMD_BIT_START) = '1' and tlb_empty = '1' and scatter_gather /= 0 then
+        if bankreg(CMD_REG)(CMD_BIT_START) = '1' and tlb_empty(cur_ctxt) = '1' and scatter_gather /= 0 then
           sample_flits <= '1';
           if coherence /= ACC_COH_FULL then
             dma_next <= send_header;
           else
             dma_next <= fully_coherent_request;
           end if;
-        elsif bankreg(CMD_REG)(CMD_BIT_START) = '1' and (tlb_empty = '0' or scatter_gather = 0) then
+        elsif bankreg(CMD_REG)(CMD_BIT_START) = '1' and (tlb_empty(cur_ctxt) = '0' or scatter_gather = 0) then
           dma_next <= config;
           status <= (others => '0');
           status(STATUS_BIT_RUN) <= '1';
@@ -799,6 +806,8 @@ begin  -- rtl
           end if;
         elsif bankreg(CMD_REG)(CMD_BIT_LAST downto 0) = zero(CMD_BIT_LAST downto 0) then
           dma_next <= reset;
+        elsif current_context_int /= current_context then
+          dma_next <= idle; 
         elsif pending_acc_done = '1' then
           if USE_SPANDEX /= 0 and coherence = ACC_COH_FULL then
             flush <= '1';
@@ -999,13 +1008,13 @@ begin  -- rtl
       when reply_data =>
         burst <= '1';
         dma_rcv_delay <= dma_rcv_empty_int;       -- for DVFS TRAFFIC policy
-        if dma_rcv_empty_int = '0' and tlb_empty = '1' and dvfs_transient = '0' then
+        if dma_rcv_empty_int = '0' and tlb_empty(cur_ctxt) = '1' and dvfs_transient = '0' then
           dma_rcv_rdreq_int <= '1';
           tlb_write <= '1';
           increment_count <= '1';
           if preamble = PREAMBLE_TAIL then
             clear_count <= '1';
-            tlb_valid <= '1';
+            tlb_valid(cur_ctxt) <= '1';
             dma_next <= idle;
           end if;
         elsif dma_rcv_empty_int = '0' and dvfs_transient = '0' then
@@ -1066,6 +1075,17 @@ begin  -- rtl
     end if;
   end process;
 
+  -- Internal signal for current_context
+  process (clk, rst)
+  begin  -- process
+    if rst = '0' then                   -- asynchronous reset (active low)
+      current_context_int <= (others => '0');
+    elsif clk'event and clk = '1' then  -- rising clock edge
+      current_context_int <= current_context;
+    end if;
+  end process;
+
+
   -------------------------------------------------------------------------------
   -- DMA Controller APB Slave
   -------------------------------------------------------------------------------
@@ -1115,23 +1135,32 @@ begin  -- rtl
   end process drive_irq;
 
   -- rd/wr registers
-  process(apbi, bankreg)
+  process(apbi, bankreg, current_context, dma_state)
     variable addr : integer range 0 to MAXREGNUM - 1;
+    variable cur_ctxt : integer range 0 to 3;
   begin
     addr := conv_integer(apbi.paddr(7 downto 2));
+    cur_ctxt := conv_integer(apbi.paddr(3 downto 2));
 
     bankin <= (others => (others => '0'));
     sample <= (others => '0');
 
     -- Clear TLB when page table address is updated
-    tlb_clear <= '0';
+    tlb_clear <= "0000";
 
-    -- if apbi.paddr(7) = '0' then
-      sample(addr) <= apbi.psel(pindex) and apbi.penable and apbi.pwrite;
-      if addr = PT_ADDRESS_REG then
-        tlb_clear <= '1';
+    sample(addr) <= apbi.psel(pindex) and apbi.penable and apbi.pwrite;
+
+    -- PT_ADDRESS_REG_i are at offset 0x4i
+    if apbi.paddr(7 downto 4) = "0100" then
+      tlb_clear(cur_ctxt) <= '1';
+
+      -- Do not allow PT address to be written while that context is running
+      if apbi.paddr(3 downto 2) = current_context and dma_state /= idle then
+        tlb_clear(cur_ctxt) <= '0';
+        sample(addr) <= '0';
       end if;
-    -- end if;
+    end if;
+
     bankin(addr) <= apbi.pwdata;
     readdata <= bankreg(addr);
   end process;

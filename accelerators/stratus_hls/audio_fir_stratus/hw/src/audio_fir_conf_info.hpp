@@ -6,6 +6,9 @@
 
 #include <systemc.h>
 
+#define MAX_CONTEXTS 4
+#define MAX_CONTEXTS_BITS 2
+
 //
 // Configuration parameters for the accelerator.
 //
@@ -19,35 +22,49 @@ public:
     conf_info_t()
     {
         /* <<--ctor-->> */
-        this->logn_samples = 11;
-        this->input_queue_base = 0;
-        this->output_queue_base = 0;
-        this->filter_queue_base = 0;
+        for (int i = 0; i < MAX_CONTEXTS; i++) {
+            this->logn_samples[i] = 1;
+            this->input_queue_base[i] = 0;
+            this->output_queue_base[i] = 0;
+            this->filter_queue_base[i] = 0;
+        }
+        this->context_quota = 0;
+        this->valid_contexts = 0;
     }
 
     conf_info_t(
         /* <<--ctor-args-->> */
-        int32_t logn_samples, 
-        int32_t input_queue_base,
-        int32_t output_queue_base,
-        int32_t filter_queue_base
+        int32_t logn_samples[MAX_CONTEXTS], 
+        int32_t input_queue_base[MAX_CONTEXTS],
+        int32_t output_queue_base[MAX_CONTEXTS],
+        int32_t filter_queue_base[MAX_CONTEXTS],
+        int32_t context_quota,
+        int32_t valid_contexts
         )
     {
         /* <<--ctor-custom-->> */
-        this->logn_samples = logn_samples;
-        this->input_queue_base = input_queue_base;
-        this->output_queue_base = output_queue_base;
-        this->filter_queue_base = filter_queue_base;
+        for (int i = 0; i < MAX_CONTEXTS; i++) {
+            this->logn_samples[i] = logn_samples[i];
+            this->input_queue_base[i] = input_queue_base[i];
+            this->output_queue_base[i] = output_queue_base[i];
+            this->filter_queue_base[i] = filter_queue_base[i];
+        }
+        this->context_quota = context_quota;
+        this->valid_contexts = valid_contexts;
     }
 
     // equals operator
     inline bool operator==(const conf_info_t &rhs) const
     {
         /* <<--eq-->> */
-        if (logn_samples != rhs.logn_samples) return false;
-        if (input_queue_base != rhs.input_queue_base) return false;
-        if (output_queue_base != rhs.output_queue_base) return false;
-        if (filter_queue_base != rhs.filter_queue_base) return false;
+        for (int i = 0; i < MAX_CONTEXTS; i++) {
+            if (logn_samples[i] != rhs.logn_samples[i]) return false;
+            if (input_queue_base[i] != rhs.input_queue_base[i]) return false;
+            if (output_queue_base[i] != rhs.output_queue_base[i]) return false;
+            if (filter_queue_base[i] != rhs.filter_queue_base[i]) return false;
+        }
+        if (context_quota != rhs.context_quota) return false;
+        if (valid_contexts != rhs.valid_contexts) return false;
         return true;
     }
 
@@ -55,10 +72,14 @@ public:
     inline conf_info_t& operator=(const conf_info_t& other)
     {
         /* <<--assign-->> */
-        logn_samples = other.logn_samples;
-        input_queue_base = other.input_queue_base;
-        output_queue_base = other.output_queue_base;
-        filter_queue_base = other.filter_queue_base;
+        for (int i = 0; i < MAX_CONTEXTS; i++) {
+            logn_samples[i] = other.logn_samples[i];
+            input_queue_base[i] = other.input_queue_base[i];
+            output_queue_base[i] = other.output_queue_base[i];
+            filter_queue_base[i] = other.filter_queue_base[i];
+        }
+        context_quota = other.context_quota;
+        valid_contexts = other.valid_contexts;
         return *this;
     }
 
@@ -71,19 +92,21 @@ public:
     {
         os << "{";
         /* <<--print-->> */
-        os << "logn_samples = " << conf_info.logn_samples << ", ";
-        os << "input_queue_base = " << conf_info.input_queue_base << ", ";
-        os << "output_queue_base = " << conf_info.output_queue_base << ", ";
-        os << "filter_queue_base = " << conf_info.filter_queue_base << ", ";
+        // os << "logn_samples = " << conf_info.logn_samples << ", ";
+        // os << "input_queue_base = " << conf_info.input_queue_base << ", ";
+        // os << "output_queue_base = " << conf_info.output_queue_base << ", ";
+        // os << "filter_queue_base = " << conf_info.filter_queue_base << ", ";
         os << "}";
         return os;
     }
 
         /* <<--params-->> */
-        int32_t logn_samples;
-        int32_t input_queue_base;
-        int32_t output_queue_base;
-        int32_t filter_queue_base;
+        int32_t logn_samples[MAX_CONTEXTS];
+        int32_t input_queue_base[MAX_CONTEXTS];
+        int32_t output_queue_base[MAX_CONTEXTS];
+        int32_t filter_queue_base[MAX_CONTEXTS];
+        int32_t context_quota;
+        int32_t valid_contexts;
 };
 
 #endif // __AUDIO_FIR_CONF_INFO_HPP__
