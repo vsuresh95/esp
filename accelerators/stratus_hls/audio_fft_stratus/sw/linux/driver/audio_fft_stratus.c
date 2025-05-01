@@ -67,12 +67,51 @@ static void audio_fft_prep_xfer(struct esp_device *esp, void *arg)
 	struct audio_fft_stratus_access *a = arg;
 
 	/* <<--regs-config-->> */
-	iowrite32be(a->do_inverse, esp->iomem + AUDIO_FFT_DO_INVERSE_REG);
-	iowrite32be(a->logn_samples, esp->iomem + AUDIO_FFT_LOGN_SAMPLES_REG);
-	iowrite32be(a->do_shift, esp->iomem + AUDIO_FFT_DO_SHIFT_REG);
+	// iowrite32be(a->do_inverse, esp->iomem + AUDIO_FFT_DO_INVERSE_REG);
+	// iowrite32be(a->logn_samples, esp->iomem + AUDIO_FFT_LOGN_SAMPLES_REG);
+	// iowrite32be(a->do_shift, esp->iomem + AUDIO_FFT_DO_SHIFT_REG);
 
-	iowrite32be(a->input_queue_base, esp->iomem + AUDIO_FFT_INPUT_QUEUE_BASE);
-	iowrite32be(a->output_queue_base, esp->iomem + AUDIO_FFT_OUTPUT_QUEUE_BASE);
+	// iowrite32be(a->input_queue_base, esp->iomem + AUDIO_FFT_INPUT_QUEUE_BASE);
+	// iowrite32be(a->output_queue_base, esp->iomem + AUDIO_FFT_OUTPUT_QUEUE_BASE);
+}
+
+static void audio_fft_init_accel(struct esp_device *esp, void *arg)
+{
+	struct audio_fft_stratus_access *a = arg;
+
+	/* <<--regs-config-->> */
+	iowrite32be(a->do_inverse, esp->iomem + AUDIO_FFT_DO_INVERSE_REG_0 + 0x4*esp->context_id);
+	iowrite32be(a->logn_samples, esp->iomem + AUDIO_FFT_LOGN_SAMPLES_REG_0 + 0x4*esp->context_id);
+	iowrite32be(a->do_shift, esp->iomem + AUDIO_FFT_DO_SHIFT_REG_0 + 0x4*esp->context_id);
+
+	iowrite32be(a->input_queue_base, esp->iomem + AUDIO_FFT_INPUT_QUEUE_BASE_0 + 0x4*esp->context_id);
+	iowrite32be(a->output_queue_base, esp->iomem + AUDIO_FFT_OUTPUT_QUEUE_BASE_0 + 0x4*esp->context_id);
+	
+	iowrite32be(a->context_quota, esp->iomem + AUDIO_FFT_CONTEXT_QUOTA);
+	iowrite32be(a->valid_contexts, esp->iomem + AUDIO_FFT_VALID_CONTEXTS);
+}
+
+static void audio_fft_add_context(struct esp_device *esp, void *arg)
+{
+	struct audio_fft_stratus_access *a = arg;
+
+	/* <<--regs-config-->> */
+	iowrite32be(a->do_inverse, esp->iomem + AUDIO_FFT_DO_INVERSE_REG_0 + 0x4*esp->context_id);
+	iowrite32be(a->logn_samples, esp->iomem + AUDIO_FFT_LOGN_SAMPLES_REG_0 + 0x4*esp->context_id);
+	iowrite32be(a->do_shift, esp->iomem + AUDIO_FFT_DO_SHIFT_REG_0 + 0x4*esp->context_id);
+
+	iowrite32be(a->input_queue_base, esp->iomem + AUDIO_FFT_INPUT_QUEUE_BASE_0 + 0x4*esp->context_id);
+	iowrite32be(a->output_queue_base, esp->iomem + AUDIO_FFT_OUTPUT_QUEUE_BASE_0 + 0x4*esp->context_id);
+
+	iowrite32be(a->valid_contexts, esp->iomem + AUDIO_FFT_VALID_CONTEXTS);
+}
+
+static void audio_fft_del_context(struct esp_device *esp, void *arg)
+{
+	struct audio_fft_stratus_access *a = arg;
+
+	/* <<--regs-config-->> */
+	iowrite32be(a->valid_contexts, esp->iomem + AUDIO_FFT_VALID_CONTEXTS);
 }
 
 static bool audio_fft_xfer_input_ok(struct esp_device *esp, void *arg)
@@ -128,9 +167,15 @@ static struct esp_driver audio_fft_driver = {
 		},
 	},
 	.xfer_input_ok	= audio_fft_xfer_input_ok,
-	.prep_xfer	= audio_fft_prep_xfer,
-	.ioctl_cm	= AUDIO_FFT_STRATUS_IOC_ACCESS,
-	.arg_size	= sizeof(struct audio_fft_stratus_access),
+	.prep_xfer		= audio_fft_prep_xfer,
+	.init_accel		= audio_fft_init_accel,
+	.add_context	= audio_fft_add_context,
+	.del_context	= audio_fft_del_context,
+	.ioctl_cm		= AUDIO_FFT_STRATUS_IOC_ACCESS,
+	.init_cm		= AUDIO_FFT_STRATUS_INIT_IOC_ACCESS,
+	.add_cm			= AUDIO_FFT_STRATUS_ADD_IOC_ACCESS,
+	.del_cm			= AUDIO_FFT_STRATUS_DEL_IOC_ACCESS,
+	.arg_size		= sizeof(struct audio_fft_stratus_access),
 };
 
 static int __init audio_fft_init(void)

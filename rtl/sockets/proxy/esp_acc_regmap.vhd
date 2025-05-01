@@ -74,7 +74,7 @@ package esp_acc_regmap is
 
   -- bank(15)       : RESERVED
 
-  -- bank(14-17)       : SPANDEX_REG
+  -- bank(16-19)    : PT_ADDRESS_REG_i
   constant PT_ADDRESS_REG_0 : integer range 0 to MAXREGNUM - 1 := 16;
   constant PT_ADDRESS_REG_1 : integer range 0 to MAXREGNUM - 1 := 17;
   constant PT_ADDRESS_REG_2 : integer range 0 to MAXREGNUM - 1 := 18;

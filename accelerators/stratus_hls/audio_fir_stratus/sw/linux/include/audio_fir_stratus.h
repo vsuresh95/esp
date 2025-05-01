@@ -26,8 +26,15 @@ struct audio_fir_stratus_access {
     unsigned input_queue_base;
     unsigned output_queue_base;
     unsigned filter_queue_base;
+
+	// Context related registers
+	unsigned valid_contexts;
+	unsigned context_quota;
 };
 
-#define AUDIO_FIR_STRATUS_IOC_ACCESS	_IOW ('S', 0, struct audio_fir_stratus_access)
+#define AUDIO_FIR_STRATUS_IOC_ACCESS		_IOW ('S', 0, struct audio_fir_stratus_access)
+#define AUDIO_FIR_STRATUS_INIT_IOC_ACCESS	_IOW ('S', 1, struct audio_fir_stratus_access)
+#define AUDIO_FIR_STRATUS_ADD_IOC_ACCESS	_IOW ('S', 2, struct audio_fir_stratus_access)
+#define AUDIO_FIR_STRATUS_DEL_IOC_ACCESS	_IOW ('S', 3, struct audio_fir_stratus_access)
 
 #endif /* _AUDIO_FIR_STRATUS_H_ */

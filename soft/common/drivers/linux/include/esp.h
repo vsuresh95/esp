@@ -28,6 +28,7 @@ struct esp_access {
 	unsigned src_offset;
 	unsigned dst_offset;
     unsigned spandex_conf;
+	unsigned context_id;
 
     unsigned int footprint;
     enum contig_alloc_policy alloc_policy;
@@ -66,7 +67,13 @@ struct esp_driver {
 	struct platform_driver plat;
 	bool (*xfer_input_ok)(struct esp_device *esp, void *arg);
 	void (*prep_xfer)(struct esp_device *esp, void *arg);
+	void (*init_accel)(struct esp_device *esp, void *arg);
+	void (*add_context)(struct esp_device *esp, void *arg);
+	void (*del_context)(struct esp_device *esp, void *arg);
 	unsigned int ioctl_cm;
+	unsigned int init_cm;
+	unsigned int add_cm;
+	unsigned int del_cm;
 	size_t arg_size;
 };
 
@@ -88,6 +95,7 @@ struct esp_device {
 	unsigned src_offset;
 	unsigned dst_offset;
     unsigned spandex_conf;
+	unsigned context_id;
     unsigned int footprint;
     enum contig_alloc_policy alloc_policy;
     unsigned int ddr_node;
