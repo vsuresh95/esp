@@ -30,12 +30,12 @@
 #define POLL_OUTPUT_IS_EMPTY 2
 #define LOAD_DATA_REQ 3
 #define LOAD_FILTERS_REQ 4
-#define UPDATE_INPUT_IS_EMPTY 0
-#define UPDATE_FILTER_IS_EMPTY 1
-#define UPDATE_OUTPUT_IS_FULL 2
-#define STORE_DATA_REQ 3
-#define STORE_FENCE 4
-#define ACC_DONE 5
+#define UPDATE_INPUT_IS_EMPTY 5
+#define UPDATE_FILTER_IS_EMPTY 6
+#define UPDATE_OUTPUT_IS_FULL 7
+#define STORE_DATA_REQ 8
+#define STORE_FENCE 9
+#define ACC_DONE 10
 
 #define VALID_OFFSET 0
 #define PAYLOAD_OFFSET 2
@@ -77,6 +77,8 @@ public:
         HLS_PRESERVE_SIGNAL(accel_cycles_dbg, true);
         HLS_PRESERVE_SIGNAL(current_context_int_dbg, true);
         HLS_PRESERVE_SIGNAL(switch_context_dbg, true);
+        HLS_PRESERVE_SIGNAL(cycles_elapsed_dbg, true);
+        HLS_PRESERVE_SIGNAL(start_cycles_dbg, true);
 
         // Map arrays to memories
         /* <<--plm-bind-->> */
@@ -96,12 +98,16 @@ public:
     sc_signal< sc_uint<32> > accel_cycles_dbg;
     sc_signal< sc_uint<MAX_CONTEXTS_BITS> > current_context_int_dbg;
     sc_signal< sc_int<1> > switch_context_dbg;
+    sc_signal< sc_uint<32> > cycles_elapsed_dbg;
+    sc_signal< sc_uint<32> > start_cycles_dbg;
 
     sc_int<32> load_state_req;
     sc_int<32> store_state_req;
     sc_int<32> input_is_full;
     sc_uint<MAX_CONTEXTS_BITS> current_context_int;
     sc_uint<32> accel_cycles;
+    sc_uint<32> cycles_elapsed;
+    sc_uint<32> start_cycles;
     
     // Output signal for current context
     sc_out< sc_uint<MAX_CONTEXTS_BITS> > current_context;

@@ -440,6 +440,12 @@ void audio_ffi::compute_kernel()
 
         current_context.write(0);
 
+        start_cycles = 0;
+        cycles_elapsed = 0;
+
+        start_cycles_dbg.write(0);
+        cycles_elapsed_dbg.write(0);
+
         wait();
     }
 
@@ -450,7 +456,6 @@ void audio_ffi::compute_kernel()
     int32_t do_shift;
     uint32_t context_quota;
     uint32_t valid_contexts;
-    uint32_t start_cycles;
     bool switch_context;
     {
         HLS_PROTO("compute-config");
@@ -470,7 +475,8 @@ void audio_ffi::compute_kernel()
             HLS_PROTO("check-new-context");
 
             // Is the quota of current context complete?
-            uint32_t cycles_elapsed = accel_cycles - start_cycles;
+            cycles_elapsed = accel_cycles - start_cycles;
+            cycles_elapsed_dbg.write(cycles_elapsed);
 
             conf_info_t config = this->conf_info.read();        
             HLS_FLATTEN_ARRAY(config.logn_samples);
@@ -506,6 +512,7 @@ void audio_ffi::compute_kernel()
 
                     // Set the start cycles for this context to current cycle value.
                     start_cycles = accel_cycles;
+                    start_cycles_dbg.write(start_cycles);
                     wait();
                 }
             }
