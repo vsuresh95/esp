@@ -159,7 +159,9 @@ int main(int argc, char * argv[])
 	unsigned **ptable0 = NULL;
 	unsigned **ptable1 = NULL;
 	unsigned **ptable2 = NULL;
-	token_t *mem;
+	token_t *mem0;
+	token_t *mem1;
+	token_t *mem2;
 	float *gold;
 	unsigned errors = 0;
     const float ERROR_COUNT_TH = 0.001;
@@ -214,20 +216,22 @@ int main(int argc, char * argv[])
 
 		// Allocate memory
 		gold = aligned_malloc(out_len * sizeof(float));
-		mem = aligned_malloc(mem_size);
+		mem0 = aligned_malloc(mem_size);
+		mem1 = aligned_malloc(mem_size);
+		mem2 = aligned_malloc(mem_size);
 
 		// Allocate and populate page table
 		ptable0 = aligned_malloc(NCHUNK(mem_size) * sizeof(unsigned *));
 		for (i = 0; i < NCHUNK(mem_size); i++)
-			ptable0[i] = (unsigned *) &mem[i * (CHUNK_SIZE / sizeof(token_t))];
+			ptable0[i] = (unsigned *) &mem0[i * (CHUNK_SIZE / sizeof(token_t))];
 			
 		ptable1 = aligned_malloc(NCHUNK(mem_size) * sizeof(unsigned *));
 		for (i = 0; i < NCHUNK(mem_size); i++)
-			ptable1[i] = (unsigned *) &mem[i * (CHUNK_SIZE / sizeof(token_t))];
+			ptable1[i] = (unsigned *) &mem1[i * (CHUNK_SIZE / sizeof(token_t))];
 			
 		ptable2 = aligned_malloc(NCHUNK(mem_size) * sizeof(unsigned *));
 		for (i = 0; i < NCHUNK(mem_size); i++)
-			ptable2[i] = (unsigned *) &mem[i * (CHUNK_SIZE / sizeof(token_t))];
+			ptable2[i] = (unsigned *) &mem2[i * (CHUNK_SIZE / sizeof(token_t))];
 			
 		// Program sync flags
 		unsigned input_valid_offset_0 = 0*in_len + VALID_OFFSET;
@@ -246,12 +250,12 @@ int main(int argc, char * argv[])
 		unsigned output_data_offset_2 = 5*in_len + PAYLOAD_OFFSET;
 
 		// Reset all sync variables to default values.
-		UpdateSync((void*) &mem[input_valid_offset_0], 0);
-		UpdateSync((void*) &mem[output_valid_offset_0], 0);
-		UpdateSync((void*) &mem[input_valid_offset_1], 0);
-		UpdateSync((void*) &mem[output_valid_offset_1], 0);
-		UpdateSync((void*) &mem[input_valid_offset_2], 0);
-		UpdateSync((void*) &mem[output_valid_offset_2], 0);
+		UpdateSync((void*) &mem0[input_valid_offset_0], 0);
+		UpdateSync((void*) &mem0[output_valid_offset_0], 0);
+		UpdateSync((void*) &mem1[input_valid_offset_1], 0);
+		UpdateSync((void*) &mem1[output_valid_offset_1], 0);
+		UpdateSync((void*) &mem2[input_valid_offset_2], 0);
+		UpdateSync((void*) &mem2[output_valid_offset_2], 0);
 
 		// Initialize registers of accelerator and start it.
 		iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
@@ -290,11 +294,11 @@ int main(int argc, char * argv[])
 		/// Send first context task
 		///////////////////////////////////////////////////////
 		// Wait for the accelerator to be ready
-		SpinSync((void*) &mem[input_valid_offset_0], 0);
+		SpinSync((void*) &mem0[input_valid_offset_0], 0);
 		// When the accelerator is ready, we write the input data to it
-		init_buf(&mem[input_data_offset_0], gold);
+		init_buf(&mem0[input_data_offset_0], gold);
 		// Inform the accelerator to start.
-		UpdateSync((void*) &mem[input_valid_offset_0], 1);
+		UpdateSync((void*) &mem0[input_valid_offset_0], 1);
 
 		printf("First context task sent\n");
 
@@ -322,12 +326,12 @@ int main(int argc, char * argv[])
 		/// Get first context output
 		///////////////////////////////////////////////////////
 		// Wait for the accelerator to send output
-		SpinSync((void*) &mem[output_valid_offset_0], 1);
+		SpinSync((void*) &mem0[output_valid_offset_0], 1);
 
 		// When the output is ready, we read it
-		errors += validate_buf(&mem[output_data_offset_0], gold);
+		errors += validate_buf(&mem0[output_data_offset_0], gold);
 		// Inform the accelerator - ready for next iteration.
-		UpdateSync((void*) &mem[output_valid_offset_0], 0);
+		UpdateSync((void*) &mem0[output_valid_offset_0], 0);
 
 		printf("First context task done\n");
 
@@ -335,11 +339,11 @@ int main(int argc, char * argv[])
 		/// Send second context task
 		///////////////////////////////////////////////////////
 		// Wait for the accelerator to be ready
-		SpinSync((void*) &mem[input_valid_offset_1], 0);
+		SpinSync((void*) &mem1[input_valid_offset_1], 0);
 		// When the accelerator is ready, we write the input data to it
-		init_buf(&mem[input_data_offset_1], gold);
+		init_buf(&mem1[input_data_offset_1], gold);
 		// Inform the accelerator to start.
-		UpdateSync((void*) &mem[input_valid_offset_1], 1);
+		UpdateSync((void*) &mem1[input_valid_offset_1], 1);
 
 		printf("Second context task sent\n");
 
@@ -360,11 +364,11 @@ int main(int argc, char * argv[])
 		/// Send first context task
 		///////////////////////////////////////////////////////
 		// Wait for the accelerator to be ready
-		SpinSync((void*) &mem[input_valid_offset_0], 0);
+		SpinSync((void*) &mem0[input_valid_offset_0], 0);
 		// When the accelerator is ready, we write the input data to it
-		init_buf(&mem[input_data_offset_0], gold);
+		init_buf(&mem0[input_data_offset_0], gold);
 		// Inform the accelerator to start.
-		UpdateSync((void*) &mem[input_valid_offset_0], 1);
+		UpdateSync((void*) &mem0[input_valid_offset_0], 1);
 
 		printf("First context task sent\n");
 
@@ -372,12 +376,12 @@ int main(int argc, char * argv[])
 		/// Get second context output
 		///////////////////////////////////////////////////////
 		// Wait for the accelerator to send output
-		SpinSync((void*) &mem[output_valid_offset_1], 1);
+		SpinSync((void*) &mem1[output_valid_offset_1], 1);
 
 		// When the output is ready, we read it
-		errors += validate_buf(&mem[output_data_offset_1], gold);
+		errors += validate_buf(&mem1[output_data_offset_1], gold);
 		// Inform the accelerator - ready for next iteration.
-		UpdateSync((void*) &mem[output_valid_offset_1], 0);
+		UpdateSync((void*) &mem1[output_valid_offset_1], 0);
 
 		printf("Second context task done\n");
 
@@ -385,12 +389,12 @@ int main(int argc, char * argv[])
 		/// Get first context output
 		///////////////////////////////////////////////////////
 		// Wait for the accelerator to send output
-		SpinSync((void*) &mem[output_valid_offset_0], 1);
+		SpinSync((void*) &mem0[output_valid_offset_0], 1);
 
 		// When the output is ready, we read it
-		errors += validate_buf(&mem[output_data_offset_0], gold);
+		errors += validate_buf(&mem0[output_data_offset_0], gold);
 		// Inform the accelerator - ready for next iteration.
-		UpdateSync((void*) &mem[output_valid_offset_0], 0);
+		UpdateSync((void*) &mem0[output_valid_offset_0], 0);
 
 		printf("First context task done\n");
 
@@ -398,11 +402,11 @@ int main(int argc, char * argv[])
 		/// Send first context task
 		///////////////////////////////////////////////////////
 		// Wait for the accelerator to be ready
-		SpinSync((void*) &mem[input_valid_offset_0], 0);
+		SpinSync((void*) &mem0[input_valid_offset_0], 0);
 		// When the accelerator is ready, we write the input data to it
-		init_buf(&mem[input_data_offset_0], gold);
+		init_buf(&mem0[input_data_offset_0], gold);
 		// Inform the accelerator to start.
-		UpdateSync((void*) &mem[input_valid_offset_0], 1);
+		UpdateSync((void*) &mem0[input_valid_offset_0], 1);
 
 		printf("First context task sent\n");
 
@@ -410,11 +414,11 @@ int main(int argc, char * argv[])
 		/// Send second context task
 		///////////////////////////////////////////////////////
 		// Wait for the accelerator to be ready
-		SpinSync((void*) &mem[input_valid_offset_1], 0);
+		SpinSync((void*) &mem1[input_valid_offset_1], 0);
 		// When the accelerator is ready, we write the input data to it
-		init_buf(&mem[input_data_offset_1], gold);
+		init_buf(&mem1[input_data_offset_1], gold);
 		// Inform the accelerator to start.
-		UpdateSync((void*) &mem[input_valid_offset_1], 1);
+		UpdateSync((void*) &mem1[input_valid_offset_1], 1);
 
 		printf("Second context task sent\n");
 
@@ -422,11 +426,11 @@ int main(int argc, char * argv[])
 		/// Send third context task
 		///////////////////////////////////////////////////////
 		// Wait for the accelerator to be ready
-		SpinSync((void*) &mem[input_valid_offset_2], 0);
+		SpinSync((void*) &mem2[input_valid_offset_2], 0);
 		// When the accelerator is ready, we write the input data to it
-		init_buf(&mem[input_data_offset_2], gold);
+		init_buf(&mem2[input_data_offset_2], gold);
 		// Inform the accelerator to start.
-		UpdateSync((void*) &mem[input_valid_offset_2], 1);
+		UpdateSync((void*) &mem2[input_valid_offset_2], 1);
 
 		printf("Third context task sent\n");
 
@@ -438,33 +442,33 @@ int main(int argc, char * argv[])
 		bool context_1_done = false;
 		bool context_2_done = false;
 		while (!(context_0_done & context_1_done & context_2_done)) {
-			bool context_0_ready = TestSync((void*) &mem[output_valid_offset_0], 1);
-			bool context_1_ready = TestSync((void*) &mem[output_valid_offset_1], 1);
-			bool context_2_ready = TestSync((void*) &mem[output_valid_offset_2], 1);
+			bool context_0_ready = TestSync((void*) &mem0[output_valid_offset_0], 1);
+			bool context_1_ready = TestSync((void*) &mem1[output_valid_offset_1], 1);
+			bool context_2_ready = TestSync((void*) &mem2[output_valid_offset_2], 1);
 
 			if (context_0_ready) {
 				// When the output is ready, we read it
-				errors += validate_buf(&mem[output_data_offset_0], gold);
+				errors += validate_buf(&mem0[output_data_offset_0], gold);
 				// Inform the accelerator - ready for next iteration.
-				UpdateSync((void*) &mem[output_valid_offset_0], 0);
+				UpdateSync((void*) &mem0[output_valid_offset_0], 0);
 
 				context_0_done = true;
 
 				printf("First context task done\n");
 			} else if (context_1_ready) {
 				// When the output is ready, we read it
-				errors += validate_buf(&mem[output_data_offset_1], gold);
+				errors += validate_buf(&mem1[output_data_offset_1], gold);
 				// Inform the accelerator - ready for next iteration.
-				UpdateSync((void*) &mem[output_valid_offset_1], 0);
+				UpdateSync((void*) &mem1[output_valid_offset_1], 0);
 
 				context_1_done = true;
 
 				printf("Second context task done\n");
 			} else if (context_2_ready) {
 				// When the output is ready, we read it
-				errors += validate_buf(&mem[output_data_offset_2], gold);
+				errors += validate_buf(&mem2[output_data_offset_2], gold);
 				// Inform the accelerator - ready for next iteration.
-				UpdateSync((void*) &mem[output_valid_offset_2], 0);
+				UpdateSync((void*) &mem2[output_valid_offset_2], 0);
 
 				context_2_done = true;
 
@@ -475,12 +479,12 @@ int main(int argc, char * argv[])
 		iowrite32(dev, CMD_REG, 0x0);
 	
 		// Reset all sync variables to default values.
-		UpdateSync((void*) &mem[input_valid_offset_0], 0);
-		UpdateSync((void*) &mem[output_valid_offset_0], 0);
-		UpdateSync((void*) &mem[input_valid_offset_1], 0);
-		UpdateSync((void*) &mem[output_valid_offset_1], 0);
-		UpdateSync((void*) &mem[input_valid_offset_2], 0);
-		UpdateSync((void*) &mem[output_valid_offset_2], 0);
+		UpdateSync((void*) &mem0[input_valid_offset_0], 0);
+		UpdateSync((void*) &mem0[output_valid_offset_0], 0);
+		UpdateSync((void*) &mem1[input_valid_offset_1], 0);
+		UpdateSync((void*) &mem1[output_valid_offset_1], 0);
+		UpdateSync((void*) &mem2[input_valid_offset_2], 0);
+		UpdateSync((void*) &mem2[output_valid_offset_2], 0);
 
 		// Initialize registers of accelerator and start it.
 		iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
@@ -519,11 +523,11 @@ int main(int argc, char * argv[])
 		/// Send first context task
 		///////////////////////////////////////////////////////
 		// Wait for the accelerator to be ready
-		SpinSync((void*) &mem[input_valid_offset_0], 0);
+		SpinSync((void*) &mem0[input_valid_offset_0], 0);
 		// When the accelerator is ready, we write the input data to it
-		init_buf(&mem[input_data_offset_0], gold);
+		init_buf(&mem0[input_data_offset_0], gold);
 		// Inform the accelerator to start.
-		UpdateSync((void*) &mem[input_valid_offset_0], 1);
+		UpdateSync((void*) &mem0[input_valid_offset_0], 1);
 
 		printf("First context task sent\n");	
 	
@@ -531,19 +535,21 @@ int main(int argc, char * argv[])
 		/// Get first context output
 		///////////////////////////////////////////////////////
 		// Wait for the accelerator to send output
-		SpinSync((void*) &mem[output_valid_offset_0], 1);
+		SpinSync((void*) &mem0[output_valid_offset_0], 1);
 
 		// When the output is ready, we read it
-		errors += validate_buf(&mem[output_data_offset_0], gold);
+		errors += validate_buf(&mem0[output_data_offset_0], gold);
 		// Inform the accelerator - ready for next iteration.
-		UpdateSync((void*) &mem[output_valid_offset_0], 0);
+		UpdateSync((void*) &mem0[output_valid_offset_0], 0);
 
 		printf("First context task done\n");	
 
 		aligned_free(ptable0);
 		aligned_free(ptable1);
 		aligned_free(ptable2);
-		aligned_free(mem);
+		aligned_free(mem0);
+		aligned_free(mem1);
+		aligned_free(mem2);
 		aligned_free(gold);
 
 		printf("Result: FFT Baremetal %d Total = %lu\n\n", 2 * num_samples, (t_acc_input+t_acc+t_acc_output)/ITERATIONS);

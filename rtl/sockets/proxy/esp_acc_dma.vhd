@@ -310,13 +310,13 @@ architecture rtl of esp_acc_dma is
   -- attribute mark_debug of dvfs_transient       : signal is "true";
   attribute mark_debug of pending_dma_read : signal is "true";
   attribute mark_debug of pending_dma_write : signal is "true";
-  -- attribute mark_debug of tlb_valid : signal is "true";
-  -- attribute mark_debug of tlb_clear : signal is "true";
-  -- attribute mark_debug of tlb_empty : signal is "true";
-  -- attribute mark_debug of tlb_write : signal is "true";
-  -- attribute mark_debug of tlb_wr_address : signal is "true";
-  -- attribute mark_debug of dma_address : signal is "true";
-  -- attribute mark_debug of dma_length : signal is "true";
+  attribute mark_debug of tlb_valid : signal is "true";
+  attribute mark_debug of tlb_clear : signal is "true";
+  attribute mark_debug of tlb_empty : signal is "true";
+  attribute mark_debug of tlb_write : signal is "true";
+  attribute mark_debug of tlb_wr_address : signal is "true";
+  attribute mark_debug of dma_address : signal is "true";
+  attribute mark_debug of dma_length : signal is "true";
   attribute mark_debug of pending_acc_done : signal is "true";
   attribute mark_debug of clear_acc_done : signal is "true";
   -- attribute mark_debug of dma_snd_delay : signal is "true";
@@ -330,6 +330,12 @@ architecture rtl of esp_acc_dma is
   attribute mark_debug of bankreg : signal is "true";
   attribute mark_debug of acc_rst_next : signal is "true";
   attribute mark_debug of conf_done : signal is "true";
+  attribute mark_debug of dma_rcv_rdreq : signal is "true";
+  attribute mark_debug of dma_rcv_data_out : signal is "true";
+  attribute mark_debug of dma_rcv_empty : signal is "true";
+  attribute mark_debug of dma_snd_wrreq : signal is "true";
+  attribute mark_debug of dma_snd_data_in : signal is "true";
+  attribute mark_debug of dma_snd_full : signal is "true";
 
 begin  -- rtl
 
@@ -1151,13 +1157,17 @@ begin  -- rtl
     sample(addr) <= apbi.psel(pindex) and apbi.penable and apbi.pwrite;
 
     -- PT_ADDRESS_REG_i are at offset 0x4i
-    if apbi.paddr(7 downto 4) = "0100" then
-      tlb_clear(cur_ctxt) <= '1';
+    if dma_state = reset then
+      tlb_clear <= "1111";
+    else
+      if apbi.paddr(7 downto 4) = "0100" then
+        tlb_clear(cur_ctxt) <= '1';
 
-      -- Do not allow PT address to be written while that context is running
-      if apbi.paddr(3 downto 2) = current_context and dma_state /= idle then
-        tlb_clear(cur_ctxt) <= '0';
-        sample(addr) <= '0';
+        -- Do not allow PT address to be written while that context is running
+        if apbi.paddr(3 downto 2) = current_context and dma_state /= idle then
+          tlb_clear(cur_ctxt) <= '0';
+          sample(addr) <= '0';
+        end if;
       end if;
     end if;
 
@@ -1180,10 +1190,10 @@ begin  -- rtl
   -- Other registers
   registers: for i in 0 to MAXREGNUM - 1 generate
     written_from_noc: if i /= STATUS_REG and available_reg_mask(i) = '1' generate
-      process (clk)
+      process (clk, rst, acc_rst_next)
       begin  -- process
         if clk'event and clk = '1' then  -- rising clock edge
-          if rst = '0' then                   -- synchronous reset (active low)
+          if rst = '0' or acc_rst_next = '0' then                   -- synchronous reset (active low)
             bankreg(i) <= bankdef(i);
           elsif sample(i) = '1' and rdonly_reg_mask(i) = '0' then
             bankreg(i) <= bankin(i);

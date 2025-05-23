@@ -527,10 +527,12 @@ add:
 		goto out;
 	}
 
-	esp_update_pt(esp, contig);
+	esp->context_id = access->context_id;
 
 	if (esp->driver->add_context)
 		esp->driver->add_context(esp, arg);
+
+	esp_update_pt(esp, contig);
 
 	mutex_unlock(&esp->lock);
 

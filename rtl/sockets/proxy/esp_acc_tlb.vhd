@@ -155,6 +155,17 @@ architecture tlb of esp_acc_tlb is
 
   constant address_pad_lsb : std_logic_vector(GLOB_BYTE_OFFSET_BITS - 1 downto 0) := (others => '0');
 
+  attribute mark_debug : string;
+
+  attribute mark_debug of dma_base_address    : signal is "true";
+  attribute mark_debug of tlb_rd_address    : signal is "true";
+  attribute mark_debug of tlb_enable    : signal is "true";
+  attribute mark_debug of tlb_datain    : signal is "true";
+  attribute mark_debug of tlb_dataout    : signal is "true";
+  attribute mark_debug of tlb_address    : signal is "true";
+  attribute mark_debug of tlb_write    : signal is "true";
+  attribute mark_debug of tlb_read    : signal is "true";
+
 begin  -- tlb
 
   tlb_empty <= tlb_empty_int;
@@ -379,7 +390,7 @@ begin  -- tlb
       end if;
     end if;
   end process tlb_status_register;
-  tlb_rd_address <= chunk_index((log2(tlb_entries) -1) downto 0);
+  tlb_rd_address <= current_context & chunk_index((log2(tlb_entries / 4) -1) downto 0);
   tlb_address <= tlb_wr_address when tlb_write = '1' else tlb_rd_address;
   tlb_enable <= tlb_read or tlb_write;
 
