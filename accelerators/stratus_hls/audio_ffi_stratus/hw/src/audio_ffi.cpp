@@ -540,8 +540,13 @@ void audio_ffi::compute_kernel()
                 input_is_full = 0;
                 break;
             } else {              
+                HLS_PROTO("check-cycles-elapsed");
+
                 // Is the quota of current context complete?
-                uint32_t cycles_elapsed = accel_cycles - start_cycles;
+                cycles_elapsed = accel_cycles - start_cycles;
+                cycles_elapsed_dbg.write(cycles_elapsed);
+
+                wait();
 
                 if (cycles_elapsed > context_quota) {
                     HLS_PROTO("switch-context-1");

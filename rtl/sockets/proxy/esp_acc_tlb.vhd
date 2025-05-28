@@ -370,26 +370,26 @@ begin  -- tlb
     end if;
   end process address_resolve_pipeline;
 
-  -- Read during TLB FSM Stage 2
-  tlb_status_register: process (clk, rst)
-    variable cur_ctxt : integer range 0 to 3;
-  begin  -- process tlb_status_register
-    cur_ctxt := conv_integer(current_context(1 downto 0));
-    if rst = '0' then                   -- asynchronous reset (active low)
-      tlb_empty_int <= "1111";
-    elsif clk'event and clk = '1' then  -- rising clock edge
-      if (src_is_p2p and dst_is_p2p) = '1' then
-        tlb_empty_int(cur_ctxt) <= '0';
-      else
-        if tlb_valid(cur_ctxt) = '1' then
-          tlb_empty_int(cur_ctxt) <= '0';
+  tlb_status_register : for i in 0 to 3 generate
+    process (clk, rst)
+      begin  -- process
+        if rst = '0' then                   -- asynchronous reset (active low)
+          tlb_empty_int(i) <= '1';
+        elsif clk'event and clk = '1' then  -- rising clock edge
+          if (src_is_p2p and dst_is_p2p) = '1' then
+            tlb_empty_int(i) <= '0';
+          else
+            if tlb_valid(i) = '1' then
+              tlb_empty_int(i) <= '0';
+            end if;
+            if tlb_clear(i) = '1' then
+              tlb_empty_int(i) <= '1';
+            end if;
+          end if;
         end if;
-        if tlb_clear(cur_ctxt) = '1' then
-          tlb_empty_int(cur_ctxt) <= '1';
-        end if;
-      end if;
-    end if;
-  end process tlb_status_register;
+    end process;
+  end generate tlb_status_register;
+
   tlb_rd_address <= current_context & chunk_index((log2(tlb_entries / 4) -1) downto 0);
   tlb_address <= tlb_wr_address when tlb_write = '1' else tlb_rd_address;
   tlb_enable <= tlb_read or tlb_write;
