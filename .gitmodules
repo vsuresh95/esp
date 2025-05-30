@@ -11,7 +11,7 @@
 	url = https://github.com/vsuresh95/esp-accelerator-templates.git
 [submodule "soft/ariane/linux"]
 	path = soft/ariane/linux
-	url = https://github.com/sld-columbia/linux.git
+	url = https://github.com/vsuresh95/linux.git
 	branch = ariane
 [submodule "rtl/cores/ariane/ariane"]
 	path = rtl/cores/ariane/ariane
