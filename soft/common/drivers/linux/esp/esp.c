@@ -529,10 +529,10 @@ add:
 
 	esp->context_id = access->context_id;
 
+	esp_update_pt(esp, contig);
+
 	if (esp->driver->add_context)
 		esp->driver->add_context(esp, arg);
-
-	esp_update_pt(esp, contig);
 
 	mutex_unlock(&esp->lock);
 

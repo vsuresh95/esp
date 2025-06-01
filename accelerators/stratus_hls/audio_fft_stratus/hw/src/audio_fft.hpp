@@ -34,6 +34,9 @@
 
 #define VALID_OFFSET 0
 #define PAYLOAD_OFFSET 2
+
+#define BACKOFF_INIT 8
+#define BACKOFF_LIMIT 128
  
 class audio_fft : public esp_accelerator_3P<DMA_WIDTH>
 {
@@ -72,6 +75,9 @@ public:
         HLS_PRESERVE_SIGNAL(accel_cycles_dbg, true);
         HLS_PRESERVE_SIGNAL(current_context_int_dbg, true);
         HLS_PRESERVE_SIGNAL(switch_context_dbg, true);
+        HLS_PRESERVE_SIGNAL(cycles_elapsed_dbg, true);
+        HLS_PRESERVE_SIGNAL(start_cycles_dbg, true);
+        HLS_PRESERVE_SIGNAL(backoff_count_dbg, true);
 
         // Map arrays to memories
         /* <<--plm-bind-->> */
@@ -89,12 +95,17 @@ public:
     sc_signal< sc_uint<32> > accel_cycles_dbg;
     sc_signal< sc_uint<MAX_CONTEXTS_BITS> > current_context_int_dbg;
     sc_signal< sc_int<1> > switch_context_dbg;
+    sc_signal< sc_uint<32> > cycles_elapsed_dbg;
+    sc_signal< sc_uint<32> > start_cycles_dbg;
+    sc_signal< sc_uint<32> > backoff_count_dbg;
 
     sc_int<32> load_state_req;
     sc_int<32> store_state_req;
     sc_int<32> input_is_full;
     sc_uint<MAX_CONTEXTS_BITS> current_context_int;
     sc_uint<32> accel_cycles;
+    sc_uint<32> cycles_elapsed;
+    sc_uint<32> start_cycles;
     
     // Output signal for current context
     sc_out< sc_uint<MAX_CONTEXTS_BITS> > current_context;

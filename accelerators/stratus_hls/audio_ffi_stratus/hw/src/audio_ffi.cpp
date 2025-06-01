@@ -445,6 +445,7 @@ void audio_ffi::compute_kernel()
 
         start_cycles_dbg.write(0);
         cycles_elapsed_dbg.write(0);
+        backoff_count_dbg.write(0);
 
         wait();
     }
@@ -457,12 +458,15 @@ void audio_ffi::compute_kernel()
     uint32_t context_quota;
     uint32_t valid_contexts;
     bool switch_context;
+    uint32_t backoff_count;
     {
         HLS_PROTO("compute-config");
 
         cfg.wait_for_config(); // config process
 
         switch_context = false;
+        backoff_count = BACKOFF_INIT;
+        backoff_count_dbg.write(backoff_count);
         
         wait();
     }
@@ -484,13 +488,14 @@ void audio_ffi::compute_kernel()
             HLS_FLATTEN_ARRAY(config.input_queue_base);
             HLS_FLATTEN_ARRAY(config.output_queue_base);
             HLS_FLATTEN_ARRAY(config.filter_queue_base);
+            HLS_FLATTEN_ARRAY(config.context_quota);
             
-            context_quota = config.context_quota;
+            context_quota = config.context_quota[current_context_int];
             valid_contexts = config.valid_contexts;
 
             wait();
 
-            if (cycles_elapsed > context_quota) {
+            if (cycles_elapsed > context_quota || switch_context) {
                 sc_uint<MAX_CONTEXTS> v = valid_contexts;
                 sc_uint<MAX_CONTEXTS_BITS> idx = current_context_int + 1;
 
@@ -513,12 +518,18 @@ void audio_ffi::compute_kernel()
                     // Set the start cycles for this context to current cycle value.
                     start_cycles = accel_cycles;
                     start_cycles_dbg.write(start_cycles);
+                    
+                    // If context was switched due to spinning, reset it the flag
+                    switch_context = false;
+                    switch_context_dbg.write(0);
                     wait();
                 }
             }
 
             current_context_int_dbg.write(current_context_int);
             current_context.write(current_context_int);
+            backoff_count = BACKOFF_INIT;
+            backoff_count_dbg.write(backoff_count);
             wait();
         }
 
@@ -537,6 +548,7 @@ void audio_ffi::compute_kernel()
             wait();
 
             if (input_is_full == 1) {
+                HLS_PROTO("input-is-full");
                 input_is_full = 0;
                 break;
             } else {              
@@ -548,6 +560,8 @@ void audio_ffi::compute_kernel()
 
                 wait();
 
+                // If you exceeded your quota, immediately switch out. Else, do an exponential backoff
+                // until the BACKOFF_LIMIT is reached and then switch out the context.
                 if (cycles_elapsed > context_quota) {
                     HLS_PROTO("switch-context-1");
                     switch_context = true;
@@ -556,19 +570,34 @@ void audio_ffi::compute_kernel()
                     break;
                 } else {
                     HLS_PROTO("no-switch-context");
-                    wait();
-                    continue;
+
+                    for (int i = 0; i < backoff_count; i++) {
+                        HLS_PROTO("backoff-wait");
+                        wait();
+                    }
+
+                    if (backoff_count == BACKOFF_LIMIT) {
+                        HLS_PROTO("backoff-reset");
+                        switch_context = true;
+                        switch_context_dbg.write(1);
+                        backoff_count = BACKOFF_INIT;
+                        backoff_count_dbg.write(backoff_count);
+                        wait();
+                        break;
+                    } else {
+                        HLS_PROTO("backoff-exp");
+                        backoff_count = backoff_count * 2;
+                        backoff_count_dbg.write(backoff_count);
+                        wait();
+                        continue;
+                    }
                 }
             }
-
-            // If input is not full and if quota is not exceeded, we will continue spinning.
         }
 
         // If spinning for long time, switch context
         if (switch_context) {
             HLS_PROTO("switch-context-0");
-            switch_context = false;
-            switch_context_dbg.write(0);
             wait();
             continue;
         }

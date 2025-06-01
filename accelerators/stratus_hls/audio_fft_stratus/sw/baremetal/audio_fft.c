@@ -77,8 +77,11 @@ static unsigned mem_size;
 #define AUDIO_FFT_OUTPUT_QUEUE_BASE_1 0x94
 #define AUDIO_FFT_OUTPUT_QUEUE_BASE_2 0x98
 #define AUDIO_FFT_OUTPUT_QUEUE_BASE_3 0x9C
-#define AUDIO_FFT_CONTEXT_QUOTA 0xA0
-#define AUDIO_FFT_VALID_CONTEXTS 0xA4
+#define AUDIO_FFT_CONTEXT_QUOTA_0 0xA0
+#define AUDIO_FFT_CONTEXT_QUOTA_1 0xA4
+#define AUDIO_FFT_CONTEXT_QUOTA_2 0xA8
+#define AUDIO_FFT_CONTEXT_QUOTA_3 0xAC
+#define AUDIO_FFT_VALID_CONTEXTS 0xB0
 
 static uint64_t t_start = 0;
 static uint64_t t_end = 0;
@@ -281,9 +284,9 @@ int main(int argc, char * argv[])
 		iowrite32(dev, AUDIO_FFT_DO_INVERSE_REG_0, do_inverse);
 		iowrite32(dev, AUDIO_FFT_INPUT_QUEUE_BASE_0, input_valid_offset_0);
 		iowrite32(dev, AUDIO_FFT_OUTPUT_QUEUE_BASE_0, output_valid_offset_0);
-		iowrite32(dev, AUDIO_FFT_CONTEXT_QUOTA, 50000);
-		iowrite32(dev, AUDIO_FFT_VALID_CONTEXTS, 0x1);
+		iowrite32(dev, AUDIO_FFT_CONTEXT_QUOTA_0, 50000);
 		iowrite32(dev, PT_ADDRESS_REG_0, (unsigned long long) ptable0);
+		iowrite32(dev, AUDIO_FFT_VALID_CONTEXTS, 0x1);
 
 		printf("First context configured\n");
 
@@ -317,8 +320,9 @@ int main(int argc, char * argv[])
 		iowrite32(dev, AUDIO_FFT_DO_INVERSE_REG_1, do_inverse);
 		iowrite32(dev, AUDIO_FFT_INPUT_QUEUE_BASE_1, input_valid_offset_1);
 		iowrite32(dev, AUDIO_FFT_OUTPUT_QUEUE_BASE_1, output_valid_offset_1);
-		iowrite32(dev, AUDIO_FFT_VALID_CONTEXTS, 0x3);
+		iowrite32(dev, AUDIO_FFT_CONTEXT_QUOTA_1, 50000);
 		iowrite32(dev, PT_ADDRESS_REG_1, (unsigned long long) ptable1);
+		iowrite32(dev, AUDIO_FFT_VALID_CONTEXTS, 0x3);
 
 		printf("Second context configured\n");
 
@@ -355,8 +359,9 @@ int main(int argc, char * argv[])
 		iowrite32(dev, AUDIO_FFT_DO_INVERSE_REG_2, do_inverse);
 		iowrite32(dev, AUDIO_FFT_INPUT_QUEUE_BASE_2, input_valid_offset_2);
 		iowrite32(dev, AUDIO_FFT_OUTPUT_QUEUE_BASE_2, output_valid_offset_2);
-		iowrite32(dev, AUDIO_FFT_VALID_CONTEXTS, 0x7);
+		iowrite32(dev, AUDIO_FFT_CONTEXT_QUOTA_2, 50000);
 		iowrite32(dev, PT_ADDRESS_REG_2, (unsigned long long) ptable2);
+		iowrite32(dev, AUDIO_FFT_VALID_CONTEXTS, 0x7);
 
 		printf("Third context configured\n");
 
@@ -510,9 +515,9 @@ int main(int argc, char * argv[])
 		iowrite32(dev, AUDIO_FFT_DO_INVERSE_REG_0, do_inverse);
 		iowrite32(dev, AUDIO_FFT_INPUT_QUEUE_BASE_0, input_valid_offset_0);
 		iowrite32(dev, AUDIO_FFT_OUTPUT_QUEUE_BASE_0, output_valid_offset_0);
-		iowrite32(dev, AUDIO_FFT_CONTEXT_QUOTA, 50000);
-		iowrite32(dev, AUDIO_FFT_VALID_CONTEXTS, 0x1);
+		iowrite32(dev, AUDIO_FFT_CONTEXT_QUOTA_0, 50000);
 		iowrite32(dev, PT_ADDRESS_REG_0, (unsigned long long) ptable0);
+		iowrite32(dev, AUDIO_FFT_VALID_CONTEXTS, 0x1);
 
 		printf("First context configured\n");
 

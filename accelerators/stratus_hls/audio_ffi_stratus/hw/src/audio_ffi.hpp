@@ -40,6 +40,9 @@
 #define VALID_OFFSET 0
 #define PAYLOAD_OFFSET 2
 
+#define BACKOFF_INIT 8
+#define BACKOFF_LIMIT 128
+
 class audio_ffi : public esp_accelerator_3P<DMA_WIDTH>
 {
 public:
@@ -79,6 +82,7 @@ public:
         HLS_PRESERVE_SIGNAL(switch_context_dbg, true);
         HLS_PRESERVE_SIGNAL(cycles_elapsed_dbg, true);
         HLS_PRESERVE_SIGNAL(start_cycles_dbg, true);
+        HLS_PRESERVE_SIGNAL(backoff_count_dbg, true);
 
         // Map arrays to memories
         /* <<--plm-bind-->> */
@@ -100,6 +104,7 @@ public:
     sc_signal< sc_int<1> > switch_context_dbg;
     sc_signal< sc_uint<32> > cycles_elapsed_dbg;
     sc_signal< sc_uint<32> > start_cycles_dbg;
+    sc_signal< sc_uint<32> > backoff_count_dbg;
 
     sc_int<32> load_state_req;
     sc_int<32> store_state_req;
