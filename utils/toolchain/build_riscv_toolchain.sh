@@ -12,7 +12,7 @@ LINUX_VERSION=4.20.0
 export SYSROOT=${ESP_ROOT}/soft/ariane/sysroot
 RISCV_GNU_TOOLCHAIN_SHA_DEFAULT=afcc8bc655d30cf6af054ac1d3f5f89d0627aa79
 RISCV_GNU_TOOLCHAIN_SHA_PYTHON=2c037e631e27bc01582476f5b3c5d5e9e51489b8
-BUILDROOT_SHA_DEFAULT=d6fa6a45e196665d6607b522f290b1451b949c2c
+BUILDROOT_SHA_DEFAULT=82e7e4d7874e3f1ba78d8cf53f5a34e8c2f0d09d
 BUILDROOT_SHA_PYTHON=fbff7d7289cc95db991184f890f4ca1fcf8a101e
 
 # A patch for buildroot RISCV64 with numpy enabled
@@ -179,7 +179,7 @@ if [ $(noyes "Skip buildroot?") == "n" ]; then
     	git checkout .
     	git pull
     else
-    	git clone https://git.buildroot.net/buildroot
+        git clone https://github.com/vsuresh95/buildroot.git
     	cd $src
     fi
 
@@ -192,8 +192,16 @@ if [[ "$python_en" -eq 1 ]]; then       # python enable
     make -j ${NTHREADS}
 else                                    # default
     git reset --hard ${BUILDROOT_SHA}
+    echo "CP 1"
     git submodule update --init --recursive
+    echo "CP 2"
+    mkdir output
+    touch output/.br-external.mk
     make distclean
+    echo "CP 3"
+    mkdir output
+    touch output/.br-external.mk
+    echo "Touched"
     make defconfig BR2_DEFCONFIG=${SCRIPT_PATH}/riscv_buildroot_defconfig
     make -j ${NTHREADS}
 fi
