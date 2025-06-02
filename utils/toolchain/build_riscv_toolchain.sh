@@ -192,16 +192,12 @@ if [[ "$python_en" -eq 1 ]]; then       # python enable
     make -j ${NTHREADS}
 else                                    # default
     git reset --hard ${BUILDROOT_SHA}
-    echo "CP 1"
     git submodule update --init --recursive
-    echo "CP 2"
     mkdir output
     touch output/.br-external.mk
     make distclean
-    echo "CP 3"
     mkdir output
     touch output/.br-external.mk
-    echo "Touched"
     make defconfig BR2_DEFCONFIG=${SCRIPT_PATH}/riscv_buildroot_defconfig
     make -j ${NTHREADS}
 fi
