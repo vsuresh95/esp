@@ -104,7 +104,6 @@ public:
     sc_int<32> input_is_full;
     sc_uint<MAX_CONTEXTS_BITS> current_context_int;
     sc_uint<32> accel_cycles;
-    sc_uint<32> cycles_elapsed;
     sc_uint<32> start_cycles;
     
     // Output signal for current context

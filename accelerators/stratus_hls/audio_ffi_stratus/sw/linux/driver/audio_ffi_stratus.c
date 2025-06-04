@@ -90,8 +90,8 @@ static void audio_ffi_init_accel(struct esp_device *esp, void *arg)
 	iowrite32be(a->output_queue_base, esp->iomem + AUDIO_FFI_OUTPUT_QUEUE_BASE_0 + 0x4*esp->context_id);
 	iowrite32be(a->filter_queue_base, esp->iomem + AUDIO_FFI_FILTER_QUEUE_BASE_0 + 0x4*esp->context_id);
 	
-	iowrite32be(a->context_quota, esp->iomem + AUDIO_FFI_CONTEXT_QUOTA_0 + 0x4*esp->context_id);
-	iowrite32be(a->valid_contexts, esp->iomem + AUDIO_FFI_VALID_CONTEXTS);
+	iowrite32be(a->esp.context_quota, esp->iomem + AUDIO_FFI_CONTEXT_QUOTA_0 + 0x4*esp->context_id);
+	iowrite32be(a->esp.valid_contexts, esp->iomem + AUDIO_FFI_VALID_CONTEXTS);
 }
 
 static void audio_ffi_add_context(struct esp_device *esp, void *arg)
@@ -106,8 +106,8 @@ static void audio_ffi_add_context(struct esp_device *esp, void *arg)
 	iowrite32be(a->output_queue_base, esp->iomem + AUDIO_FFI_OUTPUT_QUEUE_BASE_0 + 0x4*esp->context_id);
 	iowrite32be(a->filter_queue_base, esp->iomem + AUDIO_FFI_FILTER_QUEUE_BASE_0 + 0x4*esp->context_id);
 
-	iowrite32be(a->context_quota, esp->iomem + AUDIO_FFI_CONTEXT_QUOTA_0 + 0x4*esp->context_id);
-	iowrite32be(a->valid_contexts, esp->iomem + AUDIO_FFI_VALID_CONTEXTS);
+	iowrite32be(a->esp.context_quota, esp->iomem + AUDIO_FFI_CONTEXT_QUOTA_0 + 0x4*esp->context_id);
+	iowrite32be(a->esp.valid_contexts, esp->iomem + AUDIO_FFI_VALID_CONTEXTS);
 }
 
 static void audio_ffi_del_context(struct esp_device *esp, void *arg)
@@ -115,7 +115,7 @@ static void audio_ffi_del_context(struct esp_device *esp, void *arg)
 	struct audio_ffi_stratus_access *a = arg;
 
 	/* <<--regs-config-->> */
-	iowrite32be(a->valid_contexts, esp->iomem + AUDIO_FFI_VALID_CONTEXTS);
+	iowrite32be(a->esp.valid_contexts, esp->iomem + AUDIO_FFI_VALID_CONTEXTS);
 }
 
 static bool audio_ffi_xfer_input_ok(struct esp_device *esp, void *arg)

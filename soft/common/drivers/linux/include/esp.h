@@ -29,6 +29,8 @@ struct esp_access {
 	unsigned dst_offset;
     unsigned spandex_conf;
 	unsigned context_id;
+	unsigned valid_contexts;
+	unsigned context_quota;
 
     unsigned int footprint;
     enum contig_alloc_policy alloc_policy;

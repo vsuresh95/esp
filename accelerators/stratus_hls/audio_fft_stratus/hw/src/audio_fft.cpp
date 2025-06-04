@@ -63,9 +63,7 @@ void audio_fft::load_input()
             HLS_PROTO("read-load-config");
 
             conf_info_t config = this->conf_info.read();        
-            HLS_FLATTEN_ARRAY(config.do_inverse);
             HLS_FLATTEN_ARRAY(config.logn_samples);
-            HLS_FLATTEN_ARRAY(config.do_shift);
             HLS_FLATTEN_ARRAY(config.input_queue_base);
             HLS_FLATTEN_ARRAY(config.output_queue_base);
 
@@ -208,9 +206,7 @@ void audio_fft::store_output()
             HLS_PROTO("read-store-config");
 
             conf_info_t config = this->conf_info.read();        
-            HLS_FLATTEN_ARRAY(config.do_inverse);
             HLS_FLATTEN_ARRAY(config.logn_samples);
-            HLS_FLATTEN_ARRAY(config.do_shift);
             HLS_FLATTEN_ARRAY(config.input_queue_base);
             HLS_FLATTEN_ARRAY(config.output_queue_base);
 
@@ -350,7 +346,6 @@ void audio_fft::compute_kernel()
         current_context.write(0);
 
         start_cycles = 0;
-        cycles_elapsed = 0;
 
         start_cycles_dbg.write(0);
         cycles_elapsed_dbg.write(0);
@@ -369,6 +364,8 @@ void audio_fft::compute_kernel()
     uint32_t valid_contexts;
     bool switch_context;
     uint32_t backoff_count;
+    int32_t local_input_is_full;
+    uint32_t cycles_elapsed;
     {
         HLS_PROTO("compute-config");
 
@@ -377,7 +374,28 @@ void audio_fft::compute_kernel()
         switch_context = false;
         backoff_count = BACKOFF_INIT;
         backoff_count_dbg.write(backoff_count);
+        local_input_is_full = 0;
+        cycles_elapsed = 0;
+
+        conf_info_t config = this->conf_info.read();        
+        HLS_FLATTEN_ARRAY(config.logn_samples);
+        HLS_FLATTEN_ARRAY(config.do_shift);
+        HLS_FLATTEN_ARRAY(config.do_inverse);
+        HLS_FLATTEN_ARRAY(config.context_quota);
         
+        context_quota = config.context_quota[current_context_int];
+        valid_contexts = config.valid_contexts;
+        logn_samples = config.logn_samples[current_context_int];
+        num_samples = 1 << logn_samples;
+        do_inverse = config.do_inverse[current_context_int];
+        do_shift = config.do_shift[current_context_int];
+        
+        // Set the start cycles for this context to current cycle value.
+        start_cycles = accel_cycles;                    
+        start_cycles_dbg.write(start_cycles);
+
+        current_context_int_dbg.write(current_context_int);
+        current_context.write(current_context_int);
         wait();
     }
 
@@ -386,131 +404,171 @@ void audio_fft::compute_kernel()
 #ifdef ENABLE_SM
         // At the start of every iteration, check if there is a need to switch context
         {
-            HLS_PROTO("check-new-context");
+            HLS_PROTO("read-config");
 
             // Is the quota of current context complete?
             cycles_elapsed = accel_cycles - start_cycles;
             cycles_elapsed_dbg.write(cycles_elapsed);
 
             conf_info_t config = this->conf_info.read();        
-            HLS_FLATTEN_ARRAY(config.do_inverse);
-            HLS_FLATTEN_ARRAY(config.logn_samples);
-            HLS_FLATTEN_ARRAY(config.do_shift);
-            HLS_FLATTEN_ARRAY(config.input_queue_base);
-            HLS_FLATTEN_ARRAY(config.output_queue_base);
             HLS_FLATTEN_ARRAY(config.context_quota);
             
             context_quota = config.context_quota[current_context_int];
             valid_contexts = config.valid_contexts;
-
             wait();
+        }
+
+        {
+            HLS_PROTO("check-new-context");
 
             if (cycles_elapsed > context_quota || switch_context) {
+                HLS_PROTO("need-new-context");
+
                 sc_uint<MAX_CONTEXTS> v = valid_contexts;
                 sc_uint<MAX_CONTEXTS_BITS> idx = current_context_int + 1;
 
                 for (int i = 0; i < MAX_CONTEXTS; i++) {
                     if (v[idx] == 1) {
-                        current_context_int = idx;
                         break;
                     }
                     idx++;
                 }
 
-                {
-                    HLS_PROTO("read-compute-config");
-                    // User-defined config code
-                    /* <<--local-params-->> */
-                    logn_samples = config.logn_samples[current_context_int];
-                    num_samples = 1 << logn_samples;
-                    do_inverse = config.do_inverse[current_context_int];
-                    do_shift = config.do_shift[current_context_int];
+                wait();
+
+                if (current_context_int != idx) {
+                    current_context_int = idx;
 
                     // Set the start cycles for this context to current cycle value.
-                    start_cycles = accel_cycles;                    
+                    start_cycles = accel_cycles;
                     start_cycles_dbg.write(start_cycles);
-                    
-                    // If context was switched due to spinning, reset it the flag
-                    switch_context = false;
-                    switch_context_dbg.write(0);
+
+                    // When you switch context, reset the backoff count.
+                    backoff_count = BACKOFF_INIT;
+                    backoff_count_dbg.write(backoff_count);
+
+                    // Write out the new context to DMA/TLB
+                    current_context_int_dbg.write(current_context_int);
+                    current_context.write(current_context_int);
+
+                    // If you change context, wait for TLB to be written to (conf_done)
+                    bool end = false;
+                    do {
+                        HLS_UNROLL_LOOP(OFF);
+                        wait();
+                        end = conf_done.read();
+                    } while (!end);
+                }
+
+                wait();
+            }                
+        }
+
+        {
+            HLS_PROTO("get-new-context");
+
+            // If context was switched due to spinning, reset it the flag
+            switch_context = false;
+            switch_context_dbg.write(0);
+            wait();
+                           
+            conf_info_t config = this->conf_info.read();        
+            HLS_FLATTEN_ARRAY(config.logn_samples);
+            HLS_FLATTEN_ARRAY(config.do_shift);
+            HLS_FLATTEN_ARRAY(config.do_inverse);
+            HLS_FLATTEN_ARRAY(config.context_quota); 
+            
+            /* <<--local-params-->> */
+            logn_samples = config.logn_samples[current_context_int];
+            num_samples = 1 << logn_samples;
+            do_shift = config.do_shift[current_context_int];
+            do_inverse = config.do_inverse[current_context_int];
+            context_quota = config.context_quota[current_context_int];
+            wait();
+        }
+                
+        // Poll input queue is full for new task
+        while (true)
+        {
+            {
+                HLS_PROTO("test-input-is-full");
+
+                load_state_req = TEST_INPUT_IS_FULL;
+
+                compute_state_req_dbg.write(TEST_INPUT_IS_FULL);
+
+                this->compute_load_ready_handshake();
+                wait();
+                this->compute_load_done_handshake();
+                wait();
+
+                local_input_is_full = input_is_full;
+                wait();
+            }
+
+            {
+                if (local_input_is_full == 1) {
+                    HLS_PROTO("input-is-full");
+                    input_is_full = 0;
+                    // Reset backoff count for the next iteration of the accelerator.
+                    backoff_count = BACKOFF_INIT;
+                    backoff_count_dbg.write(backoff_count);
                     wait();
+                    break;
                 }
             }
 
-            current_context_int_dbg.write(current_context_int);
-            current_context.write(current_context_int);
-            backoff_count = BACKOFF_INIT;
-            backoff_count_dbg.write(backoff_count);
-            wait();
-        }
-
-        // Poll input queue is full for new task
-        while (1)
-        {
-            HLS_PROTO("test-input-is-full");
-
-            load_state_req = TEST_INPUT_IS_FULL;
-
-            compute_state_req_dbg.write(TEST_INPUT_IS_FULL);
-
-            this->compute_load_ready_handshake();
-            wait();
-            this->compute_load_done_handshake();
-            wait();
-
-            if (input_is_full == 1) {
-                HLS_PROTO("input-is-full");
-                input_is_full = 0;
-                break;
-            } else {              
+            {              
                 HLS_PROTO("check-cycles-elapsed");
-
                 // Is the quota of current context complete?
                 cycles_elapsed = accel_cycles - start_cycles;
                 cycles_elapsed_dbg.write(cycles_elapsed);
-
                 wait();
+            }
 
+            {
                 // If you exceeded your quota, immediately switch out. Else, do an exponential backoff
                 // until the BACKOFF_LIMIT is reached and then switch out the context.
                 if (cycles_elapsed > context_quota) {
                     HLS_PROTO("switch-context-1");
                     switch_context = true;
                     switch_context_dbg.write(1);
+                    break;
+                }
+            }
+
+            {
+                HLS_PROTO("no-switch-context");
+                for (int i = 0; i < backoff_count; i++) {
                     wait();
+                }
+            }
+
+            {
+                // If you have reached the backoff limit, you will try to switch context;
+                // if you cannot, the backoff count stays saturated at the same value.
+                if (backoff_count == BACKOFF_LIMIT) {
+                    HLS_PROTO("backoff-limit");
+                    switch_context = true;
+                    switch_context_dbg.write(1);
                     break;
                 } else {
-                    HLS_PROTO("no-switch-context");
-
-                    for (int i = 0; i < backoff_count; i++) {
-                        HLS_PROTO("backoff-wait");
-                        wait();
-                    }
-
-                    if (backoff_count == BACKOFF_LIMIT) {
-                        HLS_PROTO("backoff-reset");
-                        switch_context = true;
-                        switch_context_dbg.write(1);
-                        backoff_count = BACKOFF_INIT;
-                        backoff_count_dbg.write(backoff_count);
-                        wait();
-                        break;
-                    } else {
-                        HLS_PROTO("backoff-exp");
-                        backoff_count = backoff_count * 2;
-                        backoff_count_dbg.write(backoff_count);
-                        wait();
-                        continue;
-                    }
+                    HLS_PROTO("no-backoff-limit");
+                    backoff_count = backoff_count * 2;
+                    backoff_count_dbg.write(backoff_count);
+                    wait();
+                    continue;
                 }
             }
         }
 
         // If spinning for long time, switch context
-        if (switch_context) {
-            HLS_PROTO("switch-context-0");
-            wait();
-            continue;
+        {
+            if (switch_context) {
+                HLS_PROTO("do-switch-context");
+                wait();
+                continue;
+            }
         }
 #endif
         // Load input data

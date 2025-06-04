@@ -525,6 +525,34 @@ int main(int argc, char * argv[])
 		iowrite32(dev, CMD_REG, CMD_MASK_START);
 
 		///////////////////////////////////////////////////////
+		/// Configure second context
+		///////////////////////////////////////////////////////
+		iowrite32(dev, AUDIO_FFT_LOGN_SAMPLES_REG_1, logn_samples);
+		iowrite32(dev, AUDIO_FFT_DO_SHIFT_REG_1, do_shift);
+		iowrite32(dev, AUDIO_FFT_DO_INVERSE_REG_1, do_inverse);
+		iowrite32(dev, AUDIO_FFT_INPUT_QUEUE_BASE_1, input_valid_offset_1);
+		iowrite32(dev, AUDIO_FFT_OUTPUT_QUEUE_BASE_1, output_valid_offset_1);
+		iowrite32(dev, AUDIO_FFT_CONTEXT_QUOTA_1, 50000);
+		iowrite32(dev, PT_ADDRESS_REG_1, (unsigned long long) ptable1);
+		iowrite32(dev, AUDIO_FFT_VALID_CONTEXTS, 0x3);
+
+		printf("Second context configured\n");
+
+		///////////////////////////////////////////////////////
+		/// Configure third context
+		///////////////////////////////////////////////////////
+		iowrite32(dev, AUDIO_FFT_LOGN_SAMPLES_REG_2, logn_samples);
+		iowrite32(dev, AUDIO_FFT_DO_SHIFT_REG_2, do_shift);
+		iowrite32(dev, AUDIO_FFT_DO_INVERSE_REG_2, do_inverse);
+		iowrite32(dev, AUDIO_FFT_INPUT_QUEUE_BASE_2, input_valid_offset_2);
+		iowrite32(dev, AUDIO_FFT_OUTPUT_QUEUE_BASE_2, output_valid_offset_2);
+		iowrite32(dev, AUDIO_FFT_CONTEXT_QUOTA_2, 50000);
+		iowrite32(dev, PT_ADDRESS_REG_2, (unsigned long long) ptable2);
+		iowrite32(dev, AUDIO_FFT_VALID_CONTEXTS, 0x7);
+
+		printf("Third context configured\n");
+
+		///////////////////////////////////////////////////////
 		/// Send first context task
 		///////////////////////////////////////////////////////
 		// Wait for the accelerator to be ready
@@ -535,7 +563,31 @@ int main(int argc, char * argv[])
 		UpdateSync((void*) &mem0[input_valid_offset_0], 1);
 
 		printf("First context task sent\n");	
-	
+
+		///////////////////////////////////////////////////////
+		/// Send second context task
+		///////////////////////////////////////////////////////
+		// Wait for the accelerator to be ready
+		SpinSync((void*) &mem1[input_valid_offset_1], 0);
+		// When the accelerator is ready, we write the input data to it
+		init_buf(&mem1[input_data_offset_1], gold);
+		// Inform the accelerator to start.
+		UpdateSync((void*) &mem1[input_valid_offset_1], 1);
+
+		printf("Second context task sent\n");
+
+		///////////////////////////////////////////////////////
+		/// Send third context task
+		///////////////////////////////////////////////////////
+		// Wait for the accelerator to be ready
+		SpinSync((void*) &mem2[input_valid_offset_2], 0);
+		// When the accelerator is ready, we write the input data to it
+		init_buf(&mem2[input_data_offset_2], gold);
+		// Inform the accelerator to start.
+		UpdateSync((void*) &mem2[input_valid_offset_2], 1);
+
+		printf("Third context task sent\n");	
+
 		///////////////////////////////////////////////////////
 		/// Get first context output
 		///////////////////////////////////////////////////////
@@ -548,6 +600,32 @@ int main(int argc, char * argv[])
 		UpdateSync((void*) &mem0[output_valid_offset_0], 0);
 
 		printf("First context task done\n");	
+
+		///////////////////////////////////////////////////////
+		/// Get second context output
+		///////////////////////////////////////////////////////
+		// Wait for the accelerator to send output
+		SpinSync((void*) &mem1[output_valid_offset_1], 1);
+
+		// When the output is ready, we read it
+		errors += validate_buf(&mem1[output_data_offset_1], gold);
+		// Inform the accelerator - ready for next iteration.
+		UpdateSync((void*) &mem1[output_valid_offset_1], 0);
+
+		printf("Second context task done\n");
+
+		///////////////////////////////////////////////////////
+		/// Get second context output
+		///////////////////////////////////////////////////////
+		// Wait for the accelerator to send output
+		SpinSync((void*) &mem2[output_valid_offset_2], 1);
+
+		// When the output is ready, we read it
+		errors += validate_buf(&mem2[output_data_offset_2], gold);
+		// Inform the accelerator - ready for next iteration.
+		UpdateSync((void*) &mem2[output_valid_offset_2], 0);
+
+		printf("Third context task done\n");
 
 		aligned_free(ptable0);
 		aligned_free(ptable1);
