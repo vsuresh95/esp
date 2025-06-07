@@ -134,6 +134,10 @@ end;
     -- EXP_DO_REG         => '1', -- uncomment if re-enabling regs for SRAM
                                   -- expansion to reg bank
     YX_REG             => '1',
+    MON_UTIL_REG_0     => '1',
+    MON_UTIL_REG_1     => '1',
+    MON_UTIL_REG_2     => '1',
+    MON_UTIL_REG_3     => '1',
     -- <<user_read_only>>
     others             => '0');
   -- Available registers mask (lo: common; hi: user defined)
@@ -156,7 +160,18 @@ end;
     PT_ADDRESS_REG_1   => '1',
     PT_ADDRESS_REG_2   => '1',
     PT_ADDRESS_REG_3   => '1',
+    MON_UTIL_REG_0     => '1',
+    MON_UTIL_REG_1     => '1',
+    MON_UTIL_REG_2     => '1',
+    MON_UTIL_REG_3     => '1',
     -- <<user_mask>>
+    others             => '0');
+
+  constant monitor_reg_mask : std_logic_vector(0 to MAXREGNUM - 1) := (
+    MON_UTIL_REG_0     => '1',
+    MON_UTIL_REG_1     => '1',
+    MON_UTIL_REG_2     => '1',
+    MON_UTIL_REG_3     => '1',
     others             => '0');
 
   function check_scatter_gather (
@@ -225,6 +240,10 @@ end;
   signal acc_fence_ready            : std_ulogic;
   signal acc_fence_data             : std_logic_vector(1 downto 0);
   signal current_context            : std_logic_vector(1 downto 0);
+  signal mon_chnl_valid             : std_ulogic;
+  signal mon_chnl_ready             : std_ulogic;
+  signal mon_chnl_data_data         : std_logic_vector(31 downto 0);  
+  signal mon_chnl_data_mode         : std_logic_vector(1 downto 0);  
   -- Register control, interrupt and monitor signals
   signal pllclk_int        : std_ulogic;
   signal mon_dvfs_feedthru : monitor_dvfs_type;
@@ -369,6 +388,7 @@ begin
       revision           => revision,
       devid              => devid,
       available_reg_mask => available_reg_mask,
+      monitor_reg_mask   => monitor_reg_mask,
       rdonly_reg_mask    => rdonly_reg_mask,
       exp_registers      => exp_registers,
       scatter_gather     => scatter_gather,
@@ -412,6 +432,10 @@ begin
       flush                         => flush,
       acc_flush_done                => acc_flush_done,
       current_context               => current_context,
+      mon_chnl_valid                => mon_chnl_valid,
+      mon_chnl_ready                => mon_chnl_ready,
+      mon_chnl_data_data            => mon_chnl_data_data,
+      mon_chnl_data_mode            => mon_chnl_data_mode,
       mon_dvfs_in                   => mon_dvfs_in,
       mon_dvfs                      => mon_dvfs_feedthru,
       llc_coherent_dma_rcv_rdreq    => coherent_dma_rcv_rdreq,

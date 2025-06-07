@@ -40,8 +40,13 @@ struct esp_access {
     uint8_t start_stop;
 };
 
+struct avu_mon_desc {
+	unsigned util[4];
+};
+
 #define ESP_IOC_RUN _IO('E', 0)
 #define ESP_IOC_FLUSH _IO('E', 1)
+#define ESP_IOC_MON _IOR('E', 2, struct avu_mon_desc)
 
 #ifdef __KERNEL__
 

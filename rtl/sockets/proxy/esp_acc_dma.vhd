@@ -57,6 +57,7 @@ entity esp_acc_dma is
     revision           : integer                              := 0;
     devid              : devid_t                              := 16#001#;
     available_reg_mask : std_logic_vector(0 to MAXREGNUM - 1) := (others => '1');
+    monitor_reg_mask   : std_logic_vector(0 to MAXREGNUM - 1) := (others => '0');
     rdonly_reg_mask    : std_logic_vector(0 to MAXREGNUM - 1) := (others => '0');
     exp_registers      : integer range 0 to 1                 := 0;  -- Not implemented
     scatter_gather     : integer range 0 to 1                 := 1;
@@ -101,7 +102,11 @@ entity esp_acc_dma is
     acc_done      : in  std_ulogic;
     flush         : out std_ulogic;
     acc_flush_done: in  std_ulogic;
-    current_context : in  std_logic_vector(1 downto 0);
+    current_context    : in  std_logic_vector(1 downto 0);
+    mon_chnl_valid     : in std_ulogic;
+    mon_chnl_ready     : out std_ulogic;
+    mon_chnl_data_data : in std_logic_vector(31 downto 0);  
+    mon_chnl_data_mode : in std_logic_vector(1 downto 0); 
     mon_dvfs_in   : in  monitor_dvfs_type;
     --Monitor signals
     mon_dvfs      : out monitor_dvfs_type;
@@ -276,6 +281,9 @@ architecture rtl of esp_acc_dma is
   signal burst : std_ulogic;
   signal acc_idle : std_ulogic;
   signal mon_dvfs_ctrl : monitor_dvfs_type;
+
+  signal sample_mon : std_logic_vector(3 downto 0);
+  signal avu_mon_value : std_logic_vector(31 downto 0);
 
   -----------------------------------------------------------------------------
   -- De-comment signals you wish to debug
@@ -1189,7 +1197,7 @@ begin  -- rtl
 
   -- Other registers
   registers: for i in 0 to MAXREGNUM - 1 generate
-    written_from_noc: if i /= STATUS_REG and available_reg_mask(i) = '1' generate
+    written_from_noc: if i /= STATUS_REG and monitor_reg_mask(i) = '0' and available_reg_mask(i) = '1' generate
       process (clk, rst, acc_rst_next)
       begin  -- process
         if clk'event and clk = '1' then  -- rising clock edge
@@ -1210,6 +1218,35 @@ begin  -- rtl
       bankreg(i) <= (others => '0');
     end generate not_available;
   end generate unused_registers;
+
+  -- AVU monitor registers
+  avu_mon_registers: for i in MON_UTIL_REG_0 to MON_UTIL_REG_3 generate
+    process (clk, rst, acc_rst_next)
+    begin  -- processd
+      if clk'event and clk = '1' then  -- rising clock edge
+        if rst = '0' or acc_rst_next = '0' then                   -- asynchronous reset (active low)
+          bankreg(i) <= (others => '0');
+        elsif sample_mon(i-MON_UTIL_REG_0) = '1' then
+          bankreg(i) <= avu_mon_value;
+        end if;
+      end if;
+    end process;
+  end generate avu_mon_registers;
+
+  avu_mon_state_fsm : process (mon_chnl_valid, mon_chnl_data_data, mon_chnl_data_mode) is
+    variable mon_mode : integer range 0 to 3;
+  begin
+    mon_mode := conv_integer(mon_chnl_data_mode);
+
+    mon_chnl_ready <= '1';
+    avu_mon_value <= (others => '0');
+    sample_mon <= (others => '0');
+
+    if mon_chnl_valid = '1' then
+      sample_mon(mon_mode) <= '1';
+      avu_mon_value <= mon_chnl_data_data;
+    end if;
+  end process avu_mon_state_fsm;
 
   no_dvfs: if has_dvfs = 0 generate
     pllclk <= refclk;

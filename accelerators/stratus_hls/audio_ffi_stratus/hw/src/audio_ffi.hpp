@@ -11,6 +11,7 @@
 #include "esp_templates.hpp"
 
 #include "audio_ffi_directives.hpp"
+#include "avu_mon_info.hpp"
 
 #define __round_mask(x, y) ((y)-1)
 #define round_up(x, y) ((((x)-1) | __round_mask(x, y))+1)
@@ -58,6 +59,12 @@ public:
     // Store -> Compute
     handshake_t store_done;
 
+    // Compute -> Util monitor (Start)
+    handshake_t compute_ready;
+
+    // Compute -> Util monitor (End)
+    handshake_t compute_done;
+
     // Constructor
     SC_HAS_PROCESS(audio_ffi);
     audio_ffi(const sc_module_name& name)
@@ -67,8 +74,14 @@ public:
         , store_ready("store_ready")
         , load_done("load_done")
         , store_done("store_done")
+        , compute_ready("compute_ready")
+        , compute_done("compute_done")
+        , mon_chnl("mon_chnl")
     {
         SC_CTHREAD(cycle_counter, this->clk.pos());
+        this->reset_signal_is(this->rst, false);
+        
+        SC_CTHREAD(util_monitor, this->clk.pos());
         this->reset_signal_is(this->rst, false);
         
         // Signal binding
@@ -83,6 +96,7 @@ public:
         HLS_PRESERVE_SIGNAL(cycles_elapsed_dbg, true);
         HLS_PRESERVE_SIGNAL(start_cycles_dbg, true);
         HLS_PRESERVE_SIGNAL(backoff_count_dbg, true);
+        HLS_PRESERVE_SIGNAL(active_cycles_dbg, true);
 
         // Map arrays to memories
         /* <<--plm-bind-->> */
@@ -94,6 +108,10 @@ public:
         store_ready.bind_with(*this);
         load_done.bind_with(*this);
         store_done.bind_with(*this);
+        compute_ready.bind_with(*this);
+        compute_done.bind_with(*this);
+    
+        mon_chnl.clk_rst(clk, rst);
     }
 
     sc_signal< sc_int<32> > load_state_req_dbg;
@@ -105,6 +123,7 @@ public:
     sc_signal< sc_uint<32> > cycles_elapsed_dbg;
     sc_signal< sc_uint<32> > start_cycles_dbg;
     sc_signal< sc_uint<32> > backoff_count_dbg;
+    sc_signal< sc_uint<32> > active_cycles_dbg;
 
     sc_int<32> load_state_req;
     sc_int<32> store_state_req;
@@ -115,6 +134,8 @@ public:
     
     // Output signal for current context
     sc_out< sc_uint<MAX_CONTEXTS_BITS> > current_context;
+    
+    b_put_initiator<avu_mon_info_t> mon_chnl;
 
     // Processes
 
@@ -126,6 +147,9 @@ public:
 
     // Store the output data
     void store_output();
+
+    // Utilization Monitor
+    void util_monitor();
 
     // Configure audio_ffi
     esp_config_proc cfg;
@@ -148,6 +172,10 @@ public:
     inline void load_compute_done_handshake();
     inline void compute_store_done_handshake();
     inline void store_compute_done_handshake();
+    inline void compute_util_ready_handshake();
+    inline void util_compute_ready_handshake();
+    inline void compute_util_done_handshake();
+    inline void util_compute_done_handshake();
 
     void cycle_counter()
     {

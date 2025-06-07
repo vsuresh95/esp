@@ -80,7 +80,13 @@ package esp_acc_regmap is
   constant PT_ADDRESS_REG_2 : integer range 0 to MAXREGNUM - 1 := 18;
   constant PT_ADDRESS_REG_3 : integer range 0 to MAXREGNUM - 1 := 19;
 
-  -- bank(20 to 63) : USR (user defined)
+  -- bank(20-24)    : MON_UTIL_REG_i
+  constant MON_UTIL_REG_0 : integer range 0 to MAXREGNUM - 1 := 20;
+  constant MON_UTIL_REG_1 : integer range 0 to MAXREGNUM - 1 := 21;
+  constant MON_UTIL_REG_2 : integer range 0 to MAXREGNUM - 1 := 22;
+  constant MON_UTIL_REG_3 : integer range 0 to MAXREGNUM - 1 := 23;
+
+  -- bank(24 to 63) : USR (user defined)
 
   -- Re-enable the following 3 registers if adding an SRAM expanding the register bank
   -- -- bank(29)       : EXP_ADDR (bits 29:0 address an SRAM expanding the register bank)

@@ -648,6 +648,28 @@ out:
 	return rc;
 }
 
+static int esp_mon_ioctl(struct esp_device *esp, void __user *argp)
+{
+	int i;
+	struct avu_mon_desc mon;
+
+	if (mutex_lock_interruptible(&esp->lock)) {
+		return -EINTR;
+	}
+
+	for (i = 0; i < 4; i++) {
+		mon.util[i] = ioread32be(esp->iomem + MON_UTIL_REG_0 + 0x4*i);
+	}
+
+	if (copy_to_user(argp, &mon, sizeof(mon))) {
+		return -EFAULT;
+	}
+
+	mutex_unlock(&esp->lock);
+
+	return 0;
+}
+
 static long esp_do_ioctl(struct file *file, unsigned int cm, void __user *arg)
 {
 	struct esp_device *esp = file->private_data;
@@ -657,6 +679,8 @@ static long esp_do_ioctl(struct file *file, unsigned int cm, void __user *arg)
 		return esp_run_ioctl(esp);
 	case ESP_IOC_FLUSH:
 		return esp_flush_ioctl(esp, arg);
+	case ESP_IOC_MON:
+		return esp_mon_ioctl(esp, arg);
 	default:
 		if (cm == esp->driver->ioctl_cm)
 			return esp_access_ioctl(esp, arg);

@@ -57,31 +57,31 @@ static unsigned mem_size;
 
 /* User defined registers */
 /* <<--regs-->> */
-#define AUDIO_FFT_DO_SHIFT_REG_0 0x50
-#define AUDIO_FFT_DO_SHIFT_REG_1 0x54
-#define AUDIO_FFT_DO_SHIFT_REG_2 0x58
-#define AUDIO_FFT_DO_SHIFT_REG_3 0x5C
-#define AUDIO_FFT_LOGN_SAMPLES_REG_0 0x60
-#define AUDIO_FFT_LOGN_SAMPLES_REG_1 0x64
-#define AUDIO_FFT_LOGN_SAMPLES_REG_2 0x68
-#define AUDIO_FFT_LOGN_SAMPLES_REG_3 0x6C
-#define AUDIO_FFT_DO_INVERSE_REG_0 0x70
-#define AUDIO_FFT_DO_INVERSE_REG_1 0x74
-#define AUDIO_FFT_DO_INVERSE_REG_2 0x78
-#define AUDIO_FFT_DO_INVERSE_REG_3 0x7C
-#define AUDIO_FFT_INPUT_QUEUE_BASE_0 0x80
-#define AUDIO_FFT_INPUT_QUEUE_BASE_1 0x84
-#define AUDIO_FFT_INPUT_QUEUE_BASE_2 0x88
-#define AUDIO_FFT_INPUT_QUEUE_BASE_3 0x8C
-#define AUDIO_FFT_OUTPUT_QUEUE_BASE_0 0x90
-#define AUDIO_FFT_OUTPUT_QUEUE_BASE_1 0x94
-#define AUDIO_FFT_OUTPUT_QUEUE_BASE_2 0x98
-#define AUDIO_FFT_OUTPUT_QUEUE_BASE_3 0x9C
-#define AUDIO_FFT_CONTEXT_QUOTA_0 0xA0
-#define AUDIO_FFT_CONTEXT_QUOTA_1 0xA4
-#define AUDIO_FFT_CONTEXT_QUOTA_2 0xA8
-#define AUDIO_FFT_CONTEXT_QUOTA_3 0xAC
-#define AUDIO_FFT_VALID_CONTEXTS 0xB0
+#define AUDIO_FFT_DO_SHIFT_REG_0		0x60
+#define AUDIO_FFT_DO_SHIFT_REG_1		0x64
+#define AUDIO_FFT_DO_SHIFT_REG_2		0x68
+#define AUDIO_FFT_DO_SHIFT_REG_3		0x6C
+#define AUDIO_FFT_LOGN_SAMPLES_REG_0	0x70
+#define AUDIO_FFT_LOGN_SAMPLES_REG_1	0x74
+#define AUDIO_FFT_LOGN_SAMPLES_REG_2	0x78
+#define AUDIO_FFT_LOGN_SAMPLES_REG_3	0x7C
+#define AUDIO_FFT_DO_INVERSE_REG_0		0x80
+#define AUDIO_FFT_DO_INVERSE_REG_1		0x84
+#define AUDIO_FFT_DO_INVERSE_REG_2		0x88
+#define AUDIO_FFT_DO_INVERSE_REG_3		0x8C
+#define AUDIO_FFT_INPUT_QUEUE_BASE_0	0x90
+#define AUDIO_FFT_INPUT_QUEUE_BASE_1	0x94
+#define AUDIO_FFT_INPUT_QUEUE_BASE_2	0x98
+#define AUDIO_FFT_INPUT_QUEUE_BASE_3	0x9C
+#define AUDIO_FFT_OUTPUT_QUEUE_BASE_0	0xA0
+#define AUDIO_FFT_OUTPUT_QUEUE_BASE_1	0xA4
+#define AUDIO_FFT_OUTPUT_QUEUE_BASE_2	0xA8
+#define AUDIO_FFT_OUTPUT_QUEUE_BASE_3	0xAC
+#define AUDIO_FFT_CONTEXT_QUOTA_0		0xB0
+#define AUDIO_FFT_CONTEXT_QUOTA_1		0xB4
+#define AUDIO_FFT_CONTEXT_QUOTA_2		0xB8
+#define AUDIO_FFT_CONTEXT_QUOTA_3		0xBC
+#define AUDIO_FFT_VALID_CONTEXTS		0xC0
 
 static uint64_t t_start = 0;
 static uint64_t t_end = 0;
@@ -481,6 +481,10 @@ int main(int argc, char * argv[])
 			}
 		}
 		
+		for (i = 0; i < 3; i++) {
+			printf("MON_UTIL_REG_%d = %x\n", i, ioread32(dev, MON_UTIL_REG_0 + 0x4*i));
+		}
+
 		iowrite32(dev, CMD_REG, 0x0);
 	
 		// Reset all sync variables to default values.
@@ -626,6 +630,10 @@ int main(int argc, char * argv[])
 		UpdateSync((void*) &mem2[output_valid_offset_2], 0);
 
 		printf("Third context task done\n");
+
+		for (i = 0; i < 3; i++) {
+			printf("MON_UTIL_REG_%d = %x\n", i, ioread32(dev, MON_UTIL_REG_0 + 0x4*i));
+		}
 
 		aligned_free(ptable0);
 		aligned_free(ptable1);

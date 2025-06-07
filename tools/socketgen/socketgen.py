@@ -448,6 +448,10 @@ def write_acc_interface(f, acc, dma_width, datatype, rst, is_vivadohls_if, is_ca
     f.write("      dma_write_chnl_data        : out std_logic_vector(" + str(dma_width - 1) + " downto 0);\n")
     f.write("      acc_done                   : out std_ulogic;\n")
     f.write("      current_context            : out std_logic_vector(1 downto 0);\n")
+    f.write("      mon_chnl_valid             : out std_ulogic;\n")
+    f.write("      mon_chnl_ready             : in std_ulogic;\n")
+    f.write("      mon_chnl_data_data         : out std_logic_vector(" + str(31) + " downto 0);\n")
+    f.write("      mon_chnl_data_mode         : out std_logic_vector(" + str(1) + " downto 0);\n")
     f.write("      acc_fence_valid            : out std_ulogic;\n")
     f.write("      acc_fence_ready            : in std_ulogic;\n")
     f.write("      acc_fence_data             : out std_logic_vector(" + str(1) + " downto 0)\n")
@@ -693,6 +697,10 @@ def write_acc_port_map(f, acc, dma_width, datatype, rst, is_noc_interface, is_vi
     f.write("      dma_write_chnl_data        => dma_write_chnl_data,\n")
     f.write("      acc_done                   => acc_done,\n")
     f.write("      current_context            => current_context,\n")
+    f.write("      mon_chnl_valid             => mon_chnl_valid,\n")
+    f.write("      mon_chnl_ready             => mon_chnl_ready,\n")
+    f.write("      mon_chnl_data_data         => mon_chnl_data_data,\n")
+    f.write("      mon_chnl_data_mode         => mon_chnl_data_mode,\n")
     f.write("      acc_fence_valid            => acc_fence_valid,\n")
     f.write("      acc_fence_ready            => acc_fence_ready,\n")
     f.write("      acc_fence_data             => acc_fence_data \n")
@@ -2064,7 +2072,7 @@ for acc in accelerators:
       # Default to stratus_hls for Chisel, because the interface matches the Stratus HLS flow
       accd.hls_tool = 'stratus_hls'
 
-    reg = 20
+    reg = 24
     for xmlparam in xmlacc.findall('param'):
       param = Parameter()
       param.name = xmlparam.get('name')

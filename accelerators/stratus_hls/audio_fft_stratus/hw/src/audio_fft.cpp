@@ -83,6 +83,8 @@ void audio_fft::load_input()
             // offsets for input valid and output payload based on preset values
             input_payload_offset = input_queue_base + PAYLOAD_OFFSET;
 
+            input_is_full = 0;
+
             wait();
         }
 
@@ -334,13 +336,15 @@ void audio_fft::compute_kernel()
         load_done.ack.reset_ack();
         store_ready.req.reset_req();
         store_done.ack.reset_ack();
+        compute_ready.req.reset_req();
+        compute_done.req.reset_req();
 
         load_state_req = 0;
         store_state_req = 0;
 
         current_context_int = 0;
 
-        switch_context_dbg.write(0);
+        switch_context_dbg.write(false);
         current_context_int_dbg.write(0);
 
         current_context.write(0);
@@ -438,6 +442,7 @@ void audio_fft::compute_kernel()
 
                 if (current_context_int != idx) {
                     current_context_int = idx;
+                    switch_context_dbg.write(true);
 
                     // Set the start cycles for this context to current cycle value.
                     start_cycles = accel_cycles;
@@ -469,7 +474,7 @@ void audio_fft::compute_kernel()
 
             // If context was switched due to spinning, reset it the flag
             switch_context = false;
-            switch_context_dbg.write(0);
+            switch_context_dbg.write(false);
             wait();
                            
             conf_info_t config = this->conf_info.read();        
@@ -509,7 +514,6 @@ void audio_fft::compute_kernel()
             {
                 if (local_input_is_full == 1) {
                     HLS_PROTO("input-is-full");
-                    input_is_full = 0;
                     // Reset backoff count for the next iteration of the accelerator.
                     backoff_count = BACKOFF_INIT;
                     backoff_count_dbg.write(backoff_count);
@@ -532,7 +536,7 @@ void audio_fft::compute_kernel()
                 if (cycles_elapsed > context_quota) {
                     HLS_PROTO("switch-context-1");
                     switch_context = true;
-                    switch_context_dbg.write(1);
+                    switch_context_dbg.write(true);
                     break;
                 }
             }
@@ -540,6 +544,7 @@ void audio_fft::compute_kernel()
             {
                 HLS_PROTO("no-switch-context");
                 for (int i = 0; i < backoff_count; i++) {
+                    HLS_PROTO("backoff-wait");
                     wait();
                 }
             }
@@ -550,7 +555,7 @@ void audio_fft::compute_kernel()
                 if (backoff_count == BACKOFF_LIMIT) {
                     HLS_PROTO("backoff-limit");
                     switch_context = true;
-                    switch_context_dbg.write(1);
+                    switch_context_dbg.write(true);
                     break;
                 } else {
                     HLS_PROTO("no-backoff-limit");
@@ -574,6 +579,9 @@ void audio_fft::compute_kernel()
         // Load input data
         {
             HLS_PROTO("load-input-data");
+
+            this->compute_util_ready_handshake();
+            wait();
 
             load_state_req = LOAD_DATA_REQ;
 
@@ -738,10 +746,97 @@ void audio_fft::compute_kernel()
             wait();
             this->compute_store_done_handshake();
             wait();
+
+            this->compute_util_done_handshake();
+            wait();
         }
 #endif
     } // while (true)
 } // Function : compute_kernel
+
+void audio_fft::util_monitor()
+{
+    // Reset
+    {
+        HLS_DEFINE_PROTOCOL("monitor-reset");
+
+        mon_chnl.reset_put();
+
+        compute_ready.ack.reset_ack();
+        compute_done.ack.reset_ack();
+
+        active_cycles_dbg.write(0);
+
+        wait();
+    }
+
+    // Config
+    uint32_t active_cycles[MAX_CONTEXTS];
+    uint32_t start_cycles;
+    uint32_t end_cycles;
+    {
+        HLS_DEFINE_PROTOCOL("monitor-cfg");
+        cfg.wait_for_config(); // config process
+        wait();
+
+        HLS_FLATTEN_ARRAY(active_cycles);
+
+        for (uint16_t k = 0; k < MAX_CONTEXTS; k++)
+        {
+            HLS_UNROLL_SIMPLE;
+            active_cycles[k] = 0;
+        }
+    }        
+    
+    while(true)
+    {
+        {
+            HLS_DEFINE_PROTOCOL("monitor-loop");
+            
+            // Wait for compute to start
+            util_compute_ready_handshake();
+            wait();
+
+            start_cycles = accel_cycles;
+
+            // Before waiting for end handshake, capture the current context.
+            sc_uint<MAX_CONTEXTS_BITS> active_context = current_context_int;
+
+            // Write to debug registers
+            active_cycles_dbg.write(active_cycles[active_context]);
+
+            // Wait for compute to end
+            util_compute_done_handshake();
+            wait();
+
+            // Capture the active cycles and total cycles with the current cycles.
+            end_cycles = accel_cycles;
+            active_cycles[active_context] += end_cycles - start_cycles;
+            
+            // We write out the utilization for active context
+            avu_mon_info_t mon_info(active_cycles[active_context], active_context);
+            this->mon_chnl.put(mon_info);
+            wait();
+
+            // Check all the valid contexts and zero out the cycles
+            // for invalid contexts (registers are zeroed out in wrapper).
+            conf_info_t config = this->conf_info.read();        
+            uint32_t valid_contexts = config.valid_contexts;
+
+            sc_uint<MAX_CONTEXTS> v = valid_contexts;
+            sc_uint<MAX_CONTEXTS_BITS> idx = 0;
+
+            for (int i = 0; i < MAX_CONTEXTS; i++) {
+                if (v[idx] == 0) {
+                    active_cycles[idx] = 0;
+                }
+                idx++;
+            }
+
+            wait();
+        }
+    }
+}
 
 #else // ENABLE_PP
 
