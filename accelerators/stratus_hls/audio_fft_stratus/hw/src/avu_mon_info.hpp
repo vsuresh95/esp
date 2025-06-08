@@ -7,7 +7,7 @@ class avu_mon_info_t
 {
     public:
         // Monitor data
-        uint32_t data;
+        uint64_t data;
 
         // Monitor mode
         sc_dt::sc_bv<MODE_BITS> mode;
@@ -16,7 +16,7 @@ class avu_mon_info_t
         avu_mon_info_t()
             : data(0), mode(0) { }
 
-        avu_mon_info_t(uint32_t d, sc_dt::sc_bv<MODE_BITS> m)
+        avu_mon_info_t(uint64_t d, sc_dt::sc_bv<MODE_BITS> m)
             : data(d), mode(m) { }
 
         avu_mon_info_t(const avu_mon_info_t &other)

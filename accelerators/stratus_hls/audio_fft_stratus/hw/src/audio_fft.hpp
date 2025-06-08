@@ -113,17 +113,17 @@ public:
     sc_signal< sc_uint<32> > accel_cycles_dbg;
     sc_signal< sc_uint<MAX_CONTEXTS_BITS> > current_context_int_dbg;
     sc_signal< sc_int<1> > switch_context_dbg;
-    sc_signal< sc_uint<32> > cycles_elapsed_dbg;
-    sc_signal< sc_uint<32> > start_cycles_dbg;
+    sc_signal< sc_uint<64> > cycles_elapsed_dbg;
+    sc_signal< sc_uint<64> > start_cycles_dbg;
     sc_signal< sc_uint<32> > backoff_count_dbg;
-    sc_signal< sc_uint<32> > active_cycles_dbg;
+    sc_signal< sc_uint<64> > active_cycles_dbg;
 
     sc_int<32> load_state_req;
     sc_int<32> store_state_req;
     sc_int<32> input_is_full;
     sc_uint<MAX_CONTEXTS_BITS> current_context_int;
-    sc_uint<32> accel_cycles;
-    sc_uint<32> start_cycles;
+    sc_uint<64> accel_cycles;
+    sc_uint<64> start_cycles;
     
     // Output signal for current context
     sc_out< sc_uint<MAX_CONTEXTS_BITS> > current_context;

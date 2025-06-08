@@ -134,10 +134,14 @@ end;
     -- EXP_DO_REG         => '1', -- uncomment if re-enabling regs for SRAM
                                   -- expansion to reg bank
     YX_REG             => '1',
-    MON_UTIL_REG_0     => '1',
-    MON_UTIL_REG_1     => '1',
-    MON_UTIL_REG_2     => '1',
-    MON_UTIL_REG_3     => '1',
+    MON_UTIL_REG_0_LO  => '1',
+    MON_UTIL_REG_0_HI  => '1',
+    MON_UTIL_REG_1_LO  => '1',
+    MON_UTIL_REG_1_HI  => '1',
+    MON_UTIL_REG_2_LO  => '1',
+    MON_UTIL_REG_2_HI  => '1',
+    MON_UTIL_REG_3_LO  => '1',
+    MON_UTIL_REG_3_HI  => '1',
     -- <<user_read_only>>
     others             => '0');
   -- Available registers mask (lo: common; hi: user defined)
@@ -160,18 +164,26 @@ end;
     PT_ADDRESS_REG_1   => '1',
     PT_ADDRESS_REG_2   => '1',
     PT_ADDRESS_REG_3   => '1',
-    MON_UTIL_REG_0     => '1',
-    MON_UTIL_REG_1     => '1',
-    MON_UTIL_REG_2     => '1',
-    MON_UTIL_REG_3     => '1',
+    MON_UTIL_REG_0_LO  => '1',
+    MON_UTIL_REG_0_HI  => '1',
+    MON_UTIL_REG_1_LO  => '1',
+    MON_UTIL_REG_1_HI  => '1',
+    MON_UTIL_REG_2_LO  => '1',
+    MON_UTIL_REG_2_HI  => '1',
+    MON_UTIL_REG_3_LO  => '1',
+    MON_UTIL_REG_3_HI  => '1',
     -- <<user_mask>>
     others             => '0');
 
   constant monitor_reg_mask : std_logic_vector(0 to MAXREGNUM - 1) := (
-    MON_UTIL_REG_0     => '1',
-    MON_UTIL_REG_1     => '1',
-    MON_UTIL_REG_2     => '1',
-    MON_UTIL_REG_3     => '1',
+    MON_UTIL_REG_0_LO  => '1',
+    MON_UTIL_REG_0_HI  => '1',
+    MON_UTIL_REG_1_LO  => '1',
+    MON_UTIL_REG_1_HI  => '1',
+    MON_UTIL_REG_2_LO  => '1',
+    MON_UTIL_REG_2_HI  => '1',
+    MON_UTIL_REG_3_LO  => '1',
+    MON_UTIL_REG_3_HI  => '1',
     others             => '0');
 
   function check_scatter_gather (
@@ -242,7 +254,7 @@ end;
   signal current_context            : std_logic_vector(1 downto 0);
   signal mon_chnl_valid             : std_ulogic;
   signal mon_chnl_ready             : std_ulogic;
-  signal mon_chnl_data_data         : std_logic_vector(31 downto 0);  
+  signal mon_chnl_data_data         : std_logic_vector(63 downto 0);  
   signal mon_chnl_data_mode         : std_logic_vector(1 downto 0);  
   -- Register control, interrupt and monitor signals
   signal pllclk_int        : std_ulogic;

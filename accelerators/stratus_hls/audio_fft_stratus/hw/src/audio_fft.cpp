@@ -364,12 +364,12 @@ void audio_fft::compute_kernel()
     int32_t num_samples;
     int32_t do_inverse;
     int32_t do_shift;
-    uint32_t context_quota;
+    uint64_t context_quota;
     uint32_t valid_contexts;
     bool switch_context;
     uint32_t backoff_count;
     int32_t local_input_is_full;
-    uint32_t cycles_elapsed;
+    uint64_t cycles_elapsed;
     {
         HLS_PROTO("compute-config");
 
@@ -387,7 +387,7 @@ void audio_fft::compute_kernel()
         HLS_FLATTEN_ARRAY(config.do_inverse);
         HLS_FLATTEN_ARRAY(config.context_quota);
         
-        context_quota = config.context_quota[current_context_int];
+        context_quota = (uint64_t) config.context_quota[current_context_int];
         valid_contexts = config.valid_contexts;
         logn_samples = config.logn_samples[current_context_int];
         num_samples = 1 << logn_samples;
@@ -417,7 +417,7 @@ void audio_fft::compute_kernel()
             conf_info_t config = this->conf_info.read();        
             HLS_FLATTEN_ARRAY(config.context_quota);
             
-            context_quota = config.context_quota[current_context_int];
+            context_quota = (uint64_t) config.context_quota[current_context_int];
             valid_contexts = config.valid_contexts;
             wait();
         }
@@ -488,7 +488,7 @@ void audio_fft::compute_kernel()
             num_samples = 1 << logn_samples;
             do_shift = config.do_shift[current_context_int];
             do_inverse = config.do_inverse[current_context_int];
-            context_quota = config.context_quota[current_context_int];
+            context_quota = (uint64_t) config.context_quota[current_context_int];
             wait();
         }
                 
@@ -771,9 +771,9 @@ void audio_fft::util_monitor()
     }
 
     // Config
-    uint32_t active_cycles[MAX_CONTEXTS];
-    uint32_t start_cycles;
-    uint32_t end_cycles;
+    uint64_t active_cycles[MAX_CONTEXTS];
+    uint64_t start_cycles;
+    uint64_t end_cycles;
     {
         HLS_DEFINE_PROTOCOL("monitor-cfg");
         cfg.wait_for_config(); // config process

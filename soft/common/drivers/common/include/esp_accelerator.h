@@ -86,13 +86,17 @@ enum accelerator_coherence {ACC_COH_NONE = 0, ACC_COH_LLC, ACC_COH_RECALL, ACC_C
 #define PT_ADDRESS_REG_2 0x48
 #define PT_ADDRESS_REG_3 0x4c
 
-/* bank(20 to 23) : MON_UTIL_REG_i */
-#define MON_UTIL_REG_0 0x50
-#define MON_UTIL_REG_1 0x54
-#define MON_UTIL_REG_2 0x58
-#define MON_UTIL_REG_3 0x5c
+/* bank(20 to 27) : MON_UTIL_REG_i */
+#define MON_UTIL_REG_0_LO 0x50
+#define MON_UTIL_REG_0_HI 0x54
+#define MON_UTIL_REG_1_LO 0x58
+#define MON_UTIL_REG_1_HI 0x5c
+#define MON_UTIL_REG_2_LO 0x60
+#define MON_UTIL_REG_2_HI 0x64
+#define MON_UTIL_REG_3_LO 0x68
+#define MON_UTIL_REG_3_HI 0x6c
 
-/* bank(24 to 63) : USR (user defined) */
+/* bank(28 to 63) : USR (user defined) */
 
 // Re-enable the following 3 registers if adding an SRAM expanding the register bank
 // /* bank(29)       : EXP_ADDR (bits 29:0 address an SRAM expanding the register bank) */

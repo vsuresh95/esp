@@ -657,8 +657,8 @@ static int esp_mon_ioctl(struct esp_device *esp, void __user *argp)
 		return -EINTR;
 	}
 
-	for (i = 0; i < 4; i++) {
-		mon.util[i] = ioread32be(esp->iomem + MON_UTIL_REG_0 + 0x4*i);
+	for (i = 0; i < 8; i++) {
+		mon.util[i] = ioread32be(esp->iomem + MON_UTIL_REG_0_LO + 0x4*i);
 	}
 
 	if (copy_to_user(argp, &mon, sizeof(mon))) {

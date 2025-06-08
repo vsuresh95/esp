@@ -41,7 +41,7 @@ struct esp_access {
 };
 
 struct avu_mon_desc {
-	unsigned util[4];
+	unsigned util[8];
 };
 
 #define ESP_IOC_RUN _IO('E', 0)

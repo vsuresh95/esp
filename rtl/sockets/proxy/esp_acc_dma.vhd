@@ -105,7 +105,7 @@ entity esp_acc_dma is
     current_context    : in  std_logic_vector(1 downto 0);
     mon_chnl_valid     : in std_ulogic;
     mon_chnl_ready     : out std_ulogic;
-    mon_chnl_data_data : in std_logic_vector(31 downto 0);  
+    mon_chnl_data_data : in std_logic_vector(63 downto 0);  
     mon_chnl_data_mode : in std_logic_vector(1 downto 0); 
     mon_dvfs_in   : in  monitor_dvfs_type;
     --Monitor signals
@@ -283,7 +283,7 @@ architecture rtl of esp_acc_dma is
   signal mon_dvfs_ctrl : monitor_dvfs_type;
 
   signal sample_mon : std_logic_vector(3 downto 0);
-  signal avu_mon_value : std_logic_vector(31 downto 0);
+  signal avu_mon_value : std_logic_vector(63 downto 0);
 
   -----------------------------------------------------------------------------
   -- De-comment signals you wish to debug
@@ -1220,14 +1220,16 @@ begin  -- rtl
   end generate unused_registers;
 
   -- AVU monitor registers
-  avu_mon_registers: for i in MON_UTIL_REG_0 to MON_UTIL_REG_3 generate
+  avu_mon_registers: for i in 0 to 3 generate
     process (clk, rst, acc_rst_next)
     begin  -- processd
       if clk'event and clk = '1' then  -- rising clock edge
         if rst = '0' or acc_rst_next = '0' then                   -- asynchronous reset (active low)
-          bankreg(i) <= (others => '0');
-        elsif sample_mon(i-MON_UTIL_REG_0) = '1' then
-          bankreg(i) <= avu_mon_value;
+          bankreg((2*i)+MON_UTIL_REG_0_LO) <= (others => '0');
+          bankreg((2*i)+MON_UTIL_REG_0_HI) <= (others => '0');
+        elsif sample_mon(i) = '1' then
+          bankreg((2*i)+MON_UTIL_REG_0_LO) <= avu_mon_value(31 downto 0);
+          bankreg((2*i)+MON_UTIL_REG_0_HI) <= avu_mon_value(63 downto 32);
         end if;
       end if;
     end process;

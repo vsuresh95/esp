@@ -450,7 +450,7 @@ def write_acc_interface(f, acc, dma_width, datatype, rst, is_vivadohls_if, is_ca
     f.write("      current_context            : out std_logic_vector(1 downto 0);\n")
     f.write("      mon_chnl_valid             : out std_ulogic;\n")
     f.write("      mon_chnl_ready             : in std_ulogic;\n")
-    f.write("      mon_chnl_data_data         : out std_logic_vector(" + str(31) + " downto 0);\n")
+    f.write("      mon_chnl_data_data         : out std_logic_vector(" + str(63) + " downto 0);\n")
     f.write("      mon_chnl_data_mode         : out std_logic_vector(" + str(1) + " downto 0);\n")
     f.write("      acc_fence_valid            : out std_ulogic;\n")
     f.write("      acc_fence_ready            : in std_ulogic;\n")
@@ -2072,7 +2072,7 @@ for acc in accelerators:
       # Default to stratus_hls for Chisel, because the interface matches the Stratus HLS flow
       accd.hls_tool = 'stratus_hls'
 
-    reg = 24
+    reg = 28
     for xmlparam in xmlacc.findall('param'):
       param = Parameter()
       param.name = xmlparam.get('name')

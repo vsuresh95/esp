@@ -775,7 +775,7 @@ package tile is
       current_context               : in std_logic_vector(1 downto 0);
       mon_chnl_valid                : in std_ulogic;
       mon_chnl_ready                : out std_ulogic;
-      mon_chnl_data_data            : in std_logic_vector(31 downto 0);  
+      mon_chnl_data_data            : in std_logic_vector(63 downto 0);  
       mon_chnl_data_mode            : in std_logic_vector(1 downto 0); 
       mon_dvfs_in                   : in  monitor_dvfs_type;
       mon_dvfs                      : out monitor_dvfs_type;
