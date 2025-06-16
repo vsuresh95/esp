@@ -188,3 +188,39 @@ inline void audio_fir::store_compute_done_handshake()
         store_done.req.req();
     }
 }
+
+inline void audio_fir::compute_util_ready_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("compute-util-ready-handshake");
+
+        compute_ready.req.req();
+    }
+}
+
+inline void audio_fir::util_compute_ready_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("util-compute-ready-handshake");
+
+        compute_ready.ack.ack();
+    }
+}
+
+inline void audio_fir::compute_util_done_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("compute-util-done-handshake");
+
+        compute_done.req.req();
+    }
+}
+
+inline void audio_fir::util_compute_done_handshake()
+{
+    {
+        HLS_DEFINE_PROTOCOL("util-compute-done-handshake");
+
+        compute_done.ack.ack();
+    }
+}

@@ -17,7 +17,10 @@
     <param name="filter_queue_base_1" desc="filter_queue_base_1" />
     <param name="filter_queue_base_2" desc="filter_queue_base_2" />
     <param name="filter_queue_base_3" desc="filter_queue_base_3" />
-    <param name="context_quota" desc="context_quota" />
+    <param name="context_quota_0" desc="context_quota_0" />
+    <param name="context_quota_1" desc="context_quota_1" />
+    <param name="context_quota_2" desc="context_quota_2" />
+    <param name="context_quota_3" desc="context_quota_3" />
     <param name="valid_contexts" desc="valid_contexts" />
   </accelerator>
 </sld>

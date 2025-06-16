@@ -760,6 +760,18 @@ int main(int argc, char * argv[])
 		printf("First context task sent\n");	
 
 		///////////////////////////////////////////////////////
+		/// Send first context task
+		///////////////////////////////////////////////////////
+		// Wait for the accelerator to be ready
+		SpinSync((void*) &mem0[input_valid_offset_0], 0);
+		// When the accelerator is ready, we write the input data to it
+		init_buf(&mem0[input_data_offset_0], gold);
+		// Inform the accelerator to start.
+		UpdateSync((void*) &mem0[input_valid_offset_0], 1);
+
+		printf("First context task sent\n");	
+
+		///////////////////////////////////////////////////////
 		/// Send second context task
 		///////////////////////////////////////////////////////
 		// Wait for the accelerator to be ready
@@ -781,7 +793,11 @@ int main(int argc, char * argv[])
 		// Inform the accelerator to start.
 		UpdateSync((void*) &mem2[input_valid_offset_2], 1);
 
-		printf("Third context task sent\n");	
+		printf("Third context task sent\n");
+
+		for (int i = 0; i < 10; i++) {
+			printf("Idle loop...\n");
+		}
 
 		///////////////////////////////////////////////////////
 		/// Get first context output

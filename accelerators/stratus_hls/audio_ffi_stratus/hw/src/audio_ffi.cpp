@@ -26,6 +26,7 @@ void audio_ffi::load_input()
         load_done.req.reset_req();
 
         input_is_full = 0;
+        output_is_empty = 1;
 
         wait();
     }
@@ -95,6 +96,7 @@ void audio_ffi::load_input()
             twiddle_payload_offset = filter_payload_offset + 2 * (num_samples + 1);
 
             input_is_full = 0;
+            output_is_empty = 1;
 
             wait();
         }
@@ -135,23 +137,18 @@ void audio_ffi::load_input()
                 }
             }
             break;
-            case POLL_OUTPUT_IS_EMPTY:
+            case TEST_OUTPUT_IS_EMPTY:
             {
                 dma_info_t dma_info(output_valid_offset / DMA_WORD_PER_BEAT, TEST_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
                 sc_dt::sc_bv<DMA_WIDTH> dataBv;
-                int32_t output_is_empty = 1;
 
                 wait();
 
                 // Wait for consumer to accept new data
-                while (output_is_empty != 0)
-                {
-                    HLS_UNROLL_LOOP(OFF);
-                    this->dma_read_ctrl.put(dma_info);
-                    dataBv = this->dma_read_chnl.get();
-                    wait();
-                    output_is_empty = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
-                }
+                this->dma_read_ctrl.put(dma_info);
+                dataBv = this->dma_read_chnl.get();
+                wait();
+                output_is_empty = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
             }
             break;
 #endif
@@ -450,6 +447,8 @@ void audio_ffi::compute_kernel()
         cycles_elapsed_dbg.write(0);
         backoff_count_dbg.write(0);
 
+        discarded_compute = false;
+
         wait();
     }
 
@@ -463,6 +462,7 @@ void audio_ffi::compute_kernel()
     bool switch_context;
     uint32_t backoff_count;
     int32_t local_input_is_full;
+    int32_t local_output_is_empty;
     uint64_t cycles_elapsed;
     {
         HLS_PROTO("compute-config");
@@ -473,6 +473,7 @@ void audio_ffi::compute_kernel()
         backoff_count = BACKOFF_INIT;
         backoff_count_dbg.write(backoff_count);
         local_input_is_full = 0;
+        local_output_is_empty = 1;
         cycles_elapsed = 0;
 
         conf_info_t config = this->conf_info.read();        
@@ -532,13 +533,13 @@ void audio_ffi::compute_kernel()
 
                 wait();
 
+                // Set the start cycles for this context to current cycle value.
+                start_cycles = accel_cycles;
+                start_cycles_dbg.write(start_cycles);
+
                 if (current_context_int != idx) {
                     current_context_int = idx;
                     switch_context_dbg.write(true);
-
-                    // Set the start cycles for this context to current cycle value.
-                    start_cycles = accel_cycles;
-                    start_cycles_dbg.write(start_cycles);
 
                     // When you switch context, reset the backoff count.
                     backoff_count = BACKOFF_INIT;
@@ -613,7 +614,7 @@ void audio_ffi::compute_kernel()
             }
 
             {              
-                HLS_PROTO("check-cycles-elapsed");
+                HLS_PROTO("check-cycles-elapsed-input");
                 // Is the quota of current context complete?
                 cycles_elapsed = accel_cycles - start_cycles;
                 cycles_elapsed_dbg.write(cycles_elapsed);
@@ -622,9 +623,9 @@ void audio_ffi::compute_kernel()
 
             {
                 // If you exceeded your quota, immediately switch out. Else, do an exponential backoff
-                // until the BACKOFF_LIMIT is reached and then switch out the context.
+                // until the BACKOFF_LIMIT_INPUT is reached and then switch out the context.
                 if (cycles_elapsed > context_quota) {
-                    HLS_PROTO("switch-context-1");
+                    HLS_PROTO("switch-context-1-input");
                     switch_context = true;
                     switch_context_dbg.write(true);
                     break;
@@ -632,9 +633,9 @@ void audio_ffi::compute_kernel()
             }
 
             {
-                HLS_PROTO("no-switch-context");
+                HLS_PROTO("no-switch-context-input");
                 for (int i = 0; i < backoff_count; i++) {
-                    HLS_PROTO("backoff-wait");
+                    HLS_PROTO("backoff-wait-input");
                     wait();
                 }
             }
@@ -642,13 +643,13 @@ void audio_ffi::compute_kernel()
             {
                 // If you have reached the backoff limit, you will try to switch context;
                 // if you cannot, the backoff count stays saturated at the same value.
-                if (backoff_count == BACKOFF_LIMIT) {
-                    HLS_PROTO("backoff-limit");
+                if (backoff_count == BACKOFF_LIMIT_INPUT) {
+                    HLS_PROTO("backoff-limit-input");
                     switch_context = true;
                     switch_context_dbg.write(true);
                     break;
                 } else {
-                    HLS_PROTO("no-backoff-limit");
+                    HLS_PROTO("no-backoff-limit-input");
                     backoff_count = backoff_count * 2;
                     backoff_count_dbg.write(backoff_count);
                     wait();
@@ -660,7 +661,7 @@ void audio_ffi::compute_kernel()
         // If spinning for long time, switch context
         {
             if (switch_context) {
-                HLS_PROTO("do-switch-context");
+                HLS_PROTO("do-switch-context-input");
                 wait();
                 continue;
             }
@@ -672,6 +673,8 @@ void audio_ffi::compute_kernel()
 
             this->compute_util_ready_handshake();
             wait();
+
+            discarded_compute = false;
 
             load_state_req = POLL_FILTER_IS_FULL;
 
@@ -695,56 +698,10 @@ void audio_ffi::compute_kernel()
             wait();
             this->compute_load_done_handshake();
             wait();
-        }
-#ifdef ENABLE_SM
-        // Update input queue to be empty
-        {
-            HLS_PROTO("update-input-is-empty");
 
-            store_state_req = UPDATE_INPUT_IS_EMPTY;
-
-            compute_state_req_dbg.write(UPDATE_INPUT_IS_EMPTY);
-
-            this->compute_store_ready_handshake();
-            wait();
-            this->compute_store_done_handshake();
-            wait();
-
-            // Wait for all writes to be done and then issue fence
-            store_state_req = STORE_FENCE;
-
-            compute_state_req_dbg.write(STORE_FENCE);
-
-            this->compute_store_ready_handshake();
-            wait();
-            this->compute_store_done_handshake();
+            compute_state_req_dbg.write(COMPUTE);
             wait();
         }
-
-        // Update filter queue to be empty
-        {
-            HLS_PROTO("update-filter-is-empty");
-
-            store_state_req = UPDATE_FILTER_IS_EMPTY;
-
-            compute_state_req_dbg.write(UPDATE_FILTER_IS_EMPTY);
-
-            this->compute_store_ready_handshake();
-            wait();
-            this->compute_store_done_handshake();
-            wait();
-
-            // Wait for all writes to be done and then issue fence
-            store_state_req = STORE_FENCE;
-
-            compute_state_req_dbg.write(STORE_FENCE);
-
-            this->compute_store_ready_handshake();
-            wait();
-            this->compute_store_done_handshake();
-            wait();
-        }
-#endif
         // Compute - FFT
         {
             unsigned offset = 0;  // Offset into Mem for start of this FFT
@@ -979,17 +936,122 @@ void audio_ffi::compute_kernel()
                 } // for (s = 1 .. logn_samples)
         } // Compute
 #ifdef ENABLE_SM
-        // Poll output queue is empty for new task
+        // Poll output queue is full for new task
+        while (true)
         {
-            HLS_PROTO("poll-output-is-empty");
+            {
+                HLS_PROTO("test-output-is-empty");
 
-            load_state_req = POLL_OUTPUT_IS_EMPTY;
+                load_state_req = TEST_OUTPUT_IS_EMPTY;
 
-            compute_state_req_dbg.write(POLL_OUTPUT_IS_EMPTY);
+                compute_state_req_dbg.write(TEST_OUTPUT_IS_EMPTY);
 
-            this->compute_load_ready_handshake();
+                this->compute_load_ready_handshake();
+                wait();
+                this->compute_load_done_handshake();
+                wait();
+
+                local_output_is_empty = output_is_empty;
+                wait();
+            }
+
+            {
+                if (local_output_is_empty == 0) {
+                    HLS_PROTO("output-is-empty");
+                    // Reset backoff count for the next iteration of the accelerator.
+                    backoff_count = BACKOFF_INIT;
+                    backoff_count_dbg.write(backoff_count);
+                    wait();
+                    break;
+                }
+            }
+
+            {
+                HLS_PROTO("no-switch-context-output");
+                for (int i = 0; i < backoff_count; i++) {
+                    HLS_PROTO("backoff-wait-output");
+                    wait();
+                }
+            }
+
+            {
+                // If you have reached the backoff limit, you will try to switch context;
+                // if you cannot, the backoff count stays saturated at the same value.
+                if (backoff_count == BACKOFF_LIMIT_OUTPUT) {
+                    HLS_PROTO("backoff-limit-output");
+                    switch_context = true;
+                    switch_context_dbg.write(true);
+                    break;
+                } else {
+                    HLS_PROTO("no-backoff-limit-output");
+                    backoff_count = backoff_count * 2;
+                    backoff_count_dbg.write(backoff_count);
+                    wait();
+                    continue;
+                }
+            }
+        }
+
+        // If spinning for long time, switch context
+        {
+            if (switch_context) {
+                HLS_PROTO("do-switch-context-output");
+                // Since we are discarding this execution, we need to handshake
+                // with util module for the discarded execution.
+                discarded_compute = true;
+                this->compute_util_done_handshake();
+                wait();
+                continue;
+            }
+        }
+
+        // Update input queue to be empty
+        // We do this late to avoid deadlock in case of context switch within
+        // a chain of accelerators (input will be released only if output is ready).
+        {
+            HLS_PROTO("update-input-is-empty");
+
+            store_state_req = UPDATE_INPUT_IS_EMPTY;
+
+            compute_state_req_dbg.write(UPDATE_INPUT_IS_EMPTY);
+
+            this->compute_store_ready_handshake();
             wait();
-            this->compute_load_done_handshake();
+            this->compute_store_done_handshake();
+            wait();
+
+            // Wait for all writes to be done and then issue fence
+            store_state_req = STORE_FENCE;
+
+            compute_state_req_dbg.write(STORE_FENCE);
+
+            this->compute_store_ready_handshake();
+            wait();
+            this->compute_store_done_handshake();
+            wait();
+        }
+
+        // Update filter queue to be empty
+        {
+            HLS_PROTO("update-filter-is-empty");
+
+            store_state_req = UPDATE_FILTER_IS_EMPTY;
+
+            compute_state_req_dbg.write(UPDATE_FILTER_IS_EMPTY);
+
+            this->compute_store_ready_handshake();
+            wait();
+            this->compute_store_done_handshake();
+            wait();
+
+            // Wait for all writes to be done and then issue fence
+            store_state_req = STORE_FENCE;
+
+            compute_state_req_dbg.write(STORE_FENCE);
+
+            this->compute_store_ready_handshake();
+            wait();
+            this->compute_store_done_handshake();
             wait();
         }
 #endif
@@ -1105,7 +1167,9 @@ void audio_ffi::util_monitor()
 
             // Capture the active cycles and total cycles with the current cycles.
             end_cycles = accel_cycles;
-            active_cycles[active_context] += end_cycles - start_cycles;
+            if (!discarded_compute) {
+                active_cycles[active_context] += end_cycles - start_cycles;
+            }
             
             // We write out the utilization for active context
             avu_mon_info_t mon_info(active_cycles[active_context], active_context);

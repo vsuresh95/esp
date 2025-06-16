@@ -28,21 +28,23 @@
 
 #define TEST_INPUT_IS_FULL 0
 #define POLL_FILTER_IS_FULL 1
-#define POLL_OUTPUT_IS_EMPTY 2
+#define TEST_OUTPUT_IS_EMPTY 2
 #define LOAD_DATA_REQ 3
 #define LOAD_FILTERS_REQ 4
-#define UPDATE_INPUT_IS_EMPTY 5
-#define UPDATE_FILTER_IS_EMPTY 6
-#define UPDATE_OUTPUT_IS_FULL 7
-#define STORE_DATA_REQ 8
-#define STORE_FENCE 9
-#define ACC_DONE 10
+#define COMPUTE 5
+#define UPDATE_INPUT_IS_EMPTY 6
+#define UPDATE_FILTER_IS_EMPTY 7
+#define UPDATE_OUTPUT_IS_FULL 8
+#define STORE_DATA_REQ 9
+#define STORE_FENCE 10
+#define ACC_DONE 11
 
 #define VALID_OFFSET 0
 #define PAYLOAD_OFFSET 2
 
 #define BACKOFF_INIT 8
-#define BACKOFF_LIMIT 128
+#define BACKOFF_LIMIT_INPUT 128
+#define BACKOFF_LIMIT_OUTPUT 512
 
 class audio_ffi : public esp_accelerator_3P<DMA_WIDTH>
 {
@@ -117,7 +119,7 @@ public:
     sc_signal< sc_int<32> > load_state_req_dbg;
     sc_signal< sc_int<32> > store_state_req_dbg;
     sc_signal< sc_int<32> > compute_state_req_dbg;
-    sc_signal< sc_uint<32> > accel_cycles_dbg;
+    sc_signal< sc_uint<64> > accel_cycles_dbg;
     sc_signal< sc_uint<MAX_CONTEXTS_BITS> > current_context_int_dbg;
     sc_signal< sc_int<1> > switch_context_dbg;
     sc_signal< sc_uint<64> > cycles_elapsed_dbg;
@@ -128,13 +130,16 @@ public:
     sc_int<32> load_state_req;
     sc_int<32> store_state_req;
     sc_int<32> input_is_full;
+    sc_int<32> output_is_empty;
     sc_uint<MAX_CONTEXTS_BITS> current_context_int;
     sc_uint<64> accel_cycles;
     sc_uint<64> start_cycles;
+    sc_int<1> discarded_compute;
     
     // Output signal for current context
     sc_out< sc_uint<MAX_CONTEXTS_BITS> > current_context;
     
+    // Output channel for monitor metrics
     b_put_initiator<avu_mon_info_t> mon_chnl;
 
     // Processes
