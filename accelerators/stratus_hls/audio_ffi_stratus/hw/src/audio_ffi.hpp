@@ -44,7 +44,7 @@
 
 #define BACKOFF_INIT 8
 #define BACKOFF_LIMIT_INPUT 128
-#define BACKOFF_LIMIT_OUTPUT 512
+#define BACKOFF_LIMIT_OUTPUT 256
 
 class audio_ffi : public esp_accelerator_3P<DMA_WIDTH>
 {

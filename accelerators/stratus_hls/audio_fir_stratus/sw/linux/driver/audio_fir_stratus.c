@@ -108,7 +108,7 @@ static void audio_fir_del_context(struct esp_device *esp, void *arg)
 	struct audio_fir_stratus_access *a = arg;
 
 	/* <<--regs-config-->> */
-	iowrite32be(a->valid_contexts, esp->iomem + AUDIO_FIR_VALID_CONTEXTS);
+	iowrite32be(a->esp.valid_contexts, esp->iomem + AUDIO_FIR_VALID_CONTEXTS);
 }
 
 static bool audio_fir_xfer_input_ok(struct esp_device *esp, void *arg)

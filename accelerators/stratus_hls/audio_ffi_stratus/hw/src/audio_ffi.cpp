@@ -515,6 +515,28 @@ void audio_ffi::compute_kernel()
             wait();
         }
 
+        // If no context is currently valid, spin until it is valid
+        {
+            if (valid_contexts == 0) {
+                HLS_PROTO("check-context-valid");
+                wait();
+                continue;
+            }
+        }
+
+        // If the current context is no longer valid, we need to switch context
+        {
+            HLS_PROTO("check-context-valid");
+
+            sc_uint<MAX_CONTEXTS> v = valid_contexts;
+
+            if (v[current_context_int] != 1) {
+                switch_context = true;
+            }
+
+            wait();
+        }
+        
         {
             HLS_PROTO("check-new-context");
 

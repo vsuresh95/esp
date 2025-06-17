@@ -115,7 +115,7 @@ static void audio_fft_del_context(struct esp_device *esp, void *arg)
 	struct audio_fft_stratus_access *a = arg;
 
 	/* <<--regs-config-->> */
-	iowrite32be(a->valid_contexts, esp->iomem + AUDIO_FFT_VALID_CONTEXTS);
+	iowrite32be(a->esp.valid_contexts, esp->iomem + AUDIO_FFT_VALID_CONTEXTS);
 }
 
 static bool audio_fft_xfer_input_ok(struct esp_device *esp, void *arg)
