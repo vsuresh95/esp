@@ -57,15 +57,15 @@ architecture arch of jtag2apb_reg is
   signal idx               : integer range 0 to 2;
 
 
-  attribute mark_debug : string;
+  -- attribute mark_debug : string;
 
-  attribute mark_debug of bank_reg : signal is "true";
-  attribute mark_debug of addr : signal is "true";
-  attribute mark_debug of idx : signal is "true";
-  attribute mark_debug of DEV_START : signal is "true";
-  attribute mark_debug of r : signal is "true";
-  attribute mark_debug of sendin : signal is "true";
-  attribute mark_debug of bankin : signal is "true";
+  -- attribute mark_debug of bank_reg : signal is "true";
+  -- attribute mark_debug of addr : signal is "true";
+  -- attribute mark_debug of idx : signal is "true";
+  -- attribute mark_debug of DEV_START : signal is "true";
+  -- attribute mark_debug of r : signal is "true";
+  -- attribute mark_debug of sendin : signal is "true";
+  -- attribute mark_debug of bankin : signal is "true";
 
 begin
 

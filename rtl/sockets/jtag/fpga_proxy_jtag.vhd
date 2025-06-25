@@ -95,34 +95,34 @@ architecture rtl of fpga_proxy_jtag is
 
   signal source_sipo_out, req_flit, wr_flit, empty_fifo : std_logic_vector(5 downto 0);
 
-  attribute mark_debug : string;
+  -- attribute mark_debug : string;
 
-  attribute mark_debug of apbi : signal is "true";
-  attribute mark_debug of apbo0 : signal is "true";
-  attribute mark_debug of apbo1 : signal is "true";
+  -- attribute mark_debug of apbi : signal is "true";
+  -- attribute mark_debug of apbo0 : signal is "true";
+  -- attribute mark_debug of apbo1 : signal is "true";
 
-  attribute mark_debug of r : signal is "true";
+  -- attribute mark_debug of r : signal is "true";
 
-  attribute mark_debug of source_sipo_en : signal is "true";
-  attribute mark_debug of source_sipo_clear : signal is "true";
-  attribute mark_debug of source_sipo_out : signal is "true";
+  -- attribute mark_debug of source_sipo_en : signal is "true";
+  -- attribute mark_debug of source_sipo_clear : signal is "true";
+  -- attribute mark_debug of source_sipo_out : signal is "true";
 
-  attribute mark_debug of testout_sipo_en : signal is "true";
-  attribute mark_debug of testout_sipo_clear : signal is "true";
-  attribute mark_debug of test_out : signal is "true";
+  -- attribute mark_debug of testout_sipo_en : signal is "true";
+  -- attribute mark_debug of testout_sipo_clear : signal is "true";
+  -- attribute mark_debug of test_out : signal is "true";
 
-  attribute mark_debug of testin_piso_en : signal is "true";
-  attribute mark_debug of testin_piso_clear : signal is "true";
-  attribute mark_debug of testin_piso_load : signal is "true";
+  -- attribute mark_debug of testin_piso_en : signal is "true";
+  -- attribute mark_debug of testin_piso_clear : signal is "true";
+  -- attribute mark_debug of testin_piso_load : signal is "true";
 
-  attribute mark_debug of apbreq : signal is "true";
-  attribute mark_debug of ack_r : signal is "true";
+  -- attribute mark_debug of apbreq : signal is "true";
+  -- attribute mark_debug of ack_r : signal is "true";
 
-  attribute mark_debug of ack2apb_r : signal is "true";
-  attribute mark_debug of ack2apb : signal is "true";
-  attribute mark_debug of req_flit : signal is "true";
-  attribute mark_debug of wr_flit : signal is "true";
-  attribute mark_debug of empty_fifo : signal is "true";
+  -- attribute mark_debug of ack2apb_r : signal is "true";
+  -- attribute mark_debug of ack2apb : signal is "true";
+  -- attribute mark_debug of req_flit : signal is "true";
+  -- attribute mark_debug of wr_flit : signal is "true";
+  -- attribute mark_debug of empty_fifo : signal is "true";
 
 
   attribute mark_debug of count_clear : signal is "true";
