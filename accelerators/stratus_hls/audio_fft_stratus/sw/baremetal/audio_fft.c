@@ -77,11 +77,12 @@ static unsigned mem_size;
 #define AUDIO_FFT_OUTPUT_QUEUE_BASE_1	0xB4
 #define AUDIO_FFT_OUTPUT_QUEUE_BASE_2	0xB8
 #define AUDIO_FFT_OUTPUT_QUEUE_BASE_3	0xBC
-#define AUDIO_FFT_CONTEXT_QUOTA_0		0xC0
-#define AUDIO_FFT_CONTEXT_QUOTA_1		0xC4
-#define AUDIO_FFT_CONTEXT_QUOTA_2		0xC8
-#define AUDIO_FFT_CONTEXT_QUOTA_3		0xCC
+#define AUDIO_FFT_CONTEXT_NPRIO_0		0xC0
+#define AUDIO_FFT_CONTEXT_NPRIO_1		0xC4
+#define AUDIO_FFT_CONTEXT_NPRIO_2		0xC8
+#define AUDIO_FFT_CONTEXT_NPRIO_3		0xCC
 #define AUDIO_FFT_VALID_CONTEXTS		0xD0
+#define AUDIO_FFT_SCHED_PERIOD			0xD4
 
 static uint64_t t_start = 0;
 static uint64_t t_end = 0;
@@ -298,7 +299,8 @@ int main(int argc, char * argv[])
 		iowrite32(dev, AUDIO_FFT_DO_INVERSE_REG_0, do_inverse);
 		iowrite32(dev, AUDIO_FFT_INPUT_QUEUE_BASE_0, input_valid_offset_0);
 		iowrite32(dev, AUDIO_FFT_OUTPUT_QUEUE_BASE_0, output_valid_offset_0);
-		iowrite32(dev, AUDIO_FFT_CONTEXT_QUOTA_0, 50000);
+		iowrite32(dev, AUDIO_FFT_CONTEXT_NPRIO_0, 1);
+		iowrite32(dev, AUDIO_FFT_SCHED_PERIOD, 0x10000);
 		iowrite32(dev, PT_ADDRESS_REG_0, (unsigned long long) ptable0);
 		iowrite32(dev, AUDIO_FFT_VALID_CONTEXTS, 0x1);
 
@@ -334,7 +336,7 @@ int main(int argc, char * argv[])
 		iowrite32(dev, AUDIO_FFT_DO_INVERSE_REG_1, do_inverse);
 		iowrite32(dev, AUDIO_FFT_INPUT_QUEUE_BASE_1, input_valid_offset_1);
 		iowrite32(dev, AUDIO_FFT_OUTPUT_QUEUE_BASE_1, output_valid_offset_1);
-		iowrite32(dev, AUDIO_FFT_CONTEXT_QUOTA_1, 50000);
+		iowrite32(dev, AUDIO_FFT_CONTEXT_NPRIO_1, 1);
 		iowrite32(dev, PT_ADDRESS_REG_1, (unsigned long long) ptable1);
 		iowrite32(dev, AUDIO_FFT_VALID_CONTEXTS, 0x3);
 
@@ -373,7 +375,7 @@ int main(int argc, char * argv[])
 		iowrite32(dev, AUDIO_FFT_DO_INVERSE_REG_2, do_inverse);
 		iowrite32(dev, AUDIO_FFT_INPUT_QUEUE_BASE_2, input_valid_offset_2);
 		iowrite32(dev, AUDIO_FFT_OUTPUT_QUEUE_BASE_2, output_valid_offset_2);
-		iowrite32(dev, AUDIO_FFT_CONTEXT_QUOTA_2, 50000);
+		iowrite32(dev, AUDIO_FFT_CONTEXT_NPRIO_2, 1);
 		iowrite32(dev, PT_ADDRESS_REG_2, (unsigned long long) ptable2);
 		iowrite32(dev, AUDIO_FFT_VALID_CONTEXTS, 0x7);
 
@@ -544,7 +546,8 @@ int main(int argc, char * argv[])
 		iowrite32(dev, AUDIO_FFT_DO_INVERSE_REG_0, do_inverse);
 		iowrite32(dev, AUDIO_FFT_INPUT_QUEUE_BASE_0, input_valid_offset_0);
 		iowrite32(dev, AUDIO_FFT_OUTPUT_QUEUE_BASE_0, output_valid_offset_0);
-		iowrite32(dev, AUDIO_FFT_CONTEXT_QUOTA_0, 50000);
+		iowrite32(dev, AUDIO_FFT_CONTEXT_NPRIO_0, 1);
+		iowrite32(dev, AUDIO_FFT_SCHED_PERIOD, 0x10000);
 		iowrite32(dev, PT_ADDRESS_REG_0, (unsigned long long) ptable0);
 		iowrite32(dev, AUDIO_FFT_VALID_CONTEXTS, 0x1);
 
@@ -561,7 +564,7 @@ int main(int argc, char * argv[])
 		iowrite32(dev, AUDIO_FFT_DO_INVERSE_REG_1, do_inverse);
 		iowrite32(dev, AUDIO_FFT_INPUT_QUEUE_BASE_1, input_valid_offset_1);
 		iowrite32(dev, AUDIO_FFT_OUTPUT_QUEUE_BASE_1, output_valid_offset_1);
-		iowrite32(dev, AUDIO_FFT_CONTEXT_QUOTA_1, 50000);
+		iowrite32(dev, AUDIO_FFT_CONTEXT_NPRIO_1, 1);
 		iowrite32(dev, PT_ADDRESS_REG_1, (unsigned long long) ptable1);
 		iowrite32(dev, AUDIO_FFT_VALID_CONTEXTS, 0x3);
 
@@ -575,7 +578,7 @@ int main(int argc, char * argv[])
 		iowrite32(dev, AUDIO_FFT_DO_INVERSE_REG_2, do_inverse);
 		iowrite32(dev, AUDIO_FFT_INPUT_QUEUE_BASE_2, input_valid_offset_2);
 		iowrite32(dev, AUDIO_FFT_OUTPUT_QUEUE_BASE_2, output_valid_offset_2);
-		iowrite32(dev, AUDIO_FFT_CONTEXT_QUOTA_2, 50000);
+		iowrite32(dev, AUDIO_FFT_CONTEXT_NPRIO_2, 1);
 		iowrite32(dev, PT_ADDRESS_REG_2, (unsigned long long) ptable2);
 		iowrite32(dev, AUDIO_FFT_VALID_CONTEXTS, 0x7);
 
@@ -741,7 +744,7 @@ int main(int argc, char * argv[])
 		iowrite32(dev, AUDIO_FFT_DO_INVERSE_REG_3, do_inverse);
 		iowrite32(dev, AUDIO_FFT_INPUT_QUEUE_BASE_3, input_valid_offset_3);
 		iowrite32(dev, AUDIO_FFT_OUTPUT_QUEUE_BASE_3, output_valid_offset_3);
-		iowrite32(dev, AUDIO_FFT_CONTEXT_QUOTA_3, 50000);
+		iowrite32(dev, AUDIO_FFT_CONTEXT_NPRIO_3, 1);
 		iowrite32(dev, PT_ADDRESS_REG_3, (unsigned long long) ptable3);
 		iowrite32(dev, AUDIO_FFT_VALID_CONTEXTS, 0xD);
 
@@ -838,6 +841,19 @@ int main(int argc, char * argv[])
 
 		printf("Third context task done\n");
 
+		///////////////////////////////////////////////////////
+		/// Get first context output
+		///////////////////////////////////////////////////////
+		// Wait for the accelerator to send output
+		SpinSync((void*) &mem0[output_valid_offset_0], 1);
+
+		// When the output is ready, we read it
+		errors += validate_buf(&mem0[output_data_offset_0], gold);
+		// Inform the accelerator - ready for next iteration.
+		UpdateSync((void*) &mem0[output_valid_offset_0], 0);
+
+		printf("First context task done\n");	
+		
 		for (i = 0; i < 3; i++) {
 			printf("MON_UTIL_REG_%d_LO = %x\n", i, ioread32(dev, MON_UTIL_REG_0_LO + 0x8*i));
 			printf("MON_UTIL_REG_%d_HI = %x\n", i, ioread32(dev, MON_UTIL_REG_0_HI + 0x8*i));

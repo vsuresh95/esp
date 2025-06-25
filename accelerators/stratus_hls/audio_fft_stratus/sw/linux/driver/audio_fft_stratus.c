@@ -33,11 +33,12 @@
 #define AUDIO_FFT_OUTPUT_QUEUE_BASE_1	0xB4
 #define AUDIO_FFT_OUTPUT_QUEUE_BASE_2	0xB8
 #define AUDIO_FFT_OUTPUT_QUEUE_BASE_3	0xBC
-#define AUDIO_FFT_CONTEXT_QUOTA_0		0xC0
-#define AUDIO_FFT_CONTEXT_QUOTA_1		0xC4
-#define AUDIO_FFT_CONTEXT_QUOTA_2		0xC8
-#define AUDIO_FFT_CONTEXT_QUOTA_3		0xCC
+#define AUDIO_FFT_CONTEXT_NPRIO_0		0XC0
+#define AUDIO_FFT_CONTEXT_NPRIO_1		0xC4
+#define AUDIO_FFT_CONTEXT_NPRIO_2		0xC8
+#define AUDIO_FFT_CONTEXT_NPRIO_3		0xCC
 #define AUDIO_FFT_VALID_CONTEXTS		0xD0
+#define AUDIO_FFT_SCHED_PERIOD			0xD4
 
 struct audio_fft_stratus_device {
 	struct esp_device esp;
@@ -90,8 +91,9 @@ static void audio_fft_init_accel(struct esp_device *esp, void *arg)
 	iowrite32be(a->input_queue_base, esp->iomem + AUDIO_FFT_INPUT_QUEUE_BASE_0 + 0x4*esp->context_id);
 	iowrite32be(a->output_queue_base, esp->iomem + AUDIO_FFT_OUTPUT_QUEUE_BASE_0 + 0x4*esp->context_id);
 	
-	iowrite32be(a->esp.context_quota, esp->iomem + AUDIO_FFT_CONTEXT_QUOTA_0 + 0x4*esp->context_id);
+	iowrite32be(a->esp.context_nprio, esp->iomem + AUDIO_FFT_CONTEXT_NPRIO_0 + 0x4*esp->context_id);
 	iowrite32be(a->esp.valid_contexts, esp->iomem + AUDIO_FFT_VALID_CONTEXTS);
+	iowrite32be(a->esp.sched_period, esp->iomem + AUDIO_FFT_SCHED_PERIOD);
 }
 
 static void audio_fft_add_context(struct esp_device *esp, void *arg)
@@ -106,8 +108,9 @@ static void audio_fft_add_context(struct esp_device *esp, void *arg)
 	iowrite32be(a->input_queue_base, esp->iomem + AUDIO_FFT_INPUT_QUEUE_BASE_0 + 0x4*esp->context_id);
 	iowrite32be(a->output_queue_base, esp->iomem + AUDIO_FFT_OUTPUT_QUEUE_BASE_0 + 0x4*esp->context_id);
 
-	iowrite32be(a->esp.context_quota, esp->iomem + AUDIO_FFT_CONTEXT_QUOTA_0 + 0x4*esp->context_id);
+	iowrite32be(a->esp.context_nprio, esp->iomem + AUDIO_FFT_CONTEXT_NPRIO_0 + 0x4*esp->context_id);
 	iowrite32be(a->esp.valid_contexts, esp->iomem + AUDIO_FFT_VALID_CONTEXTS);
+	iowrite32be(a->esp.sched_period, esp->iomem + AUDIO_FFT_SCHED_PERIOD);
 }
 
 static void audio_fft_del_context(struct esp_device *esp, void *arg)

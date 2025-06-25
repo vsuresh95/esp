@@ -21,10 +21,11 @@
     <param name="output_queue_base_1" desc="output_queue_base_1" />
     <param name="output_queue_base_2" desc="output_queue_base_2" />
     <param name="output_queue_base_3" desc="output_queue_base_3" />
-    <param name="context_quota_0" desc="context_quota_0" />
-    <param name="context_quota_1" desc="context_quota_1" />
-    <param name="context_quota_2" desc="context_quota_2" />
-    <param name="context_quota_3" desc="context_quota_3" />
+    <param name="context_nprio_0" desc="context_nprio_0" />
+    <param name="context_nprio_1" desc="context_nprio_1" />
+    <param name="context_nprio_2" desc="context_nprio_2" />
+    <param name="context_nprio_3" desc="context_nprio_3" />
     <param name="valid_contexts" desc="valid_contexts" />
+    <param name="sched_period" desc="sched_period" />
   </accelerator>
 </sld>

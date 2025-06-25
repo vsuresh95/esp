@@ -30,7 +30,8 @@ struct esp_access {
     unsigned spandex_conf;
 	unsigned context_id;
 	unsigned valid_contexts;
-	unsigned context_quota;
+	unsigned context_nprio;
+	unsigned sched_period;
 
     unsigned int footprint;
     enum contig_alloc_policy alloc_policy;

@@ -28,9 +28,10 @@ public:
             this->do_shift[i] = 1;
             this->input_queue_base[i] = 0;
             this->output_queue_base[i] = 0;
-            this->context_quota[i] = 0;
+            this->context_nprio[i] = 0;
         }
         this->valid_contexts = 0;
+        this->sched_period = 0;
     }
 
     conf_info_t(
@@ -40,8 +41,9 @@ public:
         int32_t do_shift[MAX_CONTEXTS],
         int32_t input_queue_base[MAX_CONTEXTS],
         int32_t output_queue_base[MAX_CONTEXTS],
-        int32_t context_quota[MAX_CONTEXTS],
-        int32_t valid_contexts
+        int32_t context_nprio[MAX_CONTEXTS],
+        int32_t valid_contexts,
+        int32_t sched_period
         )
     {
         /* <<--ctor-custom-->> */
@@ -51,9 +53,10 @@ public:
             this->do_shift[i] = do_shift[i];
             this->input_queue_base[i] = input_queue_base[i];
             this->output_queue_base[i] = output_queue_base[i];
-            this->context_quota[i] = context_quota[i];
+            this->context_nprio[i] = context_nprio[i];
         }
         this->valid_contexts = valid_contexts;
+        this->sched_period = sched_period;
     }
 
     // equals operator
@@ -66,9 +69,10 @@ public:
             if (do_shift[i] != rhs.do_shift[i]) return false;
             if (input_queue_base[i] != rhs.input_queue_base[i]) return false;
             if (output_queue_base[i] != rhs.output_queue_base[i]) return false;
-            if (context_quota[i] != rhs.context_quota[i]) return false;
+            if (context_nprio[i] != rhs.context_nprio[i]) return false;
         }
         if (valid_contexts != rhs.valid_contexts) return false;
+        if (sched_period != rhs.sched_period) return false;
         return true;
     }
 
@@ -82,8 +86,9 @@ public:
             do_shift[i] = other.do_shift[i];
             input_queue_base[i] = other.input_queue_base[i];
             output_queue_base[i] = other.output_queue_base[i];
-            context_quota[i] = other.context_quota[i];
+            context_nprio[i] = other.context_nprio[i];
         }
+        valid_contexts = other.valid_contexts;
         valid_contexts = other.valid_contexts;
         return *this;
     }
@@ -112,8 +117,9 @@ public:
         int32_t do_shift[MAX_CONTEXTS];
         int32_t input_queue_base[MAX_CONTEXTS];
         int32_t output_queue_base[MAX_CONTEXTS];
-        int32_t context_quota[MAX_CONTEXTS];
+        int32_t context_nprio[MAX_CONTEXTS];
         int32_t valid_contexts;
+        int32_t sched_period;
 };
 
 #endif // __AUDIO_FFT_CONF_INFO_HPP__
