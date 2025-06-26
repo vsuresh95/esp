@@ -37,5 +37,6 @@ struct audio_fft_stratus_access {
 #define AUDIO_FFT_STRATUS_INIT_IOC_ACCESS	_IOW ('S', 1, struct audio_fft_stratus_access)
 #define AUDIO_FFT_STRATUS_ADD_IOC_ACCESS	_IOW ('S', 2, struct audio_fft_stratus_access)
 #define AUDIO_FFT_STRATUS_DEL_IOC_ACCESS	_IOW ('S', 3, struct audio_fft_stratus_access)
+#define AUDIO_FFT_STRATUS_PRIO_IOC_ACCESS	_IOW ('S', 4, struct audio_fft_stratus_access)
 
 #endif /* _AUDIO_FFT_STRATUS_H_ */

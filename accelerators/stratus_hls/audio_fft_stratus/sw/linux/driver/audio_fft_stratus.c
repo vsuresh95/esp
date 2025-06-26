@@ -121,6 +121,14 @@ static void audio_fft_del_context(struct esp_device *esp, void *arg)
 	iowrite32be(a->esp.valid_contexts, esp->iomem + AUDIO_FFT_VALID_CONTEXTS);
 }
 
+static void audio_fft_setprio(struct esp_device *esp, void *arg)
+{
+	struct audio_fft_stratus_access *a = arg;
+
+	/* <<--regs-config-->> */
+	iowrite32be(a->esp.context_nprio, esp->iomem + AUDIO_FFT_CONTEXT_NPRIO_0 + 0x4*esp->context_id);
+}
+
 static bool audio_fft_xfer_input_ok(struct esp_device *esp, void *arg)
 {
 	/* struct audio_fft_stratus_device *audio_fft = to_audio_fft(esp); */
@@ -178,10 +186,12 @@ static struct esp_driver audio_fft_driver = {
 	.init_accel		= audio_fft_init_accel,
 	.add_context	= audio_fft_add_context,
 	.del_context	= audio_fft_del_context,
+	.setprio		= audio_fft_setprio,
 	.ioctl_cm		= AUDIO_FFT_STRATUS_IOC_ACCESS,
 	.init_cm		= AUDIO_FFT_STRATUS_INIT_IOC_ACCESS,
 	.add_cm			= AUDIO_FFT_STRATUS_ADD_IOC_ACCESS,
 	.del_cm			= AUDIO_FFT_STRATUS_DEL_IOC_ACCESS,
+	.prio_cm		= AUDIO_FFT_STRATUS_PRIO_IOC_ACCESS,
 	.arg_size		= sizeof(struct audio_fft_stratus_access),
 };
 

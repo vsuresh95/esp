@@ -78,10 +78,12 @@ struct esp_driver {
 	void (*init_accel)(struct esp_device *esp, void *arg);
 	void (*add_context)(struct esp_device *esp, void *arg);
 	void (*del_context)(struct esp_device *esp, void *arg);
+	void (*setprio)(struct esp_device *esp, void *arg);
 	unsigned int ioctl_cm;
 	unsigned int init_cm;
 	unsigned int add_cm;
 	unsigned int del_cm;
+	unsigned int prio_cm;
 	size_t arg_size;
 };
 
