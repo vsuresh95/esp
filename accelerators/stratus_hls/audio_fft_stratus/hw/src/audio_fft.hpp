@@ -18,7 +18,7 @@
 
 #define PLM_IN_WORD 2048
  
-class audio_fft : public esp_accelerator_avu<DMA_WIDTH>
+class audio_fft : public esp_accelerator_avu<DMA_WIDTH, N_INPUTS, N_OUTPUTS, N_CONTEXTS_BITS>
 {
 public:
     // Compute -> Load
@@ -30,7 +30,7 @@ public:
     // Constructor
     SC_HAS_PROCESS(audio_fft);
     audio_fft(const sc_module_name& name)
-    : esp_accelerator_avu<DMA_WIDTH>(name)
+    : esp_accelerator_avu<DMA_WIDTH, N_INPUTS, N_OUTPUTS, N_CONTEXTS_BITS>(name)
         , load_ready("load_ready")
         , store_ready("store_ready")
     {

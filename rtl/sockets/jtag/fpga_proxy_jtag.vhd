@@ -125,8 +125,8 @@ architecture rtl of fpga_proxy_jtag is
   -- attribute mark_debug of empty_fifo : signal is "true";
 
 
-  attribute mark_debug of count_clear : signal is "true";
-  attribute mark_debug of count_en : signal is "true";
+  -- attribute mark_debug of count_clear : signal is "true";
+  -- attribute mark_debug of count_en : signal is "true";
 
 
 begin

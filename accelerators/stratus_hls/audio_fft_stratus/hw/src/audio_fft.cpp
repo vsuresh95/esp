@@ -59,7 +59,7 @@ void audio_fft::load_input()
             num_samples = 1 << logn_samples;
 
             // Configured shared memory base addresses for input queue
-            input_payload_offset = config.input_queue_base[current_context_int] + PAYLOAD_OFFSET;
+            input_payload_offset = config.input_queue_base[current_context_int][0] + PAYLOAD_OFFSET;
 
             wait();
         }
@@ -142,7 +142,7 @@ void audio_fft::store_output()
             num_samples = 1 << logn_samples;
 
             // Configured shared memory base addresses for output queue
-            output_payload_offset = config.output_queue_base[current_context_int] + PAYLOAD_OFFSET;
+            output_payload_offset = config.output_queue_base[current_context_int][0] + PAYLOAD_OFFSET;
 
             wait();
         }

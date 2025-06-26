@@ -13,14 +13,14 @@
     <param name="do_inverse_1" desc="do_inverse_1" />
     <param name="do_inverse_2" desc="do_inverse_2" />
     <param name="do_inverse_3" desc="do_inverse_3" />
-    <param name="input_queue_base_0" desc="input_queue_base_0" />
-    <param name="input_queue_base_1" desc="input_queue_base_1" />
-    <param name="input_queue_base_2" desc="input_queue_base_2" />
-    <param name="input_queue_base_3" desc="input_queue_base_3" />
-    <param name="output_queue_base_0" desc="output_queue_base_0" />
-    <param name="output_queue_base_1" desc="output_queue_base_1" />
-    <param name="output_queue_base_2" desc="output_queue_base_2" />
-    <param name="output_queue_base_3" desc="output_queue_base_3" />
+    <param name="input_queue_base_0_0" desc="input_queue_base_0_0" />
+    <param name="input_queue_base_1_0" desc="input_queue_base_1_0" />
+    <param name="input_queue_base_2_0" desc="input_queue_base_2_0" />
+    <param name="input_queue_base_3_0" desc="input_queue_base_3_0" />
+    <param name="output_queue_base_0_0" desc="output_queue_base_0_0" />
+    <param name="output_queue_base_1_0" desc="output_queue_base_1_0" />
+    <param name="output_queue_base_2_0" desc="output_queue_base_2_0" />
+    <param name="output_queue_base_3_0" desc="output_queue_base_3_0" />
     <param name="context_nprio_0" desc="context_nprio_0" />
     <param name="context_nprio_1" desc="context_nprio_1" />
     <param name="context_nprio_2" desc="context_nprio_2" />
