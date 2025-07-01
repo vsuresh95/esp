@@ -5,22 +5,23 @@
     <param name="logn_samples_1" desc="logn_samples_1" />
     <param name="logn_samples_2" desc="logn_samples_2" />
     <param name="logn_samples_3" desc="logn_samples_3" />
-    <param name="input_queue_base_0" desc="input_queue_base_0" />
-    <param name="input_queue_base_1" desc="input_queue_base_1" />
-    <param name="input_queue_base_2" desc="input_queue_base_2" />
-    <param name="input_queue_base_3" desc="input_queue_base_3" />
-    <param name="output_queue_base_0" desc="output_queue_base_0" />
-    <param name="output_queue_base_1" desc="output_queue_base_1" />
-    <param name="output_queue_base_2" desc="output_queue_base_2" />
-    <param name="output_queue_base_3" desc="output_queue_base_3" />
-    <param name="filter_queue_base_0" desc="filter_queue_base_0" />
-    <param name="filter_queue_base_1" desc="filter_queue_base_1" />
-    <param name="filter_queue_base_2" desc="filter_queue_base_2" />
-    <param name="filter_queue_base_3" desc="filter_queue_base_3" />
-    <param name="context_quota_0" desc="context_quota_0" />
-    <param name="context_quota_1" desc="context_quota_1" />
-    <param name="context_quota_2" desc="context_quota_2" />
-    <param name="context_quota_3" desc="context_quota_3" />
+    <param name="input_queue_base_0_0" desc="input_queue_base_0_0" />
+    <param name="input_queue_base_0_1" desc="input_queue_base_0_1" />
+    <param name="input_queue_base_1_0" desc="input_queue_base_1_0" />
+    <param name="input_queue_base_1_1" desc="input_queue_base_1_1" />
+    <param name="input_queue_base_2_0" desc="input_queue_base_2_0" />
+    <param name="input_queue_base_2_1" desc="input_queue_base_2_1" />
+    <param name="input_queue_base_3_0" desc="input_queue_base_3_0" />
+    <param name="input_queue_base_3_1" desc="input_queue_base_3_1" />
+    <param name="output_queue_base_0_0" desc="output_queue_base_0_0" />
+    <param name="output_queue_base_1_0" desc="output_queue_base_1_0" />
+    <param name="output_queue_base_2_0" desc="output_queue_base_2_0" />
+    <param name="output_queue_base_3_0" desc="output_queue_base_3_0" />
+    <param name="context_nprio_0" desc="context_nprio_0" />
+    <param name="context_nprio_1" desc="context_nprio_1" />
+    <param name="context_nprio_2" desc="context_nprio_2" />
+    <param name="context_nprio_3" desc="context_nprio_3" />
     <param name="valid_contexts" desc="valid_contexts" />
+    <param name="sched_period" desc="sched_period" />
   </accelerator>
 </sld>

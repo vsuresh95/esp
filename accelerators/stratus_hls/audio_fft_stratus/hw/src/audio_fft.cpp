@@ -208,7 +208,7 @@ void audio_fft::compute_kernel()
         wait();
     }
 
-    // Store
+    // Compute
     while(true)
     {
         // Read config information for current context
@@ -307,10 +307,8 @@ void audio_fft::compute_kernel()
 
             wait();
         }
-
-
-    }
-}
+    } // while (true)
+} // Function : compute_kernel
 
 #else // ENABLE_PP
 

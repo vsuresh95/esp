@@ -6,8 +6,10 @@
 
 #include <systemc.h>
 
-#define MAX_CONTEXTS 4
-#define MAX_CONTEXTS_BITS 2
+#define N_INPUTS 2
+#define N_OUTPUTS 1
+#define N_CONTEXTS 4
+#define N_CONTEXTS_BITS 2
 
 //
 // Configuration parameters for the accelerator.
@@ -22,49 +24,61 @@ public:
     conf_info_t()
     {
         /* <<--ctor-->> */
-        for (int i = 0; i < MAX_CONTEXTS; i++) {
+        for (int i = 0; i < N_CONTEXTS; i++) {
             this->logn_samples[i] = 1;
-            this->input_queue_base[i] = 0;
-            this->output_queue_base[i] = 0;
-            this->filter_queue_base[i] = 0;
-            this->context_quota[i] = 0;
+            for (int j = 0; j < N_INPUTS; j++) {
+                this->input_queue_base[i][j] = 0;
+            }
+            for (int j = 0; j < N_OUTPUTS; j++) {
+                this->output_queue_base[i][j] = 0;
+            }
+            this->context_nprio[i] = 0;
         }
         this->valid_contexts = 0;
+        this->sched_period = 0;
     }
 
     conf_info_t(
         /* <<--ctor-args-->> */
-        int32_t logn_samples[MAX_CONTEXTS], 
-        int32_t input_queue_base[MAX_CONTEXTS],
-        int32_t output_queue_base[MAX_CONTEXTS],
-        int32_t filter_queue_base[MAX_CONTEXTS],
-        int32_t context_quota[MAX_CONTEXTS],
-        int32_t valid_contexts
+        int32_t logn_samples[N_CONTEXTS],
+        int32_t input_queue_base[N_CONTEXTS][N_INPUTS],
+        int32_t output_queue_base[N_CONTEXTS][N_OUTPUTS],
+        int32_t context_nprio[N_CONTEXTS],
+        int32_t valid_contexts,
+        int32_t sched_period
         )
     {
         /* <<--ctor-custom-->> */
-        for (int i = 0; i < MAX_CONTEXTS; i++) {
+        for (int i = 0; i < N_CONTEXTS; i++) {
             this->logn_samples[i] = logn_samples[i];
-            this->input_queue_base[i] = input_queue_base[i];
-            this->output_queue_base[i] = output_queue_base[i];
-            this->filter_queue_base[i] = filter_queue_base[i];
-            this->context_quota[i] = context_quota[i];
+            for (int j = 0; j < N_INPUTS; j++) {
+                this->input_queue_base[i][j] = input_queue_base[i][j];
+            }
+            for (int j = 0; j < N_OUTPUTS; j++) {
+                this->output_queue_base[i][j] = output_queue_base[i][j];
+            }
+            this->context_nprio[i] = context_nprio[i];
         }
         this->valid_contexts = valid_contexts;
+        this->sched_period = sched_period;
     }
 
     // equals operator
     inline bool operator==(const conf_info_t &rhs) const
     {
         /* <<--eq-->> */
-        for (int i = 0; i < MAX_CONTEXTS; i++) {
+        for (int i = 0; i < N_CONTEXTS; i++) {
             if (logn_samples[i] != rhs.logn_samples[i]) return false;
-            if (input_queue_base[i] != rhs.input_queue_base[i]) return false;
-            if (output_queue_base[i] != rhs.output_queue_base[i]) return false;
-            if (filter_queue_base[i] != rhs.filter_queue_base[i]) return false;
-            if (context_quota[i] != rhs.context_quota[i]) return false;
+            for (int j = 0; j < N_INPUTS; j++) {
+                if (input_queue_base[i][j] != rhs.input_queue_base[i][j]) return false;
+            }
+            for (int j = 0; j < N_OUTPUTS; j++) {
+                if (output_queue_base[i][j] != rhs.output_queue_base[i][j]) return false;
+            }
+            if (context_nprio[i] != rhs.context_nprio[i]) return false;
         }
         if (valid_contexts != rhs.valid_contexts) return false;
+        if (sched_period != rhs.sched_period) return false;
         return true;
     }
 
@@ -72,13 +86,17 @@ public:
     inline conf_info_t& operator=(const conf_info_t& other)
     {
         /* <<--assign-->> */
-        for (int i = 0; i < MAX_CONTEXTS; i++) {
+        for (int i = 0; i < N_CONTEXTS; i++) {
             logn_samples[i] = other.logn_samples[i];
-            input_queue_base[i] = other.input_queue_base[i];
-            output_queue_base[i] = other.output_queue_base[i];
-            filter_queue_base[i] = other.filter_queue_base[i];
-            context_quota[i] = other.context_quota[i];
+            for (int j = 0; j < N_INPUTS; j++) {
+                input_queue_base[i][j] = other.input_queue_base[i][j];
+            }
+            for (int j = 0; j < N_OUTPUTS; j++) {
+                output_queue_base[i][j] = other.output_queue_base[i][j];
+            }
+            context_nprio[i] = other.context_nprio[i];
         }
+        valid_contexts = other.valid_contexts;
         valid_contexts = other.valid_contexts;
         return *this;
     }
@@ -101,12 +119,12 @@ public:
     }
 
         /* <<--params-->> */
-        int32_t logn_samples[MAX_CONTEXTS];
-        int32_t input_queue_base[MAX_CONTEXTS];
-        int32_t output_queue_base[MAX_CONTEXTS];
-        int32_t filter_queue_base[MAX_CONTEXTS];
-        int32_t context_quota[MAX_CONTEXTS];
+        int32_t logn_samples[N_CONTEXTS];
+        int32_t input_queue_base[N_CONTEXTS][N_INPUTS];
+        int32_t output_queue_base[N_CONTEXTS][N_OUTPUTS];
+        int32_t context_nprio[N_CONTEXTS];
         int32_t valid_contexts;
+        int32_t sched_period;
 };
 
 #endif // __AUDIO_FIR_CONF_INFO_HPP__
