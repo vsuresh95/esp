@@ -8,13 +8,9 @@
 
 #include <esp_accelerator.h>
 #include <esp_probe.h>
-#include "utils/fft2_utils.h"
 
-#define COH_MODE 1
-#define IS_ESP 1
-
-#include "coh_func.h"
 #include "sm.h"
+#include <math.h>
 
 static unsigned DMA_WORD_PER_BEAT(unsigned _st)
 {
@@ -25,21 +21,9 @@ static unsigned DMA_WORD_PER_BEAT(unsigned _st)
 #define DEV_NAME "sld,gemm_stratus"
 
 /* <<--params-->> */
-const unsigned dim_m = 16;
-const unsigned dim_n = 16;
-const unsigned dim_k = 16;
-
-static unsigned in_1_words_adj;
-static unsigned in_2_words_adj;
-static unsigned out_words_adj;
-static unsigned in_1_len;
-static unsigned in_2_len;
-static unsigned in_len;
-static unsigned out_len;
-static unsigned in_size;
-static unsigned out_size;
-static unsigned out_offset;
-static unsigned mem_size;
+const unsigned dim_m = 40;
+const unsigned dim_n = 20;
+const unsigned dim_k = 40;
 
 /* Size of the contiguous chunks for scatter/gather */
 #define CHUNK_SHIFT 20
@@ -50,29 +34,42 @@ static unsigned mem_size;
 
 /* User defined registers */
 /* <<--regs-->> */
-#define GEMM_DIMM_M_REG 0x40
-#define GEMM_DIMM_N_REG 0x44
-#define GEMM_DIMM_K_REG 0x48
-
-#define GEMM_PROD_VALID_OFFSET 0x4C
-#define GEMM_PROD_READY_OFFSET 0x50
-#define GEMM_CONS_VALID_OFFSET 0x54
-#define GEMM_CONS_READY_OFFSET 0x58
-#define GEMM_INPUT_1_OFFSET 0x5C
-#define GEMM_INPUT_2_OFFSET 0x60
-#define GEMM_OUTPUT_OFFSET 0x64
-
-#define ITERATIONS 1
+#define GEMM_DIM_M_REG_0			0x70
+#define GEMM_DIM_M_REG_1			0x74
+#define GEMM_DIM_M_REG_2			0x78
+#define GEMM_DIM_M_REG_3			0x7C
+#define GEMM_DIM_N_REG_0			0x80
+#define GEMM_DIM_N_REG_1			0x84
+#define GEMM_DIM_N_REG_2			0x88
+#define GEMM_DIM_N_REG_3			0x8C
+#define GEMM_DIM_K_REG_0			0x90
+#define GEMM_DIM_K_REG_1			0x94
+#define GEMM_DIM_K_REG_2			0x98
+#define GEMM_DIM_K_REG_3			0x9C
+#define GEMM_INPUT_QUEUE_BASE_0_0	0xA0
+#define GEMM_INPUT_QUEUE_BASE_0_1	0xA4
+#define GEMM_INPUT_QUEUE_BASE_1_0	0xA8
+#define GEMM_INPUT_QUEUE_BASE_1_1	0xAC
+#define GEMM_INPUT_QUEUE_BASE_2_0	0xB0
+#define GEMM_INPUT_QUEUE_BASE_2_1	0xB4
+#define GEMM_INPUT_QUEUE_BASE_3_0	0xB8
+#define GEMM_INPUT_QUEUE_BASE_3_1	0xBC
+#define GEMM_OUTPUT_QUEUE_BASE_0	0xC0
+#define GEMM_OUTPUT_QUEUE_BASE_1	0xC4
+#define GEMM_OUTPUT_QUEUE_BASE_2	0xC8
+#define GEMM_OUTPUT_QUEUE_BASE_3	0xCC
+#define GEMM_CONTEXT_NPRIO_0		0xD0
+#define GEMM_CONTEXT_NPRIO_1		0xD4
+#define GEMM_CONTEXT_NPRIO_2		0xD8
+#define GEMM_CONTEXT_NPRIO_3		0xDC
+#define GEMM_VALID_CONTEXTS			0xE0
+#define GEMM_SCHED_PERIOD			0xE4
 
 static uint64_t t_start = 0;
 static uint64_t t_end = 0;
 
-uint64_t t_sw_input;
 uint64_t t_sw;
-uint64_t t_sw_output;
-uint64_t t_acc_input;
 uint64_t t_acc;
-uint64_t t_acc_output;
 
 static inline void start_counter() {
 	asm volatile (
@@ -98,91 +95,70 @@ static inline uint64_t end_counter() {
 	return (t_end - t_start);
 }
 
-void sw_run(unsigned *gold)
+void gemm(const unsigned* mat_a, const unsigned* mat_b, unsigned* mat_c, unsigned dim_m, unsigned dim_n, unsigned dim_k) {
+    const unsigned block_size = 16;
+    unsigned sum;
+
+	for (unsigned m = 0; m < dim_m; m += block_size) {
+	    for (unsigned n = 0; n < dim_n; n += block_size) {
+	        for (unsigned k = 0; k < dim_k; k += block_size) {
+
+                unsigned m_rem = (m + block_size < dim_m) ? m + block_size : dim_m;
+                unsigned n_rem = (n + block_size < dim_n) ? n + block_size : dim_n;
+                unsigned k_rem = (k + block_size < dim_k) ? k + block_size : dim_k;
+
+                for (unsigned m_ = m; m_ < m_rem; m_++) {
+                    for (unsigned n_ = n; n_ < n_rem; n_++) {
+                        if (k == 0) sum = 0;
+                        else sum = mat_c[m_ * dim_n + n_];
+                        for (unsigned k_ = k; k_ < k_rem; k_++) {
+							sum += mat_a[m_ * dim_k + k_] * mat_b[n_ * dim_k + k_];
+                        }
+                        mat_c[m_ * dim_n + n_] = sum;
+                    }
+                }
+            }
+        }
+    }
+}
+
+int validate_buffer(unsigned *mem_c, unsigned *gold_c)
 {
-	int j, m, n, k, m_, n_, k_;
-	spandex_token_t in_data;
-    void* src = (void*) gold;
-	const unsigned block_size = 16;
+    unsigned errors = 0;
+    const unsigned len = dim_m * dim_n;
 
-	for (j = 0; j < dim_m * dim_k; j+=2, src+=8) {
-		in_data.value_32_1 = (j+1) % 100;
-		in_data.value_32_2 = (j+2) % 100;
-        write_mem_wtfwd(src, in_data.value_64);
-	}
+    for (unsigned j = 0; j < len; j++) {
+        if (gold_c[j] != mem_c[j]) {
+            if (errors < 10) { printf("\tGOLD[%u] = %d vs %d = out[%u]\n", j, gold_c[j], mem_c[j], j); }
+            errors++;
+        }
+    }
 
-    src = (void*) (gold + in_1_words_adj);
+    printf("\tError for %d values out of %d\n", errors, len);
 
-	for (j = 0; j < dim_n * dim_k; j+=2, src+=8) {
-		in_data.value_32_1 = (j+1) % 100;
-		in_data.value_32_2 = (j+2) % 100;
-        write_mem_wtfwd(src, in_data.value_64);
-	}
+    return errors;
+}
 
-	// Compute golden output
+// Initialize input and calculate golden output
+void init_buffer(unsigned *mem_a, unsigned *mem_b, unsigned *gold_a, unsigned *gold_b, unsigned *gold_c)
+{
+    const unsigned len_a = dim_m * dim_k;
+    const unsigned len_b = dim_n * dim_k;
+
+    for (unsigned j = 0; j < len_a; j++) {
+        gold_a[j] = j % 100;
+        mem_a[j] = j % 100;
+    }
+
+    for (unsigned j = 0; j < len_b; j++) {
+        gold_b[j] = j % 100;
+        mem_b[j] = j % 100;
+    }
+
+    // Compute golden output
 	start_counter();
-	for (m = 0; m < dim_m/block_size; m++) {
-		unsigned in_1_offset = (m * block_size) * dim_k;
-		unsigned local_out_offset = in_1_words_adj + in_2_words_adj + (m * block_size) * dim_n;
-		for (n = 0; n < dim_n/block_size; n++) {
-			unsigned in_2_offset = in_1_words_adj + (n * block_size) * dim_k;
-			unsigned out_block_offset = local_out_offset + n * block_size;
-			for (k = 0; k < dim_k/block_size; k++) {
-				unsigned in_1_block_offset = in_1_offset + k * block_size;
-				unsigned in_2_block_offset = in_2_offset + k * block_size;
-				for (m_ = 0; m_ < block_size; m_++) {
-					unsigned in_1_elem_offset = in_1_block_offset + m_ * dim_k;
-					unsigned out_elem_offset = out_block_offset + m_ * dim_n;
-					for (n_ = 0; n_ < block_size; n_++) {
-						unsigned in_2_elem_offset = in_2_block_offset + n_ * dim_k;
-						for (k_ = 0; k_ < block_size; k_++) {
-							gold[out_elem_offset + n_] += gold[in_1_elem_offset + k_] * gold[in_2_elem_offset + k_];
-						}
-					}
-				}
-			}
-		}
-	}
+    gemm(gold_a, gold_b, gold_c, dim_m, dim_n, dim_k);
 	t_sw += end_counter();
-}
-
-int validate_buf(unsigned *out, unsigned *gold)
-{
-	int j;
-	unsigned errors = 0;
-
-	spandex_token_t out_data;
-    void* src = (void*) out;
-
-	for (j = 0; j < dim_m * dim_n; j+=2, src+=8) {
-        out_data.value_64 = read_mem_reqodata(src);
-		if (out_data.value_32_1 != gold[in_1_words_adj + in_2_words_adj + j]) errors++;
-		if (out_data.value_32_2 != gold[in_1_words_adj + in_2_words_adj + j + 1]) errors++;
-	}
-
-	return errors;
-}
-
-void init_buf(unsigned *in)
-{
-	int j;
-	
-	spandex_token_t in_data;
-    void* src = (void*) in;
-
-	for (j = 0; j < dim_m * dim_k; j+=2, src+=8) {
-		in_data.value_32_1 = (j+1) % 100;
-		in_data.value_32_2 = (j+2) % 100;
-        write_mem_wtfwd(src, in_data.value_64);
-	}
-
-    src = (void*) (in + in_1_words_adj);
-
-	for (j = 0; j < dim_n * dim_k; j+=2, src+=8) {
-		in_data.value_32_1 = (j+1) % 100;
-		in_data.value_32_2 = (j+2) % 100;
-        write_mem_wtfwd(src, in_data.value_64);
-	}
 }
 
 int main(int argc, char * argv[])
@@ -201,23 +177,23 @@ int main(int argc, char * argv[])
 	unsigned coherence;
 
 	printf("dim_m %u dim_n %u dim_k %u\n", dim_m, dim_n, dim_k);
-	if (DMA_WORD_PER_BEAT(sizeof(unsigned)) == 0) {
-		in_1_words_adj = dim_m * dim_k;
-		in_2_words_adj = dim_n * dim_k;
-		out_words_adj = dim_m * dim_n;
-	} else {
-		in_1_words_adj = round_up(dim_m * dim_k, DMA_WORD_PER_BEAT(sizeof(unsigned)));
-		in_2_words_adj = round_up(dim_n * dim_k, DMA_WORD_PER_BEAT(sizeof(unsigned)));
-		out_words_adj = round_up(dim_m * dim_n, DMA_WORD_PER_BEAT(sizeof(unsigned)));
-	}
-	in_len = in_1_words_adj + in_2_words_adj + SYNC_VAR_SIZE;
-	out_len = out_words_adj + SYNC_VAR_SIZE;
-	in_size = in_len * sizeof(unsigned);
-	out_size = out_len * sizeof(unsigned);
-	out_offset  = in_len;
-	mem_size = (out_offset * sizeof(unsigned)) + out_size;
+    unsigned flag_len = PAYLOAD_OFFSET/sizeof(unsigned); // Number of unsigned elements reserved for flags
+    unsigned mat_a_len = flag_len + (dim_m * dim_k);
+    unsigned mat_b_len = flag_len + (dim_n * dim_k);
+    unsigned mat_c_len = flag_len + (dim_m * dim_n);
 
-	printf("ilen %u isize %u o_off %u olen %u osize %u msize %u\n", in_len, out_len, in_size, out_size, out_offset, mem_size);
+    // Data offsets
+    unsigned mat_a_offset = flag_len;
+    unsigned mat_b_offset = mat_a_offset + mat_a_len;
+    unsigned mat_c_offset = mat_b_offset + mat_b_len;
+
+    // Sync flag offsets
+    unsigned mat_a_valid_offset = VALID_OFFSET;
+    unsigned mat_b_valid_offset = mat_a_valid_offset + mat_a_len;
+    unsigned mat_c_valid_offset = mat_b_valid_offset + mat_b_len;
+	
+    unsigned mem_size = (mat_c_offset + mat_c_len) * sizeof(unsigned);
+
 	// Search for the device
 	ndev = probe(&espdevs, VENDOR_SLD, SLD_GEMM, DEV_NAME);
 	if (ndev == 0) {
@@ -225,146 +201,106 @@ int main(int argc, char * argv[])
 		return 0;
 	}
 
-	t_sw_input = 0;
 	t_sw = 0;
-	t_sw_output = 0;
-	t_acc_input = 0;
 	t_acc = 0;
-	t_acc_output = 0;
 
-	// Program sync flags
-	unsigned cons_rdy_flag_offset = 0*in_len + READY_FLAG_OFFSET;
-	unsigned cons_vld_flag_offset = 0*in_len + VALID_FLAG_OFFSET;
-	unsigned prod_rdy_flag_offset = 1*in_len + READY_FLAG_OFFSET;
-	unsigned prod_vld_flag_offset = 1*in_len + VALID_FLAG_OFFSET;
+	printf("**************** %s.0 ****************\n", DEV_NAME);
 
-	n = 0;
-	{
-		printf("**************** %s.%d ****************\n", DEV_NAME, n);
+	dev = &espdevs[0];
 
-		dev = &espdevs[n];
-
-		// Check DMA capabilities
-		if (ioread32(dev, PT_NCHUNK_MAX_REG) == 0) {
-			printf("  -> scatter-gather DMA is disabled. Abort.\n");
-			return 0;
-		}
-
-		if (ioread32(dev, PT_NCHUNK_MAX_REG) < NCHUNK(mem_size)) {
-			printf("  -> Not enough TLB entries available. Abort.\n");
-			return 0;
-		}
-
-		// Allocate memory
-		gold = aligned_malloc((in_len + out_len) * sizeof(unsigned));
-		mem = aligned_malloc(mem_size);
-
-		// Allocate and populate page table
-		ptable = aligned_malloc(NCHUNK(mem_size) * sizeof(unsigned *));
-		for (i = 0; i < NCHUNK(mem_size); i++)
-			ptable[i] = (unsigned *) &mem[i * (CHUNK_SIZE / sizeof(unsigned))];
-
-		// Reset all sync variables to default values.
-		UpdateSync((void*) &mem[cons_vld_flag_offset], 0);
-		UpdateSync((void*) &mem[cons_rdy_flag_offset], 1);
-		UpdateSync((void*) &mem[END_FLAG_OFFSET], 0);
-		UpdateSync((void*) &mem[prod_vld_flag_offset], 0);
-		UpdateSync((void*) &mem[prod_rdy_flag_offset], 1);
-
-		sw_run(gold);
-
-		{
-			/* TODO: Restore full test once ESP caches are integrated */
-			coherence = ACC_COH_RECALL;
-
-			// Pass common configuration parameters
-			start_counter();
-			iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
-			iowrite32(dev, COHERENCE_REG, coherence);
-
-			iowrite32(dev, PT_ADDRESS_REG, (unsigned long long) ptable);
-			iowrite32(dev, PT_NCHUNK_REG, NCHUNK(mem_size));
-			iowrite32(dev, PT_SHIFT_REG, CHUNK_SHIFT);
-
-			// Use the following if input and output data are not allocated at the default offsets
-			iowrite32(dev, SRC_OFFSET_REG, 0x0);
-			iowrite32(dev, DST_OFFSET_REG, 0x0);
-
-			// Pass accelerator-specific configuration parameters
-			/* <<--regs-config-->> */
-			iowrite32(dev, GEMM_DIMM_M_REG, dim_m);
-			iowrite32(dev, GEMM_DIMM_N_REG, dim_n);
-			iowrite32(dev, GEMM_DIMM_K_REG, dim_k);
-
-			iowrite32(dev, GEMM_PROD_VALID_OFFSET, cons_vld_flag_offset);
-			iowrite32(dev, GEMM_PROD_READY_OFFSET, cons_rdy_flag_offset);
-			iowrite32(dev, GEMM_CONS_VALID_OFFSET, prod_vld_flag_offset);
-			iowrite32(dev, GEMM_CONS_READY_OFFSET, prod_rdy_flag_offset);
-			iowrite32(dev, GEMM_INPUT_1_OFFSET, SYNC_VAR_SIZE);
-			iowrite32(dev, GEMM_INPUT_2_OFFSET, in_1_words_adj + SYNC_VAR_SIZE);
-			iowrite32(dev, GEMM_OUTPUT_OFFSET, in_len + SYNC_VAR_SIZE);
-
-			// Flush (customize coherence model here)
-			esp_flush(coherence);
-
-			// Start accelerators
-			iowrite32(dev, CMD_REG, CMD_MASK_START);
-
-			for (i = 0; i < ITERATIONS; i++)
-			{
-				// Wait for the accelerator to be ready
-				SpinSync((void*) &mem[cons_rdy_flag_offset], 1);
-				// Reset flag for the next iteration
-				UpdateSync((void*) &mem[cons_rdy_flag_offset], 0);
-				// When the accelerator is ready, we write the input data to it
-				init_buf(&mem[SYNC_VAR_SIZE]);
-
-				if (i == ITERATIONS - 1) {
-					UpdateSync((void*) &mem[END_FLAG_OFFSET], 1);
-				}
-
-				// Inform the accelerator to start.
-				UpdateSync((void*) &mem[cons_vld_flag_offset], 1);
-				t_acc_input += end_counter();
-
-				start_counter();
-				// Wait for the accelerator to send output.
-				SpinSync((void*) &mem[prod_vld_flag_offset], 1);
-				// Reset flag for next iteration.
-				UpdateSync((void*) &mem[prod_vld_flag_offset], 0);
-				t_acc += end_counter();
-
-				start_counter();
-				errors += validate_buf(&mem[in_len + SYNC_VAR_SIZE], gold);
-				// Inform the accelerator - ready for next iteration.
-				UpdateSync((void*) &mem[prod_rdy_flag_offset], 1);
-				t_acc_output += end_counter();
-			}
-
-			// Wait for completion
-			done = 0;
-			spin_ct = 0;
-			while (!done) {
-				done = ioread32(dev, STATUS_REG);
-				done &= STATUS_MASK_DONE;
-				spin_ct++;
-			}
-			iowrite32(dev, CMD_REG, 0x0);
-			t_acc += end_counter();
-		}
-
-		aligned_free(ptable);
-		aligned_free(mem);
-		aligned_free(gold);
-
-		printf("  Errors = %d\n", errors);
-		printf("  Software Input = %lu\n", t_sw_input);
-		printf("  Software = %lu\n", t_sw);
-		printf("  Software Output = %lu\n", t_sw_output);
-		printf("  Accel Input = %lu\n", t_acc_input/ITERATIONS);
-		printf("  Accel = %lu\n", t_acc/ITERATIONS);
-		printf("  Accel Output = %lu\n", t_acc_output/ITERATIONS);
+	// Check DMA capabilities
+	if (ioread32(dev, PT_NCHUNK_MAX_REG) == 0) {
+		printf("  -> scatter-gather DMA is disabled. Abort.\n");
+		return 0;
 	}
+
+	if (ioread32(dev, PT_NCHUNK_MAX_REG) < NCHUNK(mem_size)) {
+		printf("  -> Not enough TLB entries available. Abort.\n");
+		return 0;
+	}
+
+	// Allocate memory
+	gold = aligned_malloc((mat_c_offset + mat_c_len) * sizeof(unsigned));
+	mem = aligned_malloc(mem_size);
+
+	// Allocate and populate page table
+	ptable = aligned_malloc(NCHUNK(mem_size) * sizeof(unsigned *));
+	for (i = 0; i < NCHUNK(mem_size); i++)
+		ptable[i] = (unsigned *) &mem[i * (CHUNK_SIZE / sizeof(unsigned))];
+
+	coherence = ACC_COH_RECALL;
+
+    // We will cast the synchronization flags from *mem to custom atomic flags
+    atomic_flag_t input_a_flag;
+    atomic_flag_t input_b_flag;
+    atomic_flag_t output_flag;
+	atomic_flag_init(&input_a_flag, (volatile uint64_t *) &mem[mat_a_valid_offset]);
+	atomic_flag_init(&input_b_flag, (volatile uint64_t *) &mem[mat_b_valid_offset]);
+	atomic_flag_init(&output_flag, (volatile uint64_t *) &mem[mat_c_valid_offset]);
+
+	// Pass common configuration parameters
+	iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
+	iowrite32(dev, COHERENCE_REG, coherence);
+
+	iowrite32(dev, PT_ADDRESS_REG, (unsigned long long) ptable);
+	iowrite32(dev, PT_NCHUNK_REG, NCHUNK(mem_size));
+	iowrite32(dev, PT_SHIFT_REG, CHUNK_SHIFT);
+
+	// Use the following if input and output data are not allocated at the default offsets
+	iowrite32(dev, SRC_OFFSET_REG, 0x0);
+	iowrite32(dev, DST_OFFSET_REG, 0x0);
+
+	// Pass accelerator-specific configuration parameters
+	/* <<--regs-config-->> */
+	iowrite32(dev, GEMM_DIM_M_REG_0, dim_m);
+	iowrite32(dev, GEMM_DIM_N_REG_0, dim_n);
+	iowrite32(dev, GEMM_DIM_K_REG_0, dim_k);
+	iowrite32(dev, GEMM_INPUT_QUEUE_BASE_0_0, mat_a_valid_offset);
+	iowrite32(dev, GEMM_INPUT_QUEUE_BASE_0_1, mat_b_valid_offset);
+	iowrite32(dev, GEMM_OUTPUT_QUEUE_BASE_0, mat_c_valid_offset);
+	iowrite32(dev, PT_ADDRESS_REG_0, (unsigned long long) ptable);
+	iowrite32(dev, GEMM_CONTEXT_NPRIO_0, 1);
+	iowrite32(dev, GEMM_VALID_CONTEXTS, 0x1);
+	iowrite32(dev, GEMM_SCHED_PERIOD, 0x100000);
+
+	// Flush (customize coherence model here)
+	esp_flush(coherence);
+
+	// Start accelerators
+	iowrite32(dev, CMD_REG, CMD_MASK_START);
+
+    const unsigned iterations = 1000;
+
+    for (unsigned i = 0; i < iterations; i++) {
+        printf("[APP] Starting iteration %d!\n", i);
+
+		// Accelerator is implicitly ready because computation is chained
+        init_buffer(&mem[mat_a_offset], &mem[mat_b_offset],
+                    &gold[mat_a_offset], &gold[mat_b_offset], &gold[mat_c_offset]);
+		// Inform the accelerator to start.
+		atomic_flag_store(&input_a_flag, 1);
+		atomic_flag_store(&input_b_flag, 1);
+
+		// Wait for the accelerator to send output.
+		start_counter();
+		while(atomic_flag_load(&output_flag) != 1);
+		t_acc += end_counter();
+		errors += validate_buffer(&mem[mat_c_offset], &gold[mat_c_offset]);
+
+		// Reset for next iteration.
+		atomic_flag_store(&output_flag, 0);
+    }
+
+	// Wait for completion
+	iowrite32(dev, CMD_REG, 0x0);
+
+	aligned_free(ptable);
+	aligned_free(mem);
+	aligned_free(gold);
+
+	printf("  Errors = %d\n", errors);
+	printf("  Software = %lu\n", t_sw/iterations);
+	printf("  Accel = %lu\n", t_acc/iterations);
 
 	return 0;
 }

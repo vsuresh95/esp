@@ -260,99 +260,98 @@ void gemm::compute_kernel()
 
         // Compute GeMM
         {
-            // Number of tiles -- to perform computation over registers
-            uint32_t num_blocks_m = (dim_m == BLOCK_SIZE) ? 1 : dim_m/BLOCK_SIZE;
-            uint32_t num_blocks_n = (dim_n == BLOCK_SIZE) ? 1 : dim_n/BLOCK_SIZE;
-            uint32_t num_blocks_k = (dim_k == BLOCK_SIZE) ? 1 : dim_k/BLOCK_SIZE;
-
             // Iterate over register block across M dimension
-            for (uint32_t m_block = 0; m_block < num_blocks_m; m_block++)
+            for (unsigned block_m = 0; block_m < dim_m; block_m += BLOCK_SIZE)
             {
-                uint32_t in_1_offset = (m_block * BLOCK_SIZE) * dim_k;
-                uint32_t out_offset = (m_block * BLOCK_SIZE) * dim_n;
-
                 // Iterate over register block across N dimension
-                for (uint32_t n_block = 0; n_block < num_blocks_n; n_block++)
+                for (unsigned block_n = 0; block_n < dim_n; block_n += BLOCK_SIZE)
                 {
-                    uint32_t in_2_offset = (n_block * BLOCK_SIZE) * dim_k;
-                    uint32_t out_block_offset = out_offset + n_block * BLOCK_SIZE;
-
                     // Iterate over register block across K dimension
-                    for (uint32_t k_block = 0; k_block < num_blocks_k; k_block++)
-                    {                  
-                        uint32_t regs_1[BLOCK_SIZE];
-                        uint32_t regs_2[BLOCK_SIZE];
-                        uint32_t regs_mul[BLOCK_SIZE];
-                        uint32_t regs_acc;                        
-                        HLS_FLATTEN_ARRAY(regs_1);
-                        HLS_FLATTEN_ARRAY(regs_2);
+                    for (unsigned block_k = 0; block_k < dim_k; block_k += BLOCK_SIZE)
+                    { 
+                        unsigned regs_m[BLOCK_SIZE];
+                        unsigned regs_n[BLOCK_SIZE];
+                        unsigned regs_mul[BLOCK_SIZE];
+                        unsigned regs_valid[BLOCK_SIZE];
+                        unsigned regs_acc;     
+                        HLS_FLATTEN_ARRAY(regs_m);
+                        HLS_FLATTEN_ARRAY(regs_n);
                         HLS_FLATTEN_ARRAY(regs_mul);
+                        HLS_FLATTEN_ARRAY(regs_valid);
 
-                        uint32_t in_1_block_offset = in_1_offset + k_block * BLOCK_SIZE;
-                        uint32_t in_2_block_offset = in_2_offset + k_block * BLOCK_SIZE;
+                        // If the remainder of is not a multiple of block_size, we will zero out
+                        // the read elements with a valid vector
+                        for (unsigned elem_k = 0; elem_k < BLOCK_SIZE; elem_k++)
+                        {
+                            regs_valid[elem_k] = (block_k + elem_k < dim_k) ? 1 : 0;
+                        }
 
                         // Perform block-level multiply - M dimension
-                        for (uint32_t row_m = 0; row_m < BLOCK_SIZE; row_m++)
+                        for (unsigned row_m = 0; row_m < BLOCK_SIZE; row_m++)
                         {
-                            uint32_t in_1_elem_offset = in_1_block_offset + row_m * dim_k;
-                            uint32_t out_elem_offset = out_block_offset + row_m * dim_n;
+                            unsigned elem_m = block_m + row_m;
+                            unsigned idx_mk = (elem_m * dim_k) + block_k;
+
+                            // If the remainder is not a multiple of block_size, break out of the loop
+                            if (elem_m >= dim_m) continue;
 
                             // read Mth block across K dimension of matrix 1 from PLM into a register array
-                            for (int elem_k = 0; elem_k < BLOCK_SIZE; elem_k++)
+                            for (unsigned elem_k = 0; elem_k < BLOCK_SIZE; elem_k++)
                             {
                                 HLS_UNROLL_LOOP(ON, "read_plm_m");
                                 HLS_BREAK_ARRAY_DEPENDENCY(plm_in_1);
-
-                                uint32_t in_1_index = in_1_elem_offset + elem_k;
-                                regs_1[elem_k] = plm_in_1[in_1_index];
+                                regs_m[elem_k] = regs_valid[elem_k] * plm_in_1[idx_mk + elem_k];
                             }
 
                             // Perform block-level multiply - N dimension
-                            for (uint32_t row_n = 0; row_n < BLOCK_SIZE; row_n++)
+                            for (unsigned row_n = 0; row_n < BLOCK_SIZE; row_n++)
                             {
-                                uint32_t in_2_elem_offset = in_2_block_offset + row_n * dim_k;
+                                unsigned elem_n = block_n + row_n;
+                                unsigned idx_nk = (elem_n * dim_k) + block_k;
 
+                                unsigned idx_mn = (elem_m * dim_n) + elem_n;
+
+                                // If the remainder is not a multiple of block_size, break out of the loop
+                                if (elem_n >= dim_n) continue;
+                                
                                 // read Nth block across K dimension of matrix 2 from PLM into a register array
-                                for (int elem_k = 0; elem_k < BLOCK_SIZE; elem_k++)
+                                for (unsigned elem_k = 0; elem_k < BLOCK_SIZE; elem_k++)
                                 {
                                     HLS_UNROLL_LOOP(ON, "read_plm_n");
                                     HLS_BREAK_ARRAY_DEPENDENCY(plm_in_2);
-
-                                    uint32_t in_2_index = in_2_elem_offset + elem_k;
-                                    regs_2[elem_k] = plm_in_2[in_2_index];
+                                    regs_n[elem_k] = regs_valid[elem_k] * plm_in_2[idx_nk + elem_k];
                                 }
 
                                 // multiply all elements stored in regs_1 and regs_2
-                                for (uint32_t mul = 0; mul < BLOCK_SIZE; mul++)
+                                for (unsigned elem_k = 0; elem_k < BLOCK_SIZE; elem_k++)
                                 {
                                     HLS_UNROLL_LOOP(ON, "multiply_k");
-                                    regs_mul[mul] = regs_1[mul] * regs_2[mul];
+                                    regs_mul[elem_k] = regs_m[elem_k] * regs_n[elem_k];
                                 }
 
                                 // read the previous partial sum, or not
-                                if (k_block == 0)
+                                if (block_k == 0)
                                 {
                                     regs_acc = 0;
                                 }
                                 else
                                 {
-                                    uint32_t out_index = out_elem_offset + row_n;
-                                    regs_acc = plm_out[out_index];
+                                    regs_acc = plm_out[idx_mn];
                                 }
 
                                 // Accumulate all products
-                                for (uint32_t mul = 0; mul < BLOCK_SIZE; mul++)
+                                for (unsigned elem_k = 0; elem_k < BLOCK_SIZE; elem_k++)
                                 {
                                     HLS_UNROLL_LOOP(ON, "accumulate_k_0");
-                                    regs_acc += regs_mul[mul];
+                                    regs_acc += regs_mul[elem_k];
                                 }
 
                                 // write the partial sum to PLM
                                 {
-                                    uint32_t out_index = out_elem_offset + row_n;
-                                    plm_out[out_index] = regs_acc;
+                                    plm_out[idx_mn] = regs_acc;
+
                                 }
-                            }                                  
+                            }
                         }
                     }
                 }

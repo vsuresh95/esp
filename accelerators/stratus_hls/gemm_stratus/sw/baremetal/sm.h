@@ -1,99 +1,44 @@
 // Size and parameter defines
-#define SYNC_VAR_SIZE 10
-#define UPDATE_VAR_SIZE 2
-#define VALID_FLAG_OFFSET 0
-#define END_FLAG_OFFSET 2
-#define READY_FLAG_OFFSET 4
+#define VALID_OFFSET 0
+#define PAYLOAD_OFFSET 8
 
-static inline void write_mem (void* dst, int64_t value_64)
-{
-	asm volatile (
-		"mv t0, %0;"
-		"mv t1, %1;"
-		".word " QU(WRITE_CODE)
-		:
-		: "r" (dst), "r" (value_64)
-		: "t0", "t1", "memory"
-	);
-}
+// Custom implementation of atomic flag for performance
+typedef struct {
+    volatile uint64_t *flag;
+} atomic_flag_t;
 
-static inline int64_t read_mem (void* dst)
-{
-	int64_t value_64;
+uint64_t atomic_flag_load(atomic_flag_t *atom) {
+	uint64_t val;
 
 	asm volatile (
 		"mv t0, %1;"
-		".word " QU(READ_CODE) ";"
-		"mv %0, t1"
-		: "=r" (value_64)
-		: "r" (dst)
+		"lr.d.aq t1, (t0);"
+		"mv %0, t1;"
+		: "=r" (val)
+		: "r" (atom->flag)
 		: "t0", "t1", "memory"
-	);
+		);
 
-	return value_64;
+	return val;
 }
 
-static inline void write_mem_wtfwd (void* dst, int64_t value_64)
-{
-	asm volatile (
-		"mv t0, %0;"
-		"mv t1, %1;"
-		".word " QU(WRITE_CODE_WTFWD)
-		// ".word " QU(WRITE_CODE)
-		:
-		: "r" (dst), "r" (value_64)
-		: "t0", "t1", "memory"
-	);
-}
-
-static inline int64_t read_mem_reqv (void* dst)
-{
-	int64_t value_64;
+void atomic_flag_store(atomic_flag_t *atom, uint64_t val) {
+	uint64_t old_val;
 
 	asm volatile (
-		"mv t0, %1;"
-		".word " QU(READ_CODE_REQV) ";"
-		"mv %0, t1"
-		: "=r" (value_64)
-		: "r" (dst)
-		: "t0", "t1", "memory"
-	);
-
-	return value_64;
+		"mv t0, %2;"
+		"mv t2, %1;"
+		"amoswap.d.aqrl t1, t0, (t2);"
+		"mv %0, t1;"
+		: "=r" (old_val)
+		: "r" (atom->flag), "r" (val)
+		: "t0", "t1", "t2", "memory"
+		);
 }
 
-static inline int64_t read_mem_reqodata (void* dst)
-{
-	int64_t value_64;
-
-	asm volatile (
-		"mv t0, %1;"
-		".word " QU(READ_CODE_REQODATA) ";"
-		// ".word " QU(READ_CODE) ";"
-		"mv %0, t1"
-		: "=r" (value_64)
-		: "r" (dst)
-		: "t0", "t1", "memory"
-	);
-
-	return value_64;
+void atomic_flag_init(atomic_flag_t *atom, volatile uint64_t *f) {
+	atom->flag = f;
+	printf("flag = %p\n", atom->flag);
+	atomic_flag_store(atom, 0);
 }
 
-void UpdateSync(void* sync, int64_t UpdateValue) {
-	asm volatile ("fence w, w");
-
-	// Need to cast to void* for extended ASM code.
-	write_mem_wtfwd((void *) sync, UpdateValue);
-
-	asm volatile ("fence w, w");
-}
-
-void SpinSync(void* sync, int64_t SpinValue) {
-	int64_t ExpectedValue = SpinValue;
-	int64_t ActualValue = 0xcafedead;
-
-	while (ActualValue != ExpectedValue) {
-		// Need to cast to void* for extended ASM code.
-		ActualValue = read_mem_reqodata((void *) sync);
-	}
-}
