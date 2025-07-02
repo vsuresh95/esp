@@ -20,23 +20,20 @@
 struct gemm_stratus_access {
 	struct esp_access esp;
 	/* <<--regs-->> */
-	unsigned do_inverse;
-	unsigned logn_samples;
-	unsigned do_shift;
+    unsigned dim_m;
+    unsigned dim_n;
+    unsigned dim_k;
 
-	// ASI sync flag offsets
-    unsigned prod_valid_offset;
-    unsigned prod_ready_offset;
-    unsigned cons_valid_offset;
-    unsigned cons_ready_offset;
-    unsigned input_offset;
-    unsigned output_offset;
-
-	unsigned src_offset;
-	unsigned dst_offset;
-    unsigned spandex_conf;
+    // Input/output offsets
+    unsigned input_1_queue_base;
+    unsigned input_2_queue_base;
+    unsigned output_queue_base;
 };
 
-#define GEMM_STRATUS_IOC_ACCESS	_IOW ('S', 0, struct gemm_stratus_access)
+#define GEMM_STRATUS_IOC_ACCESS			_IOW ('S', 0, struct gemm_stratus_access)
+#define GEMM_STRATUS_INIT_IOC_ACCESS	_IOW ('S', 1, struct gemm_stratus_access)
+#define GEMM_STRATUS_ADD_IOC_ACCESS		_IOW ('S', 2, struct gemm_stratus_access)
+#define GEMM_STRATUS_DEL_IOC_ACCESS		_IOW ('S', 3, struct gemm_stratus_access)
+#define GEMM_STRATUS_PRIO_IOC_ACCESS	_IOW ('S', 4, struct gemm_stratus_access)
 
 #endif /* _GEMM_STRATUS_H_ */

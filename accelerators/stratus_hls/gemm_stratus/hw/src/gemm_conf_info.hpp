@@ -6,6 +6,11 @@
 
 #include <systemc.h>
 
+#define N_INPUTS 2
+#define N_OUTPUTS 1
+#define N_CONTEXTS 4
+#define N_CONTEXTS_BITS 2
+
 //
 // Configuration parameters for the accelerator.
 //
@@ -19,59 +24,69 @@ public:
     conf_info_t()
     {
         /* <<--ctor-->> */
-        this->dim_m = 1;
-        this->dim_n = 1;
-        this->dim_k = 1;
-        this->prod_valid_offset = 0;
-        this->prod_ready_offset = 0;
-        this->cons_valid_offset = 0;
-        this->cons_ready_offset = 0;
-        this->input_1_offset = 0;
-        this->input_2_offset = 0;
-        this->output_offset = 0;
+        for (int i = 0; i < N_CONTEXTS; i++) {
+            this->dim_m[i] = 1;
+            this->dim_n[i] = 1;
+            this->dim_k[i] = 1;
+            for (int j = 0; j < N_INPUTS; j++) {
+                this->input_queue_base[i][j] = 0;
+            }
+            for (int j = 0; j < N_OUTPUTS; j++) {
+                this->output_queue_base[i][j] = 0;
+            }
+            this->context_nprio[i] = 0;
+        }
+        this->valid_contexts = 0;
+        this->sched_period = 0;
     }
 
     conf_info_t(
         /* <<--ctor-args-->> */
-        int32_t dim_m, 
-        int32_t dim_n, 
-        int32_t dim_k,
-        int32_t prod_valid_offset,
-        int32_t prod_ready_offset,
-        int32_t cons_valid_offset,
-        int32_t cons_ready_offset,
-        int32_t input_1_offset,
-        int32_t input_2_offset,
-        int32_t output_offset
+        int32_t dim_m[N_CONTEXTS], 
+        int32_t dim_n[N_CONTEXTS], 
+        int32_t dim_k[N_CONTEXTS],
+        int32_t input_queue_base[N_CONTEXTS][N_INPUTS],
+        int32_t output_queue_base[N_CONTEXTS][N_OUTPUTS],
+        int32_t context_nprio[N_CONTEXTS],
+        int32_t valid_contexts,
+        int32_t sched_period
         )
     {
         /* <<--ctor-custom-->> */
-        this->dim_m = dim_m;
-        this->dim_n = dim_n;
-        this->dim_k = dim_k;
-        this->prod_valid_offset = prod_valid_offset;
-        this->prod_ready_offset = prod_ready_offset;
-        this->cons_valid_offset = cons_valid_offset;
-        this->cons_ready_offset = cons_ready_offset;
-        this->input_1_offset = input_1_offset;
-        this->input_2_offset = input_2_offset;
-        this->output_offset = output_offset;
+        for (int i = 0; i < N_CONTEXTS; i++) {
+            this->dim_m[i] = dim_m[i];
+            this->dim_n[i] = dim_n[i];
+            this->dim_k[i] = dim_k[i];
+            for (int j = 0; j < N_INPUTS; j++) {
+                this->input_queue_base[i][j] = input_queue_base[i][j];
+            }
+            for (int j = 0; j < N_OUTPUTS; j++) {
+                this->output_queue_base[i][j] = output_queue_base[i][j];
+            }
+            this->context_nprio[i] = context_nprio[i];
+        }
+        this->valid_contexts = valid_contexts;
+        this->sched_period = sched_period;
     }
 
     // equals operator
     inline bool operator==(const conf_info_t &rhs) const
     {
         /* <<--eq-->> */
-        if (dim_m != rhs.dim_m) return false;
-        if (dim_n != rhs.dim_n) return false;
-        if (dim_k != rhs.dim_k) return false;
-        if (prod_valid_offset != rhs.prod_valid_offset) return false;
-        if (prod_ready_offset != rhs.prod_ready_offset) return false;
-        if (cons_valid_offset != rhs.cons_valid_offset) return false;
-        if (cons_ready_offset != rhs.cons_valid_offset) return false;
-        if (input_1_offset != rhs.input_1_offset) return false;
-        if (input_2_offset != rhs.input_2_offset) return false;
-        if (output_offset != rhs.output_offset) return false;
+        for (int i = 0; i < N_CONTEXTS; i++) {
+            if (dim_m[i] != rhs.dim_m[i]) return false;
+            if (dim_n[i] != rhs.dim_n[i]) return false;
+            if (dim_k[i] != rhs.dim_k[i]) return false;
+            for (int j = 0; j < N_INPUTS; j++) {
+                if (input_queue_base[i][j] != rhs.input_queue_base[i][j]) return false;
+            }
+            for (int j = 0; j < N_OUTPUTS; j++) {
+                if (output_queue_base[i][j] != rhs.output_queue_base[i][j]) return false;
+            }
+            if (context_nprio[i] != rhs.context_nprio[i]) return false;
+        }
+        if (valid_contexts != rhs.valid_contexts) return false;
+        if (sched_period != rhs.sched_period) return false;
         return true;
     }
 
@@ -79,16 +94,20 @@ public:
     inline conf_info_t& operator=(const conf_info_t& other)
     {
         /* <<--assign-->> */
-        dim_m = other.dim_m;
-        dim_n = other.dim_n;
-        dim_k = other.dim_k;
-        prod_valid_offset = other.prod_valid_offset;
-        prod_ready_offset = other.prod_ready_offset;
-        cons_valid_offset = other.cons_valid_offset;
-        cons_ready_offset = other.cons_ready_offset;
-        input_1_offset = other.input_1_offset;
-        input_2_offset = other.input_2_offset;
-        output_offset = other.output_offset;
+        for (int i = 0; i < N_CONTEXTS; i++) {
+            dim_m[i] = other.dim_m[i];
+            dim_n[i] = other.dim_n[i];
+            dim_k[i] = other.dim_k[i];
+            for (int j = 0; j < N_INPUTS; j++) {
+                input_queue_base[i][j] = other.input_queue_base[i][j];
+            }
+            for (int j = 0; j < N_OUTPUTS; j++) {
+                output_queue_base[i][j] = other.output_queue_base[i][j];
+            }
+            context_nprio[i] = other.context_nprio[i];
+        }
+        valid_contexts = other.valid_contexts;
+        valid_contexts = other.valid_contexts;
         return *this;
     }
 
@@ -101,31 +120,19 @@ public:
     {
         os << "{";
         /* <<--print-->> */
-        os << "dim_m = " << conf_info.dim_m << ", ";
-        os << "dim_n = " << conf_info.dim_n << ", ";
-        os << "dim_k = " << conf_info.dim_k << ", ";
-        os << "prod_valid_offset = " << conf_info.prod_valid_offset << ", ";
-        os << "prod_ready_offset = " << conf_info.prod_ready_offset << ", ";
-        os << "cons_valid_offset = " << conf_info.cons_valid_offset << ", ";
-        os << "cons_ready_offset = " << conf_info.cons_ready_offset << ", ";
-        os << "input_1_offset = " << conf_info.input_1_offset << ", ";
-        os << "input_2_offset = " << conf_info.input_2_offset << ", ";
-        os << "output_offset = " << conf_info.output_offset << "";
         os << "}";
         return os;
     }
 
         /* <<--params-->> */
-        int32_t dim_m;
-        int32_t dim_n;
-        int32_t dim_k;
-        int32_t prod_valid_offset;
-        int32_t prod_ready_offset;
-        int32_t cons_valid_offset;
-        int32_t cons_ready_offset;
-        int32_t input_1_offset;
-        int32_t input_2_offset;
-        int32_t output_offset;
+        int32_t dim_m[N_CONTEXTS];
+        int32_t dim_n[N_CONTEXTS];
+        int32_t dim_k[N_CONTEXTS];
+        int32_t input_queue_base[N_CONTEXTS][N_INPUTS];
+        int32_t output_queue_base[N_CONTEXTS][N_OUTPUTS];
+        int32_t context_nprio[N_CONTEXTS];
+        int32_t valid_contexts;
+        int32_t sched_period;
 };
 
 #endif // __GEMM_CONF_INFO_HPP__

@@ -1,15 +1,35 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <sld>
   <accelerator name="gemm" desc="Accelerator GEMM" data_size="4" device_id="051" hls_tool="stratus_hls">
-    <param name="dim_m" desc="dim_m" />
-    <param name="dim_n" desc="dim_n" />
-    <param name="dim_k" desc="dim_k" />
-    <param name="prod_valid_offset" desc="prod_valid_offset" />
-    <param name="prod_ready_offset" desc="prod_ready_offset" />
-    <param name="cons_valid_offset" desc="cons_valid_offset" />
-    <param name="cons_ready_offset" desc="cons_ready_offset" />
-    <param name="input_1_offset" desc="input_1_offset" />
-    <param name="input_2_offset" desc="input_2_offset" />
-    <param name="output_offset" desc="output_offset" />
+    <param name="dim_m_0" desc="dim_m_0" />
+    <param name="dim_m_1" desc="dim_m_1" />
+    <param name="dim_m_2" desc="dim_m_2" />
+    <param name="dim_m_3" desc="dim_m_3" />
+    <param name="dim_n_0" desc="dim_n_0" />
+    <param name="dim_n_1" desc="dim_n_1" />
+    <param name="dim_n_2" desc="dim_n_2" />
+    <param name="dim_n_3" desc="dim_n_3" />
+    <param name="dim_k_0" desc="dim_k_0" />
+    <param name="dim_k_1" desc="dim_k_1" />
+    <param name="dim_k_2" desc="dim_k_2" />
+    <param name="dim_k_3" desc="dim_k_3" />
+    <param name="input_queue_base_0_0" desc="input_queue_base_0_0" />
+    <param name="input_queue_base_0_1" desc="input_queue_base_0_1" />
+    <param name="input_queue_base_1_0" desc="input_queue_base_1_0" />
+    <param name="input_queue_base_1_1" desc="input_queue_base_1_1" />
+    <param name="input_queue_base_2_0" desc="input_queue_base_2_0" />
+    <param name="input_queue_base_2_1" desc="input_queue_base_2_1" />
+    <param name="input_queue_base_3_0" desc="input_queue_base_3_0" />
+    <param name="input_queue_base_3_1" desc="input_queue_base_3_1" />
+    <param name="output_queue_base_0_0" desc="output_queue_base_0_0" />
+    <param name="output_queue_base_1_0" desc="output_queue_base_1_0" />
+    <param name="output_queue_base_2_0" desc="output_queue_base_2_0" />
+    <param name="output_queue_base_3_0" desc="output_queue_base_3_0" />
+    <param name="context_nprio_0" desc="context_nprio_0" />
+    <param name="context_nprio_1" desc="context_nprio_1" />
+    <param name="context_nprio_2" desc="context_nprio_2" />
+    <param name="context_nprio_3" desc="context_nprio_3" />
+    <param name="valid_contexts" desc="valid_contexts" />
+    <param name="sched_period" desc="sched_period" />
   </accelerator>
 </sld>

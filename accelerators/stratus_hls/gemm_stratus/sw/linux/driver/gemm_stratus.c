@@ -13,16 +13,36 @@
 #define DRV_NAME	"gemm_stratus"
 
 /* <<--regs-->> */
-#define GEMM_DO_INVERSE_REG 0x48
-#define GEMM_LOGN_SAMPLES_REG 0x44
-#define GEMM_DO_SHIFT_REG 0x40
-
-#define GEMM_PROD_VALID_OFFSET 0x4C
-#define GEMM_PROD_READY_OFFSET 0x50
-#define GEMM_CONS_VALID_OFFSET 0x54
-#define GEMM_CONS_READY_OFFSET 0x58
-#define GEMM_INPUT_OFFSET 0x5C
-#define GEMM_OUTPUT_OFFSET 0x60
+#define GEMM_DIM_M_REG_0			0x70
+#define GEMM_DIM_M_REG_1			0x74
+#define GEMM_DIM_M_REG_2			0x78
+#define GEMM_DIM_M_REG_3			0x7C
+#define GEMM_DIM_N_REG_0			0x80
+#define GEMM_DIM_N_REG_1			0x84
+#define GEMM_DIM_N_REG_2			0x88
+#define GEMM_DIM_N_REG_3			0x8C
+#define GEMM_DIM_K_REG_0			0x90
+#define GEMM_DIM_K_REG_1			0x94
+#define GEMM_DIM_K_REG_2			0x98
+#define GEMM_DIM_K_REG_3			0x9C
+#define GEMM_INPUT_QUEUE_BASE_0_0	0xA0
+#define GEMM_INPUT_QUEUE_BASE_0_1	0xA4
+#define GEMM_INPUT_QUEUE_BASE_1_0	0xA8
+#define GEMM_INPUT_QUEUE_BASE_1_1	0xAC
+#define GEMM_INPUT_QUEUE_BASE_2_0	0xB0
+#define GEMM_INPUT_QUEUE_BASE_2_1	0xB4
+#define GEMM_INPUT_QUEUE_BASE_3_0	0xB8
+#define GEMM_INPUT_QUEUE_BASE_3_1	0xBC
+#define GEMM_OUTPUT_QUEUE_BASE_0	0xC0
+#define GEMM_OUTPUT_QUEUE_BASE_1	0xC4
+#define GEMM_OUTPUT_QUEUE_BASE_2	0xC8
+#define GEMM_OUTPUT_QUEUE_BASE_3	0xCC
+#define GEMM_CONTEXT_NPRIO_0		0xD0
+#define GEMM_CONTEXT_NPRIO_1		0xD4
+#define GEMM_CONTEXT_NPRIO_2		0xD8
+#define GEMM_CONTEXT_NPRIO_3		0xDC
+#define GEMM_VALID_CONTEXTS			0xE0
+#define GEMM_SCHED_PERIOD			0xE4
 
 struct gemm_stratus_device {
 	struct esp_device esp;
@@ -52,24 +72,58 @@ static inline struct gemm_stratus_device *to_gemm(struct esp_device *esp)
 
 static void gemm_prep_xfer(struct esp_device *esp, void *arg)
 {
+}
+
+static void gemm_init_accel(struct esp_device *esp, void *arg)
+{
 	struct gemm_stratus_access *a = arg;
 
 	/* <<--regs-config-->> */
-	iowrite32be(a->do_inverse, esp->iomem + GEMM_DO_INVERSE_REG);
-	iowrite32be(a->logn_samples, esp->iomem + GEMM_LOGN_SAMPLES_REG);
-	iowrite32be(a->do_shift, esp->iomem + GEMM_DO_SHIFT_REG);
+	iowrite32be(a->dim_m, esp->iomem + GEMM_DIM_M_REG_0 + 0x4*esp->context_id);
+	iowrite32be(a->dim_n, esp->iomem + GEMM_DIM_N_REG_0 + 0x4*esp->context_id);
+	iowrite32be(a->dim_k, esp->iomem + GEMM_DIM_K_REG_0 + 0x4*esp->context_id);
 
-	iowrite32be(a->prod_valid_offset, esp->iomem + GEMM_PROD_VALID_OFFSET);
-	iowrite32be(a->prod_ready_offset, esp->iomem + GEMM_PROD_READY_OFFSET);
-	iowrite32be(a->cons_valid_offset, esp->iomem + GEMM_CONS_VALID_OFFSET);
-	iowrite32be(a->cons_ready_offset, esp->iomem + GEMM_CONS_READY_OFFSET);
-	iowrite32be(a->input_offset, esp->iomem + GEMM_INPUT_OFFSET);
-	iowrite32be(a->output_offset, esp->iomem + GEMM_OUTPUT_OFFSET);
+	iowrite32be(a->input_1_queue_base, esp->iomem + GEMM_INPUT_QUEUE_BASE_0_0 + 0x8*esp->context_id);
+	iowrite32be(a->input_2_queue_base, esp->iomem + GEMM_INPUT_QUEUE_BASE_0_1 + 0x8*esp->context_id);
+	iowrite32be(a->output_queue_base, esp->iomem + GEMM_OUTPUT_QUEUE_BASE_0 + 0x4*esp->context_id);
 
-	iowrite32be(a->src_offset, esp->iomem + SRC_OFFSET_REG);
-	iowrite32be(a->dst_offset, esp->iomem + DST_OFFSET_REG);
-	iowrite32be(a->spandex_conf, esp->iomem + SPANDEX_REG);
+	iowrite32be(a->esp.context_nprio, esp->iomem + GEMM_CONTEXT_NPRIO_0 + 0x4*esp->context_id);
+	iowrite32be(a->esp.valid_contexts, esp->iomem + GEMM_VALID_CONTEXTS);
+	iowrite32be(a->esp.sched_period, esp->iomem + GEMM_SCHED_PERIOD);
+}
 
+static void gemm_add_context(struct esp_device *esp, void *arg)
+{
+	struct gemm_stratus_access *a = arg;
+
+	/* <<--regs-config-->> */
+	iowrite32be(a->dim_m, esp->iomem + GEMM_DIM_M_REG_0 + 0x4*esp->context_id);
+	iowrite32be(a->dim_n, esp->iomem + GEMM_DIM_N_REG_0 + 0x4*esp->context_id);
+	iowrite32be(a->dim_k, esp->iomem + GEMM_DIM_K_REG_0 + 0x4*esp->context_id);
+
+	iowrite32be(a->input_1_queue_base, esp->iomem + GEMM_INPUT_QUEUE_BASE_0_0 + 0x8*esp->context_id);
+	iowrite32be(a->input_2_queue_base, esp->iomem + GEMM_INPUT_QUEUE_BASE_0_1 + 0x8*esp->context_id);
+	iowrite32be(a->output_queue_base, esp->iomem + GEMM_OUTPUT_QUEUE_BASE_0 + 0x4*esp->context_id);
+
+	iowrite32be(a->esp.context_nprio, esp->iomem + GEMM_CONTEXT_NPRIO_0 + 0x4*esp->context_id);
+	iowrite32be(a->esp.valid_contexts, esp->iomem + GEMM_VALID_CONTEXTS);
+	iowrite32be(a->esp.sched_period, esp->iomem + GEMM_SCHED_PERIOD);
+}
+
+static void gemm_del_context(struct esp_device *esp, void *arg)
+{
+	struct gemm_stratus_access *a = arg;
+
+	/* <<--regs-config-->> */
+	iowrite32be(a->esp.valid_contexts, esp->iomem + GEMM_VALID_CONTEXTS);
+}
+
+static void gemm_setprio(struct esp_device *esp, void *arg)
+{
+	struct gemm_stratus_access *a = arg;
+
+	/* <<--regs-config-->> */
+	iowrite32be(a->esp.context_nprio, esp->iomem + GEMM_CONTEXT_NPRIO_0 + 0x4*esp->context_id);
 }
 
 static bool gemm_xfer_input_ok(struct esp_device *esp, void *arg)
@@ -126,7 +180,15 @@ static struct esp_driver gemm_driver = {
 	},
 	.xfer_input_ok	= gemm_xfer_input_ok,
 	.prep_xfer	= gemm_prep_xfer,
-	.ioctl_cm	= GEMM_STRATUS_IOC_ACCESS,
+	.init_accel		= gemm_init_accel,
+	.add_context	= gemm_add_context,
+	.del_context	= gemm_del_context,
+	.setprio		= gemm_setprio,
+	.ioctl_cm		= GEMM_STRATUS_IOC_ACCESS,
+	.init_cm		= GEMM_STRATUS_INIT_IOC_ACCESS,
+	.add_cm			= GEMM_STRATUS_ADD_IOC_ACCESS,
+	.del_cm			= GEMM_STRATUS_DEL_IOC_ACCESS,
+	.prio_cm		= GEMM_STRATUS_PRIO_IOC_ACCESS,
 	.arg_size	= sizeof(struct gemm_stratus_access),
 };
 

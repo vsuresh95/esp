@@ -1,8 +1,6 @@
 // Copyright (c) 2011-2019 Columbia University, System Level Design Group
 // SPDX-License-Identifier: Apache-2.0
 
-#ifndef ENABLE_PP
-
 #include "gemm.hpp"
 #include "gemm_directives.hpp"
 
@@ -20,11 +18,6 @@ void gemm::load_input()
 
         this->reset_load_input();
 
-        load_state_req_dbg.write(0);
-
-        load_ready.ack.reset_ack();
-        load_done.req.reset_req();
-
         wait();
     }
 
@@ -33,145 +26,100 @@ void gemm::load_input()
     int32_t dim_m;
     int32_t dim_n;
     int32_t dim_k;
-    int32_t prod_valid_offset;
-    int32_t prod_ready_offset;
-    int32_t cons_valid_offset;
-    int32_t cons_ready_offset;
-    int32_t input_1_offset;
-    int32_t input_2_offset;
-    int32_t output_offset;
+    int32_t input_1_payload_offset;
+    int32_t input_2_payload_offset;
     {
         HLS_PROTO("load-config");
 
         cfg.wait_for_config(); // config process
-        conf_info_t config = this->conf_info.read();
-
-        // User-defined config code
-        /* <<--local-params-->> */
-        dim_m = config.dim_m;
-        dim_n = config.dim_n;
-        dim_k = config.dim_k;
-
-        // Configured shared memory offsets for sync flags
-        prod_valid_offset = config.prod_valid_offset;
-        prod_ready_offset = config.prod_ready_offset;
-        cons_valid_offset = config.cons_valid_offset;
-        cons_ready_offset = config.cons_ready_offset;
-        input_1_offset = config.input_1_offset;
-        input_2_offset = config.input_2_offset;
     }
 
     // Load
     while(true)
     {
-        HLS_PROTO("load-dma");
+        HLS_PROTO("load-loop");
 
         wait();
 
-        this->load_compute_ready_handshake();
+        this->load_avu_ready_handshake();
 
-        load_state_req_dbg.write(load_state_req);
-
-        switch (load_state_req)
+        // Read config information for current context
         {
-#ifdef ENABLE_SM
-            case POLL_PROD_VALID_REQ:
+            HLS_PROTO("read-load-config");
+
+            conf_info_t config = this->conf_info.read();        
+            HLS_FLATTEN_ARRAY(config.dim_m);
+            HLS_FLATTEN_ARRAY(config.dim_n);
+            HLS_FLATTEN_ARRAY(config.dim_k);
+            HLS_FLATTEN_ARRAY(config.input_queue_base[current_context_int]);
+
+            // User-defined config code
+            /* <<--local-params-->> */
+            dim_m = config.dim_m[current_context_int];
+            dim_n = config.dim_n[current_context_int];
+            dim_k = config.dim_k[current_context_int];
+
+            // Configured shared memory base addresses for input queues
+            input_1_payload_offset = config.input_queue_base[current_context_int][0] + PAYLOAD_OFFSET;
+            input_2_payload_offset = config.input_queue_base[current_context_int][1] + PAYLOAD_OFFSET;
+
+            wait();
+        }
+
+        // Load input 1 data
+        {
+            HLS_PROTO("load-input-1");
+
+            dma_info_t dma_info(input_1_payload_offset / DMA_WORD_PER_BEAT, dim_m * dim_k / DMA_WORD_PER_BEAT, DMA_SIZE);
+            sc_dt::sc_bv<DMA_WIDTH> dataBv;
+
+            wait();
+
+            this->dma_read_ctrl.put(dma_info);
+
+            for (int i = 0; i < dim_m * dim_k; i += DMA_WORD_PER_BEAT)
             {
-                dma_info_t dma_info(prod_valid_offset / DMA_WORD_PER_BEAT, 2 * TEST_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
-                sc_dt::sc_bv<DMA_WIDTH> dataBv;
-                int32_t valid_task = 0;
+                HLS_BREAK_DEP(plm_in_1);
 
+                dataBv = this->dma_read_chnl.get();
                 wait();
-
-                // Wait for producer to send new data
-                while (valid_task != 1)
+                
+                for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
                 {
-                    HLS_UNROLL_LOOP(OFF);
-                    this->dma_read_ctrl.put(dma_info);
-                    dataBv = this->dma_read_chnl.get();
-                    wait();
-                    valid_task = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
-                    dataBv = this->dma_read_chnl.get();
-                    wait();
-                    last_task = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
+                    HLS_UNROLL_SIMPLE;
+                    plm_in_1[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
                 }
             }
-            break;
-            case POLL_CONS_READY_REQ:
-            {
-                dma_info_t dma_info(cons_ready_offset / DMA_WORD_PER_BEAT, TEST_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
-                sc_dt::sc_bv<DMA_WIDTH> dataBv;
-                int32_t ready_for_task = 0;
+        }
+        // Load input 2 data
+        {
+            HLS_PROTO("load-input-2");
 
+            dma_info_t dma_info(input_2_payload_offset / DMA_WORD_PER_BEAT, dim_n * dim_k / DMA_WORD_PER_BEAT, DMA_SIZE);
+            sc_dt::sc_bv<DMA_WIDTH> dataBv;
+
+            wait();
+
+            this->dma_read_ctrl.put(dma_info);
+
+            for (int i = 0; i < dim_n * dim_k; i += DMA_WORD_PER_BEAT)
+            {
+                HLS_BREAK_DEP(plm_in_2);
+
+                dataBv = this->dma_read_chnl.get();
                 wait();
 
-                // Wait for consumer to accept new data
-                while (ready_for_task != 1)
+                for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
                 {
-                    HLS_UNROLL_LOOP(OFF);
-                    this->dma_read_ctrl.put(dma_info);
-                    dataBv = this->dma_read_chnl.get();
-                    wait();
-                    ready_for_task = dataBv.range(DATA_WIDTH - 1, 0).to_int64();
+                    HLS_UNROLL_SIMPLE;
+                    plm_in_2[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
                 }
             }
-            break;
-#endif
-            case LOAD_DATA_REQ:
-            // Load input 1 data
-            {
-                dma_info_t dma_info(input_1_offset / DMA_WORD_PER_BEAT, dim_m * dim_k / DMA_WORD_PER_BEAT, DMA_SIZE);
-                sc_dt::sc_bv<DMA_WIDTH> dataBv;
-
-                wait();
-
-                this->dma_read_ctrl.put(dma_info);
-
-                for (int i = 0; i < dim_m * dim_k; i += DMA_WORD_PER_BEAT)
-                {
-                    HLS_BREAK_DEP(plm_in_1);
-
-                    dataBv = this->dma_read_chnl.get();
-                    wait();
-                    
-                    for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
-                    {
-                        HLS_UNROLL_SIMPLE;
-                        plm_in_1[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
-                    }
-                }
-            }
-            // Load input 2 data
-            {
-                dma_info_t dma_info(input_2_offset / DMA_WORD_PER_BEAT, dim_n * dim_k / DMA_WORD_PER_BEAT, DMA_SIZE);
-                sc_dt::sc_bv<DMA_WIDTH> dataBv;
-
-                wait();
-
-                this->dma_read_ctrl.put(dma_info);
-
-                for (int i = 0; i < dim_n * dim_k; i += DMA_WORD_PER_BEAT)
-                {
-                    HLS_BREAK_DEP(plm_in_2);
-
-                    dataBv = this->dma_read_chnl.get();
-                    wait();
-
-                    for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
-                    {
-                        HLS_UNROLL_SIMPLE;
-                        plm_in_2[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
-                    }
-                }
-            }
-            break;
-            default:
-            break;
         }
 
         wait();
 
-        this->load_compute_done_handshake();
+        this->load_avu_done_handshake();
     }
 } // Function : load_input
 
@@ -183,11 +131,6 @@ void gemm::store_output()
 
         this->reset_store_output();
 
-        store_state_req_dbg.write(0);
-
-        store_ready.ack.reset_ack();
-        store_done.req.reset_req();
-
         wait();
     }
 
@@ -195,163 +138,75 @@ void gemm::store_output()
     /* <<--params-->> */
     int32_t dim_m;
     int32_t dim_n;
-    int32_t num_samples;
-    int32_t prod_valid_offset;
-    int32_t prod_ready_offset;
-    int32_t cons_valid_offset;
-    int32_t cons_ready_offset;
-    int32_t output_offset;
+    int32_t output_payload_offset;
     {
         HLS_PROTO("store-config");
 
         cfg.wait_for_config(); // config process
-
-        conf_info_t config = this->conf_info.read();
-
-        // User-defined config code
-        /* <<--local-params-->> */
-        dim_m = config.dim_m;
-        dim_n = config.dim_n;
-
-        // Configured shared memory offsets for sync flags
-        prod_valid_offset = config.prod_valid_offset;
-        prod_ready_offset = config.prod_ready_offset;
-        cons_valid_offset = config.cons_valid_offset;
-        cons_ready_offset = config.cons_ready_offset;
-        output_offset = config.output_offset;
     }
 
     // Store
     while(true)
     {
-        HLS_PROTO("store-dma");
+        HLS_PROTO("store-loop");
 
         wait();
 
-        this->store_compute_ready_handshake();
+        this->store_avu_ready_handshake();
 
-        store_state_req_dbg.write(store_state_req);
-
-        switch (store_state_req)
+        // Read config information for current context
         {
-#ifdef ENABLE_SM
-            case UPDATE_PROD_READY_REQ:
+            HLS_PROTO("read-store-config");
+
+            conf_info_t config = this->conf_info.read();        
+            HLS_FLATTEN_ARRAY(config.dim_m);
+            HLS_FLATTEN_ARRAY(config.dim_n);
+            HLS_FLATTEN_ARRAY(config.output_queue_base);
+
+            // User-defined config code
+            /* <<--local-params-->> */
+            dim_m = config.dim_m[current_context_int];
+            dim_n = config.dim_n[current_context_int];
+
+            // Configured shared memory base addresses for output queue
+            output_payload_offset = config.output_queue_base[current_context_int][0] + PAYLOAD_OFFSET;
+
+            wait();
+        }
+
+        {
+            HLS_PROTO("store-data");
+
+            dma_info_t dma_info(output_payload_offset / DMA_WORD_PER_BEAT, dim_m * dim_n / DMA_WORD_PER_BEAT, DMA_SIZE);
+            sc_dt::sc_bv<DMA_WIDTH> dataBv;
+
+            wait();
+
+            this->dma_write_ctrl.put(dma_info);
+
+            for (int i = 0; i < dim_m * dim_n; i += DMA_WORD_PER_BEAT)
             {
-                dma_info_t dma_info(prod_ready_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
-                sc_dt::sc_bv<DMA_WIDTH> dataBv;
-                dataBv.range(DMA_WIDTH - 1, 0) = 1;
-
-                this->dma_write_ctrl.put(dma_info);
-                wait();
-                this->dma_write_chnl.put(dataBv);
-                wait();
-
-                // Wait till the write is accepted at the cache (and previous fences)
-                while (!(this->dma_write_chnl.ready)) wait();
-                wait();
-            }
-            break;
-            case UPDATE_PROD_VALID_REQ:
-            {
-                dma_info_t dma_info(prod_valid_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
-                sc_dt::sc_bv<DMA_WIDTH> dataBv;
-                dataBv.range(DMA_WIDTH - 1, 0) = 0;
-
-                this->dma_write_ctrl.put(dma_info);
-                wait();
-                this->dma_write_chnl.put(dataBv);
-                wait();
-
-                // Wait till the write is accepted at the cache (and previous fences)
-                while (!(this->dma_write_chnl.ready)) wait();
-                wait();
-            }
-            break;
-            case UPDATE_CONS_VALID_REQ:
-            {
-                dma_info_t dma_info(cons_valid_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
-                sc_dt::sc_bv<DMA_WIDTH> dataBv;
-                dataBv.range(DMA_WIDTH - 1, 0) = 1;
-
-                this->dma_write_ctrl.put(dma_info);
-                wait();
-                this->dma_write_chnl.put(dataBv);
-                wait();
-
-                // Wait till the write is accepted at the cache (and previous fences)
-                while (!(this->dma_write_chnl.ready)) wait();
-                wait();
-            }
-            break;
-            case UPDATE_CONS_READY_REQ:
-            {
-                dma_info_t dma_info(cons_ready_offset / DMA_WORD_PER_BEAT, UPDATE_VAR_SIZE / DMA_WORD_PER_BEAT, DMA_SIZE);
-                sc_dt::sc_bv<DMA_WIDTH> dataBv;
-                dataBv.range(DMA_WIDTH - 1, 0) = 0;
-
-                this->dma_write_ctrl.put(dma_info);
-                wait();
-                this->dma_write_chnl.put(dataBv);
-                wait();
-
-                // Wait till the write is accepted at the cache (and previous fences)
-                while (!(this->dma_write_chnl.ready)) wait();
-                wait();
-            }
-            break;
-#endif
-            case STORE_DATA_REQ:
-            {
-                dma_info_t dma_info(output_offset / DMA_WORD_PER_BEAT, dim_m * dim_n / DMA_WORD_PER_BEAT, DMA_SIZE);
-                sc_dt::sc_bv<DMA_WIDTH> dataBv;
+                HLS_BREAK_DEP(plm_out);
 
                 wait();
 
-                this->dma_write_ctrl.put(dma_info);
-
-                for (int i = 0; i < dim_m * dim_n; i += DMA_WORD_PER_BEAT)
+                for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
                 {
-                    HLS_BREAK_DEP(plm_out);
-
-                    wait();
-
-                    for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
-                    {
-                        HLS_UNROLL_SIMPLE;
-                        dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH) = plm_out[i + k];
-                    }
-
-                    this->dma_write_chnl.put(dataBv);
+                    HLS_UNROLL_SIMPLE;
+                    dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH) = plm_out[i + k];
                 }
 
-                // Wait till the last write is accepted at the cache
-                wait();
-                while (!(this->dma_write_chnl.ready)) wait();
+                this->dma_write_chnl.put(dataBv);
             }
-            break;
-            case STORE_FENCE:
-            {
-                // Block till L2 to be ready to receive a fence, then send
-                this->acc_fence.put(0x2);
-                wait();
-            }
-            break;
-            case ACC_DONE:
-            {
-                // Ensure the previous fence was accepted, then acc_done
-                while (!(this->acc_fence.ready)) wait();
-                wait();
-                this->accelerator_done();
-                wait();
-            }
-            break;
-            default:
-            break;
+
+            // Wait till the last write is accepted at the cache
+            wait();
+            while (!(this->dma_write_chnl.ready)) wait();
         }
 
         wait();
 
-        this->store_compute_done_handshake();
+        this->store_avu_done_handshake();
     }
 } // Function : store_output
 
@@ -362,16 +217,6 @@ void gemm::compute_kernel()
         HLS_PROTO("compute-reset");
 
         this->reset_compute_kernel();
-
-        compute_state_req_dbg.write(0);
-
-        load_ready.req.reset_req();
-        load_done.ack.reset_ack();
-        store_ready.req.reset_req();
-        store_done.ack.reset_ack();
-
-        load_state_req = 0;
-        store_state_req = 0;
 
         wait();
     }
@@ -385,98 +230,35 @@ void gemm::compute_kernel()
         HLS_PROTO("compute-config");
 
         cfg.wait_for_config(); // config process
-        conf_info_t config = this->conf_info.read();
-
-        // User-defined config code
-        /* <<--local-params-->> */
-        dim_n = config.dim_n;
-        dim_m = config.dim_m;
-        dim_k = config.dim_k;
+        
+        wait();
     }
 
     while(true)
     {
-#ifdef ENABLE_SM
-        // Poll producer's valid for new task
+        // Read config information for current context
         {
-            HLS_PROTO("poll-prod-valid");
+            HLS_PROTO("read-compute-config");
 
-            load_state_req = POLL_PROD_VALID_REQ;
+            this->compute_avu_ready_handshake();
 
-            compute_state_req_dbg.write(POLL_PROD_VALID_REQ);
-
-            this->compute_load_ready_handshake();
             wait();
-            this->compute_load_done_handshake();
+
+            conf_info_t config = this->conf_info.read();            
+            HLS_FLATTEN_ARRAY(config.dim_m);
+            HLS_FLATTEN_ARRAY(config.dim_n);
+            HLS_FLATTEN_ARRAY(config.dim_k);
+
+            // User-defined config code
+            /* <<--local-params-->> */
+            dim_m = config.dim_m[current_context_int];
+            dim_n = config.dim_n[current_context_int];
+            dim_k = config.dim_k[current_context_int];
+
             wait();
         }
 
-        // Reset producer's valid
-        {
-            HLS_PROTO("update-prod-valid");
-
-            store_state_req = UPDATE_PROD_VALID_REQ;
-
-            compute_state_req_dbg.write(UPDATE_PROD_VALID_REQ);
-
-            this->compute_store_ready_handshake();
-            wait();
-            this->compute_store_done_handshake();
-            wait();
-
-            // Wait for all writes to be done and then issue fence
-            store_state_req = STORE_FENCE;
-
-            compute_state_req_dbg.write(STORE_FENCE);
-
-            this->compute_store_ready_handshake();
-            wait();
-            this->compute_store_done_handshake();
-            wait();
-        }
-#endif
-        // Load input data
-        {
-            HLS_PROTO("load-input-data");
-
-            load_state_req = LOAD_DATA_REQ;
-
-            compute_state_req_dbg.write(LOAD_DATA_REQ);
-
-            this->compute_load_ready_handshake();
-            wait();
-            this->compute_load_done_handshake();
-            wait();
-        }
-#ifdef ENABLE_SM
-        // update producer's ready to accept new data
-        {
-            HLS_PROTO("update-prod-ready");
-
-            store_state_req = UPDATE_PROD_READY_REQ;
-
-            compute_state_req_dbg.write(UPDATE_PROD_READY_REQ);
-
-            this->compute_store_ready_handshake();
-            wait();
-            this->compute_store_done_handshake();
-            wait();
-
-            // Wait for all writes to be done and then issue fence
-            store_state_req = STORE_FENCE;
-
-            compute_state_req_dbg.write(STORE_FENCE);
-
-            this->compute_store_ready_handshake();
-            wait();
-            this->compute_store_done_handshake();
-            wait();
-
-            compute_state_req_dbg.write(COMPUTE);
-        }
-#endif
-
-        // Compute
+        // Compute GeMM
         {
             // Number of tiles -- to perform computation over registers
             uint32_t num_blocks_m = (dim_m == BLOCK_SIZE) ? 1 : dim_m/BLOCK_SIZE;
@@ -577,120 +359,12 @@ void gemm::compute_kernel()
             }
         }
 
-#ifdef ENABLE_SM
-        // Poll consumer's ready to know if we can send new data
         {
-            HLS_PROTO("poll-for-cons-ready");
+            HLS_PROTO("compute-done");
 
-            load_state_req = POLL_CONS_READY_REQ;
-
-            compute_state_req_dbg.write(POLL_CONS_READY_REQ);
-
-            this->compute_load_ready_handshake();
-            wait();
-            this->compute_load_done_handshake();
-            wait();
-        }
-
-        // Reset consumer's ready
-        {
-            HLS_PROTO("update-cons-ready");
-
-            store_state_req = UPDATE_CONS_READY_REQ;
-
-            compute_state_req_dbg.write(UPDATE_CONS_READY_REQ);
-
-            this->compute_store_ready_handshake();
-            wait();
-            this->compute_store_done_handshake();
-            wait();
-
-            // Wait for all writes to be done and then issue fence
-            store_state_req = STORE_FENCE;
-
-            compute_state_req_dbg.write(STORE_FENCE);
-
-            this->compute_store_ready_handshake();
-            wait();
-            this->compute_store_done_handshake();
-            wait();
-        }
-#endif
-        // Store output data
-        {
-            HLS_PROTO("store-output-data");
-
-            store_state_req = STORE_DATA_REQ;
-
-            this->compute_store_ready_handshake();
-
-            compute_state_req_dbg.write(STORE_DATA_REQ);
+            this->compute_avu_done_handshake();
 
             wait();
-            this->compute_store_done_handshake();
-            wait();
-
-            // Wait for all writes to be done and then issue fence
-            store_state_req = STORE_FENCE;
-
-            compute_state_req_dbg.write(STORE_FENCE);
-
-            this->compute_store_ready_handshake();
-            wait();
-            this->compute_store_done_handshake();
-            wait();
-        }
-#ifdef ENABLE_SM
-        // update consumer's ready for new data available
-        {
-            HLS_PROTO("update-cons-valid");
-
-            store_state_req = UPDATE_CONS_VALID_REQ;
-
-            compute_state_req_dbg.write(UPDATE_CONS_VALID_REQ);
-
-            this->compute_store_ready_handshake();
-            wait();
-            this->compute_store_done_handshake();
-            wait();
-
-            // Wait for all writes to be done and then issue fence
-            store_state_req = STORE_FENCE;
-
-            compute_state_req_dbg.write(STORE_FENCE);
-
-            this->compute_store_ready_handshake();
-            wait();
-            this->compute_store_done_handshake();
-            wait();
-        }
-#endif
-        // End operation
-        {
-            HLS_PROTO("end-acc");
-
-#ifdef ENABLE_SM
-            if (last_task == 1)
-            {
-#endif
-                store_state_req = ACC_DONE;
-
-                compute_state_req_dbg.write(ACC_DONE);
-
-                this->compute_store_ready_handshake();
-                wait();
-                this->compute_store_done_handshake();
-                wait();
-                this->process_done();
-#ifdef ENABLE_SM
-            }
-#endif
         }
     } // while (true)
 } // Function : compute_kernel
-
-#else // ENABLE_PP
-
-#include "gemm_pipelined.cpp"
-
-#endif // ENABLE_PP
