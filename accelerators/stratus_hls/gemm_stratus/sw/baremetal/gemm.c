@@ -21,9 +21,9 @@ static unsigned DMA_WORD_PER_BEAT(unsigned _st)
 #define DEV_NAME "sld,gemm_stratus"
 
 /* <<--params-->> */
-const unsigned dim_m = 40;
-const unsigned dim_n = 20;
-const unsigned dim_k = 40;
+const unsigned dim_m = 20;
+const unsigned dim_n = 18;
+const unsigned dim_k = 20;
 
 /* Size of the contiguous chunks for scatter/gather */
 #define CHUNK_SHIFT 20
@@ -34,36 +34,36 @@ const unsigned dim_k = 40;
 
 /* User defined registers */
 /* <<--regs-->> */
-#define GEMM_DIM_M_REG_0			0x70
-#define GEMM_DIM_M_REG_1			0x74
-#define GEMM_DIM_M_REG_2			0x78
-#define GEMM_DIM_M_REG_3			0x7C
-#define GEMM_DIM_N_REG_0			0x80
-#define GEMM_DIM_N_REG_1			0x84
-#define GEMM_DIM_N_REG_2			0x88
-#define GEMM_DIM_N_REG_3			0x8C
-#define GEMM_DIM_K_REG_0			0x90
-#define GEMM_DIM_K_REG_1			0x94
-#define GEMM_DIM_K_REG_2			0x98
-#define GEMM_DIM_K_REG_3			0x9C
-#define GEMM_INPUT_QUEUE_BASE_0_0	0xA0
-#define GEMM_INPUT_QUEUE_BASE_0_1	0xA4
-#define GEMM_INPUT_QUEUE_BASE_1_0	0xA8
-#define GEMM_INPUT_QUEUE_BASE_1_1	0xAC
-#define GEMM_INPUT_QUEUE_BASE_2_0	0xB0
-#define GEMM_INPUT_QUEUE_BASE_2_1	0xB4
-#define GEMM_INPUT_QUEUE_BASE_3_0	0xB8
-#define GEMM_INPUT_QUEUE_BASE_3_1	0xBC
-#define GEMM_OUTPUT_QUEUE_BASE_0	0xC0
-#define GEMM_OUTPUT_QUEUE_BASE_1	0xC4
-#define GEMM_OUTPUT_QUEUE_BASE_2	0xC8
-#define GEMM_OUTPUT_QUEUE_BASE_3	0xCC
-#define GEMM_CONTEXT_NPRIO_0		0xD0
-#define GEMM_CONTEXT_NPRIO_1		0xD4
-#define GEMM_CONTEXT_NPRIO_2		0xD8
-#define GEMM_CONTEXT_NPRIO_3		0xDC
-#define GEMM_VALID_CONTEXTS			0xE0
-#define GEMM_SCHED_PERIOD			0xE4
+#define GEMM_DIM_M_REG_0		0x70
+#define GEMM_DIM_M_REG_1		0x74
+#define GEMM_DIM_M_REG_2		0x78
+#define GEMM_DIM_M_REG_3		0x7C
+#define GEMM_DIM_N_REG_0		0x80
+#define GEMM_DIM_N_REG_1		0x84
+#define GEMM_DIM_N_REG_2		0x88
+#define GEMM_DIM_N_REG_3		0x8C
+#define GEMM_DIM_K_REG_0		0x90
+#define GEMM_DIM_K_REG_1		0x94
+#define GEMM_DIM_K_REG_2		0x98
+#define GEMM_DIM_K_REG_3		0x9C
+#define GEMM_WEIGHT_BASE_0		0xA0
+#define GEMM_WEIGHT_BASE_1		0xA4
+#define GEMM_WEIGHT_BASE_2		0xA8
+#define GEMM_WEIGHT_BASE_3		0xAC
+#define GEMM_INPUT_BASE_0		0xB0
+#define GEMM_INPUT_BASE_1		0xB4
+#define GEMM_INPUT_BASE_2		0xB8
+#define GEMM_INPUT_BASE_3		0xBC
+#define GEMM_OUTPUT_BASE_0		0xC0
+#define GEMM_OUTPUT_BASE_1		0xC4
+#define GEMM_OUTPUT_BASE_2		0xC8
+#define GEMM_OUTPUT_BASE_3		0xCC
+#define GEMM_CONTEXT_NPRIO_0	0xD0
+#define GEMM_CONTEXT_NPRIO_1	0xD4
+#define GEMM_CONTEXT_NPRIO_2	0xD8
+#define GEMM_CONTEXT_NPRIO_3	0xDC
+#define GEMM_VALID_CONTEXTS		0xE0
+#define GEMM_SCHED_PERIOD		0xE4
 
 static uint64_t t_start = 0;
 static uint64_t t_end = 0;
@@ -179,18 +179,17 @@ int main(int argc, char * argv[])
 	printf("dim_m %u dim_n %u dim_k %u\n", dim_m, dim_n, dim_k);
     unsigned flag_len = PAYLOAD_OFFSET/sizeof(unsigned); // Number of unsigned elements reserved for flags
     unsigned mat_a_len = flag_len + (dim_m * dim_k);
-    unsigned mat_b_len = flag_len + (dim_n * dim_k);
+    unsigned mat_b_len = dim_n * dim_k;
     unsigned mat_c_len = flag_len + (dim_m * dim_n);
 
     // Data offsets
     unsigned mat_a_offset = flag_len;
-    unsigned mat_b_offset = mat_a_offset + mat_a_len;
-    unsigned mat_c_offset = mat_b_offset + mat_b_len;
+    unsigned mat_b_offset = mat_a_len;
+    unsigned mat_c_offset = mat_b_offset + mat_b_len + flag_len;
 
     // Sync flag offsets
     unsigned mat_a_valid_offset = VALID_OFFSET;
-    unsigned mat_b_valid_offset = mat_a_valid_offset + mat_a_len;
-    unsigned mat_c_valid_offset = mat_b_valid_offset + mat_b_len;
+    unsigned mat_c_valid_offset = mat_b_offset + mat_b_len;
 	
     unsigned mem_size = (mat_c_offset + mat_c_len) * sizeof(unsigned);
 
@@ -231,11 +230,9 @@ int main(int argc, char * argv[])
 	coherence = ACC_COH_RECALL;
 
     // We will cast the synchronization flags from *mem to custom atomic flags
-    atomic_flag_t input_a_flag;
-    atomic_flag_t input_b_flag;
+    atomic_flag_t input_flag;
     atomic_flag_t output_flag;
-	atomic_flag_init(&input_a_flag, (volatile uint64_t *) &mem[mat_a_valid_offset]);
-	atomic_flag_init(&input_b_flag, (volatile uint64_t *) &mem[mat_b_valid_offset]);
+	atomic_flag_init(&input_flag, (volatile uint64_t *) &mem[mat_a_valid_offset]);
 	atomic_flag_init(&output_flag, (volatile uint64_t *) &mem[mat_c_valid_offset]);
 
 	// Pass common configuration parameters
@@ -255,9 +252,9 @@ int main(int argc, char * argv[])
 	iowrite32(dev, GEMM_DIM_M_REG_0, dim_m);
 	iowrite32(dev, GEMM_DIM_N_REG_0, dim_n);
 	iowrite32(dev, GEMM_DIM_K_REG_0, dim_k);
-	iowrite32(dev, GEMM_INPUT_QUEUE_BASE_0_0, mat_a_valid_offset);
-	iowrite32(dev, GEMM_INPUT_QUEUE_BASE_0_1, mat_b_valid_offset);
-	iowrite32(dev, GEMM_OUTPUT_QUEUE_BASE_0, mat_c_valid_offset);
+	iowrite32(dev, GEMM_WEIGHT_BASE_0, mat_b_offset);
+	iowrite32(dev, GEMM_INPUT_BASE_0, mat_a_valid_offset);
+	iowrite32(dev, GEMM_OUTPUT_BASE_0, mat_c_valid_offset);
 	iowrite32(dev, PT_ADDRESS_REG_0, (unsigned long long) ptable);
 	iowrite32(dev, GEMM_CONTEXT_NPRIO_0, 1);
 	iowrite32(dev, GEMM_VALID_CONTEXTS, 0x1);
@@ -278,8 +275,7 @@ int main(int argc, char * argv[])
         init_buffer(&mem[mat_a_offset], &mem[mat_b_offset],
                     &gold[mat_a_offset], &gold[mat_b_offset], &gold[mat_c_offset]);
 		// Inform the accelerator to start.
-		atomic_flag_store(&input_a_flag, 1);
-		atomic_flag_store(&input_b_flag, 1);
+		atomic_flag_store(&input_flag, 1);
 
 		// Wait for the accelerator to send output.
 		start_counter();

@@ -23,11 +23,11 @@ struct gemm_stratus_access {
     unsigned dim_m;
     unsigned dim_n;
     unsigned dim_k;
+    unsigned weight_base;
 
     // Input/output offsets
-    unsigned input_1_queue_base;
-    unsigned input_2_queue_base;
-    unsigned output_queue_base;
+    unsigned input_base;
+    unsigned output_base;
 };
 
 #define GEMM_STRATUS_IOC_ACCESS			_IOW ('S', 0, struct gemm_stratus_access)

@@ -13,36 +13,36 @@
 #define DRV_NAME	"gemm_stratus"
 
 /* <<--regs-->> */
-#define GEMM_DIM_M_REG_0			0x70
-#define GEMM_DIM_M_REG_1			0x74
-#define GEMM_DIM_M_REG_2			0x78
-#define GEMM_DIM_M_REG_3			0x7C
-#define GEMM_DIM_N_REG_0			0x80
-#define GEMM_DIM_N_REG_1			0x84
-#define GEMM_DIM_N_REG_2			0x88
-#define GEMM_DIM_N_REG_3			0x8C
-#define GEMM_DIM_K_REG_0			0x90
-#define GEMM_DIM_K_REG_1			0x94
-#define GEMM_DIM_K_REG_2			0x98
-#define GEMM_DIM_K_REG_3			0x9C
-#define GEMM_INPUT_QUEUE_BASE_0_0	0xA0
-#define GEMM_INPUT_QUEUE_BASE_0_1	0xA4
-#define GEMM_INPUT_QUEUE_BASE_1_0	0xA8
-#define GEMM_INPUT_QUEUE_BASE_1_1	0xAC
-#define GEMM_INPUT_QUEUE_BASE_2_0	0xB0
-#define GEMM_INPUT_QUEUE_BASE_2_1	0xB4
-#define GEMM_INPUT_QUEUE_BASE_3_0	0xB8
-#define GEMM_INPUT_QUEUE_BASE_3_1	0xBC
-#define GEMM_OUTPUT_QUEUE_BASE_0	0xC0
-#define GEMM_OUTPUT_QUEUE_BASE_1	0xC4
-#define GEMM_OUTPUT_QUEUE_BASE_2	0xC8
-#define GEMM_OUTPUT_QUEUE_BASE_3	0xCC
-#define GEMM_CONTEXT_NPRIO_0		0xD0
-#define GEMM_CONTEXT_NPRIO_1		0xD4
-#define GEMM_CONTEXT_NPRIO_2		0xD8
-#define GEMM_CONTEXT_NPRIO_3		0xDC
-#define GEMM_VALID_CONTEXTS			0xE0
-#define GEMM_SCHED_PERIOD			0xE4
+#define GEMM_DIM_M_REG_0		0x70
+#define GEMM_DIM_M_REG_1		0x74
+#define GEMM_DIM_M_REG_2		0x78
+#define GEMM_DIM_M_REG_3		0x7C
+#define GEMM_DIM_N_REG_0		0x80
+#define GEMM_DIM_N_REG_1		0x84
+#define GEMM_DIM_N_REG_2		0x88
+#define GEMM_DIM_N_REG_3		0x8C
+#define GEMM_DIM_K_REG_0		0x90
+#define GEMM_DIM_K_REG_1		0x94
+#define GEMM_DIM_K_REG_2		0x98
+#define GEMM_DIM_K_REG_3		0x9C
+#define GEMM_WEIGHT_BASE_0		0xA0
+#define GEMM_WEIGHT_BASE_1		0xA4
+#define GEMM_WEIGHT_BASE_2		0xA8
+#define GEMM_WEIGHT_BASE_3		0xAC
+#define GEMM_INPUT_BASE_0		0xB0
+#define GEMM_INPUT_BASE_1		0xB4
+#define GEMM_INPUT_BASE_2		0xB8
+#define GEMM_INPUT_BASE_3		0xBC
+#define GEMM_OUTPUT_BASE_0		0xC0
+#define GEMM_OUTPUT_BASE_1		0xC4
+#define GEMM_OUTPUT_BASE_2		0xC8
+#define GEMM_OUTPUT_BASE_3		0xCC
+#define GEMM_CONTEXT_NPRIO_0	0xD0
+#define GEMM_CONTEXT_NPRIO_1	0xD4
+#define GEMM_CONTEXT_NPRIO_2	0xD8
+#define GEMM_CONTEXT_NPRIO_3	0xDC
+#define GEMM_VALID_CONTEXTS		0xE0
+#define GEMM_SCHED_PERIOD		0xE4
 
 struct gemm_stratus_device {
 	struct esp_device esp;
@@ -82,10 +82,10 @@ static void gemm_init_accel(struct esp_device *esp, void *arg)
 	iowrite32be(a->dim_m, esp->iomem + GEMM_DIM_M_REG_0 + 0x4*esp->context_id);
 	iowrite32be(a->dim_n, esp->iomem + GEMM_DIM_N_REG_0 + 0x4*esp->context_id);
 	iowrite32be(a->dim_k, esp->iomem + GEMM_DIM_K_REG_0 + 0x4*esp->context_id);
+	iowrite32be(a->weight_base, esp->iomem + GEMM_WEIGHT_BASE_0 + 0x4*esp->context_id);
 
-	iowrite32be(a->input_1_queue_base, esp->iomem + GEMM_INPUT_QUEUE_BASE_0_0 + 0x8*esp->context_id);
-	iowrite32be(a->input_2_queue_base, esp->iomem + GEMM_INPUT_QUEUE_BASE_0_1 + 0x8*esp->context_id);
-	iowrite32be(a->output_queue_base, esp->iomem + GEMM_OUTPUT_QUEUE_BASE_0 + 0x4*esp->context_id);
+	iowrite32be(a->input_base, esp->iomem + GEMM_INPUT_BASE_0 + 0x4*esp->context_id);
+	iowrite32be(a->output_base, esp->iomem + GEMM_OUTPUT_BASE_0 + 0x4*esp->context_id);
 
 	iowrite32be(a->esp.context_nprio, esp->iomem + GEMM_CONTEXT_NPRIO_0 + 0x4*esp->context_id);
 	iowrite32be(a->esp.valid_contexts, esp->iomem + GEMM_VALID_CONTEXTS);
@@ -100,10 +100,10 @@ static void gemm_add_context(struct esp_device *esp, void *arg)
 	iowrite32be(a->dim_m, esp->iomem + GEMM_DIM_M_REG_0 + 0x4*esp->context_id);
 	iowrite32be(a->dim_n, esp->iomem + GEMM_DIM_N_REG_0 + 0x4*esp->context_id);
 	iowrite32be(a->dim_k, esp->iomem + GEMM_DIM_K_REG_0 + 0x4*esp->context_id);
+	iowrite32be(a->weight_base, esp->iomem + GEMM_WEIGHT_BASE_0 + 0x4*esp->context_id);
 
-	iowrite32be(a->input_1_queue_base, esp->iomem + GEMM_INPUT_QUEUE_BASE_0_0 + 0x8*esp->context_id);
-	iowrite32be(a->input_2_queue_base, esp->iomem + GEMM_INPUT_QUEUE_BASE_0_1 + 0x8*esp->context_id);
-	iowrite32be(a->output_queue_base, esp->iomem + GEMM_OUTPUT_QUEUE_BASE_0 + 0x4*esp->context_id);
+	iowrite32be(a->input_base, esp->iomem + GEMM_INPUT_BASE_0 + 0x4*esp->context_id);
+	iowrite32be(a->output_base, esp->iomem + GEMM_OUTPUT_BASE_0 + 0x4*esp->context_id);
 
 	iowrite32be(a->esp.context_nprio, esp->iomem + GEMM_CONTEXT_NPRIO_0 + 0x4*esp->context_id);
 	iowrite32be(a->esp.valid_contexts, esp->iomem + GEMM_VALID_CONTEXTS);

@@ -13,18 +13,18 @@
     <param name="dim_k_1" desc="dim_k_1" />
     <param name="dim_k_2" desc="dim_k_2" />
     <param name="dim_k_3" desc="dim_k_3" />
-    <param name="input_queue_base_0_0" desc="input_queue_base_0_0" />
-    <param name="input_queue_base_0_1" desc="input_queue_base_0_1" />
-    <param name="input_queue_base_1_0" desc="input_queue_base_1_0" />
-    <param name="input_queue_base_1_1" desc="input_queue_base_1_1" />
-    <param name="input_queue_base_2_0" desc="input_queue_base_2_0" />
-    <param name="input_queue_base_2_1" desc="input_queue_base_2_1" />
-    <param name="input_queue_base_3_0" desc="input_queue_base_3_0" />
-    <param name="input_queue_base_3_1" desc="input_queue_base_3_1" />
-    <param name="output_queue_base_0_0" desc="output_queue_base_0_0" />
-    <param name="output_queue_base_1_0" desc="output_queue_base_1_0" />
-    <param name="output_queue_base_2_0" desc="output_queue_base_2_0" />
-    <param name="output_queue_base_3_0" desc="output_queue_base_3_0" />
+    <param name="weight_base_0" desc="weight_base_0" />
+    <param name="weight_base_1" desc="weight_base_1" />
+    <param name="weight_base_2" desc="weight_base_2" />
+    <param name="weight_base_3" desc="weight_base_3" />
+    <param name="input_base_0_0" desc="input_base_0_0" />
+    <param name="input_base_1_0" desc="input_base_1_0" />
+    <param name="input_base_2_0" desc="input_base_2_0" />
+    <param name="input_base_3_0" desc="input_base_3_0" />
+    <param name="output_base_0_0" desc="output_base_0_0" />
+    <param name="output_base_1_0" desc="output_base_1_0" />
+    <param name="output_base_2_0" desc="output_base_2_0" />
+    <param name="output_base_3_0" desc="output_base_3_0" />
     <param name="context_nprio_0" desc="context_nprio_0" />
     <param name="context_nprio_1" desc="context_nprio_1" />
     <param name="context_nprio_2" desc="context_nprio_2" />

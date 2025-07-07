@@ -26,8 +26,8 @@ void gemm::load_input()
     int32_t dim_m;
     int32_t dim_n;
     int32_t dim_k;
-    int32_t input_1_payload_offset;
-    int32_t input_2_payload_offset;
+    int32_t input_payload_offset;
+    int32_t weight_payload_offset;
     {
         HLS_PROTO("load-config");
 
@@ -51,17 +51,18 @@ void gemm::load_input()
             HLS_FLATTEN_ARRAY(config.dim_m);
             HLS_FLATTEN_ARRAY(config.dim_n);
             HLS_FLATTEN_ARRAY(config.dim_k);
-            HLS_FLATTEN_ARRAY(config.input_queue_base[current_context_int]);
+            HLS_FLATTEN_ARRAY(config.input_base);
+            HLS_FLATTEN_ARRAY(config.weight_base);
 
             // User-defined config code
             /* <<--local-params-->> */
             dim_m = config.dim_m[current_context_int];
             dim_n = config.dim_n[current_context_int];
             dim_k = config.dim_k[current_context_int];
+            weight_payload_offset = config.weight_base[current_context_int];
 
             // Configured shared memory base addresses for input queues
-            input_1_payload_offset = config.input_queue_base[current_context_int][0] + PAYLOAD_OFFSET;
-            input_2_payload_offset = config.input_queue_base[current_context_int][1] + PAYLOAD_OFFSET;
+            input_payload_offset = config.input_base[current_context_int][0] + PAYLOAD_OFFSET;
 
             wait();
         }
@@ -70,7 +71,7 @@ void gemm::load_input()
         {
             HLS_PROTO("load-input-1");
 
-            dma_info_t dma_info(input_1_payload_offset / DMA_WORD_PER_BEAT, dim_m * dim_k / DMA_WORD_PER_BEAT, DMA_SIZE);
+            dma_info_t dma_info(input_payload_offset / DMA_WORD_PER_BEAT, dim_m * dim_k / DMA_WORD_PER_BEAT, DMA_SIZE);
             sc_dt::sc_bv<DMA_WIDTH> dataBv;
 
             wait();
@@ -79,7 +80,7 @@ void gemm::load_input()
 
             for (int i = 0; i < dim_m * dim_k; i += DMA_WORD_PER_BEAT)
             {
-                HLS_BREAK_DEP(plm_in_1);
+                HLS_BREAK_DEP(plm_in);
 
                 dataBv = this->dma_read_chnl.get();
                 wait();
@@ -87,7 +88,7 @@ void gemm::load_input()
                 for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
                 {
                     HLS_UNROLL_SIMPLE;
-                    plm_in_1[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
+                    plm_in[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
                 }
             }
         }
@@ -95,7 +96,7 @@ void gemm::load_input()
         {
             HLS_PROTO("load-input-2");
 
-            dma_info_t dma_info(input_2_payload_offset / DMA_WORD_PER_BEAT, dim_n * dim_k / DMA_WORD_PER_BEAT, DMA_SIZE);
+            dma_info_t dma_info(weight_payload_offset / DMA_WORD_PER_BEAT, dim_n * dim_k / DMA_WORD_PER_BEAT, DMA_SIZE);
             sc_dt::sc_bv<DMA_WIDTH> dataBv;
 
             wait();
@@ -104,7 +105,7 @@ void gemm::load_input()
 
             for (int i = 0; i < dim_n * dim_k; i += DMA_WORD_PER_BEAT)
             {
-                HLS_BREAK_DEP(plm_in_2);
+                HLS_BREAK_DEP(plm_wgt);
 
                 dataBv = this->dma_read_chnl.get();
                 wait();
@@ -112,7 +113,7 @@ void gemm::load_input()
                 for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
                 {
                     HLS_UNROLL_SIMPLE;
-                    plm_in_2[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
+                    plm_wgt[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
                 }
             }
         }
@@ -161,7 +162,7 @@ void gemm::store_output()
             conf_info_t config = this->conf_info.read();        
             HLS_FLATTEN_ARRAY(config.dim_m);
             HLS_FLATTEN_ARRAY(config.dim_n);
-            HLS_FLATTEN_ARRAY(config.output_queue_base);
+            HLS_FLATTEN_ARRAY(config.output_base);
 
             // User-defined config code
             /* <<--local-params-->> */
@@ -169,7 +170,7 @@ void gemm::store_output()
             dim_n = config.dim_n[current_context_int];
 
             // Configured shared memory base addresses for output queue
-            output_payload_offset = config.output_queue_base[current_context_int][0] + PAYLOAD_OFFSET;
+            output_payload_offset = config.output_base[current_context_int][0] + PAYLOAD_OFFSET;
 
             wait();
         }
@@ -299,8 +300,8 @@ void gemm::compute_kernel()
                             for (unsigned elem_k = 0; elem_k < BLOCK_SIZE; elem_k++)
                             {
                                 HLS_UNROLL_LOOP(ON, "read_plm_m");
-                                HLS_BREAK_ARRAY_DEPENDENCY(plm_in_1);
-                                regs_m[elem_k] = regs_valid[elem_k] * plm_in_1[idx_mk + elem_k];
+                                HLS_BREAK_ARRAY_DEPENDENCY(plm_in);
+                                regs_m[elem_k] = regs_valid[elem_k] * plm_in[idx_mk + elem_k];
                             }
 
                             // Perform block-level multiply - N dimension
@@ -318,8 +319,8 @@ void gemm::compute_kernel()
                                 for (unsigned elem_k = 0; elem_k < BLOCK_SIZE; elem_k++)
                                 {
                                     HLS_UNROLL_LOOP(ON, "read_plm_n");
-                                    HLS_BREAK_ARRAY_DEPENDENCY(plm_in_2);
-                                    regs_n[elem_k] = regs_valid[elem_k] * plm_in_2[idx_nk + elem_k];
+                                    HLS_BREAK_ARRAY_DEPENDENCY(plm_wgt);
+                                    regs_n[elem_k] = regs_valid[elem_k] * plm_wgt[idx_nk + elem_k];
                                 }
 
                                 // multiply all elements stored in regs_1 and regs_2

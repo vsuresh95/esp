@@ -29,8 +29,8 @@ public:
     {
         // Map arrays to memories
         /* <<--plm-bind-->> */
-        HLS_MAP_plm(plm_in_1, PLM_IN_NAME);
-        HLS_MAP_plm(plm_in_2, PLM_IN_NAME);
+        HLS_MAP_plm(plm_in, PLM_IN_NAME);
+        HLS_MAP_plm(plm_wgt, PLM_IN_NAME);
         HLS_MAP_plm(plm_out, PLM_OUT_NAME);
     }
 
@@ -46,8 +46,8 @@ public:
     void store_output();
 
     // Private local memories
-    sc_dt::sc_int<DATA_WIDTH> plm_in_1[PLM_IN_WORD];
-    sc_dt::sc_int<DATA_WIDTH> plm_in_2[PLM_IN_WORD];
+    sc_dt::sc_int<DATA_WIDTH> plm_in[PLM_IN_WORD];
+    sc_dt::sc_int<DATA_WIDTH> plm_wgt[PLM_IN_WORD];
     sc_dt::sc_int<DATA_WIDTH> plm_out[PLM_OUT_WORD];
 };
 
