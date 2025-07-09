@@ -88,7 +88,7 @@ void gemm::load_input()
                 for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
                 {
                     HLS_UNROLL_SIMPLE;
-                    plm_in[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
+                    plm_in[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_uint64();
                 }
             }
         }
@@ -270,11 +270,11 @@ void gemm::compute_kernel()
                     // Iterate over register block across K dimension
                     for (unsigned block_k = 0; block_k < dim_k; block_k += BLOCK_SIZE)
                     { 
-                        unsigned regs_m[BLOCK_SIZE];
-                        unsigned regs_n[BLOCK_SIZE];
-                        unsigned regs_mul[BLOCK_SIZE];
-                        unsigned regs_valid[BLOCK_SIZE];
-                        unsigned regs_acc;     
+                        FPDATA regs_m[BLOCK_SIZE];
+                        FPDATA regs_n[BLOCK_SIZE];
+                        FPDATA regs_mul[BLOCK_SIZE];
+                        FPDATA regs_valid[BLOCK_SIZE];
+                        FPDATA regs_acc;     
                         HLS_FLATTEN_ARRAY(regs_m);
                         HLS_FLATTEN_ARRAY(regs_n);
                         HLS_FLATTEN_ARRAY(regs_mul);
@@ -301,15 +301,14 @@ void gemm::compute_kernel()
                             {
                                 HLS_UNROLL_LOOP(ON, "read_plm_m");
                                 HLS_BREAK_ARRAY_DEPENDENCY(plm_in);
-                                regs_m[elem_k] = regs_valid[elem_k] * plm_in[idx_mk + elem_k];
+                                regs_m[elem_k] = regs_valid[elem_k] * INT2FP(plm_in[idx_mk + elem_k]);
                             }
 
                             // Perform block-level multiply - N dimension
                             for (unsigned row_n = 0; row_n < BLOCK_SIZE; row_n++)
                             {
                                 unsigned elem_n = block_n + row_n;
-                                unsigned idx_nk = (elem_n * dim_k) + block_k;
-
+                                unsigned idx_kn = (block_k * dim_n) + elem_n;
                                 unsigned idx_mn = (elem_m * dim_n) + elem_n;
 
                                 // If the remainder is not a multiple of block_size, break out of the loop
@@ -320,7 +319,7 @@ void gemm::compute_kernel()
                                 {
                                     HLS_UNROLL_LOOP(ON, "read_plm_n");
                                     HLS_BREAK_ARRAY_DEPENDENCY(plm_wgt);
-                                    regs_n[elem_k] = regs_valid[elem_k] * plm_wgt[idx_nk + elem_k];
+                                    regs_n[elem_k] = regs_valid[elem_k] * INT2FP(plm_wgt[idx_kn + (elem_k * dim_n)]);
                                 }
 
                                 // multiply all elements stored in regs_1 and regs_2
@@ -337,7 +336,7 @@ void gemm::compute_kernel()
                                 }
                                 else
                                 {
-                                    regs_acc = plm_out[idx_mn];
+                                    regs_acc = INT2FP(plm_out[idx_mn]);
                                 }
 
                                 // Accumulate all products
@@ -349,7 +348,7 @@ void gemm::compute_kernel()
 
                                 // write the partial sum to PLM
                                 {
-                                    plm_out[idx_mn] = regs_acc;
+                                    plm_out[idx_mn] = FP2INT(regs_acc);
 
                                 }
                             }

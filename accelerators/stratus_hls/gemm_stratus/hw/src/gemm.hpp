@@ -8,6 +8,7 @@
 #include "gemm_conf_info.hpp"
 #include "gemm_debug_info.hpp"
 #include "esp_templates.hpp"
+#include "fpdata.hpp"
 
 #define __round_mask(x, y) ((y)-1)
 #define round_up(x, y) ((((x)-1) | __round_mask(x, y))+1)

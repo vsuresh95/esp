@@ -8,6 +8,8 @@
 
 #include <esp_accelerator.h>
 #include <esp_probe.h>
+#include <fixed_point.h>
+#include <utils/fft2_utils.h>
 
 #include "sm.h"
 #include <math.h>
@@ -19,6 +21,7 @@ static unsigned DMA_WORD_PER_BEAT(unsigned _st)
 
 #define SLD_GEMM 0x051
 #define DEV_NAME "sld,gemm_stratus"
+#define FX_IL 16
 
 /* <<--params-->> */
 const unsigned dim_m = 20;
@@ -95,9 +98,9 @@ static inline uint64_t end_counter() {
 	return (t_end - t_start);
 }
 
-void gemm(const unsigned* mat_a, const unsigned* mat_b, unsigned* mat_c, unsigned dim_m, unsigned dim_n, unsigned dim_k) {
+void gemm(const float* mat_a, const float* mat_b, float* mat_c, unsigned dim_m, unsigned dim_n, unsigned dim_k) {
     const unsigned block_size = 16;
-    unsigned sum;
+    float sum;
 
 	for (unsigned m = 0; m < dim_m; m += block_size) {
 	    for (unsigned n = 0; n < dim_n; n += block_size) {
@@ -112,7 +115,7 @@ void gemm(const unsigned* mat_a, const unsigned* mat_b, unsigned* mat_c, unsigne
                         if (k == 0) sum = 0;
                         else sum = mat_c[m_ * dim_n + n_];
                         for (unsigned k_ = k; k_ < k_rem; k_++) {
-							sum += mat_a[m_ * dim_k + k_] * mat_b[n_ * dim_k + k_];
+							sum += mat_a[m_ * dim_k + k_] * mat_b[k_ * dim_n + n_];
                         }
                         mat_c[m_ * dim_n + n_] = sum;
                     }
@@ -122,14 +125,20 @@ void gemm(const unsigned* mat_a, const unsigned* mat_b, unsigned* mat_c, unsigne
     }
 }
 
-int validate_buffer(unsigned *mem_c, unsigned *gold_c)
+int validate_buffer(int *mem_c, float *gold_c)
 {
     unsigned errors = 0;
     const unsigned len = dim_m * dim_n;
+	const float ERR_TH = 0.05;
 
     for (unsigned j = 0; j < len; j++) {
-        if (gold_c[j] != mem_c[j]) {
-            if (errors < 10) { printf("\tGOLD[%u] = %d vs %d = out[%u]\n", j, gold_c[j], mem_c[j], j); }
+		float val = fixed32_to_float(mem_c[j], FX_IL);
+		if ((fabs(gold_c[j] - val) / fabs(gold_c[j])) > ERR_TH) {
+            if (errors < 10) {
+				uint32_t g = *((uint32_t *)&gold_c[j]);
+				uint32_t v = *((uint32_t *)&val);
+				printf("\tGOLD[%u] = 0x%x vs 0x%x = out[%u]\n", j, g, v, j);
+			}
             errors++;
         }
     }
@@ -140,19 +149,23 @@ int validate_buffer(unsigned *mem_c, unsigned *gold_c)
 }
 
 // Initialize input and calculate golden output
-void init_buffer(unsigned *mem_a, unsigned *mem_b, unsigned *gold_a, unsigned *gold_b, unsigned *gold_c)
+void init_buffer(int *mem_a, int *mem_b, float *gold_a, float *gold_b, float *gold_c)
 {
+    const float LO = -2.0;
+    const float HI = 2.0;
     const unsigned len_a = dim_m * dim_k;
     const unsigned len_b = dim_n * dim_k;
 
     for (unsigned j = 0; j < len_a; j++) {
-        gold_a[j] = j % 100;
-        mem_a[j] = j % 100;
+        float scaling_factor = (float) rand() / (float) RAND_MAX;
+        gold_a[j] = LO + scaling_factor * (HI - LO);
+        mem_a[j] = float_to_fixed32(gold_a[j], FX_IL);
     }
 
     for (unsigned j = 0; j < len_b; j++) {
-        gold_b[j] = j % 100;
-        mem_b[j] = j % 100;
+        float scaling_factor = (float) rand() / (float) RAND_MAX;
+        gold_b[j] = LO + scaling_factor * (HI - LO);
+        mem_b[j] = float_to_fixed32(gold_b[j], FX_IL);
     }
 
     // Compute golden output
@@ -171,8 +184,8 @@ int main(int argc, char * argv[])
 	unsigned done;
 	unsigned spin_ct;
 	unsigned **ptable = NULL;
-	unsigned *mem;
-	unsigned *gold;
+	int *mem;
+	float *gold;
 	unsigned errors = 0;
 	unsigned coherence;
 
@@ -191,7 +204,7 @@ int main(int argc, char * argv[])
     unsigned mat_a_valid_offset = VALID_OFFSET;
     unsigned mat_c_valid_offset = mat_b_offset + mat_b_len;
 	
-    unsigned mem_size = (mat_c_offset + mat_c_len) * sizeof(unsigned);
+    unsigned mem_size = (mat_c_offset + mat_c_len) * sizeof(int);
 
 	// Search for the device
 	ndev = probe(&espdevs, VENDOR_SLD, SLD_GEMM, DEV_NAME);

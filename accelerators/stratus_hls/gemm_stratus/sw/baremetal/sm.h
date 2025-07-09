@@ -38,7 +38,6 @@ void atomic_flag_store(atomic_flag_t *atom, uint64_t val) {
 
 void atomic_flag_init(atomic_flag_t *atom, volatile uint64_t *f) {
 	atom->flag = f;
-	printf("flag = %p\n", atom->flag);
 	atomic_flag_store(atom, 0);
 }
 
