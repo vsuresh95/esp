@@ -17,7 +17,6 @@
 class conf_info_t
 {
 public:
-
     //
     // constructors
     //
@@ -43,8 +42,8 @@ public:
 
     conf_info_t(
         /* <<--ctor-args-->> */
-        int32_t dim_m[N_CONTEXTS], 
-        int32_t dim_n[N_CONTEXTS], 
+        int32_t dim_m[N_CONTEXTS],
+        int32_t dim_n[N_CONTEXTS],
         int32_t dim_k[N_CONTEXTS],
         int32_t weight_base[N_CONTEXTS],
         int32_t input_base[N_CONTEXTS][N_INPUTS],

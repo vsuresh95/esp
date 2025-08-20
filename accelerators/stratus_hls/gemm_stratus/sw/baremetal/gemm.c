@@ -279,7 +279,7 @@ int main(int argc, char * argv[])
 	// Start accelerators
 	iowrite32(dev, CMD_REG, CMD_MASK_START);
 
-    const unsigned iterations = 1000;
+    const unsigned iterations = 20;
 
     for (unsigned i = 0; i < iterations; i++) {
         printf("[APP] Starting iteration %d!\n", i);
