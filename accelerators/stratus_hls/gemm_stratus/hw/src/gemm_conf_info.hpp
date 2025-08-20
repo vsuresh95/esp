@@ -6,8 +6,6 @@
 
 #include <systemc.h>
 
-#define N_INPUTS 1
-#define N_OUTPUTS 1
 #define N_CONTEXTS 4
 #define N_CONTEXTS_BITS 2
 
@@ -28,12 +26,8 @@ public:
             this->dim_n[i] = 1;
             this->dim_k[i] = 1;
             this->weight_base[i] = 1;
-            for (int j = 0; j < N_INPUTS; j++) {
-                this->input_base[i][j] = 0;
-            }
-            for (int j = 0; j < N_OUTPUTS; j++) {
-                this->output_base[i][j] = 0;
-            }
+            this->input_base[i] = 0;
+            this->output_base[i] = 0;
             this->context_nprio[i] = 0;
         }
         this->valid_contexts = 0;
@@ -46,8 +40,8 @@ public:
         int32_t dim_n[N_CONTEXTS],
         int32_t dim_k[N_CONTEXTS],
         int32_t weight_base[N_CONTEXTS],
-        int32_t input_base[N_CONTEXTS][N_INPUTS],
-        int32_t output_base[N_CONTEXTS][N_OUTPUTS],
+        int32_t input_base[N_CONTEXTS],
+        int32_t output_base[N_CONTEXTS],
         int32_t context_nprio[N_CONTEXTS],
         int32_t valid_contexts,
         int32_t sched_period
@@ -59,12 +53,8 @@ public:
             this->dim_n[i] = dim_n[i];
             this->dim_k[i] = dim_k[i];
             this->weight_base[i] = weight_base[i];
-            for (int j = 0; j < N_INPUTS; j++) {
-                this->input_base[i][j] = input_base[i][j];
-            }
-            for (int j = 0; j < N_OUTPUTS; j++) {
-                this->output_base[i][j] = output_base[i][j];
-            }
+            this->input_base[i] = input_base[i];
+            this->output_base[i] = output_base[i];
             this->context_nprio[i] = context_nprio[i];
         }
         this->valid_contexts = valid_contexts;
@@ -80,12 +70,8 @@ public:
             if (dim_n[i] != rhs.dim_n[i]) return false;
             if (dim_k[i] != rhs.dim_k[i]) return false;
             if (weight_base[i] != rhs.weight_base[i]) return false;
-            for (int j = 0; j < N_INPUTS; j++) {
-                if (input_base[i][j] != rhs.input_base[i][j]) return false;
-            }
-            for (int j = 0; j < N_OUTPUTS; j++) {
-                if (output_base[i][j] != rhs.output_base[i][j]) return false;
-            }
+            if (input_base[i] != rhs.input_base[i]) return false;
+            if (output_base[i] != rhs.output_base[i]) return false;
             if (context_nprio[i] != rhs.context_nprio[i]) return false;
         }
         if (valid_contexts != rhs.valid_contexts) return false;
@@ -102,12 +88,8 @@ public:
             dim_n[i] = other.dim_n[i];
             dim_k[i] = other.dim_k[i];
             weight_base[i] = other.weight_base[i];
-            for (int j = 0; j < N_INPUTS; j++) {
-                input_base[i][j] = other.input_base[i][j];
-            }
-            for (int j = 0; j < N_OUTPUTS; j++) {
-                output_base[i][j] = other.output_base[i][j];
-            }
+            input_base[i] = other.input_base[i];
+            output_base[i] = other.output_base[i];
             context_nprio[i] = other.context_nprio[i];
         }
         valid_contexts = other.valid_contexts;
@@ -133,8 +115,8 @@ public:
         int32_t dim_n[N_CONTEXTS];
         int32_t dim_k[N_CONTEXTS];
         int32_t weight_base[N_CONTEXTS];
-        int32_t input_base[N_CONTEXTS][N_INPUTS];
-        int32_t output_base[N_CONTEXTS][N_OUTPUTS];
+        int32_t input_base[N_CONTEXTS];
+        int32_t output_base[N_CONTEXTS];
         int32_t context_nprio[N_CONTEXTS];
         int32_t valid_contexts;
         int32_t sched_period;

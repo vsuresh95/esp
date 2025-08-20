@@ -21,13 +21,13 @@
 #define PLM_IN_WORD TILE_SIZE
 #define PLM_OUT_WORD TILE_SIZE
 
-class gemm : public esp_accelerator_avu<DMA_WIDTH, N_INPUTS, N_OUTPUTS, N_CONTEXTS_BITS>
+class gemm : public esp_accelerator_avu<DMA_WIDTH, N_CONTEXTS_BITS>
 {
 public:
     // Constructor
     SC_HAS_PROCESS(gemm);
     gemm(const sc_module_name& name)
-    : esp_accelerator_avu<DMA_WIDTH, N_INPUTS, N_OUTPUTS, N_CONTEXTS_BITS>(name)
+    : esp_accelerator_avu<DMA_WIDTH, N_CONTEXTS_BITS>(name)
     {
         // Map arrays to memories
         /* <<--plm-bind-->> */

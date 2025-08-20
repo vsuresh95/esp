@@ -61,7 +61,7 @@ void gemm::load_input()
             dim_n = config.dim_n[current_context_int];
             dim_k = config.dim_k[current_context_int];
             weight_payload_base = config.weight_base[current_context_int];
-            input_payload_offset = config.input_base[current_context_int][0] + PAYLOAD_OFFSET;
+            input_payload_offset = config.input_base[current_context_int] + PAYLOAD_OFFSET;
             in_pingpong = true;
             pingpong = true;
             kill_task = false;
@@ -245,7 +245,7 @@ void gemm::store_output()
             dim_m = config.dim_m[current_context_int];
             dim_n = config.dim_n[current_context_int];
             dim_k = config.dim_k[current_context_int];
-            output_payload_base = config.output_base[current_context_int][0] + PAYLOAD_OFFSET;
+            output_payload_base = config.output_base[current_context_int] + PAYLOAD_OFFSET;
             pingpong = true;
             wait();
         }
