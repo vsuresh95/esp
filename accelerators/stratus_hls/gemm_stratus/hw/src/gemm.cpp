@@ -47,21 +47,13 @@ void gemm::load_input()
         // Read config information for current context
         {
             HLS_PROTO("read-load-config");
-            conf_info_t config = this->conf_info.read();
-
-            HLS_FLATTEN_ARRAY(config.dim_m);
-            HLS_FLATTEN_ARRAY(config.dim_n);
-            HLS_FLATTEN_ARRAY(config.dim_k);
-            HLS_FLATTEN_ARRAY(config.input_base);
-            HLS_FLATTEN_ARRAY(config.weight_base);
-
-            // User-defined config code
+            sm_info_t info = this->sm_info.read();
             /* <<--local-params-->> */
-            dim_m = config.dim_m[current_context_int];
-            dim_n = config.dim_n[current_context_int];
-            dim_k = config.dim_k[current_context_int];
-            weight_payload_base = config.weight_base[current_context_int];
-            input_payload_offset = config.input_base[current_context_int] + PAYLOAD_OFFSET;
+            dim_m = info.dim_m;
+            dim_n = info.dim_n;
+            dim_k = info.dim_k;
+            weight_payload_base = info.weight_base;
+            input_payload_offset = info.input_base + PAYLOAD_OFFSET;
             in_pingpong = true;
             pingpong = true;
             kill_task = false;
@@ -233,19 +225,12 @@ void gemm::store_output()
         // Read config information for current context
         {
             HLS_PROTO("read-store-config");
-            conf_info_t config = this->conf_info.read();
-
-            HLS_FLATTEN_ARRAY(config.dim_m);
-            HLS_FLATTEN_ARRAY(config.dim_n);
-            HLS_FLATTEN_ARRAY(config.dim_k);
-            HLS_FLATTEN_ARRAY(config.output_base);
-
-            // User-defined config code
             /* <<--local-params-->> */
-            dim_m = config.dim_m[current_context_int];
-            dim_n = config.dim_n[current_context_int];
-            dim_k = config.dim_k[current_context_int];
-            output_payload_base = config.output_base[current_context_int] + PAYLOAD_OFFSET;
+            sm_info_t info = this->sm_info.read();
+            dim_m = info.dim_m;
+            dim_n = info.dim_n;
+            dim_k = info.dim_k;
+            output_payload_base = info.output_base + PAYLOAD_OFFSET;
             pingpong = true;
             wait();
         }
@@ -359,18 +344,11 @@ void gemm::compute_kernel()
             HLS_PROTO("read-compute-config");
             this->compute_avu_ready_handshake();
             wait();
-            
-            conf_info_t config = this->conf_info.read();
-
-            HLS_FLATTEN_ARRAY(config.dim_m);
-            HLS_FLATTEN_ARRAY(config.dim_n);
-            HLS_FLATTEN_ARRAY(config.dim_k);
-
-            // User-defined config code
             /* <<--local-params-->> */
-            dim_m = config.dim_m[current_context_int];
-            dim_n = config.dim_n[current_context_int];
-            dim_k = config.dim_k[current_context_int];
+            sm_info_t info = this->sm_info.read();
+            dim_m = info.dim_m;
+            dim_n = info.dim_n;
+            dim_k = info.dim_k;
             in_pingpong = true;
             pingpong = true;
             kill_task = false;

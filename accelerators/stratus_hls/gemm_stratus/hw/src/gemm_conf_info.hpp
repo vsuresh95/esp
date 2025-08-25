@@ -22,12 +22,7 @@ public:
     {
         /* <<--ctor-->> */
         for (int i = 0; i < N_CONTEXTS; i++) {
-            this->dim_m[i] = 1;
-            this->dim_n[i] = 1;
-            this->dim_k[i] = 1;
-            this->weight_base[i] = 1;
-            this->input_base[i] = 0;
-            this->output_base[i] = 0;
+            this->context_base_ptr[i] = 0;
             this->context_nprio[i] = 0;
         }
         this->valid_contexts = 0;
@@ -36,12 +31,7 @@ public:
 
     conf_info_t(
         /* <<--ctor-args-->> */
-        int32_t dim_m[N_CONTEXTS],
-        int32_t dim_n[N_CONTEXTS],
-        int32_t dim_k[N_CONTEXTS],
-        int32_t weight_base[N_CONTEXTS],
-        int32_t input_base[N_CONTEXTS],
-        int32_t output_base[N_CONTEXTS],
+        int32_t context_base_ptr[N_CONTEXTS],
         int32_t context_nprio[N_CONTEXTS],
         int32_t valid_contexts,
         int32_t sched_period
@@ -49,12 +39,7 @@ public:
     {
         /* <<--ctor-custom-->> */
         for (int i = 0; i < N_CONTEXTS; i++) {
-            this->dim_m[i] = dim_m[i];
-            this->dim_n[i] = dim_n[i];
-            this->dim_k[i] = dim_k[i];
-            this->weight_base[i] = weight_base[i];
-            this->input_base[i] = input_base[i];
-            this->output_base[i] = output_base[i];
+            this->context_base_ptr[i] = context_base_ptr[i];
             this->context_nprio[i] = context_nprio[i];
         }
         this->valid_contexts = valid_contexts;
@@ -66,12 +51,7 @@ public:
     {
         /* <<--eq-->> */
         for (int i = 0; i < N_CONTEXTS; i++) {
-            if (dim_m[i] != rhs.dim_m[i]) return false;
-            if (dim_n[i] != rhs.dim_n[i]) return false;
-            if (dim_k[i] != rhs.dim_k[i]) return false;
-            if (weight_base[i] != rhs.weight_base[i]) return false;
-            if (input_base[i] != rhs.input_base[i]) return false;
-            if (output_base[i] != rhs.output_base[i]) return false;
+            if (context_base_ptr[i] != rhs.context_base_ptr[i]) return false;
             if (context_nprio[i] != rhs.context_nprio[i]) return false;
         }
         if (valid_contexts != rhs.valid_contexts) return false;
@@ -84,16 +64,11 @@ public:
     {
         /* <<--assign-->> */
         for (int i = 0; i < N_CONTEXTS; i++) {
-            dim_m[i] = other.dim_m[i];
-            dim_n[i] = other.dim_n[i];
-            dim_k[i] = other.dim_k[i];
-            weight_base[i] = other.weight_base[i];
-            input_base[i] = other.input_base[i];
-            output_base[i] = other.output_base[i];
+            context_base_ptr[i] = other.context_base_ptr[i];
             context_nprio[i] = other.context_nprio[i];
         }
         valid_contexts = other.valid_contexts;
-        valid_contexts = other.valid_contexts;
+        sched_period = other.sched_period;
         return *this;
     }
 
@@ -110,16 +85,11 @@ public:
         return os;
     }
 
-        /* <<--params-->> */
-        int32_t dim_m[N_CONTEXTS];
-        int32_t dim_n[N_CONTEXTS];
-        int32_t dim_k[N_CONTEXTS];
-        int32_t weight_base[N_CONTEXTS];
-        int32_t input_base[N_CONTEXTS];
-        int32_t output_base[N_CONTEXTS];
-        int32_t context_nprio[N_CONTEXTS];
-        int32_t valid_contexts;
-        int32_t sched_period;
+    /* <<--params-->> */
+    int32_t context_base_ptr[N_CONTEXTS];
+    int32_t context_nprio[N_CONTEXTS];
+    int32_t valid_contexts;
+    int32_t sched_period;
 };
 
 #endif // __GEMM_CONF_INFO_HPP__

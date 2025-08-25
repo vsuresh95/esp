@@ -37,36 +37,16 @@ const unsigned dim_k = 20;
 
 /* User defined registers */
 /* <<--regs-->> */
-#define GEMM_DIM_M_REG_0		0x70
-#define GEMM_DIM_M_REG_1		0x74
-#define GEMM_DIM_M_REG_2		0x78
-#define GEMM_DIM_M_REG_3		0x7C
-#define GEMM_DIM_N_REG_0		0x80
-#define GEMM_DIM_N_REG_1		0x84
-#define GEMM_DIM_N_REG_2		0x88
-#define GEMM_DIM_N_REG_3		0x8C
-#define GEMM_DIM_K_REG_0		0x90
-#define GEMM_DIM_K_REG_1		0x94
-#define GEMM_DIM_K_REG_2		0x98
-#define GEMM_DIM_K_REG_3		0x9C
-#define GEMM_WEIGHT_BASE_0		0xA0
-#define GEMM_WEIGHT_BASE_1		0xA4
-#define GEMM_WEIGHT_BASE_2		0xA8
-#define GEMM_WEIGHT_BASE_3		0xAC
-#define GEMM_INPUT_BASE_0		0xB0
-#define GEMM_INPUT_BASE_1		0xB4
-#define GEMM_INPUT_BASE_2		0xB8
-#define GEMM_INPUT_BASE_3		0xBC
-#define GEMM_OUTPUT_BASE_0		0xC0
-#define GEMM_OUTPUT_BASE_1		0xC4
-#define GEMM_OUTPUT_BASE_2		0xC8
-#define GEMM_OUTPUT_BASE_3		0xCC
-#define GEMM_CONTEXT_NPRIO_0	0xD0
-#define GEMM_CONTEXT_NPRIO_1	0xD4
-#define GEMM_CONTEXT_NPRIO_2	0xD8
-#define GEMM_CONTEXT_NPRIO_3	0xDC
-#define GEMM_VALID_CONTEXTS		0xE0
-#define GEMM_SCHED_PERIOD		0xE4
+#define GEMM_CONTEXT_BASE_PTR_0		0x70
+#define GEMM_CONTEXT_BASE_PTR_1		0x74
+#define GEMM_CONTEXT_BASE_PTR_2		0x78
+#define GEMM_CONTEXT_BASE_PTR_3		0x7C
+#define GEMM_CONTEXT_NPRIO_0		0x80
+#define GEMM_CONTEXT_NPRIO_1		0x84
+#define GEMM_CONTEXT_NPRIO_2		0x88
+#define GEMM_CONTEXT_NPRIO_3		0x8C
+#define GEMM_VALID_CONTEXTS			0x90
+#define GEMM_SCHED_PERIOD			0x94
 
 static uint64_t t_start = 0;
 static uint64_t t_end = 0;
@@ -191,20 +171,26 @@ int main(int argc, char * argv[])
 
 	printf("dim_m %u dim_n %u dim_k %u\n", dim_m, dim_n, dim_k);
     unsigned flag_len = PAYLOAD_OFFSET/sizeof(unsigned); // Number of unsigned elements reserved for flags
-    unsigned mat_a_len = flag_len + (dim_m * dim_k);
+    unsigned mat_a_len = dim_m * dim_k;
     unsigned mat_b_len = dim_n * dim_k;
-    unsigned mat_c_len = flag_len + (dim_m * dim_n);
+    unsigned mat_c_len = dim_m * dim_n;
 
-    // Data offsets
-    unsigned mat_a_offset = flag_len;
-    unsigned mat_b_offset = mat_a_len;
-    unsigned mat_c_offset = mat_b_offset + mat_b_len + flag_len;
-
-    // Sync flag offsets
+    // Sync flag and data offsets
     unsigned mat_a_valid_offset = VALID_OFFSET;
+    unsigned mat_a_offset = mat_a_valid_offset + flag_len;
+
+    unsigned mat_b_offset = mat_a_offset + mat_a_len;
+
     unsigned mat_c_valid_offset = mat_b_offset + mat_b_len;
-	
-    unsigned mem_size = (mat_c_offset + mat_c_len) * sizeof(int);
+    unsigned mat_c_offset = mat_c_valid_offset + flag_len;
+
+	// Descriptor size - 2 (STAT) + 2 * SM_INFO_SIZE (tasks)
+	unsigned stat_len = 2;
+	unsigned stat_offset = mat_c_offset + mat_c_len;
+	unsigned descr_len = 2 * SM_INFO_SIZE;
+	unsigned descr_offset = stat_offset + stat_len;
+
+    unsigned mem_size = (descr_offset + descr_len) * sizeof(int);
 
 	// Search for the device
 	ndev = probe(&espdevs, VENDOR_SLD, SLD_GEMM, DEV_NAME);
@@ -262,16 +248,26 @@ int main(int argc, char * argv[])
 
 	// Pass accelerator-specific configuration parameters
 	/* <<--regs-config-->> */
-	iowrite32(dev, GEMM_DIM_M_REG_0, dim_m);
-	iowrite32(dev, GEMM_DIM_N_REG_0, dim_n);
-	iowrite32(dev, GEMM_DIM_K_REG_0, dim_k);
-	iowrite32(dev, GEMM_WEIGHT_BASE_0, mat_b_offset);
-	iowrite32(dev, GEMM_INPUT_BASE_0, mat_a_valid_offset);
-	iowrite32(dev, GEMM_OUTPUT_BASE_0, mat_c_valid_offset);
+	iowrite32(dev, GEMM_CONTEXT_BASE_PTR_0, stat_offset);
 	iowrite32(dev, PT_ADDRESS_REG_0, (unsigned long long) ptable);
 	iowrite32(dev, GEMM_CONTEXT_NPRIO_0, 1);
 	iowrite32(dev, GEMM_VALID_CONTEXTS, 0x1);
 	iowrite32(dev, GEMM_SCHED_PERIOD, 0x100000);
+
+	// Set up two descriptors: 1 GEMM, 1 JUMP
+	mem[stat_offset + 0] = 1;
+	mem[stat_offset + 1] = descr_offset;
+
+	mem[descr_offset + 0 * SM_INFO_SIZE + 0] = 1;
+	mem[descr_offset + 0 * SM_INFO_SIZE + 1] = dim_m;
+	mem[descr_offset + 0 * SM_INFO_SIZE + 2] = dim_n;
+	mem[descr_offset + 0 * SM_INFO_SIZE + 3] = dim_k;
+	mem[descr_offset + 0 * SM_INFO_SIZE + 4] = mat_b_offset;
+	mem[descr_offset + 0 * SM_INFO_SIZE + 5] = mat_a_valid_offset;
+	mem[descr_offset + 0 * SM_INFO_SIZE + 6] = mat_c_valid_offset;
+
+	mem[descr_offset + 1 * SM_INFO_SIZE + 0] = 2;
+	mem[descr_offset + 1 * SM_INFO_SIZE + 1] = descr_offset;
 
 	// Flush (customize coherence model here)
 	esp_flush(coherence);

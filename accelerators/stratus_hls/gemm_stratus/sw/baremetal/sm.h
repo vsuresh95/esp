@@ -1,6 +1,7 @@
 // Size and parameter defines
 #define VALID_OFFSET 0
 #define PAYLOAD_OFFSET 8
+#define SM_INFO_SIZE 8
 
 // Custom implementation of atomic flag for performance
 typedef struct {

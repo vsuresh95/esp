@@ -1,30 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <sld>
   <accelerator name="gemm" desc="Accelerator GEMM" data_size="4" device_id="051" hls_tool="stratus_hls">
-    <param name="dim_m_0" desc="dim_m_0" />
-    <param name="dim_m_1" desc="dim_m_1" />
-    <param name="dim_m_2" desc="dim_m_2" />
-    <param name="dim_m_3" desc="dim_m_3" />
-    <param name="dim_n_0" desc="dim_n_0" />
-    <param name="dim_n_1" desc="dim_n_1" />
-    <param name="dim_n_2" desc="dim_n_2" />
-    <param name="dim_n_3" desc="dim_n_3" />
-    <param name="dim_k_0" desc="dim_k_0" />
-    <param name="dim_k_1" desc="dim_k_1" />
-    <param name="dim_k_2" desc="dim_k_2" />
-    <param name="dim_k_3" desc="dim_k_3" />
-    <param name="weight_base_0" desc="weight_base_0" />
-    <param name="weight_base_1" desc="weight_base_1" />
-    <param name="weight_base_2" desc="weight_base_2" />
-    <param name="weight_base_3" desc="weight_base_3" />
-    <param name="input_base_0" desc="input_base_0" />
-    <param name="input_base_1" desc="input_base_1" />
-    <param name="input_base_2" desc="input_base_2" />
-    <param name="input_base_3" desc="input_base_3" />
-    <param name="output_base_0" desc="output_base_0" />
-    <param name="output_base_1" desc="output_base_1" />
-    <param name="output_base_2" desc="output_base_2" />
-    <param name="output_base_3" desc="output_base_3" />
+    <param name="context_base_ptr_0" desc="context_base_ptr_0" />
+    <param name="context_base_ptr_1" desc="context_base_ptr_1" />
+    <param name="context_base_ptr_2" desc="context_base_ptr_2" />
+    <param name="context_base_ptr_3" desc="context_base_ptr_3" />
     <param name="context_nprio_0" desc="context_nprio_0" />
     <param name="context_nprio_1" desc="context_nprio_1" />
     <param name="context_nprio_2" desc="context_nprio_2" />
