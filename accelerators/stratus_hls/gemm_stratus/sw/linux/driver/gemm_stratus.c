@@ -13,36 +13,16 @@
 #define DRV_NAME	"gemm_stratus"
 
 /* <<--regs-->> */
-#define GEMM_DIM_M_REG_0		0x70
-#define GEMM_DIM_M_REG_1		0x74
-#define GEMM_DIM_M_REG_2		0x78
-#define GEMM_DIM_M_REG_3		0x7C
-#define GEMM_DIM_N_REG_0		0x80
-#define GEMM_DIM_N_REG_1		0x84
-#define GEMM_DIM_N_REG_2		0x88
-#define GEMM_DIM_N_REG_3		0x8C
-#define GEMM_DIM_K_REG_0		0x90
-#define GEMM_DIM_K_REG_1		0x94
-#define GEMM_DIM_K_REG_2		0x98
-#define GEMM_DIM_K_REG_3		0x9C
-#define GEMM_WEIGHT_BASE_0		0xA0
-#define GEMM_WEIGHT_BASE_1		0xA4
-#define GEMM_WEIGHT_BASE_2		0xA8
-#define GEMM_WEIGHT_BASE_3		0xAC
-#define GEMM_INPUT_BASE_0		0xB0
-#define GEMM_INPUT_BASE_1		0xB4
-#define GEMM_INPUT_BASE_2		0xB8
-#define GEMM_INPUT_BASE_3		0xBC
-#define GEMM_OUTPUT_BASE_0		0xC0
-#define GEMM_OUTPUT_BASE_1		0xC4
-#define GEMM_OUTPUT_BASE_2		0xC8
-#define GEMM_OUTPUT_BASE_3		0xCC
-#define GEMM_CONTEXT_NPRIO_0	0xD0
-#define GEMM_CONTEXT_NPRIO_1	0xD4
-#define GEMM_CONTEXT_NPRIO_2	0xD8
-#define GEMM_CONTEXT_NPRIO_3	0xDC
-#define GEMM_VALID_CONTEXTS		0xE0
-#define GEMM_SCHED_PERIOD		0xE4
+#define GEMM_CONTEXT_BASE_PTR_0	0x70
+#define GEMM_CONTEXT_BASE_PTR_1	0x74
+#define GEMM_CONTEXT_BASE_PTR_2	0x78
+#define GEMM_CONTEXT_BASE_PTR_3	0x7C
+#define GEMM_CONTEXT_NPRIO_0	0x80
+#define GEMM_CONTEXT_NPRIO_1	0x84
+#define GEMM_CONTEXT_NPRIO_2	0x88
+#define GEMM_CONTEXT_NPRIO_3	0x8C
+#define GEMM_VALID_CONTEXTS		0x90
+#define GEMM_SCHED_PERIOD		0x94
 
 struct gemm_stratus_device {
 	struct esp_device esp;
@@ -79,14 +59,7 @@ static void gemm_init_accel(struct esp_device *esp, void *arg)
 	struct gemm_stratus_access *a = arg;
 
 	/* <<--regs-config-->> */
-	iowrite32be(a->dim_m, esp->iomem + GEMM_DIM_M_REG_0 + 0x4*esp->context_id);
-	iowrite32be(a->dim_n, esp->iomem + GEMM_DIM_N_REG_0 + 0x4*esp->context_id);
-	iowrite32be(a->dim_k, esp->iomem + GEMM_DIM_K_REG_0 + 0x4*esp->context_id);
-	iowrite32be(a->weight_base, esp->iomem + GEMM_WEIGHT_BASE_0 + 0x4*esp->context_id);
-
-	iowrite32be(a->input_base, esp->iomem + GEMM_INPUT_BASE_0 + 0x4*esp->context_id);
-	iowrite32be(a->output_base, esp->iomem + GEMM_OUTPUT_BASE_0 + 0x4*esp->context_id);
-
+	iowrite32be(a->esp.context_base_ptr, esp->iomem + GEMM_CONTEXT_BASE_PTR_0 + 0x4*esp->context_id);
 	iowrite32be(a->esp.context_nprio, esp->iomem + GEMM_CONTEXT_NPRIO_0 + 0x4*esp->context_id);
 	iowrite32be(a->esp.valid_contexts, esp->iomem + GEMM_VALID_CONTEXTS);
 	iowrite32be(a->esp.sched_period, esp->iomem + GEMM_SCHED_PERIOD);
@@ -97,14 +70,7 @@ static void gemm_add_context(struct esp_device *esp, void *arg)
 	struct gemm_stratus_access *a = arg;
 
 	/* <<--regs-config-->> */
-	iowrite32be(a->dim_m, esp->iomem + GEMM_DIM_M_REG_0 + 0x4*esp->context_id);
-	iowrite32be(a->dim_n, esp->iomem + GEMM_DIM_N_REG_0 + 0x4*esp->context_id);
-	iowrite32be(a->dim_k, esp->iomem + GEMM_DIM_K_REG_0 + 0x4*esp->context_id);
-	iowrite32be(a->weight_base, esp->iomem + GEMM_WEIGHT_BASE_0 + 0x4*esp->context_id);
-
-	iowrite32be(a->input_base, esp->iomem + GEMM_INPUT_BASE_0 + 0x4*esp->context_id);
-	iowrite32be(a->output_base, esp->iomem + GEMM_OUTPUT_BASE_0 + 0x4*esp->context_id);
-
+	iowrite32be(a->esp.context_base_ptr, esp->iomem + GEMM_CONTEXT_BASE_PTR_0 + 0x4*esp->context_id);
 	iowrite32be(a->esp.context_nprio, esp->iomem + GEMM_CONTEXT_NPRIO_0 + 0x4*esp->context_id);
 	iowrite32be(a->esp.valid_contexts, esp->iomem + GEMM_VALID_CONTEXTS);
 	iowrite32be(a->esp.sched_period, esp->iomem + GEMM_SCHED_PERIOD);
@@ -185,6 +151,7 @@ static struct esp_driver gemm_driver = {
 	.del_context	= gemm_del_context,
 	.setprio		= gemm_setprio,
 	.ioctl_cm		= GEMM_STRATUS_IOC_ACCESS,
+	.reset_cm		= GEMM_STRATUS_RESET_IOC_ACCESS,
 	.init_cm		= GEMM_STRATUS_INIT_IOC_ACCESS,
 	.add_cm			= GEMM_STRATUS_ADD_IOC_ACCESS,
 	.del_cm			= GEMM_STRATUS_DEL_IOC_ACCESS,

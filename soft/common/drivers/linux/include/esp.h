@@ -30,6 +30,7 @@ struct esp_access {
     unsigned spandex_conf;
 	unsigned context_id;
 	unsigned valid_contexts;
+	unsigned context_base_ptr;
 	unsigned context_nprio;
 	unsigned sched_period;
 
@@ -80,6 +81,7 @@ struct esp_driver {
 	void (*del_context)(struct esp_device *esp, void *arg);
 	void (*setprio)(struct esp_device *esp, void *arg);
 	unsigned int ioctl_cm;
+	unsigned int reset_cm;
 	unsigned int init_cm;
 	unsigned int add_cm;
 	unsigned int del_cm;

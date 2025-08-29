@@ -491,13 +491,27 @@ static int esp_access_virt(struct esp_device *esp, unsigned int cm, void __user 
 	}
 
 	// Initializing the accelerator, adding context/deleting context/changing priority?
-	if (cm == esp->driver->del_cm) {
+	if (cm == esp->driver->reset_cm) {
+		goto reset;
+	} else if (cm == esp->driver->del_cm) {
 		goto del;
 	} else if (cm == esp->driver->prio_cm) {
 		goto prio;
 	} else {
 		goto add;
 	}
+
+reset:
+	if (mutex_lock_interruptible(&esp->lock)) {
+		rc = -EINTR;
+		goto out;
+	}
+
+	esp_halt(esp);
+
+	mutex_unlock(&esp->lock);
+
+	goto out;
 
 del:
 	if (mutex_lock_interruptible(&esp->lock)) {
@@ -699,6 +713,8 @@ static long esp_do_ioctl(struct file *file, unsigned int cm, void __user *arg)
 	default:
 		if (cm == esp->driver->ioctl_cm)
 			return esp_access_ioctl(esp, arg);
+		else if (cm == esp->driver->reset_cm)
+			return esp_access_virt(esp, cm, arg);
 		else if (cm == esp->driver->init_cm)
 			return esp_access_virt(esp, cm, arg);
 		else if (cm == esp->driver->add_cm)
