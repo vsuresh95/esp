@@ -21,7 +21,7 @@ public:
     conf_info_t()
     {
         /* <<--ctor-->> */
-        for (int i = 0; i < N_CONTEXTS; i++) {
+        for (unsigned i = 0; i < N_CONTEXTS; i++) {
             this->context_base_ptr[i] = 0;
             this->context_nprio[i] = 0;
         }
@@ -31,14 +31,14 @@ public:
 
     conf_info_t(
         /* <<--ctor-args-->> */
-        int32_t context_base_ptr[N_CONTEXTS],
-        int32_t context_nprio[N_CONTEXTS],
-        int32_t valid_contexts,
-        int32_t sched_period
+        uint32_t context_base_ptr[N_CONTEXTS],
+        uint32_t context_nprio[N_CONTEXTS],
+        uint32_t valid_contexts,
+        uint32_t sched_period
         )
     {
         /* <<--ctor-custom-->> */
-        for (int i = 0; i < N_CONTEXTS; i++) {
+        for (unsigned i = 0; i < N_CONTEXTS; i++) {
             this->context_base_ptr[i] = context_base_ptr[i];
             this->context_nprio[i] = context_nprio[i];
         }
@@ -50,7 +50,7 @@ public:
     inline bool operator==(const conf_info_t &rhs) const
     {
         /* <<--eq-->> */
-        for (int i = 0; i < N_CONTEXTS; i++) {
+        for (unsigned i = 0; i < N_CONTEXTS; i++) {
             if (context_base_ptr[i] != rhs.context_base_ptr[i]) return false;
             if (context_nprio[i] != rhs.context_nprio[i]) return false;
         }
@@ -63,7 +63,7 @@ public:
     inline conf_info_t& operator=(const conf_info_t& other)
     {
         /* <<--assign-->> */
-        for (int i = 0; i < N_CONTEXTS; i++) {
+        for (unsigned i = 0; i < N_CONTEXTS; i++) {
             context_base_ptr[i] = other.context_base_ptr[i];
             context_nprio[i] = other.context_nprio[i];
         }
@@ -86,10 +86,10 @@ public:
     }
 
     /* <<--params-->> */
-    int32_t context_base_ptr[N_CONTEXTS];
-    int32_t context_nprio[N_CONTEXTS];
-    int32_t valid_contexts;
-    int32_t sched_period;
+    uint32_t context_base_ptr[N_CONTEXTS];
+    uint32_t context_nprio[N_CONTEXTS];
+    uint32_t valid_contexts;
+    uint32_t sched_period;
 };
 
 #endif // __GEMM_CONF_INFO_HPP__

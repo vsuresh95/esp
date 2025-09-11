@@ -33,14 +33,14 @@ public:
 
     sm_info_t(
         /* <<--ctor-args-->> */
-        int32_t opcode,
-        int32_t dim_m,
-        int32_t dim_n,
-        int32_t dim_k,
-        int32_t weight_base,
-        int32_t input_base,
-        int32_t output_base,
-        int32_t padding
+        uint32_t opcode,
+        uint32_t dim_m,
+        uint32_t dim_n,
+        uint32_t dim_k,
+        uint32_t weight_base,
+        uint32_t input_base,
+        uint32_t output_base,
+        uint32_t padding
         )
     {
         /* <<--ctor-custom-->> */
@@ -85,7 +85,7 @@ public:
     }
 
     // index assignment operator
-    inline int32_t& operator[](int index)
+    inline uint32_t& operator[](int index)
     {
         /* <<--index assign-->> */
         switch (index) {
@@ -102,7 +102,7 @@ public:
     }
 
     // index read operator
-    inline const int32_t& operator[](int index) const
+    inline const uint32_t& operator[](int index) const
     {
         /* <<--index read-->> */
         switch (index) {
@@ -132,14 +132,14 @@ public:
     }
 
     /* <<--params-->> */
-    int32_t opcode;
-    int32_t dim_m;
-    int32_t dim_n;
-    int32_t dim_k;
-    int32_t weight_base;
-    int32_t input_base;
-    int32_t output_base;
-    int32_t padding;
+    uint32_t opcode;
+    uint32_t dim_m;
+    uint32_t dim_n;
+    uint32_t dim_k;
+    uint32_t weight_base;
+    uint32_t input_base;
+    uint32_t output_base;
+    uint32_t padding;
 };
 
 #endif // __GEMM_SM_INFO_HPP__

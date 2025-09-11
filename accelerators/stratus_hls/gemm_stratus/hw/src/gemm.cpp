@@ -21,16 +21,16 @@ void gemm::load_input()
 
     // Config
     /* <<--params-->> */
-    int32_t dim_m;
-    int32_t dim_n;
-    int32_t dim_k;
-    int32_t input_payload_offset;
-    int32_t weight_payload_base;
-    int32_t weight_payload_offset;
+    uint32_t dim_m;
+    uint32_t dim_n;
+    uint32_t dim_k;
+    uint32_t input_payload_offset;
+    uint32_t weight_payload_base;
+    uint32_t weight_payload_offset;
     bool in_pingpong;
     bool pingpong;
     bool kill_task;
-    int32_t tile_size_m, tile_size_n, tile_size_k;
+    uint32_t tile_size_m, tile_size_n, tile_size_k;
     {
         HLS_PROTO("load-config");
         cfg.wait_for_config(); // config process
@@ -70,16 +70,16 @@ void gemm::load_input()
             wait();
 
             // Load input matrix
-            for (int tile_m = 0; tile_m < dim_m && !kill_task; tile_m += tile_size_m)
+            for (unsigned tile_m = 0; tile_m < dim_m && !kill_task; tile_m += tile_size_m)
             {
                 // Accomodate dim_m not being multiple of tile_size_m
                 unsigned actual_tile_m = (tile_m + tile_size_m < dim_m) ? tile_size_m : dim_m - tile_m;
                 acquire_load_dma_accel();
 
                 // Accomododate offset or size not being a multiple of DMA_WORD_PER_BEAT
-                int32_t aligned_input_offset = input_payload_offset / DMA_WORD_PER_BEAT;
-                int32_t input_alignment_skew = input_payload_offset - (aligned_input_offset * DMA_WORD_PER_BEAT);
-                int32_t aligned_input_words = (input_alignment_skew + (actual_tile_m * tile_size_k) + DMA_WORD_PER_BEAT - 1) / DMA_WORD_PER_BEAT;
+                uint32_t aligned_input_offset = input_payload_offset / DMA_WORD_PER_BEAT;
+                uint32_t input_alignment_skew = input_payload_offset - (aligned_input_offset * DMA_WORD_PER_BEAT);
+                uint32_t aligned_input_words = (input_alignment_skew + (actual_tile_m * tile_size_k) + DMA_WORD_PER_BEAT - 1) / DMA_WORD_PER_BEAT;
 
                 // Create a DMA request
                 dma_info_t dma_info_1(aligned_input_offset, aligned_input_words, DMA_SIZE);
@@ -90,9 +90,9 @@ void gemm::load_input()
                 this->dma_read_ctrl.put(dma_info_1);
 
                 // Number of invalid words at the beginning of the burst
-                int32_t begin_input_invalid = input_alignment_skew;
+                uint32_t begin_input_invalid = input_alignment_skew;
                 // Number of invalid words at the end of the burst
-                int32_t end_input_invalid = begin_input_invalid + (actual_tile_m * tile_size_k);
+                uint32_t end_input_invalid = begin_input_invalid + (actual_tile_m * tile_size_k);
 
                 for (int i = 0; i < aligned_input_words * DMA_WORD_PER_BEAT; i += DMA_WORD_PER_BEAT)
                 {
@@ -116,7 +116,7 @@ void gemm::load_input()
                 input_payload_offset += actual_tile_m * tile_size_k;
 
                 // Load weight matrix
-                for (int tile_n = 0; tile_n < dim_n && !kill_task; tile_n += tile_size_n)
+                for (unsigned tile_n = 0; tile_n < dim_n && !kill_task; tile_n += tile_size_n)
                 {
                     // Accomodate dim_n not being multiple of tile_size_n
                     // Ensure non-tiled loads are not tiled.
@@ -132,12 +132,12 @@ void gemm::load_input()
                     acquire_load_dma_accel();
                     weight_payload_offset = weight_payload_base + tile_n;
 
-                    for (int k = 0; k < actual_tile_k; k++)
+                    for (unsigned k = 0; k < actual_tile_k; k++)
                     {
                         // Accomododate offset or size not being a multiple of DMA_WORD_PER_BEAT
-                        int32_t aligned_wgt_offset = weight_payload_offset / DMA_WORD_PER_BEAT;
-                        int32_t wgt_alignment_skew = weight_payload_offset - (aligned_wgt_offset * DMA_WORD_PER_BEAT);
-                        int32_t aligned_wgt_words = (wgt_alignment_skew + actual_tile_n + DMA_WORD_PER_BEAT - 1) / DMA_WORD_PER_BEAT;
+                        uint32_t aligned_wgt_offset = weight_payload_offset / DMA_WORD_PER_BEAT;
+                        uint32_t wgt_alignment_skew = weight_payload_offset - (aligned_wgt_offset * DMA_WORD_PER_BEAT);
+                        uint32_t aligned_wgt_words = (wgt_alignment_skew + actual_tile_n + DMA_WORD_PER_BEAT - 1) / DMA_WORD_PER_BEAT;
 
                         // Create a DMA request
                         dma_info_t dma_info_2(aligned_wgt_offset, aligned_wgt_words, DMA_SIZE);
@@ -147,11 +147,11 @@ void gemm::load_input()
                         this->dma_read_ctrl.put(dma_info_2);
 
                         // Number of invalid words at the beginning of the burst
-                        int32_t begin_wgt_invalid = wgt_alignment_skew;
+                        uint32_t begin_wgt_invalid = wgt_alignment_skew;
                         // Number of invalid words at the end of the burst
-                        int32_t end_wgt_invalid = begin_wgt_invalid + actual_tile_n;
+                        uint32_t end_wgt_invalid = begin_wgt_invalid + actual_tile_n;
 
-                        for (int i = 0; i < aligned_wgt_words * DMA_WORD_PER_BEAT; i += DMA_WORD_PER_BEAT)
+                        for (unsigned i = 0; i < aligned_wgt_words * DMA_WORD_PER_BEAT; i += DMA_WORD_PER_BEAT)
                         {
                             HLS_BREAK_ARRAY_DEPENDENCY(plm_wgt_ping);
                             HLS_BREAK_ARRAY_DEPENDENCY(plm_wgt_pong);
@@ -202,13 +202,13 @@ void gemm::store_output()
 
     // Config
     /* <<--params-->> */
-    int32_t dim_m;
-    int32_t dim_n;
-    int32_t dim_k;
-    int32_t output_payload_base;
-    int32_t output_payload_offset;
+    uint32_t dim_m;
+    uint32_t dim_n;
+    uint32_t dim_k;
+    uint32_t output_payload_base;
+    uint32_t output_payload_offset;
     bool pingpong;
-    int32_t tile_size_m, tile_size_n, tile_size_k;
+    uint32_t tile_size_m, tile_size_n, tile_size_k;
     {
         HLS_PROTO("store-config");
         cfg.wait_for_config(); // config process
@@ -243,11 +243,11 @@ void gemm::store_output()
             tile_size_n = (tile_size_m / DMA_WORD_PER_BEAT) * DMA_WORD_PER_BEAT;
             wait();
 
-            for (int tile_m = 0; tile_m < dim_m; tile_m += tile_size_m)
+            for (unsigned tile_m = 0; tile_m < dim_m; tile_m += tile_size_m)
             {
                 unsigned actual_tile_m = (tile_m + tile_size_m < dim_m) ? tile_size_m : dim_m - tile_m;
 
-                for (int tile_n = 0; tile_n < dim_n; tile_n += tile_size_n)
+                for (unsigned tile_n = 0; tile_n < dim_n; tile_n += tile_size_n)
                 {
                     // Accomodate dim_n not being multiple of tile_size_n
                     // Ensure non-tiled stores are not tiled.
@@ -265,12 +265,12 @@ void gemm::store_output()
 
                     output_payload_offset = output_payload_base + (tile_m * dim_n) + tile_n;
 
-                    for (int m = 0; m < actual_tile_m_2; m++)
+                    for (unsigned m = 0; m < actual_tile_m_2; m++)
                     {
                         // Accomododate offset or size not being a multiple of DMA_WORD_PER_BEAT
-                        int32_t aligned_output_offset = output_payload_offset / DMA_WORD_PER_BEAT;
-                        int32_t output_alignment_skew = output_payload_offset - (aligned_output_offset * DMA_WORD_PER_BEAT);
-                        int32_t aligned_output_words = (output_alignment_skew + actual_tile_n + DMA_WORD_PER_BEAT - 1) / DMA_WORD_PER_BEAT;
+                        uint32_t aligned_output_offset = output_payload_offset / DMA_WORD_PER_BEAT;
+                        uint32_t output_alignment_skew = output_payload_offset - (aligned_output_offset * DMA_WORD_PER_BEAT);
+                        uint32_t aligned_output_words = (output_alignment_skew + actual_tile_n + DMA_WORD_PER_BEAT - 1) / DMA_WORD_PER_BEAT;
 
                         dma_info_t dma_info(aligned_output_offset, aligned_output_words, DMA_SIZE);
                         sc_dt::sc_bv<DMA_WIDTH> dataBv;
@@ -279,7 +279,7 @@ void gemm::store_output()
                         wait();
                         this->dma_write_ctrl.put(dma_info);
 
-                        for (int i = 0; i < aligned_output_words * DMA_WORD_PER_BEAT; i += DMA_WORD_PER_BEAT)
+                        for (unsigned i = 0; i < aligned_output_words * DMA_WORD_PER_BEAT; i += DMA_WORD_PER_BEAT)
                         {
                             HLS_BREAK_ARRAY_DEPENDENCY(plm_out_ping);
                             HLS_BREAK_ARRAY_DEPENDENCY(plm_out_pong);
@@ -324,13 +324,13 @@ void gemm::compute_kernel()
 
     // Config
     /* <<--params-->> */
-    int32_t dim_n;
-    int32_t dim_m;
-    int32_t dim_k;
+    uint32_t dim_n;
+    uint32_t dim_m;
+    uint32_t dim_k;
     bool in_pingpong;
     bool pingpong;
     bool kill_task;
-    int32_t tile_size_m, tile_size_n, tile_size_k;
+    uint32_t tile_size_m, tile_size_n, tile_size_k;
     {
         HLS_PROTO("compute-config");
         cfg.wait_for_config(); // config process
@@ -361,11 +361,11 @@ void gemm::compute_kernel()
             tile_size_m = TILE_SIZE / tile_size_k;
             tile_size_n = (tile_size_m / DMA_WORD_PER_BEAT) * DMA_WORD_PER_BEAT;
 
-            for (int tile_m = 0; tile_m < dim_m && !kill_task; tile_m += tile_size_m)
+            for (unsigned tile_m = 0; tile_m < dim_m && !kill_task; tile_m += tile_size_m)
             {
                 unsigned actual_tile_m = (tile_m + tile_size_m < dim_m) ? tile_size_m : dim_m - tile_m;
 
-                for (int tile_n = 0; tile_n < dim_n && !kill_task; tile_n += tile_size_n)
+                for (unsigned tile_n = 0; tile_n < dim_n && !kill_task; tile_n += tile_size_n)
                 {
                     unsigned actual_tile_n = (tile_n + tile_size_n < dim_n) ? tile_size_n : dim_n - tile_n;
 
