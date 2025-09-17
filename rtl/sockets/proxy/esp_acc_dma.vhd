@@ -268,6 +268,7 @@ architecture rtl of esp_acc_dma is
   signal dma_address : addr_t;
   signal dma_length : std_logic_vector(31 downto 0);
   signal current_context_int : std_logic_vector(1 downto 0);
+  signal sample_current_context : std_ulogic;
 
   -- Sample acc_done:
   signal pending_acc_done, clear_acc_done : std_ulogic;
@@ -344,6 +345,8 @@ architecture rtl of esp_acc_dma is
   attribute mark_debug of dma_snd_wrreq : signal is "true";
   attribute mark_debug of dma_snd_data_in : signal is "true";
   attribute mark_debug of dma_snd_full : signal is "true";
+  attribute mark_debug of current_context_int : signal is "true";
+  attribute mark_debug of sample_current_context : signal is "true";
 
 begin  -- rtl
 
@@ -755,6 +758,7 @@ begin  -- rtl
     read_burst <= '0';
     write_burst <= '0';
     burst <= '0';
+    sample_current_context <= '0';
 
     case dma_state is
       when idle =>
@@ -821,6 +825,7 @@ begin  -- rtl
         elsif bankreg(CMD_REG)(CMD_BIT_LAST downto 0) = zero(CMD_BIT_LAST downto 0) then
           dma_next <= reset;
         elsif current_context_int /= current_context then
+          sample_current_context <= '1';
           dma_next <= idle; 
         elsif pending_acc_done = '1' then
           if USE_SPANDEX /= 0 and coherence = ACC_COH_FULL then
@@ -1095,7 +1100,9 @@ begin  -- rtl
     if rst = '0' then                   -- asynchronous reset (active low)
       current_context_int <= (others => '0');
     elsif clk'event and clk = '1' then  -- rising clock edge
-      current_context_int <= current_context;
+      if dma_state = idle or sample_current_context = '1' then
+        current_context_int <= current_context;
+      end if;
     end if;
   end process;
 
