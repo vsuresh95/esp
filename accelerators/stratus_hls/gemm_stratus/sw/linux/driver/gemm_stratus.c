@@ -54,6 +54,12 @@ static void gemm_prep_xfer(struct esp_device *esp, void *arg)
 {
 }
 
+static void gemm_reset_accel(struct esp_device *esp)
+{
+	/* <<--regs-config-->> */
+	iowrite32be(0x0, esp->iomem + GEMM_VALID_CONTEXTS);
+}
+
 static void gemm_init_accel(struct esp_device *esp, void *arg)
 {
 	struct gemm_stratus_access *a = arg;
@@ -146,6 +152,7 @@ static struct esp_driver gemm_driver = {
 	},
 	.xfer_input_ok	= gemm_xfer_input_ok,
 	.prep_xfer	= gemm_prep_xfer,
+	.res_accel		= gemm_reset_accel,
 	.init_accel		= gemm_init_accel,
 	.add_context	= gemm_add_context,
 	.del_context	= gemm_del_context,

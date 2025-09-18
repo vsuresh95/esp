@@ -57,7 +57,7 @@ entity esp_acc_dma is
     revision           : integer                              := 0;
     devid              : devid_t                              := 16#001#;
     available_reg_mask : std_logic_vector(0 to MAXREGNUM - 1) := (others => '1');
-    monitor_reg_mask   : std_logic_vector(0 to MAXREGNUM - 1) := (others => '0');
+    avu_reg_mask   : std_logic_vector(0 to MAXREGNUM - 1) := (others => '0');
     rdonly_reg_mask    : std_logic_vector(0 to MAXREGNUM - 1) := (others => '0');
     exp_registers      : integer range 0 to 1                 := 0;  -- Not implemented
     scatter_gather     : integer range 0 to 1                 := 1;
@@ -103,6 +103,7 @@ entity esp_acc_dma is
     flush         : out std_ulogic;
     acc_flush_done: in  std_ulogic;
     current_context    : in  std_logic_vector(1 downto 0);
+    valid_contexts_ack : in  std_logic_vector(3 downto 0);
     mon_chnl_valid     : in std_ulogic;
     mon_chnl_ready     : out std_ulogic;
     mon_chnl_data_data : in std_logic_vector(63 downto 0);  
@@ -347,6 +348,7 @@ architecture rtl of esp_acc_dma is
   attribute mark_debug of dma_snd_full : signal is "true";
   attribute mark_debug of current_context_int : signal is "true";
   attribute mark_debug of sample_current_context : signal is "true";
+  attribute mark_debug of valid_contexts_ack : signal is "true";
 
 begin  -- rtl
 
@@ -1204,7 +1206,7 @@ begin  -- rtl
 
   -- Other registers
   registers: for i in 0 to MAXREGNUM - 1 generate
-    written_from_noc: if i /= STATUS_REG and monitor_reg_mask(i) = '0' and available_reg_mask(i) = '1' generate
+    written_from_noc: if i /= STATUS_REG and avu_reg_mask(i) = '0' and available_reg_mask(i) = '1' generate
       process (clk, rst, acc_rst_next)
       begin  -- process
         if clk'event and clk = '1' then  -- rising clock edge
@@ -1225,6 +1227,18 @@ begin  -- rtl
       bankreg(i) <= (others => '0');
     end generate not_available;
   end generate unused_registers;
+
+  -- AVU register for valid contexts ack
+  avu_context_ack_registers: process (clk, rst, acc_rst_next)
+  begin  -- process avu_context_ack_registers
+    if clk'event and clk = '1' then  -- rising clock edge
+      if rst = '0' or acc_rst_next = '0' then                   -- asynchronous reset (active low)
+        bankreg(VALID_CONTEXTS_ACK_REG) <= (others => '0');
+      else
+        bankreg(VALID_CONTEXTS_ACK_REG)(3 downto 0) <= valid_contexts_ack;
+      end if;
+    end if;
+  end process ;
 
   -- AVU monitor registers
   avu_mon_registers: for i in 0 to 3 generate

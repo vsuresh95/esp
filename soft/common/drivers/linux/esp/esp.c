@@ -248,6 +248,14 @@ static void esp_run(struct esp_device *esp)
 	iowrite32be(0x1, esp->iomem + CMD_REG);
 }
 
+static void esp_check_context(struct esp_device *esp, unsigned expected_mask)
+{
+	/* Wait for all contexts to be clear */
+	while ((ioread32be(esp->iomem + VALID_CONTEXTS_ACK_REG) & expected_mask) != 0x0){
+        cpu_relax();
+    }		
+}
+
 static void esp_halt(struct esp_device *esp)
 {
 	/* reset device and wait for it to complete */
@@ -480,6 +488,7 @@ static int esp_access_virt(struct esp_device *esp, unsigned int cm, void __user 
 	struct esp_access *access;
 	void *arg;
 	int rc = 0;
+	unsigned mask;
 
 	arg = kmalloc(esp->driver->arg_size, GFP_KERNEL);
 	if (arg == NULL)
@@ -506,6 +515,11 @@ reset:
 		rc = -EINTR;
 		goto out;
 	}
+
+	if (esp->driver->res_accel)
+		esp->driver->res_accel(esp);
+	
+	esp_check_context(esp, 0xFFFFFFFF);
 
 	esp_halt(esp);
 
@@ -557,6 +571,9 @@ add:
 	}
 
 	esp->context_id = access->context_id;
+	mask = 0x0;
+	mask |= (1 << esp->context_id);
+	esp_check_context(esp, mask);
 
 	esp_update_pt(esp, contig);
 

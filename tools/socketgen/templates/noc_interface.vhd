@@ -134,6 +134,7 @@ end;
     -- EXP_DO_REG         => '1', -- uncomment if re-enabling regs for SRAM
                                   -- expansion to reg bank
     YX_REG             => '1',
+    VALID_CONTEXTS_ACK_REG  => '1',
     MON_UTIL_REG_0_LO  => '1',
     MON_UTIL_REG_0_HI  => '1',
     MON_UTIL_REG_1_LO  => '1',
@@ -160,6 +161,7 @@ end;
     P2P_REG            => '1',
     YX_REG             => '1',
     SPANDEX_REG        => '1',
+    VALID_CONTEXTS_ACK_REG => '1',
     PT_ADDRESS_REG_0   => '1',
     PT_ADDRESS_REG_1   => '1',
     PT_ADDRESS_REG_2   => '1',
@@ -175,7 +177,8 @@ end;
     -- <<user_mask>>
     others             => '0');
 
-  constant monitor_reg_mask : std_logic_vector(0 to MAXREGNUM - 1) := (
+  constant avu_reg_mask : std_logic_vector(0 to MAXREGNUM - 1) := (
+    VALID_CONTEXTS_ACK_REG  => '1',
     MON_UTIL_REG_0_LO  => '1',
     MON_UTIL_REG_0_HI  => '1',
     MON_UTIL_REG_1_LO  => '1',
@@ -252,6 +255,7 @@ end;
   signal acc_fence_ready            : std_ulogic;
   signal acc_fence_data             : std_logic_vector(1 downto 0);
   signal current_context            : std_logic_vector(1 downto 0);
+  signal valid_contexts_ack         : std_logic_vector(3 downto 0);
   signal mon_chnl_valid             : std_ulogic;
   signal mon_chnl_ready             : std_ulogic;
   signal mon_chnl_data_data         : std_logic_vector(63 downto 0);  
@@ -400,7 +404,7 @@ begin
       revision           => revision,
       devid              => devid,
       available_reg_mask => available_reg_mask,
-      monitor_reg_mask   => monitor_reg_mask,
+      avu_reg_mask       => avu_reg_mask,
       rdonly_reg_mask    => rdonly_reg_mask,
       exp_registers      => exp_registers,
       scatter_gather     => scatter_gather,
@@ -444,6 +448,7 @@ begin
       flush                         => flush,
       acc_flush_done                => acc_flush_done,
       current_context               => current_context,
+      valid_contexts_ack            => valid_contexts_ack,
       mon_chnl_valid                => mon_chnl_valid,
       mon_chnl_ready                => mon_chnl_ready,
       mon_chnl_data_data            => mon_chnl_data_data,

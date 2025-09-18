@@ -74,11 +74,11 @@ enum accelerator_coherence {ACC_COH_NONE = 0, ACC_COH_LLC, ACC_COH_RECALL, ACC_C
 /* bank(13)       : DST_OFFSET (offset in bytes from beginning of physical buffer) */
 #define DST_OFFSET_REG 0x34
 
-/* bank(14)       : RESERVED */
+/* bank(14)       : SPANDEX_REG */
 #define SPANDEX_REG 0x38
 
-/* bank(15)       : RESERVED */
-
+/* bank(15)       : VALID_CONTEXTS_ACK_REG */
+#define VALID_CONTEXTS_ACK_REG 0x3c
 
 /* bank(16 to 19) : PT_ADDRESS_REG_i */
 #define PT_ADDRESS_REG_0 0x40

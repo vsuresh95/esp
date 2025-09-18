@@ -729,7 +729,7 @@ package tile is
       revision           : integer;
       devid              : devid_t;
       available_reg_mask : std_logic_vector(0 to MAXREGNUM - 1);
-      monitor_reg_mask   : std_logic_vector(0 to MAXREGNUM - 1);
+      avu_reg_mask   : std_logic_vector(0 to MAXREGNUM - 1);
       rdonly_reg_mask    : std_logic_vector(0 to MAXREGNUM - 1);
       exp_registers      : integer range 0 to 1;
       scatter_gather     : integer range 0 to 1;
@@ -773,6 +773,7 @@ package tile is
       flush                         : out std_ulogic;
       acc_flush_done                : in std_ulogic;
       current_context               : in std_logic_vector(1 downto 0);
+      valid_contexts_ack            : in std_logic_vector(3 downto 0);
       mon_chnl_valid                : in std_ulogic;
       mon_chnl_ready                : out std_ulogic;
       mon_chnl_data_data            : in std_logic_vector(63 downto 0);  

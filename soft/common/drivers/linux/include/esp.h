@@ -76,6 +76,7 @@ struct esp_driver {
 	struct platform_driver plat;
 	bool (*xfer_input_ok)(struct esp_device *esp, void *arg);
 	void (*prep_xfer)(struct esp_device *esp, void *arg);
+	void (*res_accel)(struct esp_device *esp);
 	void (*init_accel)(struct esp_device *esp, void *arg);
 	void (*add_context)(struct esp_device *esp, void *arg);
 	void (*del_context)(struct esp_device *esp, void *arg);
