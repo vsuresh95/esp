@@ -24,9 +24,9 @@ static unsigned DMA_WORD_PER_BEAT(unsigned _st)
 #define FX_IL 16
 
 /* <<--params-->> */
-const unsigned dim_m = 10;
-const unsigned dim_n = 8;
-const unsigned dim_k = 10;
+const unsigned dim_m = 20;
+const unsigned dim_n = 20;
+const unsigned dim_k = 20;
 
 /* Size of the contiguous chunks for scatter/gather */
 #define CHUNK_SHIFT 20
@@ -37,46 +37,12 @@ const unsigned dim_k = 10;
 
 /* User defined registers */
 /* <<--regs-->> */
-#define GEMM_CONTEXT_BASE_PTR_0		0x70
-#define GEMM_CONTEXT_BASE_PTR_1		0x74
-#define GEMM_CONTEXT_BASE_PTR_2		0x78
-#define GEMM_CONTEXT_BASE_PTR_3		0x7C
-#define GEMM_CONTEXT_NPRIO_0		0x80
-#define GEMM_CONTEXT_NPRIO_1		0x84
-#define GEMM_CONTEXT_NPRIO_2		0x88
-#define GEMM_CONTEXT_NPRIO_3		0x8C
-#define GEMM_VALID_CONTEXTS			0x90
-#define GEMM_SCHED_PERIOD			0x94
-
-static uint64_t t_start = 0;
-static uint64_t t_end = 0;
-
-uint64_t t_sw;
-uint64_t t_acc;
-
-static inline void start_counter() {
-	asm volatile (
-		"li t0, 0;"
-		"csrr t0, mcycle;"
-		"mv %0, t0"
-		: "=r" (t_start)
-		:
-		: "t0"
-	);
-}
-
-static inline uint64_t end_counter() {
-	asm volatile (
-		"li t0, 0;"
-		"csrr t0, mcycle;"
-		"mv %0, t0"
-		: "=r" (t_end)
-		:
-		: "t0"
-	);
-
-	return (t_end - t_start);
-}
+#define GEMM_DIM_M			0x70
+#define GEMM_DIM_N			0x74
+#define GEMM_DIM_K			0x78
+#define GEMM_WEIGHT_BASE	0x7C
+#define GEMM_INPUT_BASE		0x80
+#define GEMM_OUTPUT_BASE	0x84
 
 void gemm(const float* mat_a, const float* mat_b, float* mat_c, unsigned dim_m, unsigned dim_n, unsigned dim_k) {
     const unsigned block_size = 16;
@@ -149,9 +115,7 @@ void init_buffer(int *mem_a, int *mem_b, float *gold_a, float *gold_b, float *go
     }
 
     // Compute golden output
-	start_counter();
     gemm(gold_a, gold_b, gold_c, dim_m, dim_n, dim_k);
-	t_sw += end_counter();
 }
 
 int main(int argc, char * argv[])
@@ -207,9 +171,6 @@ int main(int argc, char * argv[])
 		return 0;
 	}
 
-	t_sw = 0;
-	t_acc = 0;
-
 	printf("**************** %s.0 ****************\n", DEV_NAME);
 
 	dev = &espdevs[0];
@@ -248,625 +209,116 @@ int main(int argc, char * argv[])
 
 	coherence = ACC_COH_RECALL;
 
-    // We will cast the synchronization flags from *mem to custom atomic flags
-    atomic_flag_t input_flag0, input_flag1, input_flag2;
-    atomic_flag_t output_flag0, output_flag1, output_flag2;
-	atomic_flag_init(&input_flag0, (volatile uint64_t *) &mem0[mat_a_valid_offset]);
-	atomic_flag_init(&output_flag0, (volatile uint64_t *) &mem0[mat_c_valid_offset]);
-	atomic_flag_init(&input_flag1, (volatile uint64_t *) &mem1[mat_a_valid_offset]);
-	atomic_flag_init(&output_flag1, (volatile uint64_t *) &mem1[mat_c_valid_offset]);
-	atomic_flag_init(&input_flag2, (volatile uint64_t *) &mem2[mat_a_valid_offset]);
-	atomic_flag_init(&output_flag2, (volatile uint64_t *) &mem2[mat_c_valid_offset]);
-
-	// Pass common configuration parameters
-	iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
-	iowrite32(dev, COHERENCE_REG, coherence);
-
-	iowrite32(dev, PT_ADDRESS_REG, (unsigned long long) ptable0);
-	iowrite32(dev, PT_NCHUNK_REG, NCHUNK(mem_size));
-	iowrite32(dev, PT_SHIFT_REG, CHUNK_SHIFT);
-
-	// Use the following if input and output data are not allocated at the default offsets
-	iowrite32(dev, SRC_OFFSET_REG, 0x0);
-	iowrite32(dev, DST_OFFSET_REG, 0x0);
-
 	// Flush (customize coherence model here)
 	esp_flush(coherence);
 
 	///////////////////////////////////////////////////////
-	/// Configure first context
+	/// Start first task
 	///////////////////////////////////////////////////////
-	iowrite32(dev, GEMM_CONTEXT_BASE_PTR_0, stat_offset);
-	iowrite32(dev, PT_ADDRESS_REG_0, (unsigned long long) ptable0);
-	iowrite32(dev, GEMM_CONTEXT_NPRIO_0, 1);
-	iowrite32(dev, GEMM_VALID_CONTEXTS, 0x1);
-	iowrite32(dev, GEMM_SCHED_PERIOD, 0x100000);
-
-	// Set up two descriptors: 1 GEMM, 1 JUMP
-	mem0[stat_offset + 0] = 1;
-	mem0[stat_offset + 1] = descr_offset;
-
-	mem0[descr_offset + 0 * SM_INFO_SIZE + 0] = 1;
-	mem0[descr_offset + 0 * SM_INFO_SIZE + 1] = dim_m;
-	mem0[descr_offset + 0 * SM_INFO_SIZE + 2] = dim_n;
-	mem0[descr_offset + 0 * SM_INFO_SIZE + 3] = dim_k;
-	mem0[descr_offset + 0 * SM_INFO_SIZE + 4] = mat_b_offset;
-	mem0[descr_offset + 0 * SM_INFO_SIZE + 5] = mat_a_valid_offset;
-	mem0[descr_offset + 0 * SM_INFO_SIZE + 6] = mat_c_valid_offset;
-
-	mem0[descr_offset + 1 * SM_INFO_SIZE + 0] = 2;
-	mem0[descr_offset + 1 * SM_INFO_SIZE + 1] = descr_offset;
-
-	printf("First context configured\n");
-
-	// Start accelerators
-	iowrite32(dev, CMD_REG, CMD_MASK_START);
-
-	///////////////////////////////////////////////////////
-	/// Send first context task
-	///////////////////////////////////////////////////////
-	// Wait for the accelerator to be ready
-	while(atomic_flag_load(&input_flag0) != 0);
-	// When the accelerator is ready, we write the input data to it
 	init_buffer(&mem0[mat_a_offset], &mem0[mat_b_offset],
 				&gold0[mat_a_offset], &gold0[mat_b_offset], &gold0[mat_c_offset]);
-	// Inform the accelerator to start.
-	atomic_flag_store(&input_flag0, 1);
 
-	printf("First context task sent\n");
-
-	printf("PT_ADDRESS_REG_0 = %x\n", ioread32(dev, PT_ADDRESS_REG_0));
-
-	for (i = 0; i < 3; i++) {
-		iowrite32(dev, PT_ADDRESS_REG_0, (unsigned long long) ptable1);
-		printf("PT_ADDRESS_REG_0 = %x\n", ioread32(dev, PT_ADDRESS_REG_0));
-	}
-
-	///////////////////////////////////////////////////////
-	/// Configure second context
-	///////////////////////////////////////////////////////
-	iowrite32(dev, GEMM_CONTEXT_BASE_PTR_1, stat_offset);
-	iowrite32(dev, PT_ADDRESS_REG_1, (unsigned long long) ptable1);
-	iowrite32(dev, GEMM_CONTEXT_NPRIO_1, 1);
-	iowrite32(dev, GEMM_VALID_CONTEXTS, 0x3);
-
-	// Set up two descriptors: 1 GEMM, 1 JUMP
-	mem1[stat_offset + 0] = 1;
-	mem1[stat_offset + 1] = descr_offset;
-
-	mem1[descr_offset + 0 * SM_INFO_SIZE + 0] = 1;
-	mem1[descr_offset + 0 * SM_INFO_SIZE + 1] = dim_m;
-	mem1[descr_offset + 0 * SM_INFO_SIZE + 2] = dim_n;
-	mem1[descr_offset + 0 * SM_INFO_SIZE + 3] = dim_k;
-	mem1[descr_offset + 0 * SM_INFO_SIZE + 4] = mat_b_offset;
-	mem1[descr_offset + 0 * SM_INFO_SIZE + 5] = mat_a_valid_offset;
-	mem1[descr_offset + 0 * SM_INFO_SIZE + 6] = mat_c_valid_offset;
-
-	mem1[descr_offset + 1 * SM_INFO_SIZE + 0] = 2;
-	mem1[descr_offset + 1 * SM_INFO_SIZE + 1] = descr_offset;
-
-	printf("Second context configured\n");
-
-	///////////////////////////////////////////////////////
-	/// Get first context output
-	///////////////////////////////////////////////////////
-	while(atomic_flag_load(&output_flag0) != 1);
-	errors0 += validate_buffer(&mem0[mat_c_offset], &gold0[mat_c_offset]);
-
-	// Reset for next iteration.
-	atomic_flag_store(&output_flag0, 0);
-
-	printf("First context task done\n");
-
-	///////////////////////////////////////////////////////
-	/// Send second context task
-	///////////////////////////////////////////////////////
-	// Wait for the accelerator to be ready
-	while(atomic_flag_load(&input_flag1) != 0);
-	// When the accelerator is ready, we write the input data to it
-	init_buffer(&mem1[mat_a_offset], &mem1[mat_b_offset],
-				&gold1[mat_a_offset], &gold1[mat_b_offset], &gold1[mat_c_offset]);
-	// Inform the accelerator to start.
-	atomic_flag_store(&input_flag1, 1);
-
-	printf("Second context task sent\n");
-
-	///////////////////////////////////////////////////////
-	/// Configure third context
-	///////////////////////////////////////////////////////
-	iowrite32(dev, GEMM_CONTEXT_BASE_PTR_2, stat_offset);
-	iowrite32(dev, PT_ADDRESS_REG_2, (unsigned long long) ptable2);
-	iowrite32(dev, GEMM_CONTEXT_NPRIO_2, 1);
-	iowrite32(dev, GEMM_VALID_CONTEXTS, 0x7);
-
-	// Set up two descriptors: 1 GEMM, 1 JUMP
-	mem2[stat_offset + 0] = 1;
-	mem2[stat_offset + 1] = descr_offset;
-
-	mem2[descr_offset + 0 * SM_INFO_SIZE + 0] = 1;
-	mem2[descr_offset + 0 * SM_INFO_SIZE + 1] = dim_m;
-	mem2[descr_offset + 0 * SM_INFO_SIZE + 2] = dim_n;
-	mem2[descr_offset + 0 * SM_INFO_SIZE + 3] = dim_k;
-	mem2[descr_offset + 0 * SM_INFO_SIZE + 4] = mat_b_offset;
-	mem2[descr_offset + 0 * SM_INFO_SIZE + 5] = mat_a_valid_offset;
-	mem2[descr_offset + 0 * SM_INFO_SIZE + 6] = mat_c_valid_offset;
-
-	mem2[descr_offset + 1 * SM_INFO_SIZE + 0] = 2;
-	mem2[descr_offset + 1 * SM_INFO_SIZE + 1] = descr_offset;
-
-	printf("Third context configured\n");
-
-	///////////////////////////////////////////////////////
-	/// Send first context task
-	///////////////////////////////////////////////////////
-	// Wait for the accelerator to be ready
-	while(atomic_flag_load(&input_flag0) != 0);
-	// When the accelerator is ready, we write the input data to it
-	init_buffer(&mem0[mat_a_offset], &mem0[mat_b_offset],
-				&gold0[mat_a_offset], &gold0[mat_b_offset], &gold0[mat_c_offset]);
-	// Inform the accelerator to start.
-	atomic_flag_store(&input_flag0, 1);
-
-	printf("First context task sent\n");
-
-	///////////////////////////////////////////////////////
-	/// Get second context output
-	///////////////////////////////////////////////////////
-	while(atomic_flag_load(&output_flag1) != 1);
-	errors1 += validate_buffer(&mem1[mat_c_offset], &gold1[mat_c_offset]);
-
-	// Reset for next iteration.
-	atomic_flag_store(&output_flag1, 0);
-
-	printf("Second context task done\n");
-
-	///////////////////////////////////////////////////////
-	/// Get first context output
-	///////////////////////////////////////////////////////
-	while(atomic_flag_load(&output_flag0) != 1);
-	errors0 += validate_buffer(&mem0[mat_c_offset], &gold0[mat_c_offset]);
-
-	// Reset for next iteration.
-	atomic_flag_store(&output_flag0, 0);
-
-	printf("First context task done\n");
-
-	///////////////////////////////////////////////////////
-	/// New test
-	///////////////////////////////////////////////////////
-	printf("-----------------------\n");	
-
-	///////////////////////////////////////////////////////
-	/// Send first context task
-	///////////////////////////////////////////////////////
-	// Wait for the accelerator to be ready
-	while(atomic_flag_load(&input_flag0) != 0);
-	// When the accelerator is ready, we write the input data to it
-	init_buffer(&mem0[mat_a_offset], &mem0[mat_b_offset],
-				&gold0[mat_a_offset], &gold0[mat_b_offset], &gold0[mat_c_offset]);
-	// Inform the accelerator to start.
-	atomic_flag_store(&input_flag0, 1);
-
-	printf("First context task sent\n");
-
-	///////////////////////////////////////////////////////
-	/// Send second context task
-	///////////////////////////////////////////////////////
-	// Wait for the accelerator to be ready
-	while(atomic_flag_load(&input_flag1) != 0);
-	// When the accelerator is ready, we write the input data to it
-	init_buffer(&mem1[mat_a_offset], &mem1[mat_b_offset],
-				&gold1[mat_a_offset], &gold1[mat_b_offset], &gold1[mat_c_offset]);
-	// Inform the accelerator to start.
-	atomic_flag_store(&input_flag1, 1);
-
-	printf("Second context task sent\n");
-
-	///////////////////////////////////////////////////////
-	/// Send third context task
-	///////////////////////////////////////////////////////
-	// Wait for the accelerator to be ready
-	while(atomic_flag_load(&input_flag2) != 0);
-	// When the accelerator is ready, we write the input data to it
-	init_buffer(&mem2[mat_a_offset], &mem2[mat_b_offset],
-				&gold2[mat_a_offset], &gold2[mat_b_offset], &gold2[mat_c_offset]);
-	// Inform the accelerator to start.
-	atomic_flag_store(&input_flag2, 1);
-
-	printf("Third context task sent\n");
-
-	///////////////////////////////////////////////////////
-	/// Get all contexts output
-	///////////////////////////////////////////////////////
-	// Check for the accelerator to send output
-	bool context_0_done = false;
-	bool context_1_done = false;
-	bool context_2_done = false;
-	while (!(context_0_done & context_1_done & context_2_done)) {
-		bool context_0_ready = (atomic_flag_load(&output_flag0) == 1);
-		bool context_1_ready = (atomic_flag_load(&output_flag1) == 1);
-		bool context_2_ready = (atomic_flag_load(&output_flag2) == 1);
-
-		if (context_0_ready) {
-			// When the output is ready, we read it
-			errors0 += validate_buffer(&mem0[mat_c_offset], &gold0[mat_c_offset]);
-
-			// Reset for next iteration.
-			atomic_flag_store(&output_flag0, 0);
-
-			context_0_done = true;
-
-			printf("First context task done\n");
-		} else if (context_1_ready) {
-			// When the output is ready, we read it
-			errors1 += validate_buffer(&mem1[mat_c_offset], &gold1[mat_c_offset]);
-
-			// Reset for next iteration.
-			atomic_flag_store(&output_flag1, 0);
-
-			context_1_done = true;
-
-			printf("Second context task done\n");
-		} else if (context_2_ready) {
-			// When the output is ready, we read it
-			errors2 += validate_buffer(&mem2[mat_c_offset], &gold2[mat_c_offset]);
-
-			// Reset for next iteration.
-			atomic_flag_store(&output_flag2, 0);
-
-			context_2_done = true;
-
-			printf("Third context task done\n");
-		}
-	}
-	
-	for (i = 0; i < 3; i++) {
-		printf("MON_UTIL_REG_%d_LO = %x\n", i, ioread32(dev, MON_UTIL_REG_0_LO + 0x8*i));
-		printf("MON_UTIL_REG_%d_HI = %x\n", i, ioread32(dev, MON_UTIL_REG_0_HI + 0x8*i));
-	}
-
-	iowrite32(dev, GEMM_VALID_CONTEXTS, 0);
-	while(ioread32(dev, VALID_CONTEXTS_ACK_REG) != 0);
-	iowrite32(dev, CMD_REG, 0x0);
-
-	// Reset all sync variables to default values.
-	atomic_flag_store(&input_flag0, 0);
-	atomic_flag_store(&output_flag0, 0);
-	atomic_flag_store(&input_flag1, 0);
-	atomic_flag_store(&output_flag1, 0);
-	atomic_flag_store(&input_flag2, 0);
-	atomic_flag_store(&output_flag2, 0);
-
-	///////////////////////////////////////////////////////
-	/// New test
-	///////////////////////////////////////////////////////
-	printf("-----------------------\n");	
-
-	// Initialize registers of accelerator and start it.
 	iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
 	iowrite32(dev, COHERENCE_REG, coherence);
-
-	iowrite32(dev, PT_ADDRESS_REG, (unsigned long long) ptable0);
+	iowrite32(dev, PT_ADDRESS_REG_0, (unsigned long long) ptable0);
 	iowrite32(dev, PT_NCHUNK_REG, NCHUNK(mem_size));
 	iowrite32(dev, PT_SHIFT_REG, CHUNK_SHIFT);
-
-	// Use the following if input and output data are not allocated at the default offsets
 	iowrite32(dev, SRC_OFFSET_REG, 0x0);
 	iowrite32(dev, DST_OFFSET_REG, 0x0);
-
-	// Flush (customize coherence model here)
-	esp_flush(coherence);
-
-	///////////////////////////////////////////////////////
-	/// Configure first context
-	///////////////////////////////////////////////////////
-	iowrite32(dev, GEMM_CONTEXT_BASE_PTR_0, stat_offset);
-	iowrite32(dev, PT_ADDRESS_REG_0, (unsigned long long) ptable0);
-	iowrite32(dev, GEMM_CONTEXT_NPRIO_0, 1);
-	iowrite32(dev, GEMM_VALID_CONTEXTS, 0x1);
-	iowrite32(dev, GEMM_SCHED_PERIOD, 0x100000);
-
-	// Set context as available
-	mem0[stat_offset + 0] = 1;
-
-	printf("First context configured\n");
+	iowrite32(dev, GEMM_DIM_M, dim_m);
+	iowrite32(dev, GEMM_DIM_N, dim_n);
+	iowrite32(dev, GEMM_DIM_K, dim_k);
+	iowrite32(dev, GEMM_WEIGHT_BASE, mat_b_offset);
+	iowrite32(dev, GEMM_INPUT_BASE, mat_a_valid_offset);
+	iowrite32(dev, GEMM_OUTPUT_BASE, mat_c_valid_offset);
 
 	// Start accelerator
 	iowrite32(dev, CMD_REG, CMD_MASK_START);
-
-	///////////////////////////////////////////////////////
-	/// Configure second context
-	///////////////////////////////////////////////////////
-	iowrite32(dev, GEMM_CONTEXT_BASE_PTR_1, stat_offset);
-	iowrite32(dev, PT_ADDRESS_REG_1, (unsigned long long) ptable1);
-	iowrite32(dev, GEMM_CONTEXT_NPRIO_1, 1);
-	iowrite32(dev, GEMM_VALID_CONTEXTS, 0x3);
-
-	// Set context as available
-	mem1[stat_offset + 0] = 1;
-
-	printf("Second context configured\n");
-
-	///////////////////////////////////////////////////////
-	/// Configure third context
-	///////////////////////////////////////////////////////
-	iowrite32(dev, GEMM_CONTEXT_BASE_PTR_2, stat_offset);
-	iowrite32(dev, PT_ADDRESS_REG_2, (unsigned long long) ptable2);
-	iowrite32(dev, GEMM_CONTEXT_NPRIO_2, 1);
-	iowrite32(dev, GEMM_VALID_CONTEXTS, 0x7);
-
-	// Set context as available
-	mem2[stat_offset + 0] = 1;
-
-	printf("Third context configured\n");
-
-	///////////////////////////////////////////////////////
-	/// Send first context task
-	///////////////////////////////////////////////////////
-	// Wait for the accelerator to be ready
-	while(atomic_flag_load(&input_flag0) != 0);
-	// When the accelerator is ready, we write the input data to it
-	init_buffer(&mem0[mat_a_offset], &mem0[mat_b_offset],
-				&gold0[mat_a_offset], &gold0[mat_b_offset], &gold0[mat_c_offset]);
-	// Inform the accelerator to start.
-	atomic_flag_store(&input_flag0, 1);
-
-	printf("First context task sent\n");	
-
-	///////////////////////////////////////////////////////
-	/// Send second context task
-	///////////////////////////////////////////////////////
-	// Wait for the accelerator to be ready
-	while(atomic_flag_load(&input_flag1) != 0);
-	// When the accelerator is ready, we write the input data to it
-	init_buffer(&mem1[mat_a_offset], &mem1[mat_b_offset],
-				&gold1[mat_a_offset], &gold1[mat_b_offset], &gold1[mat_c_offset]);
-	// Inform the accelerator to start.
-	atomic_flag_store(&input_flag1, 1);
-
-	printf("Second context task sent\n");
-
-	///////////////////////////////////////////////////////
-	/// Send third context task
-	///////////////////////////////////////////////////////
-	// Wait for the accelerator to be ready
-	while(atomic_flag_load(&input_flag2) != 0);
-	// When the accelerator is ready, we write the input data to it
-	init_buffer(&mem2[mat_a_offset], &mem2[mat_b_offset],
-				&gold2[mat_a_offset], &gold2[mat_b_offset], &gold2[mat_c_offset]);
-	// Inform the accelerator to start.
-	atomic_flag_store(&input_flag2, 1);
-
-	printf("Third context task sent\n");	
-
-	///////////////////////////////////////////////////////
-	/// Get first context output
-	///////////////////////////////////////////////////////
-	while(atomic_flag_load(&output_flag0) != 1);
-	errors0 += validate_buffer(&mem0[mat_c_offset], &gold0[mat_c_offset]);
-
-	// Reset for next iteration.
-	atomic_flag_store(&output_flag0, 0);
-
-	printf("First context task done\n");	
-
-	///////////////////////////////////////////////////////
-	/// Get second context output
-	///////////////////////////////////////////////////////
-	while(atomic_flag_load(&output_flag1) != 1);
-	errors1 += validate_buffer(&mem1[mat_c_offset], &gold1[mat_c_offset]);
-
-	// Reset for next iteration.
-	atomic_flag_store(&output_flag1, 0);
-
-	printf("Second context task done\n");
-
-	///////////////////////////////////////////////////////
-	/// Get third context output
-	///////////////////////////////////////////////////////
-	while(atomic_flag_load(&output_flag2) != 1);
-	errors2 += validate_buffer(&mem2[mat_c_offset], &gold2[mat_c_offset]);
-
-	// Reset for next iteration.
-	atomic_flag_store(&output_flag2, 0);
-
-	printf("Third context task done\n");
-
-	for (i = 0; i < 3; i++) {
-		printf("MON_UTIL_REG_%d_LO = %x\n", i, ioread32(dev, MON_UTIL_REG_0_LO + 0x8*i));
-		printf("MON_UTIL_REG_%d_HI = %x\n", i, ioread32(dev, MON_UTIL_REG_0_HI + 0x8*i));
-	}
-
-	///////////////////////////////////////////////////////
-	/// New test
-	///////////////////////////////////////////////////////
-	printf("-----------------------\n");	
-
-	///////////////////////////////////////////////////////
-	/// Delete second context
-	///////////////////////////////////////////////////////
-	iowrite32(dev, GEMM_VALID_CONTEXTS, 0x5);
-	while(ioread32(dev, VALID_CONTEXTS_ACK_REG) != 0x5);
-
-	printf("Second context deleted\n");
-
-	///////////////////////////////////////////////////////
-	/// Send first context task
-	///////////////////////////////////////////////////////
-	// Wait for the accelerator to be ready
-	while(atomic_flag_load(&input_flag0) != 0);
-	// When the accelerator is ready, we write the input data to it
-	init_buffer(&mem0[mat_a_offset], &mem0[mat_b_offset],
-				&gold0[mat_a_offset], &gold0[mat_b_offset], &gold0[mat_c_offset]);
-	// Inform the accelerator to start.
-	atomic_flag_store(&input_flag0, 1);
-
-	printf("First context task sent\n");	
-
-	///////////////////////////////////////////////////////
-	/// Send third context task
-	///////////////////////////////////////////////////////
-	// Wait for the accelerator to be ready
-	while(atomic_flag_load(&input_flag2) != 0);
-	// When the accelerator is ready, we write the input data to it
-	init_buffer(&mem2[mat_a_offset], &mem2[mat_b_offset],
-				&gold2[mat_a_offset], &gold2[mat_b_offset], &gold2[mat_c_offset]);
-	// Inform the accelerator to start.
-	atomic_flag_store(&input_flag2, 1);
-
-	printf("Third context task sent\n");	
-
-	///////////////////////////////////////////////////////
-	/// Get first context output
-	///////////////////////////////////////////////////////
-	while(atomic_flag_load(&output_flag0) != 1);
-	errors0 += validate_buffer(&mem0[mat_c_offset], &gold0[mat_c_offset]);
-
-	// Reset for next iteration.
-	atomic_flag_store(&output_flag0, 0);
-
-	printf("First context task done\n");	
-
-	///////////////////////////////////////////////////////
-	/// Get third context output
-	///////////////////////////////////////////////////////
-	while(atomic_flag_load(&output_flag2) != 1);
-	errors2 += validate_buffer(&mem2[mat_c_offset], &gold2[mat_c_offset]);
-
-	// Reset for next iteration.
-	atomic_flag_store(&output_flag2, 0);
-
-	printf("Third context task done\n");
-
-	for (i = 0; i < 3; i++) {
-		printf("MON_UTIL_REG_%d_LO = %x\n", i, ioread32(dev, MON_UTIL_REG_0_LO + 0x8*i));
-		printf("MON_UTIL_REG_%d_HI = %x\n", i, ioread32(dev, MON_UTIL_REG_0_HI + 0x8*i));
-	}
-
-	///////////////////////////////////////////////////////
-	/// New test
-	///////////////////////////////////////////////////////
-	printf("-----------------------\n");	
-
-	///////////////////////////////////////////////////////
-	/// Configure second context
-	///////////////////////////////////////////////////////
-	iowrite32(dev, GEMM_CONTEXT_BASE_PTR_3, stat_offset);
-	iowrite32(dev, PT_ADDRESS_REG_3, (unsigned long long) ptable1);
-	iowrite32(dev, GEMM_CONTEXT_NPRIO_3, 1);
-	iowrite32(dev, GEMM_VALID_CONTEXTS, 0xD);
-
-	printf("Second context configured\n");
-
-	///////////////////////////////////////////////////////
-	/// Send first context task
-	///////////////////////////////////////////////////////
-	// Wait for the accelerator to be ready
-	while(atomic_flag_load(&input_flag0) != 0);
-	// When the accelerator is ready, we write the input data to it
-	init_buffer(&mem0[mat_a_offset], &mem0[mat_b_offset],
-				&gold0[mat_a_offset], &gold0[mat_b_offset], &gold0[mat_c_offset]);
-	// Inform the accelerator to start.
-	atomic_flag_store(&input_flag0, 1);
-
-	printf("First context task sent\n");	
-
-	///////////////////////////////////////////////////////
-	/// Send first context task
-	///////////////////////////////////////////////////////
-	// Wait for the accelerator to be ready
-	while(atomic_flag_load(&input_flag0) != 0);
-	// When the accelerator is ready, we write the input data to it
-	init_buffer(&mem0[mat_a_offset], &mem0[mat_b_offset],
-				&gold0[mat_a_offset], &gold0[mat_b_offset], &gold0[mat_c_offset]);
-	// Inform the accelerator to start.
-	atomic_flag_store(&input_flag0, 1);
-
-	printf("First context task sent\n");	
-
-	///////////////////////////////////////////////////////
-	/// Send second context task
-	///////////////////////////////////////////////////////
-	// Wait for the accelerator to be ready
-	while(atomic_flag_load(&input_flag1) != 0);
-	// When the accelerator is ready, we write the input data to it
-	init_buffer(&mem1[mat_a_offset], &mem1[mat_b_offset],
-				&gold1[mat_a_offset], &gold1[mat_b_offset], &gold1[mat_c_offset]);
-	// Inform the accelerator to start.
-	atomic_flag_store(&input_flag1, 1);
-
-	printf("Second context task sent\n");
-
-	///////////////////////////////////////////////////////
-	/// Send third context task
-	///////////////////////////////////////////////////////
-	// Wait for the accelerator to be ready
-	while(atomic_flag_load(&input_flag2) != 0);
-	// When the accelerator is ready, we write the input data to it
-	init_buffer(&mem2[mat_a_offset], &mem2[mat_b_offset],
-				&gold2[mat_a_offset], &gold2[mat_b_offset], &gold2[mat_c_offset]);
-	// Inform the accelerator to start.
-	atomic_flag_store(&input_flag2, 1);
-
-	printf("Third context task sent\n");
-
-	for (int i = 0; i < 10; i++) {
-		printf("Idle loop...\n");
-	}
-
-	///////////////////////////////////////////////////////
-	/// Get first context output
-	///////////////////////////////////////////////////////
-	while(atomic_flag_load(&output_flag0) != 1);
-	errors0 += validate_buffer(&mem0[mat_c_offset], &gold0[mat_c_offset]);
-
-	// Reset for next iteration.
-	atomic_flag_store(&output_flag0, 0);
-
-	printf("First context task done\n");	
-
-	///////////////////////////////////////////////////////
-	/// Get second context output
-	///////////////////////////////////////////////////////
-	while(atomic_flag_load(&output_flag1) != 1);
-	errors1 += validate_buffer(&mem1[mat_c_offset], &gold1[mat_c_offset]);
-
-	// Reset for next iteration.
-	atomic_flag_store(&output_flag1, 0);
-
-	printf("Second context task done\n");
-
-	///////////////////////////////////////////////////////
-	/// Get third context output
-	///////////////////////////////////////////////////////
-	while(atomic_flag_load(&output_flag2) != 1);
-	errors2 += validate_buffer(&mem2[mat_c_offset], &gold2[mat_c_offset]);
-
-	// Reset for next iteration.
-	atomic_flag_store(&output_flag2, 0);
-
-	printf("Third context task done\n");
-
-	///////////////////////////////////////////////////////
-	/// Get first context output
-	///////////////////////////////////////////////////////
-	while(atomic_flag_load(&output_flag0) != 1);
-	errors0 += validate_buffer(&mem0[mat_c_offset], &gold0[mat_c_offset]);
-
-	// Reset for next iteration.
-	atomic_flag_store(&output_flag0, 0);
-
-	printf("First context task done\n");	
 	
-	for (i = 0; i < 3; i++) {
-		printf("MON_UTIL_REG_%d_LO = %x\n", i, ioread32(dev, MON_UTIL_REG_0_LO + 0x8*i));
-		printf("MON_UTIL_REG_%d_HI = %x\n", i, ioread32(dev, MON_UTIL_REG_0_HI + 0x8*i));
+	printf("First context started\n");
+
+	done = 0;
+	while (!done) {
+		done = ioread32(dev, STATUS_REG);
+		done &= STATUS_MASK_DONE;
 	}
+	iowrite32(dev, CMD_REG, 0x0);
+
+	printf("First context task done\n");
+
+	errors0 += validate_buffer(&mem0[mat_c_offset], &gold0[mat_c_offset]);
 
 	///////////////////////////////////////////////////////
-	/// New test
+	/// Start second task
 	///////////////////////////////////////////////////////
-	printf("-----------------------\n");	
+	init_buffer(&mem1[mat_a_offset], &mem1[mat_b_offset],
+				&gold1[mat_a_offset], &gold1[mat_b_offset], &gold1[mat_c_offset]);
+
+	iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
+	iowrite32(dev, COHERENCE_REG, coherence);
+	iowrite32(dev, PT_ADDRESS_REG_0, (unsigned long long) ptable1);
+	iowrite32(dev, PT_NCHUNK_REG, NCHUNK(mem_size));
+	iowrite32(dev, PT_SHIFT_REG, CHUNK_SHIFT);
+	iowrite32(dev, SRC_OFFSET_REG, 0x0);
+	iowrite32(dev, DST_OFFSET_REG, 0x0);
+	iowrite32(dev, GEMM_DIM_M, dim_m);
+	iowrite32(dev, GEMM_DIM_N, dim_n);
+	iowrite32(dev, GEMM_DIM_K, dim_k);
+	iowrite32(dev, GEMM_WEIGHT_BASE, mat_b_offset);
+	iowrite32(dev, GEMM_INPUT_BASE, mat_a_valid_offset);
+	iowrite32(dev, GEMM_OUTPUT_BASE, mat_c_valid_offset);
+
+	// Start accelerator
+	iowrite32(dev, CMD_REG, CMD_MASK_START);
+	
+	printf("Second context started\n");
+
+	done = 0;
+	while (!done) {
+		done = ioread32(dev, STATUS_REG);
+		done &= STATUS_MASK_DONE;
+	}
+	iowrite32(dev, CMD_REG, 0x0);
+
+	printf("Second context task done\n");
+
+	errors1 += validate_buffer(&mem1[mat_c_offset], &gold1[mat_c_offset]);
+
+	///////////////////////////////////////////////////////
+	/// Start third task
+	///////////////////////////////////////////////////////
+	init_buffer(&mem2[mat_a_offset], &mem2[mat_b_offset],
+				&gold2[mat_a_offset], &gold2[mat_b_offset], &gold2[mat_c_offset]);
+
+	iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
+	iowrite32(dev, COHERENCE_REG, coherence);
+	iowrite32(dev, PT_ADDRESS_REG_0, (unsigned long long) ptable2);
+	iowrite32(dev, PT_NCHUNK_REG, NCHUNK(mem_size));
+	iowrite32(dev, PT_SHIFT_REG, CHUNK_SHIFT);
+	iowrite32(dev, SRC_OFFSET_REG, 0x0);
+	iowrite32(dev, DST_OFFSET_REG, 0x0);
+	iowrite32(dev, GEMM_DIM_M, dim_m);
+	iowrite32(dev, GEMM_DIM_N, dim_n);
+	iowrite32(dev, GEMM_DIM_K, dim_k);
+	iowrite32(dev, GEMM_WEIGHT_BASE, mat_b_offset);
+	iowrite32(dev, GEMM_INPUT_BASE, mat_a_valid_offset);
+	iowrite32(dev, GEMM_OUTPUT_BASE, mat_c_valid_offset);
+
+	// Start accelerator
+	iowrite32(dev, CMD_REG, CMD_MASK_START);
+	
+	printf("Third context started\n");
+
+	done = 0;
+	while (!done) {
+		done = ioread32(dev, STATUS_REG);
+		done &= STATUS_MASK_DONE;
+	}
+	iowrite32(dev, CMD_REG, 0x0);
+
+	printf("Third context task done\n");
+
+	errors2 += validate_buffer(&mem2[mat_c_offset], &gold2[mat_c_offset]);
 
 	aligned_free(ptable0);
 	aligned_free(ptable1);
@@ -880,5 +332,6 @@ int main(int argc, char * argv[])
 
 	printf("  Errors = %d %d %d\n", errors0, errors1, errors2);
 
+	while(1);
 	return 0;
 }

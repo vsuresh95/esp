@@ -19,13 +19,15 @@
 
 struct gemm_stratus_access {
 	struct esp_access esp;
+	/* <<--regs-->> */
+	unsigned dim_m;
+	unsigned dim_n;
+	unsigned dim_k;
+	unsigned weight_base;
+	unsigned input_base;
+	unsigned output_base;
 };
 
 #define GEMM_STRATUS_IOC_ACCESS			_IOW ('S', 0, struct gemm_stratus_access)
-#define GEMM_STRATUS_RESET_IOC_ACCESS	_IOW ('S', 1, struct gemm_stratus_access)
-#define GEMM_STRATUS_INIT_IOC_ACCESS	_IOW ('S', 2, struct gemm_stratus_access)
-#define GEMM_STRATUS_ADD_IOC_ACCESS		_IOW ('S', 3, struct gemm_stratus_access)
-#define GEMM_STRATUS_DEL_IOC_ACCESS		_IOW ('S', 4, struct gemm_stratus_access)
-#define GEMM_STRATUS_PRIO_IOC_ACCESS	_IOW ('S', 5, struct gemm_stratus_access)
 
 #endif /* _GEMM_STRATUS_H_ */

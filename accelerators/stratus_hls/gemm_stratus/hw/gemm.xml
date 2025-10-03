@@ -1,15 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <sld>
   <accelerator name="gemm" desc="Accelerator GEMM" data_size="4" device_id="051" hls_tool="stratus_hls">
-    <param name="context_base_ptr_0" desc="context_base_ptr_0" />
-    <param name="context_base_ptr_1" desc="context_base_ptr_1" />
-    <param name="context_base_ptr_2" desc="context_base_ptr_2" />
-    <param name="context_base_ptr_3" desc="context_base_ptr_3" />
-    <param name="context_nprio_0" desc="context_nprio_0" />
-    <param name="context_nprio_1" desc="context_nprio_1" />
-    <param name="context_nprio_2" desc="context_nprio_2" />
-    <param name="context_nprio_3" desc="context_nprio_3" />
-    <param name="valid_contexts" desc="valid_contexts" />
-    <param name="sched_period" desc="sched_period" />
+    <param name="dim_m" desc="dim_m" />
+    <param name="dim_n" desc="dim_n" />
+    <param name="dim_k" desc="dim_k" />
+    <param name="weight_base" desc="weight_base" />
+    <param name="input_base" desc="input_base" />
+    <param name="output_base" desc="output_base" />
   </accelerator>
 </sld>

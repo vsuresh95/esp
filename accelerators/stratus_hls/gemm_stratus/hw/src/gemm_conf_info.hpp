@@ -6,9 +6,6 @@
 
 #include <systemc.h>
 
-#define N_CONTEXTS 4
-#define N_CONTEXTS_BITS 2
-
 //
 // Configuration parameters for the accelerator.
 //
@@ -21,41 +18,43 @@ public:
     conf_info_t()
     {
         /* <<--ctor-->> */
-        for (unsigned i = 0; i < N_CONTEXTS; i++) {
-            this->context_base_ptr[i] = 0;
-            this->context_nprio[i] = 0;
-        }
-        this->valid_contexts = 0;
-        this->sched_period = 0;
+        this->dim_m = 0;
+        this->dim_n = 0;
+        this->dim_k = 0;
+        this->weight_base = 0;
+        this->input_base = 0;
+        this->output_base = 0;
     }
 
     conf_info_t(
         /* <<--ctor-args-->> */
-        uint32_t context_base_ptr[N_CONTEXTS],
-        uint32_t context_nprio[N_CONTEXTS],
-        uint32_t valid_contexts,
-        uint32_t sched_period
+        uint32_t dim_m,
+        uint32_t dim_n,
+        uint32_t dim_k,
+        uint32_t weight_base,
+        uint32_t input_base,
+        uint32_t output_base
         )
     {
         /* <<--ctor-custom-->> */
-        for (unsigned i = 0; i < N_CONTEXTS; i++) {
-            this->context_base_ptr[i] = context_base_ptr[i];
-            this->context_nprio[i] = context_nprio[i];
-        }
-        this->valid_contexts = valid_contexts;
-        this->sched_period = sched_period;
+        this->dim_m = dim_m;
+        this->dim_n = dim_n;
+        this->dim_k = dim_k;
+        this->weight_base = weight_base;
+        this->input_base = input_base;
+        this->output_base = output_base;
     }
 
     // equals operator
     inline bool operator==(const conf_info_t &rhs) const
     {
         /* <<--eq-->> */
-        for (unsigned i = 0; i < N_CONTEXTS; i++) {
-            if (context_base_ptr[i] != rhs.context_base_ptr[i]) return false;
-            if (context_nprio[i] != rhs.context_nprio[i]) return false;
-        }
-        if (valid_contexts != rhs.valid_contexts) return false;
-        if (sched_period != rhs.sched_period) return false;
+        if (dim_m != rhs.dim_m) return false;
+        if (dim_n != rhs.dim_n) return false;
+        if (dim_k != rhs.dim_k) return false;
+        if (weight_base != rhs.weight_base) return false;
+        if (input_base != rhs.input_base) return false;
+        if (output_base != rhs.output_base) return false;
         return true;
     }
 
@@ -63,12 +62,12 @@ public:
     inline conf_info_t& operator=(const conf_info_t& other)
     {
         /* <<--assign-->> */
-        for (unsigned i = 0; i < N_CONTEXTS; i++) {
-            context_base_ptr[i] = other.context_base_ptr[i];
-            context_nprio[i] = other.context_nprio[i];
-        }
-        valid_contexts = other.valid_contexts;
-        sched_period = other.sched_period;
+        dim_m = other.dim_m;
+        dim_n = other.dim_n;
+        dim_k = other.dim_k;
+        weight_base = other.weight_base;
+        input_base = other.input_base;
+        output_base = other.output_base;
         return *this;
     }
 
@@ -86,10 +85,12 @@ public:
     }
 
     /* <<--params-->> */
-    uint32_t context_base_ptr[N_CONTEXTS];
-    uint32_t context_nprio[N_CONTEXTS];
-    uint32_t valid_contexts;
-    uint32_t sched_period;
+    uint32_t dim_m;
+    uint32_t dim_n;
+    uint32_t dim_k;
+    uint32_t weight_base;
+    uint32_t input_base;
+    uint32_t output_base;
 };
 
 #endif // __GEMM_CONF_INFO_HPP__

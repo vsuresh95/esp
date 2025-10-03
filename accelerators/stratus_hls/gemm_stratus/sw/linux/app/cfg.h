@@ -5,52 +5,42 @@
 
 #include "libesp.h"
 #include "gemm_stratus.h"
+#include <sys/epoll.h>
+
+// Size and parameter defines
+#define VALID_OFFSET 0
+#define PAYLOAD_OFFSET 8
+#define SM_INFO_SIZE 8
 
 typedef int token_t;
 typedef float native_t;
-#define fx2float fixed32_to_float
-#define float2fx float_to_fixed32
-#define FX_IL 14
+#define FX_IL 16
+
+unsigned ITERATIONS = 100;
 
 /* <<--params-def-->> */
-#define DO_INVERSE 0
-#define LOGN_SAMPLES 14
-#define DO_SHIFT 0
+unsigned dim_m = 16;
+unsigned dim_n = 16;
+unsigned dim_k = 16;
 
-/* <<--params-->> */
-const int32_t logn_samples = LOGN_SAMPLES;
-const int32_t do_inverse = DO_INVERSE;
-const int32_t do_shift = DO_SHIFT;
+// ESP API for getting contig_alloc handle
+extern contig_handle_t *lookup_handle(void *buf, enum contig_alloc_policy *policy);
 
+uint64_t get_counter() {
+    uint64_t t;
+	asm volatile (
+		"li t0, 0;"
+		"csrr t0, cycle;"
+		"mv %0, t0"
+		: "=r" (t)
+		:
+		: "t0"
+	);
 
-#define NACC 1
+	return t;
+}
 
-struct gemm_stratus_access gemm_cfg_000[] = {
-	{
-		/* <<--descriptor-->> */
-		.do_inverse = 0,
-		.logn_samples = LOGN_SAMPLES,
-		.do_shift = DO_SHIFT,
-
-		.prod_valid_offset = 0,
-		.prod_ready_offset = 0,
-		.cons_valid_offset = 0,
-		.cons_ready_offset = 0,
-		.input_offset = 0,
-		.output_offset = 0,
-		
-		.src_offset = 0,
-		.dst_offset = 0,
-	}
-};
-
-esp_thread_info_t cfg_000[] = {
-	{
-		.run = true,
-		.devname = "gemm_stratus.0",
-		.ioctl_req = GEMM_STRATUS_IOC_ACCESS,
-		.esp_desc = &(gemm_cfg_000[0].esp),
-	}
-};
+uint64_t t_sw;
+uint64_t t_acc;
 
 #endif /* __ESP_CFG_000_H__ */

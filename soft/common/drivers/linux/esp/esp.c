@@ -212,20 +212,6 @@ static void esp_transfer(struct esp_device *esp, const struct contig_desc *conti
 	esp->err = 0;
 	reinit_completion(&esp->completion);
 
-	iowrite32be(contig->arr_dma_addr, esp->iomem + PT_ADDRESS_REG);
-	iowrite32be(contig_chunk_size_log, esp->iomem + PT_SHIFT_REG);
-	iowrite32be(contig->n, esp->iomem + PT_NCHUNK_REG);
-	iowrite32be(esp->coherence, esp->iomem + COHERENCE_REG);
-	iowrite32be(esp->src_offset, esp->iomem + SRC_OFFSET_REG);
-	iowrite32be(esp->dst_offset, esp->iomem + DST_OFFSET_REG);
-	iowrite32be(esp->spandex_conf, esp->iomem + SPANDEX_REG);
-}
-
-static void esp_transfer_init(struct esp_device *esp, const struct contig_desc *contig)
-{
-	esp->err = 0;
-	reinit_completion(&esp->completion);
-
 	iowrite32be(contig->arr_dma_addr, esp->iomem + PT_ADDRESS_REG_0);
 	iowrite32be(contig_chunk_size_log, esp->iomem + PT_SHIFT_REG);
 	iowrite32be(contig->n, esp->iomem + PT_NCHUNK_REG);
@@ -235,25 +221,9 @@ static void esp_transfer_init(struct esp_device *esp, const struct contig_desc *
 	iowrite32be(esp->spandex_conf, esp->iomem + SPANDEX_REG);
 }
 
-static void esp_update_pt(struct esp_device *esp, const struct contig_desc *contig)
-{
-	esp->err = 0;
-	reinit_completion(&esp->completion);
-
-	iowrite32be(contig->arr_dma_addr, esp->iomem + PT_ADDRESS_REG_0 + 0x4*esp->context_id);
-}
-
 static void esp_run(struct esp_device *esp)
 {
 	iowrite32be(0x1, esp->iomem + CMD_REG);
-}
-
-static void esp_check_context(struct esp_device *esp, unsigned expected_mask)
-{
-	/* Wait for all contexts to be clear */
-	while ((ioread32be(esp->iomem + VALID_CONTEXTS_ACK_REG) & expected_mask) != 0x0){
-        cpu_relax();
-    }		
 }
 
 static void esp_halt(struct esp_device *esp)
@@ -268,12 +238,18 @@ static void esp_halt(struct esp_device *esp)
 static int esp_wait(struct esp_device *esp)
 {
 	/* Interrupt */
-	int wait;
+	u32 status, error, done;
+	
+	done = 0;
+	while (done == 0) {
+		status = ioread32be(esp->iomem + STATUS_REG);
+		error = status & STATUS_MASK_ERR;
+		done = status & STATUS_MASK_DONE;
+	}
 
-	wait = wait_for_completion_interruptible(&esp->completion);
-	if (wait < 0)
-		return -EINTR;
-	if (esp->err) {
+	iowrite32be(0, esp->iomem + CMD_REG);
+
+	if (error != 0) {
 		pr_info(PFX "Error occured\n");
 		return -1;
 	}
@@ -407,6 +383,11 @@ static int esp_access_ioctl(struct esp_device *esp, void __user *argp)
 		goto out;
 	}
 
+	if (mutex_lock_interruptible(&esp->lock)) {
+		rc = -EINTR;
+		goto out;
+	}
+
 	esp_halt(esp);
 
 	if (!esp_xfer_input_ok(esp, contig)) {
@@ -416,11 +397,6 @@ static int esp_access_ioctl(struct esp_device *esp, void __user *argp)
 
 	if (esp->driver->xfer_input_ok && !esp->driver->xfer_input_ok(esp, arg)) {
 		rc = -EINVAL;
-		goto out;
-	}
-
-	if (mutex_lock_interruptible(&esp->lock)) {
-		rc = -EINTR;
 		goto out;
 	}
 
@@ -456,189 +432,6 @@ static int esp_access_ioctl(struct esp_device *esp, void __user *argp)
 
 	if (esp->driver->prep_xfer)
 		esp->driver->prep_xfer(esp, arg);
-
-	if (access->run) {
-        if (access->start_stop) {
-           esp_run(esp);
-        } else {
-           esp_run(esp);
-           rc = esp_wait(esp);
-        }
-	}
-
-    if (mutex_lock_interruptible(&esp_status.lock)) {
-        rc = -EINTR;
-        goto out;
-    }
-
-    esp_update_status(esp);
-
-    mutex_unlock(&esp_status.lock);
-
-	mutex_unlock(&esp->lock);
-
-out:
-	kfree(arg);
-	return rc;
-}
-
-static int esp_access_virt(struct esp_device *esp, unsigned int cm, void __user *argp)
-{
-	struct contig_desc *contig;
-	struct esp_access *access;
-	void *arg;
-	int rc = 0;
-	unsigned mask;
-
-	arg = kmalloc(esp->driver->arg_size, GFP_KERNEL);
-	if (arg == NULL)
-		return -ENOMEM;
-
-	if (copy_from_user(arg, argp, esp->driver->arg_size)) {
-		rc = -EFAULT;
-		goto out;
-	}
-
-	// Initializing the accelerator, adding context/deleting context/changing priority?
-	if (cm == esp->driver->reset_cm) {
-		goto reset;
-	} else if (cm == esp->driver->del_cm) {
-		goto del;
-	} else if (cm == esp->driver->prio_cm) {
-		goto prio;
-	} else {
-		goto add;
-	}
-
-reset:
-	if (mutex_lock_interruptible(&esp->lock)) {
-		rc = -EINTR;
-		goto out;
-	}
-
-	if (esp->driver->res_accel)
-		esp->driver->res_accel(esp);
-	
-	esp_check_context(esp, 0xFFFFFFFF);
-
-	esp_halt(esp);
-
-	mutex_unlock(&esp->lock);
-
-	goto out;
-
-del:
-	if (mutex_lock_interruptible(&esp->lock)) {
-		rc = -EINTR;
-		goto out;
-	}
-
-	if (esp->driver->del_context)
-		esp->driver->del_context(esp, arg);
-
-	mutex_unlock(&esp->lock);
-
-	goto out;
-
-prio:
-	if (mutex_lock_interruptible(&esp->lock)) {
-		rc = -EINTR;
-		goto out;
-	}
-
-	if (esp->driver->setprio)
-		esp->driver->setprio(esp, arg);
-
-	mutex_unlock(&esp->lock);
-
-	goto out;
-
-add:
-	access = arg;
-	contig = contig_khandle_to_desc(access->contig);
-	if (contig == NULL) {
-		rc = -EFAULT;
-		goto out;
-	}
-
-	if (cm == esp->driver->init_cm) {
-		goto init;
-	}
-
-	if (mutex_lock_interruptible(&esp->lock)) {
-		rc = -EINTR;
-		goto out;
-	}
-
-	esp->context_id = access->context_id;
-	mask = 0x0;
-	mask |= (1 << esp->context_id);
-	esp_check_context(esp, mask);
-
-	esp_update_pt(esp, contig);
-
-	if (esp->driver->add_context)
-		esp->driver->add_context(esp, arg);
-
-	mutex_unlock(&esp->lock);
-
-	goto out;
-
-init:
-	if (access->p2p_nsrcs > 4) {
-		rc = -EINVAL;
-		goto out;
-	}
-
-	esp_halt(esp);
-
-	if (!esp_xfer_input_ok(esp, contig)) {
-		rc = -EINVAL;
-		goto out;
-	}
-
-	if (esp->driver->xfer_input_ok && !esp->driver->xfer_input_ok(esp, arg)) {
-		rc = -EINVAL;
-		goto out;
-	}
-
-	if (mutex_lock_interruptible(&esp->lock)) {
-		rc = -EINTR;
-		goto out;
-	}
-
-	rc = esp_p2p_init(esp, access);
-	if (rc)
-		goto out;
-
-	esp->coherence = access->coherence;
-	esp->src_offset = access->src_offset;
-	esp->dst_offset = access->dst_offset;
-	esp->spandex_conf = access->spandex_conf;
-	esp->footprint = access->footprint;
-    esp->alloc_policy = access->alloc_policy;
-    esp->ddr_node = access->ddr_node;
-	esp->in_place = access->in_place;
-	esp->reuse_factor = access->reuse_factor;
-	esp->context_id = access->context_id;
-
-    if (mutex_lock_interruptible(&esp_status.lock)) {
-        rc = -EINTR;
-        goto out;
-    }
-
-    esp_runtime_config(esp);
-
-    mutex_unlock(&esp_status.lock);
-
-	rc = esp_flush(esp);
-	if (rc)
-		goto out;
-
-	esp_transfer_init(esp, contig);
-
-	if (esp->driver->init_accel)
-		esp->driver->init_accel(esp, arg);
 
 	if (access->run) {
         if (access->start_stop) {
@@ -730,16 +523,6 @@ static long esp_do_ioctl(struct file *file, unsigned int cm, void __user *arg)
 	default:
 		if (cm == esp->driver->ioctl_cm)
 			return esp_access_ioctl(esp, arg);
-		else if (cm == esp->driver->reset_cm)
-			return esp_access_virt(esp, cm, arg);
-		else if (cm == esp->driver->init_cm)
-			return esp_access_virt(esp, cm, arg);
-		else if (cm == esp->driver->add_cm)
-			return esp_access_virt(esp, cm, arg);
-		else if (cm == esp->driver->del_cm)
-			return esp_access_virt(esp, cm, arg);
-		else if (cm == esp->driver->prio_cm)
-			return esp_access_virt(esp, cm, arg);
 		return -ENOTTY;
 	}
 }
@@ -808,17 +591,6 @@ int esp_device_register(struct esp_device *esp, struct platform_device *pdev)
 	if (rc)
 		goto out;
 
-#ifndef __sparc
-	esp->irq = of_irq_get(pdev->dev.of_node, 0);
-#else
-	esp->irq = pdev->archdata.irqs[0];
-#endif
-	rc = request_irq(esp->irq, esp_irq, IRQF_SHARED, "esp", esp->pdev);
-	if (rc) {
-		dev_info(esp->pdev, "cannot request IRQ number %d\n", esp->irq);
-		goto out_irq;
-	}
-
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	esp->iomem = devm_ioremap_resource(&pdev->dev, res);
 	if (esp->iomem == NULL) {
@@ -848,8 +620,6 @@ int esp_device_register(struct esp_device *esp, struct platform_device *pdev)
 	return 0;
 
 out_iomem:
-	free_irq(esp->irq, esp->pdev);
-out_irq:
 	esp_destroy_cdev(esp, esp->number);
 out:
 	kfree(esp);
