@@ -2519,7 +2519,7 @@ def print_load_script(fp, soc, esp_config):
     if i != nddr - 1:
         fp.write(",")
     
-  fp.write(" chunk_log=20\n")
+  fp.write(" chunk_log=24\n")
   fp.write("insmod esp_cache.ko\n")
   fp.write("insmod esp_private_cache.ko\n")
   fp.write("insmod esp.ko")

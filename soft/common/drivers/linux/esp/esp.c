@@ -242,6 +242,7 @@ static int esp_wait(struct esp_device *esp)
 	
 	done = 0;
 	while (done == 0) {
+		yield();
 		status = ioread32be(esp->iomem + STATUS_REG);
 		error = status & STATUS_MASK_ERR;
 		done = status & STATUS_MASK_DONE;
