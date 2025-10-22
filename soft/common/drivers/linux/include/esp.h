@@ -59,6 +59,7 @@ struct avu_mon_desc {
 #include <linux/mutex.h>
 #include <linux/cdev.h>
 #include <linux/list.h>
+#include <linux/poll.h>
 
 // TO DO do not hard-code this values
 #define N_MEM 8
@@ -90,6 +91,8 @@ struct esp_device {
 	void __iomem *iomem; /* mmapped registers */
 	int irq;
 	int err;
+    wait_queue_head_t waitq;
+    atomic_t done;
 	/* the below are filled in by drivers */
 	struct esp_driver *driver;
 	struct module *module;
