@@ -280,7 +280,6 @@ void gemm::compute_kernel()
         HLS_PROTO("compute-reset");
         this->reset_compute_kernel();
         this->reset_accelerator_fence();
-        this->reset_mon_chnl();
         this->reset_current_context();
         wait();
     }

@@ -28,6 +28,6 @@ struct gemm_stratus_access {
 	unsigned output_base;
 };
 
-#define GEMM_STRATUS_IOC_ACCESS			_IOW ('S', 0, struct gemm_stratus_access)
+#define GEMM_STRATUS_IOC_ACCESS			_IOWR ('S', 0, struct gemm_stratus_access)
 
 #endif /* _GEMM_STRATUS_H_ */
