@@ -60,48 +60,29 @@ static size_t cache_llc_size = 262144;
 
 struct esp_status esp_status;
 
-static irqreturn_t esp_irq_top(int irq, void *data)
+static irqreturn_t esp_irq(int irq, void *dev)
 {
-    struct esp_device *esp = data;
-	u32 status;
-    status = ioread32be(esp->iomem + STATUS_REG);
-    if (!(status & (STATUS_MASK_ERR | STATUS_MASK_DONE)))
-        return IRQ_NONE;
-    return IRQ_WAKE_THREAD;
-}
+	struct esp_device *esp = dev_get_drvdata(dev);
+	u32 status, error, done;
 
-static irqreturn_t esp_irq_thread(int irq, void *data)
-{
-    struct esp_device *esp = data;
-	u32 status;
 	status = ioread32be(esp->iomem + STATUS_REG);
+	error = status & STATUS_MASK_ERR;
+	done = status & STATUS_MASK_DONE;
 
-    if (status & STATUS_MASK_ERR) {
-        iowrite32be(0, esp->iomem + CMD_REG);
-        esp->err = -1;
-        atomic_set(&esp->done, 1);
-    }
-    if (status & STATUS_MASK_DONE) {
-        iowrite32be(0, esp->iomem + CMD_REG);
-        atomic_set(&esp->done, 1);
-    }
+	/* printk(KERN_INFO "IRQ: %08x\n", status); */
 
-    smp_wmb();
-    wake_up_interruptible(&esp->waitq);
-    return IRQ_HANDLED;
-}
-
-static __poll_t esp_poll(struct file *file, poll_table *wait)
-{
-    struct esp_device *esp = file->private_data;
-    __poll_t mask = 0;
-
-    poll_wait(file, &esp->waitq, wait);
-
-    if (atomic_read(&esp->done))
-        mask |= EPOLLIN | EPOLLRDNORM;
-
-    return mask;
+	if (error) {
+		iowrite32be(0, esp->iomem + CMD_REG);
+		esp->err = -1;
+		complete_all(&esp->completion);
+		return IRQ_HANDLED;
+	}
+	if (done) {
+		iowrite32be(0, esp->iomem + CMD_REG);
+		complete_all(&esp->completion);
+		return IRQ_HANDLED;
+	}
+	return IRQ_NONE;
 }
 
 static int esp_flush(struct esp_device *esp)
@@ -242,9 +223,6 @@ static void esp_transfer(struct esp_device *esp, const struct contig_desc *conti
 
 static void esp_run(struct esp_device *esp)
 {
-	esp->err = 0;
-	atomic_set(&esp->done, 0);
-
 	iowrite32be(0x1, esp->iomem + CMD_REG);
 }
 
@@ -457,7 +435,12 @@ static int esp_access_ioctl(struct esp_device *esp, void __user *argp)
 		esp->driver->prep_xfer(esp, arg);
 
 	if (access->run) {
-		esp_run(esp);
+        if (access->start_stop) {
+           esp_run(esp);
+        } else {
+           esp_run(esp);
+           rc = esp_wait(esp);
+        }
 	}
 
     if (mutex_lock_interruptible(&esp_status.lock)) {
@@ -551,11 +534,10 @@ static long esp_ioctl(struct file *file, unsigned int cm, unsigned long arg)
 }
 
 static const struct file_operations esp_fops = {
-	.owner			= THIS_MODULE,
-	.open			= esp_open,
-	.release		= esp_release,
+	.owner		= THIS_MODULE,
+	.open		= esp_open,
+	.release	= esp_release,
 	.unlocked_ioctl	= esp_ioctl,
-    .poll           = esp_poll,
 };
 
 static int esp_create_cdev(struct esp_device *esp, int ndev)
@@ -606,25 +588,9 @@ int esp_device_register(struct esp_device *esp, struct platform_device *pdev)
 	mutex_init(&esp->lock);
 	init_completion(&esp->completion);
 
-	init_waitqueue_head(&esp->waitq);
-	atomic_set(&esp->done, 1);
-	esp->err = 0;
-
 	rc = esp_create_cdev(esp, esp->number);
 	if (rc)
 		goto out;
-
-#ifndef __sparc
-	esp->irq = of_irq_get(pdev->dev.of_node, 0);
-#else
-	esp->irq = pdev->archdata.irqs[0];
-#endif
-
-	rc = request_threaded_irq(esp->irq, esp_irq_top, esp_irq_thread, IRQF_ONESHOT | IRQF_SHARED, "esp", esp);
-	if (rc) {
-		dev_info(esp->pdev, "cannot request IRQ number %d\n", esp->irq);
-		goto out_irq;
-	}
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	esp->iomem = devm_ioremap_resource(&pdev->dev, res);
@@ -655,8 +621,6 @@ int esp_device_register(struct esp_device *esp, struct platform_device *pdev)
 	return 0;
 
 out_iomem:
-	free_irq(esp->irq, esp);
-out_irq:
 	esp_destroy_cdev(esp, esp->number);
 out:
 	kfree(esp);
