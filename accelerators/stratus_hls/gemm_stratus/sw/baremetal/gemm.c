@@ -242,6 +242,10 @@ int main(int argc, char * argv[])
 		done = ioread32(dev, STATUS_REG);
 		done &= STATUS_MASK_DONE;
 	}
+	for (i = 0; i < 4; i++) {
+		printf("MON_UTIL_REG_%d_LO = %x\n", i, ioread32(dev, MON_UTIL_REG_0_LO + 0x8*i));
+		printf("MON_UTIL_REG_%d_HI = %x\n", i, ioread32(dev, MON_UTIL_REG_0_HI + 0x8*i));
+	}
 	iowrite32(dev, CMD_REG, 0x0);
 
 	printf("First context task done\n");
@@ -278,6 +282,10 @@ int main(int argc, char * argv[])
 		done = ioread32(dev, STATUS_REG);
 		done &= STATUS_MASK_DONE;
 	}
+	for (i = 0; i < 4; i++) {
+		printf("MON_UTIL_REG_%d_LO = %x\n", i, ioread32(dev, MON_UTIL_REG_0_LO + 0x8*i));
+		printf("MON_UTIL_REG_%d_HI = %x\n", i, ioread32(dev, MON_UTIL_REG_0_HI + 0x8*i));
+	}	
 	iowrite32(dev, CMD_REG, 0x0);
 
 	printf("Second context task done\n");
@@ -314,6 +322,10 @@ int main(int argc, char * argv[])
 		done = ioread32(dev, STATUS_REG);
 		done &= STATUS_MASK_DONE;
 	}
+	for (i = 0; i < 4; i++) {
+		printf("MON_UTIL_REG_%d_LO = %x\n", i, ioread32(dev, MON_UTIL_REG_0_LO + 0x8*i));
+		printf("MON_UTIL_REG_%d_HI = %x\n", i, ioread32(dev, MON_UTIL_REG_0_HI + 0x8*i));
+	}	
 	iowrite32(dev, CMD_REG, 0x0);
 
 	printf("Third context task done\n");

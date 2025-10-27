@@ -235,10 +235,11 @@ static void esp_halt(struct esp_device *esp)
     }
 }
 
-static int esp_wait(struct esp_device *esp)
+static int esp_wait(struct esp_device *esp, struct avu_mon_desc *mon)
 {
 	/* Interrupt */
 	u32 status, error, done;
+	int i;
 	
 	done = 0;
 	while (done == 0) {
@@ -246,6 +247,10 @@ static int esp_wait(struct esp_device *esp)
 		status = ioread32be(esp->iomem + STATUS_REG);
 		error = status & STATUS_MASK_ERR;
 		done = status & STATUS_MASK_DONE;
+	}
+
+	for (i = 0; i < 2; i++) {
+		mon->util[i] = ioread32be(esp->iomem + MON_UTIL_REG_0_LO + 0x4*i);
 	}
 
 	iowrite32be(0, esp->iomem + CMD_REG);
@@ -439,8 +444,12 @@ static int esp_access_ioctl(struct esp_device *esp, void __user *argp)
            esp_run(esp);
         } else {
            esp_run(esp);
-           rc = esp_wait(esp);
+           rc = esp_wait(esp, &access->mon_info);
         }
+	}
+
+	if (copy_to_user(argp, access, esp->driver->arg_size)) {
+		return -EFAULT;
 	}
 
     if (mutex_lock_interruptible(&esp_status.lock)) {

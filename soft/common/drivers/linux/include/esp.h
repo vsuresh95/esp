@@ -17,6 +17,10 @@
 #include <stdint.h>
 #endif /* __KERNEL__ */
 
+struct avu_mon_desc {
+	unsigned util[8];
+};
+
 /* embed this struct at the beginning of the access struct */
 struct esp_access {
 	contig_khandle_t contig;
@@ -33,6 +37,7 @@ struct esp_access {
 	unsigned context_base_ptr;
 	unsigned context_nprio;
 	unsigned sched_period;
+	struct avu_mon_desc mon_info;
 
     unsigned int footprint;
     enum contig_alloc_policy alloc_policy;
@@ -40,10 +45,6 @@ struct esp_access {
 	unsigned int in_place;
 	unsigned int reuse_factor;
     uint8_t start_stop;
-};
-
-struct avu_mon_desc {
-	unsigned util[8];
 };
 
 #define ESP_IOC_RUN _IO('E', 0)
