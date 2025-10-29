@@ -31,7 +31,7 @@ static struct of_device_id gemm_device_ids[] = {
 		.name = "SLD_GEMM_STRATUS",
 	},
 	{
-		.name = "eb_063",
+		.name = "eb_051",
 	},
 	{
 		.compatible = "sld,gemm_stratus",

@@ -304,6 +304,22 @@ static bool esp_xfer_input_ok(struct esp_device *esp, const struct contig_desc *
 	return true;
 }
 
+static void esp_update_pt(struct esp_device *esp, const struct contig_desc *contig)
+{
+	esp->err = 0;
+	reinit_completion(&esp->completion);
+
+	iowrite32be(contig->arr_dma_addr, esp->iomem + PT_ADDRESS_REG_0 + 0x4*esp->context_id);
+}
+
+static void esp_check_context(struct esp_device *esp, unsigned expected_mask)
+{
+	/* Wait for all contexts to be clear */
+	while ((ioread32be(esp->iomem + VALID_CONTEXTS_ACK_REG) & expected_mask) != 0x0){
+        cpu_relax();
+    }		
+}
+
 #define esp_get_y(_dev) (YX_MASK_YX & (ioread32be(_dev->iomem + YX_REG) >> YX_SHIFT_Y))
 #define esp_get_x(_dev) (YX_MASK_YX & (ioread32be(_dev->iomem + YX_REG) >> YX_SHIFT_X))
 #define esp_p2p_reset(_dev) iowrite32be(0, _dev->iomem + P2P_REG)
@@ -378,6 +394,82 @@ static int esp_access_ioctl(struct esp_device *esp, void __user *argp)
 	}
 
 	access = arg;
+
+	// Check the specific ioctl command
+	if (access->ioctl_cm == ESP_IOCTL_ACC_NO_SM) {
+		goto init;
+	} else if (access->ioctl_cm == ESP_IOCTL_ACC_RESET) {
+		goto reset;
+	} else if (access->ioctl_cm == ESP_IOCTL_ACC_INIT) {
+		goto init;
+	} else if (access->ioctl_cm == ESP_IOCTL_ACC_ADD_CONTEXT) {
+		goto add;
+	} else if (access->ioctl_cm == ESP_IOCTL_ACC_DEL_CONTEXT) {
+		goto del_prio;
+	} else if (access->ioctl_cm == ESP_IOCTL_ACC_SET_PRIO) {
+		goto del_prio;
+	} else {
+		rc = -EINVAL;
+		goto out;
+	}
+
+reset:
+	if (mutex_lock_interruptible(&esp->lock)) {
+		rc = -EINTR;
+		goto out;
+	}
+
+	if (esp->driver->prep_xfer)
+		esp->driver->prep_xfer(esp, arg);
+	
+	esp_check_context(esp, 0xFFFFFFFF);
+
+	esp_halt(esp);
+
+	mutex_unlock(&esp->lock);
+
+	goto out;
+
+del_prio:
+	if (mutex_lock_interruptible(&esp->lock)) {
+		rc = -EINTR;
+		goto out;
+	}
+
+	if (esp->driver->prep_xfer)
+		esp->driver->prep_xfer(esp, arg);
+
+	mutex_unlock(&esp->lock);
+
+	goto out;
+
+add:
+	contig = contig_khandle_to_desc(access->contig);
+	if (contig == NULL) {
+		rc = -EFAULT;
+		goto out;
+	}
+
+	if (mutex_lock_interruptible(&esp->lock)) {
+		rc = -EINTR;
+		goto out;
+	}
+
+	esp->context_id = access->context_id;
+	unsigned mask = 0x0;
+	mask |= (1 << esp->context_id);
+	esp_check_context(esp, mask);
+
+	esp_update_pt(esp, contig);
+
+	if (esp->driver->prep_xfer)
+		esp->driver->prep_xfer(esp, arg);
+
+	mutex_unlock(&esp->lock);
+
+	goto out;
+
+init:
 	contig = contig_khandle_to_desc(access->contig);
 	if (contig == NULL) {
 		rc = -EFAULT;

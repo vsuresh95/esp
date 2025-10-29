@@ -22,7 +22,7 @@ public:
     {
         /* <<--ctor-->> */
         for (unsigned i = 0; i < N_CONTEXTS; i++) {
-            this->context_base_ptr[i] = 0;
+            this->context_queue_ptr[i] = 0;
             this->context_nprio[i] = 0;
         }
         this->valid_contexts = 0;
@@ -31,7 +31,7 @@ public:
 
     conf_info_t(
         /* <<--ctor-args-->> */
-        uint32_t context_base_ptr[N_CONTEXTS],
+        uint32_t context_queue_ptr[N_CONTEXTS],
         uint32_t context_nprio[N_CONTEXTS],
         uint32_t valid_contexts,
         uint32_t sched_period
@@ -39,7 +39,7 @@ public:
     {
         /* <<--ctor-custom-->> */
         for (unsigned i = 0; i < N_CONTEXTS; i++) {
-            this->context_base_ptr[i] = context_base_ptr[i];
+            this->context_queue_ptr[i] = context_queue_ptr[i];
             this->context_nprio[i] = context_nprio[i];
         }
         this->valid_contexts = valid_contexts;
@@ -51,7 +51,7 @@ public:
     {
         /* <<--eq-->> */
         for (unsigned i = 0; i < N_CONTEXTS; i++) {
-            if (context_base_ptr[i] != rhs.context_base_ptr[i]) return false;
+            if (context_queue_ptr[i] != rhs.context_queue_ptr[i]) return false;
             if (context_nprio[i] != rhs.context_nprio[i]) return false;
         }
         if (valid_contexts != rhs.valid_contexts) return false;
@@ -64,7 +64,7 @@ public:
     {
         /* <<--assign-->> */
         for (unsigned i = 0; i < N_CONTEXTS; i++) {
-            context_base_ptr[i] = other.context_base_ptr[i];
+            context_queue_ptr[i] = other.context_queue_ptr[i];
             context_nprio[i] = other.context_nprio[i];
         }
         valid_contexts = other.valid_contexts;
@@ -86,7 +86,7 @@ public:
     }
 
     /* <<--params-->> */
-    uint32_t context_base_ptr[N_CONTEXTS];
+    uint32_t context_queue_ptr[N_CONTEXTS];
     uint32_t context_nprio[N_CONTEXTS];
     uint32_t valid_contexts;
     uint32_t sched_period;

@@ -5,7 +5,7 @@
 #define __GEMM_SM_HPP__
 
 #include "gemm_sm_directives.hpp"
-#include "gemm_sm_sm_info.hpp"
+#include "gemm_sm_info.hpp"
 #include "gemm_sm_debug_info.hpp"
 #include "esp_templates.hpp"
 #include "fpdata.hpp"
@@ -20,14 +20,15 @@
 #define TILE_SIZE 4096
 #define PLM_IN_WORD TILE_SIZE
 #define PLM_OUT_WORD TILE_SIZE
+#define GEMM_QUEUE_DEPTH 4
 
-class gemm_sm : public esp_accelerator_avu<DMA_WIDTH, SM_INFO_SIZE, N_CONTEXTS_BITS>
+class gemm_sm : public esp_accelerator_avu<DMA_WIDTH, SM_INFO_SIZE, GEMM_QUEUE_DEPTH, N_CONTEXTS_BITS>
 {
 public:
     // Constructor
     SC_HAS_PROCESS(gemm_sm);
     gemm_sm(const sc_module_name& name)
-    : esp_accelerator_avu<DMA_WIDTH, SM_INFO_SIZE, N_CONTEXTS_BITS>(name)
+    : esp_accelerator_avu<DMA_WIDTH, SM_INFO_SIZE, GEMM_QUEUE_DEPTH, N_CONTEXTS_BITS>(name)
     {
         // Map arrays to memories
         /* <<--plm-bind-->> */

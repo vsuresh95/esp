@@ -22,10 +22,5 @@ struct gemm_sm_stratus_access {
 };
 
 #define GEMM_SM_STRATUS_IOC_ACCESS			_IOW ('S', 0, struct gemm_sm_stratus_access)
-#define GEMM_SM_STRATUS_RESET_IOC_ACCESS	_IOW ('S', 1, struct gemm_sm_stratus_access)
-#define GEMM_SM_STRATUS_INIT_IOC_ACCESS	_IOW ('S', 2, struct gemm_sm_stratus_access)
-#define GEMM_SM_STRATUS_ADD_IOC_ACCESS		_IOW ('S', 3, struct gemm_sm_stratus_access)
-#define GEMM_SM_STRATUS_DEL_IOC_ACCESS		_IOW ('S', 4, struct gemm_sm_stratus_access)
-#define GEMM_SM_STRATUS_PRIO_IOC_ACCESS	_IOW ('S', 5, struct gemm_sm_stratus_access)
 
 #endif /* _GEMM_SM_STRATUS_H_ */

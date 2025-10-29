@@ -17,6 +17,15 @@
 #include <stdint.h>
 #endif /* __KERNEL__ */
 
+/* ioctl commands for accelerator control */
+#define ESP_IOCTL_ACC_NO_SM 0
+#define ESP_IOCTL_ACC_RESET 1
+#define ESP_IOCTL_ACC_INIT 2
+#define ESP_IOCTL_ACC_ADD_CONTEXT 3
+#define ESP_IOCTL_ACC_DEL_CONTEXT 4
+#define ESP_IOCTL_ACC_SET_PRIO 5
+
+/* monitor struct returned by ESP_IOC_MON */
 struct avu_mon_desc {
 	unsigned util[8];
 };
@@ -34,9 +43,10 @@ struct esp_access {
     unsigned spandex_conf;
 	unsigned context_id;
 	unsigned valid_contexts;
-	unsigned context_base_ptr;
+	unsigned context_queue_ptr;
 	unsigned context_nprio;
 	unsigned sched_period;
+	unsigned ioctl_cm;
 	struct avu_mon_desc mon_info;
 
     unsigned int footprint;
