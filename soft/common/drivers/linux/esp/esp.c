@@ -394,6 +394,7 @@ static int esp_access_ioctl(struct esp_device *esp, void __user *argp)
 	}
 
 	access = arg;
+	esp->context_id = access->context_id;
 
 	// Check the specific ioctl command
 	if (access->ioctl_cm == ESP_IOCTL_ACC_NO_SM) {
@@ -455,7 +456,6 @@ add:
 		goto out;
 	}
 
-	esp->context_id = access->context_id;
 	unsigned mask = 0x0;
 	mask |= (1 << esp->context_id);
 	esp_check_context(esp, mask);
