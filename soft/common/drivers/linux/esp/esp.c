@@ -383,6 +383,7 @@ static int esp_access_ioctl(struct esp_device *esp, void __user *argp)
 	struct esp_access *access;
 	void *arg;
 	int rc = 0;
+	unsigned mask;
 
 	arg = kmalloc(esp->driver->arg_size, GFP_KERNEL);
 	if (arg == NULL)
@@ -456,7 +457,7 @@ add:
 		goto out;
 	}
 
-	unsigned mask = 0x0;
+	mask = 0x0;
 	mask |= (1 << esp->context_id);
 	esp_check_context(esp, mask);
 

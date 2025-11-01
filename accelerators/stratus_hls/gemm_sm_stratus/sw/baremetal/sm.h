@@ -68,3 +68,22 @@ static inline bool gemm_queue_push(gemm_queue_t *q, gemm_queue_entry_t *e) {
     __atomic_store_n(&(q->info.head), next, __ATOMIC_RELEASE);
     return true;
 }
+
+static inline bool gemm_queue_empty(gemm_queue_t *q) {
+    sm_queue_t *info = &(q->info);
+    uint64_t head = info->head;
+    uint64_t tail = info->tail;
+    __atomic_thread_fence(__ATOMIC_ACQUIRE);
+
+    return (head == tail);
+}
+
+static inline bool gemm_queue_full(gemm_queue_t *q) {
+    sm_queue_t *info = &(q->info);
+    uint64_t head = info->head;
+    uint64_t tail = info->tail;
+    __atomic_thread_fence(__ATOMIC_ACQUIRE);
+
+    uint64_t next = (head + 1) % GEMM_QUEUE_SIZE;
+    return (next == tail);
+}

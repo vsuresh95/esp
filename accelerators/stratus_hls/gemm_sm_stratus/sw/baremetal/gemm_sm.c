@@ -22,7 +22,7 @@ static unsigned DMA_WORD_PER_BEAT(unsigned _st)
 #define SLD_GEMM_SM 0x053
 #define DEV_NAME "sld,gemm_sm_stratus"
 #define FX_IL 16
-#define N_THREADS 3
+#define N_THREADS 2
 
 /* <<--params-->> */
 const unsigned dim_m = 10;
@@ -122,29 +122,6 @@ void init_buffer(int *mem_a, int *mem_b, float *gold_a, float *gold_b, float *go
     // Compute golden output
     gemm_sm(gold_a, gold_b, gold_c, dim_m, dim_n, dim_k);
 }
-
-/* Wrap multi-statement macros safely */
-#define GEMM_SEND_CTX(i)                                                         \
-    do {                                                                         \
-        gemm_queue_push(q[(i)], &e);                                             \
-        while (__atomic_load_n(input_flag[(i)], __ATOMIC_ACQUIRE) != 0) {        \
-        }                                                                        \
-        init_buffer(&mem[(i)][mat_a_offset], &mem[(i)][mat_b_offset],            \
-                    &gold[(i)][mat_a_offset], &gold[(i)][mat_b_offset],          \
-                    &gold[(i)][mat_c_offset]);                                   \
-        __atomic_store_n(input_flag[(i)], 1, __ATOMIC_RELEASE);                  \
-        printf("Context %d task sent\n", (i));                                   \
-    } while (0)
-
-#define GEMM_RECV_CTX(i)                                                         \
-    do {                                                                         \
-        while (__atomic_load_n(output_flag[(i)], __ATOMIC_ACQUIRE) != 1) {       \
-        }                                                                        \
-        errors[(i)] += validate_buffer(&mem[(i)][mat_c_offset],                  \
-                                       &gold[(i)][mat_c_offset]);                \
-        __atomic_store_n(output_flag[(i)], 0, __ATOMIC_RELEASE);                 \
-        printf("Context %d task done\n", (i));                                   \
-    } while (0)
 
 int main(int argc, char * argv[])
 {
@@ -250,14 +227,11 @@ int main(int argc, char * argv[])
 	iowrite32(dev, PT_ADDRESS_REG_0, (unsigned long long) ptable[0]);
 	iowrite32(dev, GEMM_SM_CONTEXT_NPRIO_0, 1);
 	iowrite32(dev, GEMM_SM_VALID_CONTEXTS, 0x1);
-	iowrite32(dev, GEMM_SM_SCHED_PERIOD, 0x20000);
+	iowrite32(dev, GEMM_SM_SCHED_PERIOD, 40000);
 	// Start accelerators
 	iowrite32(dev, CMD_REG, CMD_MASK_START);
 	printf("First context configured\n");
 
-	// 0.0 Send first context task
-	GEMM_SEND_CTX(0);
-
 	// Configure second context
 	iowrite32(dev, GEMM_SM_CONTEXT_QUEUE_PTR_1, input_queue_offset);
 	iowrite32(dev, PT_ADDRESS_REG_1, (unsigned long long) ptable[1]);
@@ -265,213 +239,66 @@ int main(int argc, char * argv[])
 	iowrite32(dev, GEMM_SM_VALID_CONTEXTS, 0x3);
 	printf("Second context configured\n");
 
-	// 0.0 Get first context output
-	GEMM_RECV_CTX(0);
+	unsigned t_id = 0;
+	unsigned iterations[N_THREADS];
+	iterations[0] = 20;
+	iterations[1] = 200;
 
-	// 1.0 Send second context task
-	GEMM_SEND_CTX(1);
+	unsigned inputs_remaining[N_THREADS];
+	unsigned outputs_remaining[N_THREADS];
+	unsigned input_tasks_remaining[N_THREADS];
+	for (i = 0; i < N_THREADS; i++) {
+		inputs_remaining[i] = iterations[i];
+		outputs_remaining[i] = iterations[i];
+		input_tasks_remaining[i] = iterations[i];
+	}
 
-	// Configure third context
-	iowrite32(dev, GEMM_SM_CONTEXT_QUEUE_PTR_2, input_queue_offset);
-	iowrite32(dev, PT_ADDRESS_REG_2, (unsigned long long) ptable[2]);
-	iowrite32(dev, GEMM_SM_CONTEXT_NPRIO_2, 1);
-	iowrite32(dev, GEMM_SM_VALID_CONTEXTS, 0x7);
-	printf("Third context configured\n");
+    unsigned thread_status[N_THREADS];
+    for (unsigned i = 0; i < N_THREADS; i++) {
+        thread_status[i] = 0;
+    }
+    unsigned threads_done = 0;
 
-	// 0.1 Send first context task
-	GEMM_SEND_CTX(0);
-
-	// 0.0 Get second context output
-	GEMM_RECV_CTX(1);
-
-	// 0.1 Get first context output
-	GEMM_RECV_CTX(0);
-
-	// New test
-	printf("-----------------------\n");	
-
-	// 0.2 Send first context task
-	GEMM_SEND_CTX(0);
-
-	// 1.1 Send second context task
-	GEMM_SEND_CTX(1);
-
-	// 2.0 Send third context task
-	GEMM_SEND_CTX(2);
-
-	// Get all contexts output
-	bool context_done[N_THREADS] = {false, false, false};
-	bool all_contexts_done = false;
-	while (!all_contexts_done) {
-		all_contexts_done = true;
-		for (i = 0; i < N_THREADS; i++) {
-			if (!context_done[i]) {
-				all_contexts_done = false;
-				bool context_ready = (__atomic_load_n(output_flag[i], __ATOMIC_ACQUIRE) == 1);
-				if (context_ready) {
-					// When the output is ready, we read it
-					errors[i] += validate_buffer(&mem[i][mat_c_offset], &gold[i][mat_c_offset]);
-
-					// Reset for next iteration.
-					__atomic_store_n(output_flag[i], 0, __ATOMIC_RELEASE);
-
-					context_done[i] = true;
-
-					printf("Context %d task done\n", i);
-				}
-			}
+	// Main processing loop
+    while (threads_done < N_THREADS) {
+		// Yield to other threads if applicable
+		if (thread_status[t_id] == 1) {
+			t_id = (t_id + 1) % N_THREADS;
+			continue;
 		}
+		// Check if thread is done
+		if (input_tasks_remaining[t_id] + inputs_remaining[t_id] + outputs_remaining[t_id] == 0) {
+			threads_done++;
+			thread_status[t_id] = 1;
+			t_id = (t_id + 1) % N_THREADS;
+			printf("Thread %d done\n", t_id);
+			continue;
+		}
+		// Check if input queue is full
+		if (!gemm_queue_full(q[t_id])) {
+			gemm_queue_push(q[(t_id)], &e);
+			input_tasks_remaining[t_id]--;
+		}
+		if (input_tasks_remaining[t_id] % 50 == 0 && input_tasks_remaining[t_id] > 0) {
+			for (i = 0; i < 5; i++)
+				printf("Thread %d: input tasks remaining %d\n", t_id, input_tasks_remaining[t_id]);
+		}
+        // Check if input queue is not empty and input data is invalid
+		bool input_is_invaid = (__atomic_load_n(input_flag[t_id], __ATOMIC_ACQUIRE) == 0);
+		if (!gemm_queue_empty(q[t_id]) && input_is_invaid) {
+			// Set input flag valid
+			__atomic_store_n(input_flag[t_id], 1, __ATOMIC_RELEASE);
+			inputs_remaining[t_id]--;
+		}
+		// Check if output data is valid
+		bool output_is_valid = (__atomic_load_n(output_flag[t_id], __ATOMIC_ACQUIRE) == 1);
+		if (output_is_valid) {
+			// Reset for next iteration.
+			__atomic_store_n(output_flag[t_id], 0, __ATOMIC_RELEASE);
+			outputs_remaining[t_id]--;
+		}
+		t_id = (t_id + 1) % N_THREADS;
 	}
-	for (i = 0; i < N_THREADS; i++) {
-		printf("MON_UTIL_REG_%d_LO = %x\n", i, ioread32(dev, MON_UTIL_REG_0_LO + 0x8*i));
-		printf("MON_UTIL_REG_%d_HI = %x\n", i, ioread32(dev, MON_UTIL_REG_0_HI + 0x8*i));
-	}
-
-	iowrite32(dev, GEMM_SM_VALID_CONTEXTS, 0);
-	while(ioread32(dev, VALID_CONTEXTS_ACK_REG) != 0);
-	iowrite32(dev, CMD_REG, 0x0);
-
-	// Reset all sync variables to default values.
-	for (i = 0; i < N_THREADS; i++) {
-		__atomic_store_n(input_flag[i], 0, __ATOMIC_RELEASE);
-		__atomic_store_n(output_flag[i], 0, __ATOMIC_RELEASE);
-	}
-
-	// New test
-	printf("-----------------------\n");	
-
-	// Initialize registers of accelerator and start it.
-	iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
-	iowrite32(dev, COHERENCE_REG, coherence);
-
-	iowrite32(dev, PT_ADDRESS_REG, (unsigned long long) ptable[0]);
-	iowrite32(dev, PT_NCHUNK_REG, NCHUNK(mem_size));
-	iowrite32(dev, PT_SHIFT_REG, CHUNK_SHIFT);
-
-	// Use the following if input and output data are not allocated at the default offsets
-	iowrite32(dev, SRC_OFFSET_REG, 0x0);
-	iowrite32(dev, DST_OFFSET_REG, 0x0);
-
-	// Flush (customize coherence model here)
-	esp_flush(coherence);
-
-	// Configure first context
-	iowrite32(dev, GEMM_SM_CONTEXT_QUEUE_PTR_0, input_queue_offset);
-	iowrite32(dev, PT_ADDRESS_REG_0, (unsigned long long) ptable[0]);
-	iowrite32(dev, GEMM_SM_CONTEXT_NPRIO_0, 1);
-	iowrite32(dev, GEMM_SM_VALID_CONTEXTS, 0x1);
-	iowrite32(dev, GEMM_SM_SCHED_PERIOD, 0x20000);
-	// Start accelerator
-	iowrite32(dev, CMD_REG, CMD_MASK_START);
-	printf("First context configured\n");
-
-	// Configure second context
-	iowrite32(dev, GEMM_SM_CONTEXT_QUEUE_PTR_1, input_queue_offset);
-	iowrite32(dev, PT_ADDRESS_REG_1, (unsigned long long) ptable[1]);
-	iowrite32(dev, GEMM_SM_CONTEXT_NPRIO_1, 1);
-	iowrite32(dev, GEMM_SM_VALID_CONTEXTS, 0x3);
-	printf("Second context configured\n");
-
-	// Configure third context
-	iowrite32(dev, GEMM_SM_CONTEXT_QUEUE_PTR_2, input_queue_offset);
-	iowrite32(dev, PT_ADDRESS_REG_2, (unsigned long long) ptable[2]);
-	iowrite32(dev, GEMM_SM_CONTEXT_NPRIO_2, 1);
-	iowrite32(dev, GEMM_SM_VALID_CONTEXTS, 0x7);
-	printf("Third context configured\n");
-
-	// 0.3 Send first context task
-	GEMM_SEND_CTX(0);
-
-	// 1.2 Send second context task
-	GEMM_SEND_CTX(1);
-
-	// 2.1 Send third context task
-	GEMM_SEND_CTX(2);
-
-	// 0.3 Get first context output
-	GEMM_RECV_CTX(0);
-
-	// 1.2 Get second context output
-	GEMM_RECV_CTX(1);
-
-	// 2.1 Get third context output
-	GEMM_RECV_CTX(2);
-
-	for (i = 0; i < N_THREADS; i++) {
-		printf("MON_UTIL_REG_%d_LO = %x\n", i, ioread32(dev, MON_UTIL_REG_0_LO + 0x8*i));
-		printf("MON_UTIL_REG_%d_HI = %x\n", i, ioread32(dev, MON_UTIL_REG_0_HI + 0x8*i));
-	}
-
-	// New test
-	printf("-----------------------\n");	
-
-	// Delete second context
-	iowrite32(dev, GEMM_SM_VALID_CONTEXTS, 0x5);
-	while(ioread32(dev, VALID_CONTEXTS_ACK_REG) != 0x5);
-	printf("Second context deleted\n");
-
-	// 0.4 Send first context task
-	GEMM_SEND_CTX(0);
-
-	// 2.2 Send third context task
-	GEMM_SEND_CTX(2);
-
-	// 0.4 Get first context output
-	GEMM_RECV_CTX(0);
-
-	// 2.2 Get third context output
-	GEMM_RECV_CTX(2);
-
-	for (i = 0; i < N_THREADS; i++) {
-		printf("MON_UTIL_REG_%d_LO = %x\n", i, ioread32(dev, MON_UTIL_REG_0_LO + 0x8*i));
-		printf("MON_UTIL_REG_%d_HI = %x\n", i, ioread32(dev, MON_UTIL_REG_0_HI + 0x8*i));
-	}
-
-	// New test
-	printf("-----------------------\n");	
-
-	// Configure second context
-	iowrite32(dev, GEMM_SM_CONTEXT_QUEUE_PTR_3, input_queue_offset);
-	iowrite32(dev, PT_ADDRESS_REG_3, (unsigned long long) ptable[1]);
-	iowrite32(dev, GEMM_SM_CONTEXT_NPRIO_3, 1);
-	iowrite32(dev, GEMM_SM_VALID_CONTEXTS, 0xD);
-	printf("Second context configured\n");
-
-	// 0.5 Send first context task
-	GEMM_SEND_CTX(0);
-
-	// 0.6 Send first context task
-	GEMM_SEND_CTX(0);
-
-	// 1.3 Send second context task
-	GEMM_SEND_CTX(1);
-
-	// 2.3 Send third context task
-	GEMM_SEND_CTX(2);
-
-	for (int i = 0; i < 10; i++) {
-		printf("Idle loop...\n");
-	}
-
-	// 0.5 Get first context output
-	GEMM_RECV_CTX(0);
-
-	// 1.3 Get second context output
-	GEMM_RECV_CTX(1);
-
-	// 2.3 Get third context output
-	GEMM_RECV_CTX(2);
-
-	// 0.6 Get first context output
-	GEMM_RECV_CTX(0);
-
-	for (i = 0; i < N_THREADS; i++) {
-		printf("MON_UTIL_REG_%d_LO = %x\n", i, ioread32(dev, MON_UTIL_REG_0_LO + 0x8*i));
-		printf("MON_UTIL_REG_%d_HI = %x\n", i, ioread32(dev, MON_UTIL_REG_0_HI + 0x8*i));
-	}
-
-	// New test
-	printf("-----------------------\n");	
 
 	for (i = 0; i < N_THREADS; i++) {
 		printf("Freeing resources for thread %d\n", i);
