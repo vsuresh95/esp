@@ -29,7 +29,6 @@ void gemm_sm::load_input()
     uint32_t weight_payload_offset;
     bool in_pingpong;
     bool pingpong;
-    bool kill_task;
     uint32_t tile_size_m, tile_size_n, tile_size_k;
     {
         HLS_PROTO("load-config");
@@ -56,7 +55,6 @@ void gemm_sm::load_input()
             input_payload_offset = info.input_base + PAYLOAD_OFFSET;
             in_pingpong = true;
             pingpong = true;
-            kill_task = false;
             wait();
         }
 
@@ -70,7 +68,7 @@ void gemm_sm::load_input()
             wait();
 
             // Load input matrix
-            for (unsigned tile_m = 0; tile_m < dim_m && !kill_task; tile_m += tile_size_m)
+            for (unsigned tile_m = 0; tile_m < dim_m; tile_m += tile_size_m)
             {
                 // Accomodate dim_m not being multiple of tile_size_m
                 unsigned actual_tile_m = (tile_m + tile_size_m < dim_m) ? tile_size_m : dim_m - tile_m;
@@ -116,7 +114,7 @@ void gemm_sm::load_input()
                 input_payload_offset += actual_tile_m * tile_size_k;
 
                 // Load weight matrix
-                for (unsigned tile_n = 0; tile_n < dim_n && !kill_task; tile_n += tile_size_n)
+                for (unsigned tile_n = 0; tile_n < dim_n; tile_n += tile_size_n)
                 {
                     // Accomodate dim_n not being multiple of tile_size_n
                     // Ensure non-tiled loads are not tiled.
@@ -176,13 +174,10 @@ void gemm_sm::load_input()
                     this->load_compute_handshake();
                     wait();
 
-                    // Check if a context switch was triggered
-                    while (output_poll_complete == POLL_PENDING) wait();
-                    if (output_poll_complete == EXEC_KILL) kill_task = true;
 
-                    if (!kill_task) pingpong = !pingpong;
+                    pingpong = !pingpong;
                 }
-                if (!kill_task) in_pingpong = !in_pingpong;
+                in_pingpong = !in_pingpong;
                 wait();
             }
         }
@@ -329,7 +324,6 @@ void gemm_sm::compute_kernel()
     uint32_t dim_k;
     bool in_pingpong;
     bool pingpong;
-    bool kill_task;
     uint32_t tile_size_m, tile_size_n, tile_size_k;
     {
         HLS_PROTO("compute-config");
@@ -351,7 +345,6 @@ void gemm_sm::compute_kernel()
             dim_k = info.dim_k;
             in_pingpong = true;
             pingpong = true;
-            kill_task = false;
             wait();
         }
         // Compute GeMM
@@ -361,11 +354,11 @@ void gemm_sm::compute_kernel()
             tile_size_m = TILE_SIZE / tile_size_k;
             tile_size_n = (tile_size_m / DMA_WORD_PER_BEAT) * DMA_WORD_PER_BEAT;
 
-            for (unsigned tile_m = 0; tile_m < dim_m && !kill_task; tile_m += tile_size_m)
+            for (unsigned tile_m = 0; tile_m < dim_m; tile_m += tile_size_m)
             {
                 unsigned actual_tile_m = (tile_m + tile_size_m < dim_m) ? tile_size_m : dim_m - tile_m;
 
-                for (unsigned tile_n = 0; tile_n < dim_n && !kill_task; tile_n += tile_size_n)
+                for (unsigned tile_n = 0; tile_n < dim_n; tile_n += tile_size_n)
                 {
                     unsigned actual_tile_n = (tile_n + tile_size_n < dim_n) ? tile_size_n : dim_n - tile_n;
 
@@ -472,19 +465,10 @@ void gemm_sm::compute_kernel()
                             }
                         }
                     }
-                    // Check if a context switch was triggered
-                    {
-                        HLS_PROTO("compute-check-switch");
-                        while (output_poll_complete == POLL_PENDING) wait();
-                        if (output_poll_complete == EXEC_KILL) kill_task = true;
-                    }
-
-                    if (!kill_task) {
-                        this->compute_store_handshake();
-                        pingpong = !pingpong;
-                    }
+                    this->compute_store_handshake();
+                    pingpong = !pingpong;
                 }
-                if (!kill_task) in_pingpong = !in_pingpong;
+                in_pingpong = !in_pingpong;
             }
         }
         {

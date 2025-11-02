@@ -235,7 +235,7 @@ int main(int argc, char * argv[])
 	// Configure second context
 	iowrite32(dev, GEMM_SM_CONTEXT_QUEUE_PTR_1, input_queue_offset);
 	iowrite32(dev, PT_ADDRESS_REG_1, (unsigned long long) ptable[1]);
-	iowrite32(dev, GEMM_SM_CONTEXT_NPRIO_1, 1);
+	iowrite32(dev, GEMM_SM_CONTEXT_NPRIO_1, 2);
 	iowrite32(dev, GEMM_SM_VALID_CONTEXTS, 0x3);
 	printf("Second context configured\n");
 
@@ -270,32 +270,38 @@ int main(int argc, char * argv[])
 		if (input_tasks_remaining[t_id] + inputs_remaining[t_id] + outputs_remaining[t_id] == 0) {
 			threads_done++;
 			thread_status[t_id] = 1;
-			t_id = (t_id + 1) % N_THREADS;
 			printf("Thread %d done\n", t_id);
+			t_id = (t_id + 1) % N_THREADS;
 			continue;
 		}
 		// Check if input queue is full
-		if (!gemm_queue_full(q[t_id])) {
-			gemm_queue_push(q[(t_id)], &e);
-			input_tasks_remaining[t_id]--;
+		if (input_tasks_remaining[t_id] > 0) {
+			if (!gemm_queue_full(q[t_id])) {
+				gemm_queue_push(q[(t_id)], &e);
+				input_tasks_remaining[t_id]--;
+			}
 		}
 		if (input_tasks_remaining[t_id] % 50 == 0 && input_tasks_remaining[t_id] > 0) {
 			for (i = 0; i < 5; i++)
 				printf("Thread %d: input tasks remaining %d\n", t_id, input_tasks_remaining[t_id]);
 		}
         // Check if input queue is not empty and input data is invalid
-		bool input_is_invaid = (__atomic_load_n(input_flag[t_id], __ATOMIC_ACQUIRE) == 0);
-		if (!gemm_queue_empty(q[t_id]) && input_is_invaid) {
-			// Set input flag valid
-			__atomic_store_n(input_flag[t_id], 1, __ATOMIC_RELEASE);
-			inputs_remaining[t_id]--;
+		if (inputs_remaining[t_id] > 0) {
+			bool input_is_invaid = (__atomic_load_n(input_flag[t_id], __ATOMIC_ACQUIRE) == 0);
+			if (!gemm_queue_empty(q[t_id]) && input_is_invaid) {
+				// Set input flag valid
+				__atomic_store_n(input_flag[t_id], 1, __ATOMIC_RELEASE);
+				inputs_remaining[t_id]--;
+			}
 		}
 		// Check if output data is valid
-		bool output_is_valid = (__atomic_load_n(output_flag[t_id], __ATOMIC_ACQUIRE) == 1);
-		if (output_is_valid) {
-			// Reset for next iteration.
-			__atomic_store_n(output_flag[t_id], 0, __ATOMIC_RELEASE);
-			outputs_remaining[t_id]--;
+		if (outputs_remaining[t_id] > 0) {
+			bool output_is_valid = (__atomic_load_n(output_flag[t_id], __ATOMIC_ACQUIRE) == 1);
+			if (output_is_valid) {
+				// Reset for next iteration.
+				__atomic_store_n(output_flag[t_id], 0, __ATOMIC_RELEASE);
+				outputs_remaining[t_id]--;
+			}
 		}
 		t_id = (t_id + 1) % N_THREADS;
 	}
