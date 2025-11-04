@@ -123,6 +123,28 @@ void init_buffer(int *mem_a, int *mem_b, float *gold_a, float *gold_b, float *go
     gemm_sm(gold_a, gold_b, gold_c, dim_m, dim_n, dim_k);
 }
 
+static inline uint64_t get_counter() {
+	uint64_t t_current;
+	asm volatile (
+		"li t0, 0;"
+		"csrr t0, mcycle;"
+		"mv %0, t0"
+		: "=r" (t_current)
+		:
+		: "t0"
+	);
+	return t_current;
+}
+
+static inline bool need_to_delay (uint64_t *start_cycles, uint64_t delay) {
+	uint64_t curr_cycles = get_counter();
+	if ((curr_cycles - *start_cycles) < delay) {
+		return true;
+	} else {
+		return false;
+	}
+}
+
 int main(int argc, char * argv[])
 {
 	int i, n;
@@ -258,6 +280,13 @@ int main(int argc, char * argv[])
         thread_status[i] = 0;
     }
     unsigned threads_done = 0;
+	uint64_t start_cycles[N_THREADS];
+	for (i = 0; i < N_THREADS; i++) {
+		start_cycles[i] = get_counter();
+	}
+	uint64_t period[N_THREADS];
+	period[0] = 4 * 0x2000; // in cycles
+	period[1] = 1000; // in cycles
 
 	// Main processing loop
     while (threads_done < N_THREADS) {
@@ -276,9 +305,12 @@ int main(int argc, char * argv[])
 		}
 		// Check if input queue is full
 		if (input_tasks_remaining[t_id] > 0) {
-			if (!gemm_queue_full(q[t_id])) {
-				gemm_queue_push(q[(t_id)], &e);
-				input_tasks_remaining[t_id]--;
+			if(!need_to_delay(&start_cycles[t_id], period[t_id])) {
+				if (!gemm_queue_full(q[t_id])) {
+					gemm_queue_push(q[(t_id)], &e);
+					start_cycles[t_id] = get_counter();
+					input_tasks_remaining[t_id]--;
+				}
 			}
 		}
 		if (input_tasks_remaining[t_id] % 50 == 0 && input_tasks_remaining[t_id] > 0) {
