@@ -160,25 +160,24 @@ int main(int argc, char * argv[])
 	unsigned coherence;
 
 	printf("dim_m %u dim_n %u dim_k %u\n", dim_m, dim_n, dim_k);
-    unsigned flag_len = PAYLOAD_OFFSET/sizeof(unsigned); // Number of nn_token_t elements reserved for flags
     unsigned mat_a_len = dim_m * dim_k;
     unsigned mat_b_len = dim_n * dim_k;
     unsigned mat_c_len = dim_m * dim_n;
-    // Sync flag and data offsets
-    unsigned mat_a_valid_offset = VALID_OFFSET;
-    unsigned mat_a_offset = mat_a_valid_offset + flag_len;
+    // Data offsets
+    unsigned mat_a_offset = 0;
     unsigned mat_b_offset = mat_a_offset + mat_a_len;
-    unsigned mat_c_valid_offset = mat_b_offset + mat_b_len;
-    unsigned mat_c_offset = mat_c_valid_offset + flag_len;
+    unsigned mat_c_offset = mat_b_offset + mat_b_len;
+    // Queue and descriptor placement (in 32-bit words)
     unsigned input_queue_offset = mat_c_offset + mat_c_len;
-    unsigned mem_size = N_THREADS * ((input_queue_offset) * sizeof(int) + sizeof(gemm_queue_t));
-	// Flag offsets
-	uint64_t *input_flag[N_THREADS] = {NULL};
-	uint64_t *output_flag[N_THREADS] = {NULL};
+    unsigned output_queue_offset = input_queue_offset + SM_QUEUE_WORDS;
+    unsigned descriptor_offset = output_queue_offset + SM_QUEUE_WORDS;
+    unsigned mem_words = descriptor_offset + SM_INFO_SIZE;
+    unsigned mem_size = N_THREADS * (mem_words * sizeof(unsigned));
 	// SM queue pointers
-	gemm_queue_t *q[N_THREADS] = {NULL};
-	// Queue entry (same for all)
-	gemm_queue_entry_t e;
+	sm_queue_t *input_q[N_THREADS] = {NULL};
+	sm_queue_t *output_q[N_THREADS] = {NULL};
+	// Descriptor base pointer per thread
+	unsigned *descriptor_base[N_THREADS] = {NULL};
 
 	// Search for the device
 	ndev = probe(&espdevs, VENDOR_SLD, SLD_GEMM_SM, DEV_NAME);
@@ -212,21 +211,12 @@ int main(int argc, char * argv[])
 		for (n = 0; n < NCHUNK(mem_size); n++)
 			ptable[i][n] = (unsigned *) &mem[i][n * (CHUNK_SIZE / sizeof(unsigned))];
 		
-		input_flag[i] = (uint64_t *) &mem[i][mat_a_valid_offset];
-		__atomic_store_n(input_flag[i], 0, __ATOMIC_RELEASE);
-		output_flag[i] = (uint64_t *) &mem[i][mat_c_valid_offset];
-		__atomic_store_n(output_flag[i], 0, __ATOMIC_RELEASE);
-
-		q[i] = (gemm_queue_t *) &mem[i][input_queue_offset];
-		sm_queue_init((sm_queue_t *) q[i]);
+        input_q[i] = (sm_queue_t *) &mem[i][input_queue_offset];
+        sm_queue_init(input_q[i]);
+        output_q[i] = (sm_queue_t *) &mem[i][output_queue_offset];
+        sm_queue_init(output_q[i]);
+        descriptor_base[i] = &mem[i][descriptor_offset];
 	}
-	// Prepare queue entry ahead of time
-    e.gemm_params.dim_m = dim_m;
-	e.gemm_params.dim_n = dim_n;
-	e.gemm_params.dim_k = dim_k;
-	e.gemm_params.weight_base = mat_b_offset;
-	e.gemm_params.input_base = mat_a_valid_offset;
-	e.gemm_params.output_base = mat_c_valid_offset;
 
 	// Pass common configuration parameters
 	coherence = ACC_COH_RECALL;
@@ -264,15 +254,13 @@ int main(int argc, char * argv[])
 	unsigned t_id = 0;
 	unsigned iterations[N_THREADS];
 	iterations[0] = 20;
-	iterations[1] = 200;
+	iterations[1] = 50;
 
-	unsigned inputs_remaining[N_THREADS];
 	unsigned outputs_remaining[N_THREADS];
-	unsigned input_tasks_remaining[N_THREADS];
+	unsigned inputs_remaining[N_THREADS];
 	for (i = 0; i < N_THREADS; i++) {
-		inputs_remaining[i] = iterations[i];
 		outputs_remaining[i] = iterations[i];
-		input_tasks_remaining[i] = iterations[i];
+		inputs_remaining[i] = iterations[i];
 	}
 
     unsigned thread_status[N_THREADS];
@@ -286,7 +274,20 @@ int main(int argc, char * argv[])
 	}
 	uint64_t period[N_THREADS];
 	period[0] = 4 * 0x2000; // in cycles
-	period[1] = 1000; // in cycles
+	period[1] = 2000; // in cycles
+
+	// Initialize descriptors
+	for (i = 0; i < N_THREADS; i++) {
+		unsigned *desc = descriptor_base[i];
+		desc[0] = output_queue_offset;
+		desc[1] = 0; // test does not do anything with descriptor pointer
+		desc[2] = dim_m;
+		desc[3] = dim_n;
+		desc[4] = dim_k;
+		desc[5] = mat_b_offset;
+		desc[6] = mat_a_offset;
+		desc[7] = mat_c_offset;
+	}
 
 	// Main processing loop
     while (threads_done < N_THREADS) {
@@ -296,7 +297,7 @@ int main(int argc, char * argv[])
 			continue;
 		}
 		// Check if thread is done
-		if (input_tasks_remaining[t_id] + inputs_remaining[t_id] + outputs_remaining[t_id] == 0) {
+		if (inputs_remaining[t_id] + outputs_remaining[t_id] == 0) {
 			threads_done++;
 			thread_status[t_id] = 1;
 			printf("Thread %d done\n", t_id);
@@ -304,34 +305,23 @@ int main(int argc, char * argv[])
 			continue;
 		}
 		// Check if input queue is full
-		if (input_tasks_remaining[t_id] > 0) {
-			if(!need_to_delay(&start_cycles[t_id], period[t_id])) {
-				if (!gemm_queue_full(q[t_id])) {
-					gemm_queue_push(q[(t_id)], &e);
-					start_cycles[t_id] = get_counter();
-					input_tasks_remaining[t_id]--;
-				}
-			}
-		}
-		if (input_tasks_remaining[t_id] % 50 == 0 && input_tasks_remaining[t_id] > 0) {
-			for (i = 0; i < 5; i++)
-				printf("Thread %d: input tasks remaining %d\n", t_id, input_tasks_remaining[t_id]);
-		}
-        // Check if input queue is not empty and input data is invalid
 		if (inputs_remaining[t_id] > 0) {
-			bool input_is_invaid = (__atomic_load_n(input_flag[t_id], __ATOMIC_ACQUIRE) == 0);
-			if (!gemm_queue_empty(q[t_id]) && input_is_invaid) {
-				// Set input flag valid
-				__atomic_store_n(input_flag[t_id], 1, __ATOMIC_RELEASE);
-				inputs_remaining[t_id]--;
+			if(!need_to_delay(&start_cycles[t_id], period[t_id])) {
+				sm_queue_t *inq = input_q[t_id];
+				if (!sm_queue_full(inq)) {
+					uint64_t head = __atomic_load_n(&(inq->head), __ATOMIC_ACQUIRE);
+					__atomic_thread_fence(__ATOMIC_RELEASE);
+					sm_queue_push(inq, descriptor_offset);
+					start_cycles[t_id] = get_counter();
+					inputs_remaining[t_id]--;
+				}
 			}
 		}
 		// Check if output data is valid
 		if (outputs_remaining[t_id] > 0) {
-			bool output_is_valid = (__atomic_load_n(output_flag[t_id], __ATOMIC_ACQUIRE) == 1);
-			if (output_is_valid) {
-				// Reset for next iteration.
-				__atomic_store_n(output_flag[t_id], 0, __ATOMIC_RELEASE);
+			sm_queue_t *out_q = output_q[t_id];
+			if (!sm_queue_empty(out_q)) {
+				uint64_t entry = sm_queue_pop(out_q);
 				outputs_remaining[t_id]--;
 			}
 		}

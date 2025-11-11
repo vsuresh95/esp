@@ -52,7 +52,7 @@ void gemm_sm::load_input()
             dim_n = info.dim_n;
             dim_k = info.dim_k;
             weight_payload_base = info.weight_base;
-            input_payload_offset = info.input_base + PAYLOAD_OFFSET;
+            input_payload_offset = info.input_base;
             in_pingpong = true;
             pingpong = true;
             wait();
@@ -225,7 +225,7 @@ void gemm_sm::store_output()
             dim_m = info.dim_m;
             dim_n = info.dim_n;
             dim_k = info.dim_k;
-            output_payload_base = info.output_base + PAYLOAD_OFFSET;
+            output_payload_base = info.output_base;
             pingpong = true;
             wait();
         }

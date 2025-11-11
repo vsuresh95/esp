@@ -7,7 +7,7 @@
 #include <systemc.h>
 #include "gemm_sm_conf_info.hpp"
 
-#define SM_INFO_SIZE 6
+#define SM_INFO_SIZE 8
 
 //
 // Configuration parameters for the accelerator.
@@ -21,16 +21,20 @@ public:
     sm_info_t()
     {
         /* <<--ctor-->> */
-        this->dim_m = 1;
-        this->dim_n = 1;
-        this->dim_k = 1;
-        this->weight_base = 1;
+        this->output_queue = 0;
+        this->output_entry = 0;
+        this->dim_m = 0;
+        this->dim_n = 0;
+        this->dim_k = 0;
+        this->weight_base = 0;
         this->input_base = 0;
         this->output_base = 0;
     }
 
     sm_info_t(
         /* <<--ctor-args-->> */
+        uint32_t output_queue,
+        uint32_t output_entry,
         uint32_t dim_m,
         uint32_t dim_n,
         uint32_t dim_k,
@@ -40,6 +44,8 @@ public:
         )
     {
         /* <<--ctor-custom-->> */
+        this->output_queue = output_queue;
+        this->output_entry = output_entry;
         this->dim_m = dim_m;
         this->dim_n = dim_n;
         this->dim_k = dim_k;
@@ -52,6 +58,8 @@ public:
     inline bool operator==(const sm_info_t &rhs) const
     {
         /* <<--eq-->> */
+        if (output_queue != rhs.output_queue) return false;
+        if (output_entry != rhs.output_entry) return false;
         if (dim_m != rhs.dim_m) return false;
         if (dim_n != rhs.dim_n) return false;
         if (dim_k != rhs.dim_k) return false;
@@ -65,6 +73,8 @@ public:
     inline sm_info_t& operator=(const sm_info_t& other)
     {
         /* <<--assign-->> */
+        output_queue = other.output_queue;
+        output_entry = other.output_entry;
         dim_m = other.dim_m;
         dim_n = other.dim_n;
         dim_k = other.dim_k;
@@ -79,13 +89,15 @@ public:
     {
         /* <<--index assign-->> */
         switch (index) {
-            case 0: return dim_m;
-            case 1: return dim_n;
-            case 2: return dim_k;
-            case 3: return weight_base;
-            case 4: return input_base;
-            case 5: return output_base;
-            default: return dim_m;
+            case 0: return output_queue;
+            case 1: return output_entry;
+            case 2: return dim_m;
+            case 3: return dim_n;
+            case 4: return dim_k;
+            case 5: return weight_base;
+            case 6: return input_base;
+            case 7: return output_base;
+            default: return output_entry;
         }
     }
 
@@ -94,13 +106,15 @@ public:
     {
         /* <<--index read-->> */
         switch (index) {
-            case 0: return dim_m;
-            case 1: return dim_n;
-            case 2: return dim_k;
-            case 3: return weight_base;
-            case 4: return input_base;
-            case 5: return output_base;
-            default: return dim_m;
+            case 0: return output_queue;
+            case 1: return output_entry;
+            case 2: return dim_m;
+            case 3: return dim_n;
+            case 4: return dim_k;
+            case 5: return weight_base;
+            case 6: return input_base;
+            case 7: return output_base;
+            default: return output_entry;
         }
     }
 
@@ -118,6 +132,8 @@ public:
     }
 
     /* <<--params-->> */
+    uint32_t output_queue;
+    uint32_t output_entry;
     uint32_t dim_m;
     uint32_t dim_n;
     uint32_t dim_k;
