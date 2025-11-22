@@ -36,7 +36,7 @@ void gemm::load_input()
         dim_n = config.dim_n;
         dim_k = config.dim_k;
         weight_payload_base = config.weight_base;
-        input_payload_offset = config.input_base + PAYLOAD_OFFSET;
+        input_payload_offset = config.input_base;
         in_pingpong = true;
         pingpong = true;
         wait();
@@ -189,7 +189,7 @@ void gemm::store_output()
         dim_m = config.dim_m;
         dim_n = config.dim_n;
         dim_k = config.dim_k;
-        output_payload_base = config.output_base + PAYLOAD_OFFSET;
+        output_payload_base = config.output_base;
         pingpong = true;
         wait();
     }

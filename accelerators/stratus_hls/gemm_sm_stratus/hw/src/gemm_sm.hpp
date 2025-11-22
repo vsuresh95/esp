@@ -20,7 +20,7 @@
 #define TILE_SIZE 4096
 #define PLM_IN_WORD TILE_SIZE
 #define PLM_OUT_WORD TILE_SIZE
-#define GEMM_QUEUE_DEPTH 2
+#define GEMM_QUEUE_DEPTH 4
 
 class gemm_sm : public esp_accelerator_avu<DMA_WIDTH, SM_INFO_SIZE, GEMM_QUEUE_DEPTH, N_CONTEXTS_BITS>
 {
