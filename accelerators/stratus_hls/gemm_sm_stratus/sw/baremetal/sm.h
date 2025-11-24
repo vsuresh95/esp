@@ -6,7 +6,7 @@
 #define QUEUE_AVAIL 1
 #define QUEUE_BUSY 2
 
-#define GEMM_QUEUE_SIZE 2
+#define GEMM_QUEUE_SIZE 4
 
 // Queue layout parameters (words, 32-bit)
 #define QUEUE_ENTRY_SIZE 2

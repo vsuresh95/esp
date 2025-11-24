@@ -73,21 +73,40 @@ define_system_module tb ../tb/system.cpp ../tb/sc_main.cpp
 ######################################################################
 set DEFAULT_ARGV ""
 
-# With ASI
+# SCHED_RR
 foreach dma [list 64] {
-    define_io_config * IOCFG_DMA$dma\_SM -DDMA_WIDTH=$dma
+    define_io_config * IOCFG_DMA$dma\_RR -DDMA_WIDTH=$dma -DSCHED_RR
 
-    define_system_config tb TESTBENCH_DMA$dma\_SM -io_config IOCFG_DMA$dma\_SM
+    define_system_config tb TESTBENCH_DMA$dma\_RR -io_config IOCFG_DMA$dma\_RR
 
-    define_sim_config "BEHAV_DMA$dma\_SM" "gemm_sm BEH" "tb TESTBENCH_DMA$dma\_SM" -io_config IOCFG_DMA$dma\_SM -argv $DEFAULT_ARGV
+    define_sim_config "BEHAV_DMA$dma\_RR" "gemm_sm BEH" "tb TESTBENCH_DMA$dma\_RR" -io_config IOCFG_DMA$dma\_RR -argv $DEFAULT_ARGV
 
     foreach cfg [list BASIC] {
-	set cname $cfg\_DMA$dma\_SM
-	define_hls_config gemm_sm $cname -io_config IOCFG_DMA$dma\_SM --clock_period=$CLOCK_PERIOD $COMMON_HLS_FLAGS -DHLS_DIRECTIVES_$cfg
+	set cname $cfg\_DMA$dma\_RR
+	define_hls_config gemm_sm $cname -io_config IOCFG_DMA$dma\_RR --clock_period=$CLOCK_PERIOD $COMMON_HLS_FLAGS -DHLS_DIRECTIVES_$cfg
 	if {$TECH_IS_XILINX == 1} {
-	    define_sim_config "$cname\_V" "gemm_sm RTL_V $cname" "tb TESTBENCH_DMA$dma\_SM" -io_config IOCFG_DMA$dma\_SM -argv $DEFAULT_ARGV -verilog_top_modules glbl
+	    define_sim_config "$cname\_V" "gemm_sm RTL_V $cname" "tb TESTBENCH_DMA$dma\_RR" -io_config IOCFG_DMA$dma\_RR -argv $DEFAULT_ARGV -verilog_top_modules glbl
 	} else {
-	    define_sim_config "$cname\_V" "gemm_sm RTL_V $cname" "tb TESTBENCH_DMA$dma\_SM" -io_config IOCFG_DMA$dma\_SM -argv $DEFAULT_ARGV
+	    define_sim_config "$cname\_V" "gemm_sm RTL_V $cname" "tb TESTBENCH_DMA$dma\_RR" -io_config IOCFG_DMA$dma\_RR -argv $DEFAULT_ARGV
+	}
+    }
+}
+
+# SCHED_FAIR
+foreach dma [list 64] {
+    define_io_config * IOCFG_DMA$dma\_FAIR -DDMA_WIDTH=$dma
+
+    define_system_config tb TESTBENCH_DMA$dma\_FAIR -io_config IOCFG_DMA$dma\_FAIR
+
+    define_sim_config "BEHAV_DMA$dma\_FAIR" "gemm_sm BEH" "tb TESTBENCH_DMA$dma\_FAIR" -io_config IOCFG_DMA$dma\_FAIR -argv $DEFAULT_ARGV
+
+    foreach cfg [list BASIC] {
+	set cname $cfg\_DMA$dma\_FAIR
+	define_hls_config gemm_sm $cname -io_config IOCFG_DMA$dma\_FAIR --clock_period=$CLOCK_PERIOD $COMMON_HLS_FLAGS -DHLS_DIRECTIVES_$cfg
+	if {$TECH_IS_XILINX == 1} {
+	    define_sim_config "$cname\_V" "gemm_sm RTL_V $cname" "tb TESTBENCH_DMA$dma\_FAIR" -io_config IOCFG_DMA$dma\_FAIR -argv $DEFAULT_ARGV -verilog_top_modules glbl
+	} else {
+	    define_sim_config "$cname\_V" "gemm_sm RTL_V $cname" "tb TESTBENCH_DMA$dma\_FAIR" -io_config IOCFG_DMA$dma\_FAIR -argv $DEFAULT_ARGV
 	}
     }
 }
