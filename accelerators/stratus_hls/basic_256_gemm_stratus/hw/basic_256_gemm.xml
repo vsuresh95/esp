@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sld>
+  <accelerator name="basic_256_gemm" desc="Accelerator BASIC_256_GEMM" data_size="4" device_id="04a" hls_tool="stratus_hls">
+    <param name="N" desc="N" />
+    <param name="M" desc="M" />
+    <param name="K" desc="K" />
+    <param name="A_mat_offset" desc="A_mat_offset" />
+    <param name="B_mat_offset" desc="B_mat_offset" />
+    <param name="C_mat_offset" desc="C_mat_offset" />
+  </accelerator>
+</sld>

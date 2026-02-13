@@ -1,0 +1,4 @@
+basic_256_gemm_plm_block_in_dma32 512 32 1w:0r 0w:1r
+basic_256_gemm_plm_block_out_dma32 256 32 1w:0r 0w:1r
+basic_256_gemm_plm_block_in_dma64 512 32 2w:0r 0w:1r
+basic_256_gemm_plm_block_out_dma64 256 32 1w:0r 0w:2r

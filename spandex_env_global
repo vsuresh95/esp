@@ -1,0 +1,30 @@
+module unload cadence
+module load cadence/Mar2020
+
+if [ $HOSTNAME = "mojave.cs.illinois.edu" ]
+then
+  export VIVADO=/scratch/opt/Vivado/2019.2/
+else
+  export VIVADO=/scratch/Xilinx/Vivado/2019.2/
+fi
+
+export XILINX_VIVADO=$VIVADO
+source $VIVADO/settings64.sh
+export CDS_AUTO_64BIT=all
+export PATH=$PATH:$VIVADO/bin/
+export STRATUS_PATH=/software/cadence-Mar2020/STRATUS192
+
+
+if [ $HOSTNAME = "mojave.cs.illinois.edu" ]
+then
+  # RISC-V
+  export RISCV=/scratch/opt/riscv
+  export PATH=$PATH:/scratch/opt/riscv/bin
+else
+  # RISC-V
+  export RISCV=/scratch/riscv
+  export PATH=$PATH:/scratch/riscv/bin
+fi
+
+export XILINXD_LICENSE_FILE=2100@cad.csl.illinois.edu # xacc-head-000-4.csl.illinois.edu # 2100@cad.csl.illinois.edu
+export ESP_ROOT=$PWD
