@@ -502,14 +502,14 @@ class SoC_Config():
     if self.FPGA_BOARD.find("profpga") != -1:
       self.HAS_SGMII = False
 
-        # Define maximum number of memory tiles
-        self.nmem_max = 1
-        if self.FPGA_BOARD == "profpga-xc7v2000t" or self.FPGA_BOARD == "xilinx-vcu118-xcvu9p":
-            self.nmem_max = 2
-        elif self.FPGA_BOARD == "profpga-xcvu440":
-            self.nmem_max = 4
-        elif self.FPGA_BOARD == "profpga-xcvu19p":
-            self.nmem_max = 7
+    # Define maximum number of memory tiles
+    self.nmem_max = 1
+    if self.FPGA_BOARD == "profpga-xc7v2000t" or self.FPGA_BOARD == "xilinx-vcu118-xcvu9p":
+        self.nmem_max = 2
+    elif self.FPGA_BOARD == "profpga-xcvu440":
+        self.nmem_max = 4
+    elif self.FPGA_BOARD == "profpga-xcvu19p":
+        self.nmem_max = 7
 
     # Read GRLIB configurations
     with open("../grlib/grlib_config.vhd") as fp:
