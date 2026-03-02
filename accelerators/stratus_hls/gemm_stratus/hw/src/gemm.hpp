@@ -15,21 +15,41 @@
 #define __round_mask(x, y) ((y)-1)
 #define round_up(x, y) ((((x)-1) | __round_mask(x, y))+1)
 
+#ifdef ENABLE_AMU
+class gemm : public esp_accelerator_amu<DMA_WIDTH>
+#else
 class gemm : public esp_accelerator_3P<DMA_WIDTH>
+#endif
 {
 public:
 
     // Constructor
     SC_HAS_PROCESS(gemm);
     gemm(const sc_module_name& name)
-	: esp_accelerator_3P<DMA_WIDTH>(name)
-	, cfg("config")
+#ifdef ENABLE_AMU
+	: esp_accelerator_amu<DMA_WIDTH>(name)
+#else
+	: esp_accelerator_3P<DMA_WIDTH>(name, true)
+#endif
 	, output_done("output_done")
 	, load_compute_cfg_done("load_compute_cfg_done")
 	, load_store_cfg_done("load_store_cfg_done")
         {
+#ifdef ENABLE_AMU
+            SC_CTHREAD(load_input, this->clk.pos());
+            this->reset_signal_is(this->rst, false);
+            // set_stack_size(0x400000);
+
+            SC_CTHREAD(compute_kernel, this->clk.pos());
+            this->reset_signal_is(this->rst, false);
+            // set_stack_size(0x400000);
+
+            SC_CTHREAD(store_output, this->clk.pos());
+            this->reset_signal_is(this->rst, false);
+            // set_stack_size(0x400000);
+#endif            
+
             // Signal binding
-            cfg.bind_with(*this);
 	    output_done.bind_with<DMA_WIDTH>(*this);
 	    load_compute_cfg_done.bind_with<DMA_WIDTH>(*this);
 	    load_store_cfg_done.bind_with<DMA_WIDTH>(*this);
@@ -58,9 +78,6 @@ public:
 
     // Store the output data
     void store_output();
-
-    // Configure gemm
-    esp_config_proc cfg;
 
     // Custom handshakes
     handshake_t output_done;

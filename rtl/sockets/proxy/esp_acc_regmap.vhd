@@ -91,7 +91,19 @@ package esp_acc_regmap is
   constant MON_UTIL_REG_3_LO : integer range 0 to MAXREGNUM - 1 := 26;
   constant MON_UTIL_REG_3_HI : integer range 0 to MAXREGNUM - 1 := 27;
 
-  -- bank(28 to 63) : USR (user defined)
+  -- bank(28-37)    : AMU_INFO_QUEUE_PTR_REG_i, AMU_INFO_NPRIO_REG_i, AMU_INFO_VLD_CTXT_REG
+  constant AMU_INFO_QUEUE_PTR_REG_0 : integer range 0 to MAXREGNUM - 1 := 28;
+  constant AMU_INFO_QUEUE_PTR_REG_1 : integer range 0 to MAXREGNUM - 1 := 29;
+  constant AMU_INFO_QUEUE_PTR_REG_2 : integer range 0 to MAXREGNUM - 1 := 30;
+  constant AMU_INFO_QUEUE_PTR_REG_3 : integer range 0 to MAXREGNUM - 1 := 31;
+  constant AMU_INFO_NPRIO_REG_0     : integer range 0 to MAXREGNUM - 1 := 32;
+  constant AMU_INFO_NPRIO_REG_1     : integer range 0 to MAXREGNUM - 1 := 33;
+  constant AMU_INFO_NPRIO_REG_2     : integer range 0 to MAXREGNUM - 1 := 34;
+  constant AMU_INFO_NPRIO_REG_3     : integer range 0 to MAXREGNUM - 1 := 35;
+  constant AMU_INFO_VLD_CTXT_REG    : integer range 0 to MAXREGNUM - 1 := 36;
+  constant AMU_INFO_SCHED_PERIOD_REG : integer range 0 to MAXREGNUM - 1 := 37;
+
+  -- bank(38 to 63) : USR (user defined)
 
   -- Re-enable the following 3 registers if adding an SRAM expanding the register bank
   -- -- bank(29)       : EXP_ADDR (bits 29:0 address an SRAM expanding the register bank)

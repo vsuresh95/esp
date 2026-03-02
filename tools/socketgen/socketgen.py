@@ -449,13 +449,20 @@ def write_acc_interface(f, acc, dma_width, datatype, rst, is_vivadohls_if, is_ca
     f.write("      acc_done                   : out std_ulogic;\n")
     f.write("      current_context            : out std_logic_vector(1 downto 0);\n")
     f.write("      valid_contexts_ack         : out std_logic_vector(3 downto 0);\n")
+    f.write("      amu_info_queue_ptr_0       : in std_logic_vector(31 downto 0);\n")
+    f.write("      amu_info_queue_ptr_1       : in std_logic_vector(31 downto 0);\n")
+    f.write("      amu_info_queue_ptr_2       : in std_logic_vector(31 downto 0);\n")
+    f.write("      amu_info_queue_ptr_3       : in std_logic_vector(31 downto 0);\n")
+    f.write("      amu_info_nprio_0           : in std_logic_vector(31 downto 0);\n")
+    f.write("      amu_info_nprio_1           : in std_logic_vector(31 downto 0);\n")
+    f.write("      amu_info_nprio_2           : in std_logic_vector(31 downto 0);\n")
+    f.write("      amu_info_nprio_3           : in std_logic_vector(31 downto 0);\n")
+    f.write("      amu_info_vld_ctxt          : in std_logic_vector(31 downto 0);\n")
+    f.write("      amu_info_sched_period      : in std_logic_vector(31 downto 0);\n")
     f.write("      mon_chnl_valid             : out std_ulogic;\n")
     f.write("      mon_chnl_ready             : in std_ulogic;\n")
     f.write("      mon_chnl_data_data         : out std_logic_vector(" + str(63) + " downto 0);\n")
-    f.write("      mon_chnl_data_mode         : out std_logic_vector(" + str(1) + " downto 0);\n")
-    f.write("      acc_fence_valid            : out std_ulogic;\n")
-    f.write("      acc_fence_ready            : in std_ulogic;\n")
-    f.write("      acc_fence_data             : out std_logic_vector(" + str(1) + " downto 0)\n")
+    f.write("      mon_chnl_data_mode         : out std_logic_vector(" + str(1) + " downto 0)\n")
 
 def write_ap_acc_signals(f):
   f.write("\n")
@@ -699,13 +706,32 @@ def write_acc_port_map(f, acc, dma_width, datatype, rst, is_noc_interface, is_vi
     f.write("      acc_done                   => acc_done,\n")
     f.write("      current_context            => current_context,\n")
     f.write("      valid_contexts_ack         => valid_contexts_ack,\n")
+    if is_noc_interface:
+      f.write("      amu_info_queue_ptr_0       => bank(AMU_INFO_QUEUE_PTR_REG_0)(31 downto 0),\n")
+      f.write("      amu_info_queue_ptr_1       => bank(AMU_INFO_QUEUE_PTR_REG_1)(31 downto 0),\n")
+      f.write("      amu_info_queue_ptr_2       => bank(AMU_INFO_QUEUE_PTR_REG_2)(31 downto 0),\n")
+      f.write("      amu_info_queue_ptr_3       => bank(AMU_INFO_QUEUE_PTR_REG_3)(31 downto 0),\n")
+      f.write("      amu_info_nprio_0           => bank(AMU_INFO_NPRIO_REG_0)(31 downto 0),\n")
+      f.write("      amu_info_nprio_1           => bank(AMU_INFO_NPRIO_REG_1)(31 downto 0),\n")
+      f.write("      amu_info_nprio_2           => bank(AMU_INFO_NPRIO_REG_2)(31 downto 0),\n")
+      f.write("      amu_info_nprio_3           => bank(AMU_INFO_NPRIO_REG_3)(31 downto 0),\n")
+      f.write("      amu_info_vld_ctxt          => bank(AMU_INFO_VLD_CTXT_REG)(31 downto 0),\n")
+      f.write("      amu_info_sched_period      => bank(AMU_INFO_SCHED_PERIOD_REG)(31 downto 0),\n")
+    else:
+      f.write("      amu_info_queue_ptr_0       => amu_info_queue_ptr_0,\n")
+      f.write("      amu_info_queue_ptr_1       => amu_info_queue_ptr_1,\n")
+      f.write("      amu_info_queue_ptr_2       => amu_info_queue_ptr_2,\n")
+      f.write("      amu_info_queue_ptr_3       => amu_info_queue_ptr_3,\n")
+      f.write("      amu_info_nprio_0           => amu_info_nprio_0,\n")
+      f.write("      amu_info_nprio_1           => amu_info_nprio_1,\n")
+      f.write("      amu_info_nprio_2           => amu_info_nprio_2,\n")
+      f.write("      amu_info_nprio_3           => amu_info_nprio_3,\n")
+      f.write("      amu_info_vld_ctxt          => amu_info_vld_ctxt,\n")
+      f.write("      amu_info_sched_period      => amu_info_sched_period,\n")
     f.write("      mon_chnl_valid             => mon_chnl_valid,\n")
     f.write("      mon_chnl_ready             => mon_chnl_ready,\n")
     f.write("      mon_chnl_data_data         => mon_chnl_data_data,\n")
-    f.write("      mon_chnl_data_mode         => mon_chnl_data_mode,\n")
-    f.write("      acc_fence_valid            => acc_fence_valid,\n")
-    f.write("      acc_fence_ready            => acc_fence_ready,\n")
-    f.write("      acc_fence_data             => acc_fence_data \n")
+    f.write("      mon_chnl_data_mode         => mon_chnl_data_mode\n")
     f.write("    );\n")
 
 
@@ -2074,7 +2100,7 @@ for acc in accelerators:
       # Default to stratus_hls for Chisel, because the interface matches the Stratus HLS flow
       accd.hls_tool = 'stratus_hls'
 
-    reg = 28
+    reg = 38
     for xmlparam in xmlacc.findall('param'):
       param = Parameter()
       param.name = xmlparam.get('name')

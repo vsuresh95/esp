@@ -1,2 +1,0 @@
-gemm_plm_block_in_dma64 4096 32 2w:0r 0w:2r
-gemm_plm_block_out_dma64 4096 32 2w:0r 0w:2r

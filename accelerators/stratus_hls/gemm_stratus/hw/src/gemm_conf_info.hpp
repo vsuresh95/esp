@@ -6,6 +6,8 @@
 
 #include <systemc.h>
 
+#define CONF_INFO_SIZE 12
+
 //
 // Configuration parameters for the accelerator.
 //
@@ -71,6 +73,42 @@ public:
             do_relu = other.do_relu;
 	    transpose = other.transpose;
             return *this;
+	}
+
+    // index assignment operator
+    inline uint32_t& operator[](int index)
+    {
+        /* <<--index assign-->> */
+        switch (index) {
+            case 0: return ninputs;
+            case 1: return d1;
+            case 2: return d2;
+            case 3: return d3;
+            case 4: return ld_offset1;
+            case 5: return ld_offset2;
+            case 6: return st_offset;
+            case 7: return do_relu;
+            case 8: return transpose;
+            default: return transpose;
+        }
+    }
+
+    // index read operator
+    inline const uint32_t& operator[](int index) const
+    {
+        /* <<--index read-->> */
+        switch (index) {
+            case 0: return ninputs;
+            case 1: return d1;
+            case 2: return d2;
+            case 3: return d3;
+            case 4: return ld_offset1;
+            case 5: return ld_offset2;
+            case 6: return st_offset;
+            case 7: return do_relu;
+            case 8: return transpose;
+            default: return transpose;
+        }
 	}
 
     // VCD dumping function

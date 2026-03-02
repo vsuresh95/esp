@@ -1,126 +1,66 @@
-/* Copyright (c) 2011-2019 Columbia University, System Level Design Group */
-/* SPDX-License-Identifier: Apache-2.0 */
+#ifndef GEMM_AMU_H
+#define GEMM_AMU_H
 
-#include <stdio.h>
-#ifndef __riscv
-#include <stdlib.h>
-#endif
+// Size and parameter defines
+#define CONF_INFO_SIZE 12
 
-#include <esp_accelerator.h>
-#include <esp_probe.h>
-#include <fixed_point.h>
-#include <utils/fft2_utils.h>
+// Context descriptors status
+#define QUEUE_INVALID 0
+#define QUEUE_AVAIL 1
+#define QUEUE_BUSY 2
 
-#include "sm.h"
-#include <math.h>
+#define GEMM_QUEUE_SIZE 4
 
-static unsigned DMA_WORD_PER_BEAT(unsigned _st)
-{
-        return (sizeof(void *) / _st);
-}
+// Queue layout parameters (words, 32-bit)
+#define QUEUE_ENTRY_SIZE 2
+#define ENTRY_OFFSET 6
+#define SM_QUEUE_WORDS (ENTRY_OFFSET + (QUEUE_ENTRY_SIZE * GEMM_QUEUE_SIZE))
 
-#define SLD_GEMM_SM 0x053
-#define DEV_NAME "sld,gemm_sm_stratus"
-#define FX_IL 16
 #define N_THREADS 2
 
-/* <<--params-->> */
-const unsigned dim_m = 10;
-const unsigned dim_n = 8;
-const unsigned dim_k = 10;
+typedef struct {
+    uint64_t stat;
+    uint64_t head;
+    uint64_t tail;
+    uint64_t entry[GEMM_QUEUE_SIZE];
+} sm_queue_t;
 
-/* Size of the contiguous chunks for scatter/gather */
-#define CHUNK_SHIFT 20
-#define CHUNK_SIZE BIT(CHUNK_SHIFT)
-#define NCHUNK(_sz) ((_sz % CHUNK_SIZE == 0) ?		\
-			(_sz / CHUNK_SIZE) :		\
-			(_sz / CHUNK_SIZE) + 1)
-
-/* User defined registers */
-/* <<--regs-->> */
-#define GEMM_SM_CONTEXT_QUEUE_PTR_0		0x70
-#define GEMM_SM_CONTEXT_QUEUE_PTR_1		0x74
-#define GEMM_SM_CONTEXT_QUEUE_PTR_2		0x78
-#define GEMM_SM_CONTEXT_QUEUE_PTR_3		0x7C
-#define GEMM_SM_CONTEXT_NPRIO_0			0x80
-#define GEMM_SM_CONTEXT_NPRIO_1			0x84
-#define GEMM_SM_CONTEXT_NPRIO_2			0x88
-#define GEMM_SM_CONTEXT_NPRIO_3			0x8C
-#define GEMM_SM_VALID_CONTEXTS			0x90
-#define GEMM_SM_SCHED_PERIOD			0x94
-
-void gemm_sm(const float* mat_a, const float* mat_b, float* mat_c, unsigned dim_m, unsigned dim_n, unsigned dim_k) {
-    const unsigned block_size = 16;
-    float sum;
-
-	for (unsigned m = 0; m < dim_m; m += block_size) {
-	    for (unsigned n = 0; n < dim_n; n += block_size) {
-	        for (unsigned k = 0; k < dim_k; k += block_size) {
-
-                unsigned m_rem = (m + block_size < dim_m) ? m + block_size : dim_m;
-                unsigned n_rem = (n + block_size < dim_n) ? n + block_size : dim_n;
-                unsigned k_rem = (k + block_size < dim_k) ? k + block_size : dim_k;
-
-                for (unsigned m_ = m; m_ < m_rem; m_++) {
-                    for (unsigned n_ = n; n_ < n_rem; n_++) {
-                        if (k == 0) sum = 0;
-                        else sum = mat_c[m_ * dim_n + n_];
-                        for (unsigned k_ = k; k_ < k_rem; k_++) {
-							sum += mat_a[m_ * dim_k + k_] * mat_b[k_ * dim_n + n_];
-                        }
-                        mat_c[m_ * dim_n + n_] = sum;
-                    }
-                }
-            }
-        }
+static inline void sm_queue_init(sm_queue_t *q) {
+    __atomic_store_n(&(q->stat), QUEUE_AVAIL, __ATOMIC_SEQ_CST);
+    __atomic_store_n(&(q->head), 0, __ATOMIC_SEQ_CST);
+    __atomic_store_n(&(q->tail), 0, __ATOMIC_SEQ_CST);
+    for (unsigned i = 0; i < GEMM_QUEUE_SIZE; i++) {
+        q->entry[i] = 0;
     }
 }
 
-int validate_buffer(int *mem_c, float *gold_c)
-{
-    unsigned errors = 0;
-    const unsigned len = dim_m * dim_n;
-	const float ERR_TH = 0.05;
-
-    for (unsigned j = 0; j < len; j++) {
-		float val = fixed32_to_float(mem_c[j], FX_IL);
-		if ((fabs(gold_c[j] - val) / fabs(gold_c[j])) > ERR_TH) {
-            if (errors < 10) {
-				uint32_t g = *((uint32_t *)&gold_c[j]);
-				uint32_t v = *((uint32_t *)&val);
-				printf("\tGOLD[%u] = 0x%x vs 0x%x = out[%u]\n", j, g, v, j);
-			}
-            errors++;
-        }
-    }
-
-    printf("\tError for %d values out of %d\n", errors, len);
-
-    return errors;
+static inline bool sm_queue_empty(const sm_queue_t *q) {
+    uint64_t head = __atomic_load_n(&(q->head), __ATOMIC_ACQUIRE);
+    uint64_t tail = __atomic_load_n(&(q->tail), __ATOMIC_ACQUIRE);
+    return (head == tail);
 }
 
-// Initialize input and calculate golden output
-void init_buffer(int *mem_a, int *mem_b, float *gold_a, float *gold_b, float *gold_c)
-{
-    const float LO = -2.0;
-    const float HI = 2.0;
-    const unsigned len_a = dim_m * dim_k;
-    const unsigned len_b = dim_n * dim_k;
+static inline bool sm_queue_full(const sm_queue_t *q) {
+    uint64_t head = __atomic_load_n(&(q->head), __ATOMIC_ACQUIRE);
+    uint64_t tail = __atomic_load_n(&(q->tail), __ATOMIC_ACQUIRE);
+    return (head - tail) >= GEMM_QUEUE_SIZE;
+}
 
-    for (unsigned j = 0; j < len_a; j++) {
-        float scaling_factor = (float) rand() / (float) RAND_MAX;
-        gold_a[j] = LO + scaling_factor * (HI - LO);
-        mem_a[j] = float_to_fixed32(gold_a[j], FX_IL);
-    }
+static inline void sm_queue_push(sm_queue_t *q, uint64_t value) {
+    uint64_t head = __atomic_load_n(&(q->head), __ATOMIC_ACQUIRE);
 
-    for (unsigned j = 0; j < len_b; j++) {
-        float scaling_factor = (float) rand() / (float) RAND_MAX;
-        gold_b[j] = LO + scaling_factor * (HI - LO);
-        mem_b[j] = float_to_fixed32(gold_b[j], FX_IL);
-    }
+    q->entry[head % GEMM_QUEUE_SIZE] = value;
+    __atomic_thread_fence(__ATOMIC_RELEASE);
+    __atomic_store_n(&(q->head), head + 1, __ATOMIC_RELEASE);
+}
 
-    // Compute golden output
-    gemm_sm(gold_a, gold_b, gold_c, dim_m, dim_n, dim_k);
+static inline uint64_t sm_queue_pop(sm_queue_t *q) {
+    uint64_t tail = __atomic_load_n(&(q->tail), __ATOMIC_ACQUIRE);
+
+    uint64_t value = q->entry[tail % GEMM_QUEUE_SIZE];
+    __atomic_thread_fence(__ATOMIC_ACQUIRE);
+    __atomic_store_n(&(q->tail), tail + 1, __ATOMIC_RELEASE);
+    return value;
 }
 
 static inline uint64_t get_counter() {
@@ -145,8 +85,8 @@ static inline bool need_to_delay (uint64_t *start_cycles, uint64_t delay) {
 	}
 }
 
-int main(int argc, char * argv[])
-{
+void gemm_amu() {
+	printf("Starting gemm_amu...\n");
 	int i, n;
 	int ndev;
 	struct esp_device *espdevs;
@@ -171,7 +111,7 @@ int main(int argc, char * argv[])
     unsigned input_queue_offset = mat_c_offset + mat_c_len;
     unsigned output_queue_offset = input_queue_offset + SM_QUEUE_WORDS;
     unsigned descriptor_offset = output_queue_offset + SM_QUEUE_WORDS;
-    unsigned mem_words = descriptor_offset + SM_INFO_SIZE;
+    unsigned mem_words = descriptor_offset + CONF_INFO_SIZE;
     unsigned mem_size = N_THREADS * (mem_words * sizeof(unsigned));
 	// SM queue pointers
 	sm_queue_t *input_q[N_THREADS] = {NULL};
@@ -180,10 +120,10 @@ int main(int argc, char * argv[])
 	unsigned *descriptor_base[N_THREADS] = {NULL};
 
 	// Search for the device
-	ndev = probe(&espdevs, VENDOR_SLD, SLD_GEMM_SM, DEV_NAME);
+	ndev = probe(&espdevs, VENDOR_SLD, SLD_GEMM, DEV_NAME);
 	if (ndev == 0) {
 		printf("%s not found\n", DEV_NAME);
-		return 0;
+		return;
 	}
 
 	printf("**************** %s.0 ****************\n", DEV_NAME);
@@ -193,12 +133,12 @@ int main(int argc, char * argv[])
 	// Check DMA capabilities
 	if (ioread32(dev, PT_NCHUNK_MAX_REG) == 0) {
 		printf("  -> scatter-gather DMA is disabled. Abort.\n");
-		return 0;
+		return;
 	}
 
 	if (ioread32(dev, PT_NCHUNK_MAX_REG) < NCHUNK(mem_size)) {
 		printf("  -> Not enough TLB entries available. Abort.\n");
-		return 0;
+		return;
 	}
 
 	// Allocate memory
@@ -235,20 +175,20 @@ int main(int argc, char * argv[])
 	esp_flush(coherence);
 
 	// Configure first context
-	iowrite32(dev, GEMM_SM_CONTEXT_QUEUE_PTR_0, input_queue_offset);
+	iowrite32(dev, AMU_INFO_QUEUE_PTR_REG_0, input_queue_offset);
 	iowrite32(dev, PT_ADDRESS_REG_0, (unsigned long long) ptable[0]);
-	iowrite32(dev, GEMM_SM_CONTEXT_NPRIO_0, 1);
-	iowrite32(dev, GEMM_SM_VALID_CONTEXTS, 0x1);
-	iowrite32(dev, GEMM_SM_SCHED_PERIOD, 40000);
+	iowrite32(dev, AMU_INFO_NPRIO_REG_0, 1);
+	iowrite32(dev, AMU_INFO_VLD_CTXT_REG, 0x1);
+	iowrite32(dev, AMU_INFO_SCHED_PERIOD_REG, 10000); // in cycles
 	// Start accelerators
 	iowrite32(dev, CMD_REG, CMD_MASK_START);
 	printf("First context configured\n");
 
 	// Configure second context
-	iowrite32(dev, GEMM_SM_CONTEXT_QUEUE_PTR_1, input_queue_offset);
+	iowrite32(dev, AMU_INFO_QUEUE_PTR_REG_1, input_queue_offset);
 	iowrite32(dev, PT_ADDRESS_REG_1, (unsigned long long) ptable[1]);
-	iowrite32(dev, GEMM_SM_CONTEXT_NPRIO_1, 2);
-	iowrite32(dev, GEMM_SM_VALID_CONTEXTS, 0x3);
+	iowrite32(dev, AMU_INFO_NPRIO_REG_1, 2);
+	iowrite32(dev, AMU_INFO_VLD_CTXT_REG, 0x3);
 	printf("Second context configured\n");
 
 	unsigned t_id = 0;
@@ -273,20 +213,24 @@ int main(int argc, char * argv[])
 		start_cycles[i] = get_counter();
 	}
 	uint64_t period[N_THREADS];
-	period[0] = 4 * 0x2000; // in cycles
-	period[1] = 2000; // in cycles
+	period[0] = 4 * 1000; // in cycles
+	period[1] = 1000; // in cycles
 
 	// Initialize descriptors
 	for (i = 0; i < N_THREADS; i++) {
 		unsigned *desc = descriptor_base[i];
 		desc[0] = output_queue_offset;
 		desc[1] = 0; // test does not do anything with descriptor pointer
-		desc[2] = dim_m;
-		desc[3] = dim_n;
+		desc[2] = 1;
+		desc[3] = dim_m;
 		desc[4] = dim_k;
-		desc[5] = mat_b_offset;
+		desc[5] = dim_n;
 		desc[6] = mat_a_offset;
-		desc[7] = mat_c_offset;
+		desc[7] = mat_b_offset;
+		desc[8] = mat_c_offset;
+		desc[9] = 0;
+		desc[10] = 0;
+		desc[11] = 0;
 	}
 
 	// Main processing loop
@@ -339,6 +283,6 @@ int main(int argc, char * argv[])
 	for (i = 0; i < N_THREADS; i++)
 		printf("%d, ", errors[i]);
 	printf("\n");
-
-	return 0;
 }
+
+#endif // GEMM_AMU_H

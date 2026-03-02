@@ -99,10 +99,11 @@ if {$TECH_IS_XILINX == 1} {
 #
 # DSE configuration
 #
-set DMA_WIDTH "32 64"
+set DMA_WIDTH "64"
 set DMA_CHUNK "2048" 
 set WORD_SIZE "32"
 set PARALLELISM "8"
+set AMU_CONFIG "BASELINE AMU_RR AMU_FAIR"
 # set DMA_WIDTH "64"
 # set DMA_CHUNK "8 16 32 64 128 512 2048 4096 8192" 
 # set WORD_SIZE "32"
@@ -121,14 +122,18 @@ foreach chk $DMA_CHUNK {
     foreach dma $DMA_WIDTH {
 	foreach word $WORD_SIZE {
 	    foreach paral $PARALLELISM {
+		foreach amu_cfg $AMU_CONFIG {
 
 		# Skip these configurations
 		if {$word == 64 && $dma == 32} {continue}
 		
-		set conf "CHK$chk\_DMA$dma\_WORD$word\_PARAL$paral"
+		set conf "$amu_cfg"
+		set local_cfg_flags $COMMON_CFG_FLAGS
+		if {$amu_cfg eq "AMU_RR"} { append local_cfg_flags " -DENABLE_AMU -DSCHED_RR" }
+		if {$amu_cfg eq "AMU_FAIR"} { append local_cfg_flags " -DENABLE_AMU" }
 
 		define_io_config * IOCFG_$conf -DDMA_CHUNK=$chk \
-		    -DDMA_WIDTH=$dma -DWORD_SIZE=$word -DPARALLELISM=$paral $COMMON_CFG_FLAGS
+		    -DDMA_WIDTH=$dma -DWORD_SIZE=$word -DPARALLELISM=$paral $local_cfg_flags
 
 		define_system_config tb TESTBENCH_$conf -io_config IOCFG_$conf
 
@@ -169,6 +174,7 @@ foreach chk $DMA_CHUNK {
 				-argv $ARGV
 			}
 		    }
+		}
 		}
 	    }
 	}

@@ -11,15 +11,15 @@
 #define DRV_NAME	"gemm_stratus"
 
 /* <<--regs-->> */
-#define GEMM_TRANSPOSE_REG 0x60
-#define GEMM_DO_RELU_REG 0x5c
-#define GEMM_ST_OFFSET_REG 0x58
-#define GEMM_LD_OFFSET2_REG 0x54
-#define GEMM_LD_OFFSET1_REG 0x50
-#define GEMM_D3_REG 0x4c
-#define GEMM_D2_REG 0x48
-#define GEMM_D1_REG 0x44
-#define GEMM_NINPUTS_REG 0x40
+#define GEMM_NINPUTS_REG    0x98
+#define GEMM_D1_REG         0x9c
+#define GEMM_D2_REG         0xA0
+#define GEMM_D3_REG         0xA4
+#define GEMM_LD_OFFSET1_REG 0xA8
+#define GEMM_LD_OFFSET2_REG 0xAC
+#define GEMM_ST_OFFSET_REG  0xB0
+#define GEMM_DO_RELU_REG    0xB4
+#define GEMM_TRANSPOSE_REG  0xB8
 
 struct gemm_stratus_device {
 	struct esp_device esp;
@@ -52,17 +52,15 @@ static void gemm_prep_xfer(struct esp_device *esp, void *arg)
 	struct gemm_stratus_access *a = arg;
 
 	/* <<--regs-config-->> */
-	iowrite32be(a->do_relu, esp->iomem + GEMM_DO_RELU_REG);
-	iowrite32be(a->transpose, esp->iomem + GEMM_TRANSPOSE_REG);
-	iowrite32be(a->ninputs, esp->iomem + GEMM_NINPUTS_REG);
-	iowrite32be(a->d3, esp->iomem + GEMM_D3_REG);
-	iowrite32be(a->d2, esp->iomem + GEMM_D2_REG);
-	iowrite32be(a->d1, esp->iomem + GEMM_D1_REG);
-	iowrite32be(a->st_offset, esp->iomem + GEMM_ST_OFFSET_REG);
-	iowrite32be(a->ld_offset1, esp->iomem + GEMM_LD_OFFSET1_REG);
-	iowrite32be(a->ld_offset2, esp->iomem + GEMM_LD_OFFSET2_REG);
-	iowrite32be(a->src_offset, esp->iomem + SRC_OFFSET_REG);
-	iowrite32be(a->dst_offset, esp->iomem + DST_OFFSET_REG);
+	iowrite32be(a->params.do_relu, esp->iomem + GEMM_DO_RELU_REG);
+	iowrite32be(a->params.transpose, esp->iomem + GEMM_TRANSPOSE_REG);
+	iowrite32be(a->params.ninputs, esp->iomem + GEMM_NINPUTS_REG);
+	iowrite32be(a->params.d3, esp->iomem + GEMM_D3_REG);
+	iowrite32be(a->params.d2, esp->iomem + GEMM_D2_REG);
+	iowrite32be(a->params.d1, esp->iomem + GEMM_D1_REG);
+	iowrite32be(a->params.st_offset, esp->iomem + GEMM_ST_OFFSET_REG);
+	iowrite32be(a->params.ld_offset1, esp->iomem + GEMM_LD_OFFSET1_REG);
+	iowrite32be(a->params.ld_offset2, esp->iomem + GEMM_LD_OFFSET2_REG);
 }
 
 static bool gemm_xfer_input_ok(struct esp_device *esp, void *arg)

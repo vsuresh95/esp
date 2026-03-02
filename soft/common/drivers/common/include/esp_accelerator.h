@@ -96,7 +96,18 @@ enum accelerator_coherence {ACC_COH_NONE = 0, ACC_COH_LLC, ACC_COH_RECALL, ACC_C
 #define MON_UTIL_REG_3_LO 0x68
 #define MON_UTIL_REG_3_HI 0x6c
 
-/* bank(28 to 63) : USR (user defined) */
+#define AMU_INFO_QUEUE_PTR_REG_0 0x70
+#define AMU_INFO_QUEUE_PTR_REG_1 0x74
+#define AMU_INFO_QUEUE_PTR_REG_2 0x78
+#define AMU_INFO_QUEUE_PTR_REG_3 0x7c
+#define AMU_INFO_NPRIO_REG_0     0x80
+#define AMU_INFO_NPRIO_REG_1     0x84
+#define AMU_INFO_NPRIO_REG_2     0x88
+#define AMU_INFO_NPRIO_REG_3     0x8c
+#define AMU_INFO_VLD_CTXT_REG    0x90
+#define AMU_INFO_SCHED_PERIOD_REG 0x94
+
+/* bank(38 to 63) : USR (user defined) */
 
 // Re-enable the following 3 registers if adding an SRAM expanding the register bank
 // /* bank(29)       : EXP_ADDR (bits 29:0 address an SRAM expanding the register bank) */

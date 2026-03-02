@@ -174,6 +174,16 @@ end;
     MON_UTIL_REG_2_HI  => '1',
     MON_UTIL_REG_3_LO  => '1',
     MON_UTIL_REG_3_HI  => '1',
+    AMU_INFO_QUEUE_PTR_REG_0 => '1',
+    AMU_INFO_QUEUE_PTR_REG_1 => '1',
+    AMU_INFO_QUEUE_PTR_REG_2 => '1',
+    AMU_INFO_QUEUE_PTR_REG_3 => '1',
+    AMU_INFO_NPRIO_REG_0     => '1',
+    AMU_INFO_NPRIO_REG_1     => '1',
+    AMU_INFO_NPRIO_REG_2     => '1',
+    AMU_INFO_NPRIO_REG_3     => '1',
+    AMU_INFO_VLD_CTXT_REG    => '1',
+    AMU_INFO_SCHED_PERIOD_REG => '1',
     -- <<user_mask>>
     others             => '0');
 

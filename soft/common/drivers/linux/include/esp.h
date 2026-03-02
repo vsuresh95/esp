@@ -18,7 +18,7 @@
 #endif /* __KERNEL__ */
 
 /* ioctl commands for accelerator control */
-#define ESP_IOCTL_ACC_NO_SM 0
+#define ESP_IOCTL_ACC_NO_AMU 0
 #define ESP_IOCTL_ACC_RESET 1
 #define ESP_IOCTL_ACC_INIT 2
 #define ESP_IOCTL_ACC_ADD_CONTEXT 3

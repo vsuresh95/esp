@@ -221,6 +221,25 @@ static void esp_transfer(struct esp_device *esp, const struct contig_desc *conti
 	iowrite32be(esp->spandex_conf, esp->iomem + SPANDEX_REG);
 }
 
+static void esp_transfer_amu(struct esp_device *esp, struct esp_access *access)
+{
+	esp->err = 0;
+	reinit_completion(&esp->completion);
+
+	if (access->ioctl_cm == ESP_IOCTL_ACC_RESET) {
+		iowrite32be(0x0, esp->iomem + AMU_INFO_VLD_CTXT_REG);
+	} else if (access->ioctl_cm == ESP_IOCTL_ACC_INIT || access->ioctl_cm == ESP_IOCTL_ACC_ADD_CONTEXT) {
+		iowrite32be(access->context_queue_ptr, esp->iomem + AMU_INFO_QUEUE_PTR_REG_0 + 0x4*access->context_id);
+		iowrite32be(access->context_nprio, esp->iomem + AMU_INFO_NPRIO_REG_0 + 0x4*access->context_id);
+		iowrite32be(access->valid_contexts, esp->iomem + AMU_INFO_VLD_CTXT_REG);
+		iowrite32be(access->sched_period, esp->iomem + AMU_INFO_SCHED_PERIOD_REG);
+	} else if (access->ioctl_cm == ESP_IOCTL_ACC_DEL_CONTEXT) {
+		iowrite32be(access->valid_contexts, esp->iomem + AMU_INFO_VLD_CTXT_REG);
+	} else if (access->ioctl_cm == ESP_IOCTL_ACC_SET_PRIO) {
+		iowrite32be(access->context_nprio, esp->iomem + AMU_INFO_NPRIO_REG_0 + 0x4*access->context_id);
+	}
+}
+
 static void esp_run(struct esp_device *esp)
 {
 	iowrite32be(0x1, esp->iomem + CMD_REG);
@@ -398,7 +417,7 @@ static int esp_access_ioctl(struct esp_device *esp, void __user *argp)
 	esp->context_id = access->context_id;
 
 	// Check the specific ioctl command
-	if (access->ioctl_cm == ESP_IOCTL_ACC_NO_SM) {
+	if (access->ioctl_cm == ESP_IOCTL_ACC_NO_AMU) {
 		goto init;
 	} else if (access->ioctl_cm == ESP_IOCTL_ACC_RESET) {
 		goto reset;
@@ -421,8 +440,7 @@ reset:
 		goto out;
 	}
 
-	if (esp->driver->prep_xfer)
-		esp->driver->prep_xfer(esp, arg);
+	esp_transfer_amu(esp, access);
 	
 	esp_check_context(esp, 0xFFFFFFFF);
 
@@ -438,8 +456,7 @@ del_prio:
 		goto out;
 	}
 
-	if (esp->driver->prep_xfer)
-		esp->driver->prep_xfer(esp, arg);
+	esp_transfer_amu(esp, access);
 
 	mutex_unlock(&esp->lock);
 
@@ -462,9 +479,7 @@ add:
 	esp_check_context(esp, mask);
 
 	esp_update_pt(esp, contig);
-
-	if (esp->driver->prep_xfer)
-		esp->driver->prep_xfer(esp, arg);
+	esp_transfer_amu(esp, access);
 
 	mutex_unlock(&esp->lock);
 
@@ -528,6 +543,7 @@ init:
 		goto out;
 
 	esp_transfer(esp, contig);
+	esp_transfer_amu(esp, access);
 
 	if (esp->driver->prep_xfer)
 		esp->driver->prep_xfer(esp, arg);

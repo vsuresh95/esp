@@ -48,6 +48,9 @@ void gemm::load_input()
 	this->reset_load_input();
 	load_compute_cfg_done.req.reset_req();
 	load_store_cfg_done.req.reset_req();
+#ifdef ENABLE_AMU
+    load_done.req.reset_req();
+#endif
 
 	// PLM memories reset
 
@@ -89,12 +92,22 @@ void gemm::load_input()
 	wait();
     }
 
+#ifdef ENABLE_AMU
+    while(true)
+    {
+#endif
     // Config
     {
 	HLS_DEFINE_PROTOCOL("load-config");
 
+#ifdef ENABLE_AMU
+	this->wait_amu_config(); // wait for signal from AMU
+	conf_info_t config = this->sm_info.read();
+	wait();
+#else
 	cfg.wait_for_config(); // config process
 	conf_info_t config = this->conf_info.read();
+#endif
 
 	// User-defined config code
 	ninputs = config.ninputs;
@@ -338,12 +351,16 @@ void gemm::load_input()
     	index_d2 += size_matrix2;
     	index_d1_n += size_matrix1;
     }
-
+#ifdef ENABLE_AMU
+		this->load_amu_done_handshake(); // tell amu you are done
+	}
+#else
     // Conclude
     {
 	HLS_DEFINE_PROTOCOL("load-done");
 	this->process_done();
     }
+#endif
 }
 
 void gemm::store_output()
@@ -368,6 +385,9 @@ void gemm::store_output()
     	this->reset_store_output();
         output_done.req.reset_req();
 	load_store_cfg_done.ack.reset_ack();
+#ifdef ENABLE_AMU
+	    store_done.req.reset_req();
+#endif
 
     	// PLM memories reset
 
@@ -388,12 +408,22 @@ void gemm::store_output()
     	wait();
     }
 
+#ifdef ENABLE_AMU
+    while(true)
+    {
+#endif
     // Config
     {
     	HLS_DEFINE_PROTOCOL("store-config");
 
+#ifdef ENABLE_AMU
+		this->wait_amu_config(); // wait for signal from AMU
+		conf_info_t config = this->sm_info.read();
+	wait();
+#else
     	cfg.wait_for_config(); // config process
     	conf_info_t config = this->conf_info.read();
+#endif
 
     	// User-defined config code
     	ninputs = config.ninputs;
@@ -518,12 +548,16 @@ void gemm::store_output()
     	}
     	index_a += (size_matrix_out / ninputs);
     }
-
+#ifdef ENABLE_AMU
+		this->store_amu_done_handshake(); // tell amu you are done
+	}
+#else
     // Conclude
     {
     	this->accelerator_done();
     	this->process_done();
     }
+#endif
 }
 
 void gemm::compute_kernel()
@@ -549,6 +583,9 @@ void gemm::compute_kernel()
     	this->reset_compute_kernel();
 	output_done.ack.reset_ack();
 	load_compute_cfg_done.ack.reset_ack();
+#ifdef ENABLE_AMU
+    	compute_done.req.reset_req();
+#endif
 
     	// PLM memories reset
 
@@ -571,12 +608,22 @@ void gemm::compute_kernel()
     	wait();
     }
 
+#ifdef ENABLE_AMU
+    while(true)
+    {
+#endif
     // Config
     {
     	HLS_DEFINE_PROTOCOL("compute-config");
 
+#ifdef ENABLE_AMU
+		this->wait_amu_config(); // wait for signal from AMU
+		conf_info_t config = this->sm_info.read();
+	wait();
+#else
     	cfg.wait_for_config(); // config process
     	conf_info_t config = this->conf_info.read();
+#endif
 
     	// User-defined config code
     	ninputs = config.ninputs;
@@ -896,9 +943,13 @@ void gemm::compute_kernel()
     	store_count = OUT_DMA_CHUNK - 1;
     	sync_compute_store(store_count, 1, load_cfg, loadable_rows, pingpong_out);
     }
-
+#ifdef ENABLE_AMU
+		this->compute_amu_done_handshake(); // tell amu you are done
+	}
+#else
     // Conclude
     {
 	this->process_done();
     }
+#endif
 }
