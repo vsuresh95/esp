@@ -1,5 +1,3 @@
-// Copyright (c) 2011-2022 Columbia University, System Level Design Group
-// SPDX-License-Identifier: Apache-2.0
 #include <linux/of_device.h>
 #include <linux/mm.h>
 
@@ -13,12 +11,15 @@
 #define DRV_NAME	"gemm_stratus"
 
 /* <<--regs-->> */
-#define GEMM_DIM_M			0x70
-#define GEMM_DIM_N			0x74
-#define GEMM_DIM_K			0x78
-#define GEMM_WEIGHT_BASE	0x7C
-#define GEMM_INPUT_BASE		0x80
-#define GEMM_OUTPUT_BASE	0x84
+#define GEMM_TRANSPOSE_REG 0x60
+#define GEMM_DO_RELU_REG 0x5c
+#define GEMM_ST_OFFSET_REG 0x58
+#define GEMM_LD_OFFSET2_REG 0x54
+#define GEMM_LD_OFFSET1_REG 0x50
+#define GEMM_D3_REG 0x4c
+#define GEMM_D2_REG 0x48
+#define GEMM_D1_REG 0x44
+#define GEMM_NINPUTS_REG 0x40
 
 struct gemm_stratus_device {
 	struct esp_device esp;
@@ -51,12 +52,17 @@ static void gemm_prep_xfer(struct esp_device *esp, void *arg)
 	struct gemm_stratus_access *a = arg;
 
 	/* <<--regs-config-->> */
-	iowrite32be(a->dim_m, esp->iomem + GEMM_DIM_M);
-	iowrite32be(a->dim_n, esp->iomem + GEMM_DIM_N);
-	iowrite32be(a->dim_k, esp->iomem + GEMM_DIM_K);
-	iowrite32be(a->weight_base, esp->iomem + GEMM_WEIGHT_BASE);
-	iowrite32be(a->input_base, esp->iomem + GEMM_INPUT_BASE);
-	iowrite32be(a->output_base, esp->iomem + GEMM_OUTPUT_BASE);
+	iowrite32be(a->do_relu, esp->iomem + GEMM_DO_RELU_REG);
+	iowrite32be(a->transpose, esp->iomem + GEMM_TRANSPOSE_REG);
+	iowrite32be(a->ninputs, esp->iomem + GEMM_NINPUTS_REG);
+	iowrite32be(a->d3, esp->iomem + GEMM_D3_REG);
+	iowrite32be(a->d2, esp->iomem + GEMM_D2_REG);
+	iowrite32be(a->d1, esp->iomem + GEMM_D1_REG);
+	iowrite32be(a->st_offset, esp->iomem + GEMM_ST_OFFSET_REG);
+	iowrite32be(a->ld_offset1, esp->iomem + GEMM_LD_OFFSET1_REG);
+	iowrite32be(a->ld_offset2, esp->iomem + GEMM_LD_OFFSET2_REG);
+	iowrite32be(a->src_offset, esp->iomem + SRC_OFFSET_REG);
+	iowrite32be(a->dst_offset, esp->iomem + DST_OFFSET_REG);
 }
 
 static bool gemm_xfer_input_ok(struct esp_device *esp, void *arg)
@@ -112,9 +118,9 @@ static struct esp_driver gemm_driver = {
 		},
 	},
 	.xfer_input_ok	= gemm_xfer_input_ok,
-	.prep_xfer		= gemm_prep_xfer,
-	.ioctl_cm		= GEMM_STRATUS_IOC_ACCESS,
-	.arg_size		= sizeof(struct gemm_stratus_access),
+	.prep_xfer	= gemm_prep_xfer,
+	.ioctl_cm	= GEMM_STRATUS_IOC_ACCESS,
+	.arg_size	= sizeof(struct gemm_stratus_access),
 };
 
 static int __init gemm_init(void)

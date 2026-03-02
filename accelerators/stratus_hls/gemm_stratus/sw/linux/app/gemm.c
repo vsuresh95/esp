@@ -1,168 +1,245 @@
-// Copyright (c) 2011-2022 Columbia University, System Level Design Group
+// Copyright (c) 2011-2023 Columbia University, System Level Design Group
 // SPDX-License-Identifier: Apache-2.0
-#include "esp.h"
+
+#include "libesp.h"
 #include "cfg.h"
 
-void gemm(const native_t* mat_a, const native_t* mat_b, native_t* mat_c, unsigned dim_m, unsigned dim_n, unsigned dim_k) {
-    const unsigned block_size = 16;
-    native_t sum;
-
-	for (unsigned m = 0; m < dim_m; m += block_size) {
-	    for (unsigned n = 0; n < dim_n; n += block_size) {
-	        for (unsigned k = 0; k < dim_k; k += block_size) {
-
-                unsigned m_rem = (m + block_size < dim_m) ? m + block_size : dim_m;
-                unsigned n_rem = (n + block_size < dim_n) ? n + block_size : dim_n;
-                unsigned k_rem = (k + block_size < dim_k) ? k + block_size : dim_k;
-
-                for (unsigned m_ = m; m_ < m_rem; m_++) {
-                    for (unsigned n_ = n; n_ < n_rem; n_++) {
-                        if (k == 0) sum = 0;
-                        else sum = mat_c[m_ * dim_n + n_];
-                        for (unsigned k_ = k; k_ < k_rem; k_++) {
-							sum += mat_a[m_ * dim_k + k_] * mat_b[k_ * dim_n + n_];
-                        }
-                        mat_c[m_ * dim_n + n_] = sum;
-                    }
-                }
-            }
-        }
-    }
-}
-
-/* User-defined code */
-int validate_buffer(token_t *mem_c, native_t *gold_c)
+static void validate_buffer(token_t *acc_buf, native_t *sw_buf, unsigned len)
 {
+    int i;
+    native_t val;
     unsigned errors = 0;
-    const unsigned len = dim_m * dim_n;
-	const float ERR_TH = 0.05;
 
-    for (unsigned j = 0; j < len; j++) {
-		native_t val = fixed32_to_float(mem_c[j], FX_IL);
-		if ((fabs(gold_c[j] - val) / fabs(gold_c[j])) > ERR_TH) {
-            if (errors < 10) printf("\tGOLD[%u] = %.04f vs %.04f = out[%u]\n", j, gold_c[j], val, j);
-            errors++;
-        }
+    printf("\nPrint output\n");
+
+    for (i = 0; i < len; i++) {
+
+#ifdef __FIXED
+	val = fx2float(acc_buf[i], FX_IL);
+#else
+	val = acc_buf[i];
+#endif
+	if (sw_buf[i] != val) {
+	    errors++;
+	    if (errors <= MAX_PRINTED_ERRORS)
+		printf("index %d : output %d : expected %d <-- ERROR\n", i, (int) val, (int) sw_buf[i]);
+	}
     }
 
-    printf("\tError for %d values out of %d\n", errors, len);
-
-    return errors;
+    if (!errors)
+	printf("\n  ** Test PASSED! **\n");
+    else
+	printf("\n  ** Test FAILED! **\n");
 }
 
+
 /* User-defined code */
-void init_buffer(token_t *mem_a, token_t *mem_b, native_t *gold_a, native_t *gold_b, native_t *gold_c)
+static void init_buffer(token_t *acc_buf, native_t *sw_buf, unsigned in_len)
 {
-    const float LO = -2.0;
-    const float HI = 2.0;
-    const unsigned len_a = dim_m * dim_k;
-    const unsigned len_b = dim_n * dim_k;
+    int i;
 
-    for (unsigned j = 0; j < len_a; j++) {
-        float scaling_factor = (float) rand() / (float) RAND_MAX;
-        gold_a[j] = LO + scaling_factor * (HI - LO);
-        mem_a[j] = float_to_fixed32(gold_a[j], FX_IL);
+    printf("  Initialize inputs\n");
+
+    for (i = 0; i < in_len; i++) {
+	native_t val = i % 17 - 8;
+#ifdef __FIXED
+        acc_buf[i] = float2fx(val, FX_IL);
+#else
+        acc_buf[i] = val;
+#endif
+	sw_buf[i] = val;
+    }
+}
+
+
+/* User-defined code */
+static void init_parameters(int test, int32_t do_relu, int32_t transpose, int32_t ninputs,
+			    int32_t d3, int32_t d2, int32_t d1,
+			    unsigned *in_len, unsigned *in1_len, unsigned *out_len,
+			    unsigned *in_size, unsigned *out_size, unsigned *size)
+{
+    int32_t ld_offset1, ld_offset2, st_offset;
+    unsigned in2_len;
+    
+    *in1_len = round_up(ninputs * d1 * d2, DMA_WORD_PER_BEAT(sizeof(token_t)));
+    in2_len = round_up(ninputs * d2 * d3, DMA_WORD_PER_BEAT(sizeof(token_t)));
+    *in_len = *in1_len + in2_len;
+    *out_len = round_up(ninputs * d1 * d3, DMA_WORD_PER_BEAT(sizeof(token_t)));
+    *in_size = *in_len * sizeof(token_t);
+    *out_size = *out_len * sizeof(token_t);
+    *size = *in_size + *out_size;
+
+    ld_offset1 = 0;
+    ld_offset2 = *in1_len;
+    st_offset = *in_len;
+
+    gemm_cfg_000[0].do_relu = do_relu;
+    gemm_cfg_000[0].transpose = transpose;
+    gemm_cfg_000[0].ninputs = ninputs;
+    gemm_cfg_000[0].d1 = d1;
+    gemm_cfg_000[0].d2 = d2;
+    gemm_cfg_000[0].d3 = d3;
+    gemm_cfg_000[0].ld_offset1 = ld_offset1;
+    gemm_cfg_000[0].ld_offset2 = ld_offset2;
+    gemm_cfg_000[0].st_offset = st_offset;
+
+    // print test info
+    printf("  Prepare test %d parameters\n", test);
+    printf("    .do_relu = %d\n", do_relu);
+    printf("    .transpose = %d\n", transpose);
+    printf("    .ninputs = %d\n", ninputs);
+    printf("    .d3 = %d\n", d3);
+    printf("    .d2 = %d\n", d2);
+    printf("    .d1 = %d\n", d1);
+    printf("    .st_offset = %d\n", st_offset);
+    printf("    .ld_offset1 = %d\n", ld_offset1);
+    printf("    .ld_offset2 = %d\n", ld_offset2);
+}
+
+static void sw_run(int32_t do_relu, int32_t transpose, int32_t ninputs,
+		   int32_t d3, int32_t d2, int32_t d1,
+		   native_t *in1, native_t *in2, native_t *out)
+{
+    int i, j, k, l;
+    struct timespec th_start, th_end;
+    native_t *in1_l, *in2_l, *out_l;
+
+    gettime(&th_start);
+
+    for (l = 0; l < ninputs; ++l)
+    {
+	in1_l = &in1[l * d1 * d2];
+	in2_l = &in2[l * d2 * d3];
+	out_l = &out[l * d1 * d3];
+
+	for (i = 0; i < d1; ++i)
+	{
+	    for (j = 0; j < d3; ++j)
+	    {
+		native_t accumulator = 0.0;
+
+		for (k = 0; k < d2; ++k)
+		{
+		    int mtx_in1_i = i * d2 + k;
+		    int mtx_in2_i = transpose ? (j * d2 + k) : (k * d3 + j);
+
+		    accumulator += in1_l[mtx_in1_i] * in2_l[mtx_in2_i];
+		}
+
+		out_l[i * d3 + j] = accumulator;
+	    }
+	}
     }
 
-    for (unsigned j = 0; j < len_b; j++) {
-        float scaling_factor = (float) rand() / (float) RAND_MAX;
-        gold_b[j] = LO + scaling_factor * (HI - LO);
-        mem_b[j] = float_to_fixed32(gold_b[j], FX_IL);
-    }
+    gettime(&th_end);
 
-    // Compute golden output
-    uint64_t t_start = get_counter();
-    gemm(gold_a, gold_b, gold_c, dim_m, dim_n, dim_k);
-	t_sw += get_counter() - t_start;
+    unsigned long long hw_ns = ts_subtract(&th_start, &th_end);
+    printf("    Software execution time: %llu ns\n", hw_ns);
 }
 
 int main(int argc, char **argv)
 {
-	int errors = 0;
-	t_sw = 0; t_acc = 0;
+    int test, n_tests, start_test = 1;
 
-    if (argc > 1) {
-        ITERATIONS = atoi(argv[1]);
-        dim_m = atoi(argv[2]);
-        dim_n = atoi(argv[3]);
-        dim_k = atoi(argv[4]);
+    unsigned in_len;
+    unsigned in1_len;
+    unsigned out_len;
+    unsigned in_size;
+    unsigned out_size;
+    unsigned size;
+
+    token_t *acc_buf;
+    native_t *sw_buf;
+
+    int32_t do_relu  [MAX_TESTS] = {   0,  0,  0,    0,   0,  0,   0,   0,   0,    0,
+				       0,  0,  0,    0,   0,  0,   0,   0,   0,    0,
+				       0,  0,  0,    0,   0,  0,   0,   0,   0,    0};
+
+    int32_t transpose[MAX_TESTS] = {   1,  1,  0,    1,   1,  0,   1,   1,   0,    1,
+				       1,  1,  0,    0,   1,  1,   1,   1,   1,    1,
+				       0,  0,  0,    0,   1,  0,   0,   1,   1,    1};
+
+    int32_t ninputs  [MAX_TESTS] = {   2, 32,  4,    1,   8,  1,   1, 128,   1,    1,
+				       1,  2,  1,    1,   1,  1,   4,   8,   2,    2,
+				       2,  2,  2,    1, 128,  1,   4,   2,   2,    2};
+
+    int32_t d3       [MAX_TESTS] = {   8,  8,  8,   32,  32, 32, 128, 128, 128,    1,
+				       1, 20,  2,    2,  64, 64,  11,  18,  18,   21,
+				      11, 18, 18,   21, 128,  8,   8,   8,   8,   21};
+
+    int32_t d2       [MAX_TESTS] = {   8,  8,  8,   32,  32, 32, 128, 128, 128, 2048,
+				    2048, 16, 64, 2048,   1,  2,  246,  25,  14,   14,
+				      26, 25, 14,   14, 128,  8,   8,   8,   8,   14};
+
+    int32_t d1       [MAX_TESTS] = {   8,  8,  8,   32,  32, 32, 128, 128, 128,    1,
+				       8,  1, 10,    1,  64, 64,  21,  22,  31,   22,
+				       21,22, 31,   22, 128,  8,   8,   8,   8,   11};
+
+    printf("\n====== %s ======\n\n", cfg_000[0].devname);
+
+    // command line arguments
+    if (argc < 3) {
+	n_tests = 1;
+    } else if (argc == 3) {
+	n_tests = strtol(argv[1], NULL, 10);
+	if (n_tests > MAX_TESTS) {
+	    printf("Wrong input arguments!");
+	    return 1;
+	}
+	start_test = strtol(argv[2], NULL, 10);
+	if (start_test > MAX_TESTS) {
+	    printf("Wrong input arguments!");
+	    return 1;
 	}
 
-    printf("\tStarting test %d %d %d %d...\n", ITERATIONS, dim_m, dim_n, dim_k);
-    unsigned flag_len = PAYLOAD_OFFSET/sizeof(token_t); // Number of unsigned elements reserved for flags
-    unsigned mat_a_len = dim_m * dim_k;
-    unsigned mat_b_len = dim_n * dim_k;
-    unsigned mat_c_len = dim_m * dim_n;
-    // Sync flag and data offsets
-    unsigned mat_a_valid_offset = VALID_OFFSET;
-    unsigned mat_a_offset = mat_a_valid_offset + flag_len;
-    unsigned mat_b_offset = mat_a_offset + mat_a_len;
-    unsigned mat_c_valid_offset = mat_b_offset + mat_b_len;
-    unsigned mat_c_offset = mat_c_valid_offset + flag_len;
+    } else {
+	printf("Wrong input arguments!");
+	return 1;
+    }
+    printf("  Executing %d tests\n", n_tests);
 
-	// Accelerator struct parameters
-	struct gemm_stratus_access *gemm_access_desc = (struct gemm_stratus_access *) malloc (sizeof(struct gemm_stratus_access));
-	gemm_access_desc->dim_m = dim_m;
-	gemm_access_desc->dim_n = dim_n;
-	gemm_access_desc->dim_k = dim_k;
-	gemm_access_desc->weight_base = mat_b_offset;
-	gemm_access_desc->input_base = mat_a_valid_offset;
-	gemm_access_desc->output_base = mat_c_valid_offset;
-	gemm_access_desc->esp.src_offset = 0;
-	gemm_access_desc->esp.dst_offset = 0;
-    gemm_access_desc->esp.coherence = ACC_COH_RECALL;
+    // allocations
+    printf("  Allocations\n");
 
-    printf("\tAllocations\n");
-    token_t *mem = (token_t *) esp_alloc((mat_c_offset + mat_c_len) * sizeof(token_t));
-	native_t *gold = (native_t*) malloc((mat_c_offset + mat_c_len) * sizeof(native_t));
+    acc_buf = (token_t *) esp_alloc(MAX_SIZE);
+    cfg_000[0].hw_buf = acc_buf;
 
-	// Opening accelerator file descriptor
-	char devname[100] = "gemm_stratus.0";
-    printf("\tOpening %s...\n", devname);
+    sw_buf = malloc(MAX_SIZE);
 
-	char full_path[384];
-	snprintf(full_path, 384, "/dev/%s", devname);
-	int fd = open(full_path, O_RDWR, 0);
-	if (fd < 0) {
-		fprintf(stderr, "Error: cannot open %s", full_path);
-		exit(EXIT_FAILURE);
-	}
+    for (test = start_test - 1; test < n_tests + start_test - 1; ++test) {
 
-	// Setting up ESP memory buffer
-    enum contig_alloc_policy policy;
-	struct esp_access *esp_access_desc = (struct esp_access *) gemm_access_desc;
-    contig_handle_t *handle = lookup_handle((void*) mem, &policy);
-	esp_access_desc->contig = contig_to_khandle(*handle);
-	esp_access_desc->ddr_node = contig_to_most_allocated(*handle);
-	esp_access_desc->alloc_policy = policy;
-	esp_access_desc->run = true;
+	printf("\n\n-------------------\n");
+	printf("TEST #%d\n", test + 1);
 
-    for (int i = 0; i < ITERATIONS; i++) {
-        init_buffer(&mem[mat_a_offset], &mem[mat_b_offset],
-                    &gold[mat_a_offset], &gold[mat_b_offset], &gold[mat_c_offset]);
+	// calculate test parameters
+	init_parameters(test,
+			do_relu[test], transpose[test], ninputs[test], d3[test], d2[test], d1[test],
+			&in_len, &in1_len, &out_len, &in_size, &out_size, &size);
 
-        uint64_t t_start = get_counter();
-        if (ioctl(fd, GEMM_STRATUS_IOC_ACCESS, esp_access_desc)) {
-            perror("ioctl");
-            exit(EXIT_FAILURE);
-        }
-        t_acc += get_counter() - t_start;
-        
-        errors += validate_buffer(&mem[mat_c_offset], &gold[mat_c_offset]);
+	// initialize input data
+	init_buffer(acc_buf, sw_buf, in_len);
+
+	// hardware execution
+	printf("  Start accelerator execution\n");
+	esp_run(cfg_000, NACC);
+	printf("  Completed accelerator execution\n");
+
+	// software execution
+	printf("  Start software execution\n");
+	sw_run(do_relu[test], transpose[test], ninputs[test], d3[test], d2[test], d1[test],
+	       sw_buf, &sw_buf[in1_len], &sw_buf[in_len]);
+	printf("  Completed software execution\n");
+
+	// validation
+	// errors = print_input(buf, gold);
+	validate_buffer(&acc_buf[in_len], &sw_buf[in_len], out_len);
     }
 
     // free
-    esp_free(mem);
-    free(gold);
+    esp_free(acc_buf);
+    free(sw_buf);
 
-	printf("\tSoftware time = %lu\n", t_sw/ITERATIONS);
-	printf("\tAccel time = %lu\n", t_acc/ITERATIONS);
-	printf("\tErrors = %d\n", errors);
-    printf("\tClosing %s...\n", devname);
-	if (close(fd) == -1) {
-        perror("Error closing file");
-        return 1;
-    }
+    printf("\n====== %s ======\n\n", cfg_000[0].devname);
 
-	return errors;
+    return 0;
 }

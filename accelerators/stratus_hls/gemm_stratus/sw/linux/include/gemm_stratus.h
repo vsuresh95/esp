@@ -1,4 +1,4 @@
-// Copyright (c) 2011-2022 Columbia University, System Level Design Group
+// Copyright (c) 2011-2023 Columbia University, System Level Design Group
 // SPDX-License-Identifier: Apache-2.0
 #ifndef _GEMM_STRATUS_H_
 #define _GEMM_STRATUS_H_
@@ -20,14 +20,19 @@
 struct gemm_stratus_access {
 	struct esp_access esp;
 	/* <<--regs-->> */
-	unsigned dim_m;
-	unsigned dim_n;
-	unsigned dim_k;
-	unsigned weight_base;
-	unsigned input_base;
-	unsigned output_base;
+	unsigned do_relu;
+	unsigned transpose;
+	unsigned ninputs;
+	unsigned d3;
+	unsigned d2;
+	unsigned d1;
+	unsigned st_offset;
+	unsigned ld_offset1;
+	unsigned ld_offset2;
+	unsigned src_offset;
+	unsigned dst_offset;
 };
 
-#define GEMM_STRATUS_IOC_ACCESS			_IOWR ('S', 0, struct gemm_stratus_access)
+#define GEMM_STRATUS_IOC_ACCESS	_IOW ('S', 0, struct gemm_stratus_access)
 
 #endif /* _GEMM_STRATUS_H_ */

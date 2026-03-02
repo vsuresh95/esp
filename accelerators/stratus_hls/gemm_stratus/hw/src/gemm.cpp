@@ -1,432 +1,904 @@
-// Copyright (c) 2011-2019 Columbia University, System Level Design Group
+// Copyright (c) 2011-2023 Columbia University, System Level Design Group
 // SPDX-License-Identifier: Apache-2.0
 
 #include "gemm.hpp"
-#include "gemm_directives.hpp"
-
-// Functions
-
 #include "gemm_functions.hpp"
 
 // Processes
 
 void gemm::load_input()
 {
+    bool pingpong_m1;
+    bool pingpong_m2;
+    uint16_t i;
+    uint24_t ninputs;
+    uint16_t length1;
+    uint16_t length2;
+    uint32_t index_d1;
+    uint32_t index_d1_n;
+    uint32_t index_d2;
+    uint32_t index_d1_tmp;
+    uint32_t index_d2_tmp;
+    uint24_t matrix_d1;
+    uint24_t matrix_d2;
+    uint24_t matrix_d3;
+    uint32_t size_matrix_out;
+    uint32_t size_matrix1;
+    uint32_t size_matrix2;
+    uint24_t matrix_chk_in;
+    uint16_t matrix_rem_in1;
+    uint16_t matrix_rem_in2;
+    uint24_t matrix_chk_out;
+    uint16_t matrix_rem_out;
+    uint8_t load_cfg;
+    uint16_t loadable_rows;
+    uint16_t loadable_chunk;
+    uint16_t index_d1_incr;
+    uint32_t ld_offset1;
+    uint32_t ld_offset2;
+    bool transpose;
+    uint16_t m2_loop_iters, length_m2_dma;
+    uint32_t index_m2_incr;
+    uint16_t m2_plm_incr;
+
     // Reset
     {
-        HLS_PROTO("load-reset");
-        this->reset_load_input();
-        wait();
+	HLS_DEFINE_PROTOCOL("load-reset");
+
+	this->reset_load_input();
+	load_compute_cfg_done.req.reset_req();
+	load_store_cfg_done.req.reset_req();
+
+	// PLM memories reset
+
+	// User-defined reset code
+	i = 0;
+	ninputs = 0;
+        length1 = 0; 
+        length2 = 0; 
+        index_d1 = 0;
+        index_d1_n = 0;
+        index_d2 = 0;
+        index_d1_tmp = 0;
+        index_d2_tmp = 0;
+        matrix_d1 = 0;
+        matrix_d2 = 0;
+        matrix_d3 = 0;
+        size_matrix_out = 0;
+	size_matrix1 = 0;
+	size_matrix2 = 0;
+        matrix_chk_in = 0;
+        matrix_rem_in1 = 0;
+        matrix_rem_in2 = 0;
+        matrix_chk_out = 0;
+        matrix_rem_out = 0;
+	load_cfg = 0;
+	loadable_rows = 0;
+	loadable_chunk = 0;
+	index_d1_incr = 0;
+        ld_offset1 = 0;
+        ld_offset2 = 0;
+	transpose = 0;
+	pingpong_m1 = false;
+	pingpong_m2 = false;
+	m2_loop_iters = 0;
+	length_m2_dma = 0;
+	index_m2_incr = 0;
+	m2_plm_incr = 0;
+
+	wait();
     }
-    // Read config information for current context
-    uint32_t dim_m;
-    uint32_t dim_n;
-    uint32_t dim_k;
-    uint32_t input_payload_offset;
-    uint32_t weight_payload_base;
-    uint32_t weight_payload_offset;
-    bool in_pingpong;
-    bool pingpong;
-    uint32_t tile_size_m, tile_size_n, tile_size_k;
+
+    // Config
     {
-        HLS_PROTO("load-config");
-        cfg.wait_for_config(); // config process
-        conf_info_t config = this->conf_info.read();        
-        dim_m = config.dim_m;
-        dim_n = config.dim_n;
-        dim_k = config.dim_k;
-        weight_payload_base = config.weight_base;
-        input_payload_offset = config.input_base;
-        in_pingpong = true;
-        pingpong = true;
-        wait();
+	HLS_DEFINE_PROTOCOL("load-config");
+
+	cfg.wait_for_config(); // config process
+	conf_info_t config = this->conf_info.read();
+
+	// User-defined config code
+	ninputs = config.ninputs;
+        matrix_d1 = config.d1;
+        matrix_d2 = config.d2;
+        matrix_d3 = config.d3;
+        ld_offset1 = config.ld_offset1;
+        ld_offset2 = config.ld_offset2;
+	transpose = config.transpose;
     }
+
+    {
+    	calculate_config(ninputs, matrix_d1, matrix_d2, matrix_d3, transpose,
+    			 size_matrix1, size_matrix2, size_matrix_out, 
+    			 matrix_chk_in, matrix_rem_in1, matrix_rem_in2,
+    			 matrix_chk_out, matrix_rem_out,
+    			 load_cfg, loadable_rows, loadable_chunk, index_d1_incr,
+			 m2_loop_iters, m2_plm_incr);
+
+    	{
+    	    HLS_DEFINE_PROTOCOL("load-config-sig");
+    	    size_matrix_out_sig.write(size_matrix_out);
+    	    size_matrix1_sig.write(size_matrix1);
+    	    size_matrix2_sig.write(size_matrix2);
+    	    matrix_chk_in_sig.write(matrix_chk_in);
+    	    matrix_rem_in1_sig.write(matrix_rem_in1);
+    	    matrix_rem_in2_sig.write(matrix_rem_in2);
+    	    matrix_chk_out_sig.write(matrix_chk_out);
+    	    matrix_rem_out_sig.write(matrix_rem_out);
+    	    load_cfg_sig.write(load_cfg);
+    	    loadable_rows_sig.write(loadable_rows);
+    	    loadable_chunk_sig.write(loadable_chunk);
+    	    index_d1_incr_sig.write(index_d1_incr);
+    	    wait();
+    	}
+
+    	index_d1_n = ld_offset1;
+    	index_d2 = ld_offset2;
+	index_m2_incr = matrix_d3;
+	length_m2_dma = 1;
+
+        // ESP_REPORT_INFO("WORDS_PER_DMA %d", WORDS_PER_DMA);
+
+        // ESP_REPORT_INFO("LOAD %u %u %u %u %u %u %u %u %u %u %u",
+    	// 		(unsigned) size_matrix1, (unsigned) size_matrix2,
+    	// 		(unsigned) matrix_chk_in, (unsigned) matrix_rem_in1, (unsigned) matrix_rem_in2,
+    	// 		(unsigned) matrix_chk_out, (unsigned) matrix_rem_out,
+    	// 		(unsigned) load_cfg, (unsigned) loadable_rows,
+    	// 		(unsigned) loadable_chunk, (unsigned) index_d1_incr);
+
+    	load_compute_cfg_handshake();
+    	load_store_cfg_handshake();
+    }
+    
     // Load
+    for (uint24_t a = 0; a < ninputs; a++)
     {
-        HLS_PROTO("load-input");
+    	index_d1 = index_d1_n;
 
-        // Tile sizes for larger matrices
-        tile_size_k = dim_k;
-        tile_size_m = TILE_SIZE / tile_size_k;
-        tile_size_n = (tile_size_m / DMA_WORD_PER_BEAT) * DMA_WORD_PER_BEAT;
-        wait();
+    	for (uint24_t d1 = 0; d1 < matrix_d1; d1 += loadable_rows)
+    	{
+    	    index_d2_tmp = index_d2;
 
-        // Load input matrix
-        for (unsigned tile_m = 0; tile_m < dim_m; tile_m += tile_size_m)
-        {
-            // Accomodate dim_m not being multiple of tile_size_m
-            unsigned actual_tile_m = (tile_m + tile_size_m < dim_m) ? tile_size_m : dim_m - tile_m;
+    	    for (uint24_t d2 = 0; d2 < matrix_d3; d2 += loadable_rows)
+    	    {
+    		index_d1_tmp = index_d1;
 
-            // Accomododate offset or size not being a multiple of DMA_WORD_PER_BEAT
-            uint32_t aligned_input_offset = input_payload_offset / DMA_WORD_PER_BEAT;
-            uint32_t input_alignment_skew = input_payload_offset - (aligned_input_offset * DMA_WORD_PER_BEAT);
-            uint32_t aligned_input_words = (input_alignment_skew + (actual_tile_m * tile_size_k) + DMA_WORD_PER_BEAT - 1) / DMA_WORD_PER_BEAT;
+    		length1 = loadable_chunk;
+    		length2 = loadable_chunk;
 
-            // Create a DMA request
-            dma_info_t dma_info_1(aligned_input_offset, aligned_input_words, DMA_SIZE);
-            sc_dt::sc_bv<DMA_WIDTH> dataBv;
-            uint32_t plm_in_index = 0;
+    		uint32_t index_m2_dma = index_d2_tmp;
 
-            wait();
-            this->dma_read_ctrl.put(dma_info_1);
+    		for (uint24_t chk = 0; chk < matrix_chk_in; ++chk)
+    		{
+    		    // If true the next is the last (smaller) chunk
+    		    if (load_cfg == LESS_THAN_ROW && chk == matrix_chk_in - 1 &&
+    			matrix_rem_in2 != 0) {
+    			length1 = matrix_rem_in1;
+    			length2 = matrix_rem_in2;
+    		    } else if (load_cfg != LESS_THAN_ROW) {
+    			if (d1 + loadable_rows > matrix_d1)
+    			    length1 = matrix_rem_in1;
+    			if (d2 + loadable_rows > matrix_d3)
+    			    length2 = matrix_rem_in2;
+    		    }
 
-            // Number of invalid words at the beginning of the burst
-            uint32_t begin_input_invalid = input_alignment_skew;
-            // Number of invalid words at the end of the burst
-            uint32_t end_input_invalid = begin_input_invalid + (actual_tile_m * tile_size_k);
+    		    //
+    		    // 1. Load chunks of the first matrix in PLMs input0 and input1
+    		    //
 
-            for (int i = 0; i < aligned_input_words * DMA_WORD_PER_BEAT; i += DMA_WORD_PER_BEAT)
-            {
-                HLS_BREAK_ARRAY_DEPENDENCY(plm_in_ping);
-                HLS_BREAK_ARRAY_DEPENDENCY(plm_in_pong);
+    		    if (!(d2 && load_cfg == LESS_THAN_MATRIX2)) {
 
-                dataBv = this->dma_read_chnl.get();
-                wait();
+    			{
+    			    HLS_DEFINE_PROTOCOL("load-matrix1-info");
+    			    dma_info_t dma_info(index_d1_tmp >> WORDS_PER_DMA_LOG,
+						round_up(length1, WORDS_PER_DMA) >> WORDS_PER_DMA_LOG,
+						SIZE_WORD);
+    			    this->dma_read_ctrl.put(dma_info);
 
-                for (uint16_t j = 0; j < DMA_WORD_PER_BEAT; j++)
-                {
-                    HLS_UNROLL_SIMPLE;
-                    if (i + j >= begin_input_invalid && i + j < end_input_invalid) {
-                        if (in_pingpong) plm_in_ping[plm_in_index++] = dataBv.range((j+1) * DATA_WIDTH - 1, j * DATA_WIDTH).to_uint64();
-                        else plm_in_pong[plm_in_index++] = dataBv.range((j+1) * DATA_WIDTH - 1, j * DATA_WIDTH).to_uint64();
-                    }
-                }
-            }
+                            // ESP_REPORT_INFO("load m1 %u %u",
+                            // 		    (unsigned) index_d1_tmp, (unsigned) round_up(length1, WORDS_PER_DMA));
+    			}
 
-            input_payload_offset += actual_tile_m * tile_size_k;
+    			i = 0;
 
-            // Load weight matrix
-            for (unsigned tile_n = 0; tile_n < dim_n; tile_n += tile_size_n)
-            {
-                // Accomodate dim_n not being multiple of tile_size_n
-                // Ensure non-tiled loads are not tiled.
-                unsigned actual_tile_n, actual_tile_k;
-                if (tile_n == 0) {
-                    actual_tile_n = (tile_size_n < dim_n) ? tile_size_n : dim_n * dim_k;
-                    actual_tile_k = (tile_size_n < dim_n) ? tile_size_k : 1;
-                } else {
-                    actual_tile_n = (tile_n + tile_size_n < dim_n) ? tile_size_n : dim_n - tile_n;
-                    actual_tile_k = tile_size_k;
-                }
+			bool misaligned = index_d1_tmp & 1 & (WORDS_PER_DMA - 1);
 
-                weight_payload_offset = weight_payload_base + tile_n;
+    			for (uint16_t k = 0; k < round_up(length1 + misaligned, WORDS_PER_DMA) >> WORDS_PER_DMA_LOG; ++k)
+    			{
+    			    sc_dt::sc_bv<DMA_WIDTH> data = this->dma_read_chnl.get();
 
-                for (unsigned k = 0; k < actual_tile_k; k++)
-                {
-                    // Accomododate offset or size not being a multiple of DMA_WORD_PER_BEAT
-                    uint32_t aligned_wgt_offset = weight_payload_offset / DMA_WORD_PER_BEAT;
-                    uint32_t wgt_alignment_skew = weight_payload_offset - (aligned_wgt_offset * DMA_WORD_PER_BEAT);
-                    uint32_t aligned_wgt_words = (wgt_alignment_skew + actual_tile_n + DMA_WORD_PER_BEAT - 1) / DMA_WORD_PER_BEAT;
+    			    {
+    				// This ensures the maximum throughput
+    				HLS_CONSTRAIN_LATENCY(0, HLS_ACHIEVABLE, "load-matrix1");
+				HLS_BREAK_ARRAY_DEPENDENCY(input0);
+				HLS_BREAK_ARRAY_DEPENDENCY(input1);
 
-                    // Create a DMA request
-                    dma_info_t dma_info_2(aligned_wgt_offset, aligned_wgt_words, DMA_SIZE);
-                    uint32_t plm_wgt_index = k * actual_tile_n;
+#if (WORDS_PER_DMA == 2)                                
+				if (pingpong_m1) {
 
-                    wait();
-                    this->dma_read_ctrl.put(dma_info_2);
+				    if (!(misaligned && !k))
+					input0[i++] = data.range(31,0).to_uint();
+				    if (i < DMA_CHUNK)
+					input0[i++] = data.range(63,32).to_uint();
+				} else {
+				    if (!(misaligned && !k))
+					input1[i++] = data.range(31,0).to_uint();
+				    if (i < DMA_CHUNK)
+					input1[i++] = data.range(63,32).to_uint();
+				}
+#else
+				if (pingpong_m1) {
+                                    input0[i++] = data.to_uint();
+				} else {
+                                    input1[i++] = data.to_uint();
+				}
+#endif
+				// i+=2;
+    			    }
+			    wait(); // Only considered in behavioral simulation
+    			}
+    			pingpong_m1 = !pingpong_m1;
+    		    }
 
-                    // Number of invalid words at the beginning of the burst
-                    uint32_t begin_wgt_invalid = wgt_alignment_skew;
-                    // Number of invalid words at the end of the burst
-                    uint32_t end_wgt_invalid = begin_wgt_invalid + actual_tile_n;
+    		    //
+    		    // 2. Load chunks of the second matrix in PLMs input2 and input3
+    		    //
 
-                    for (unsigned i = 0; i < aligned_wgt_words * DMA_WORD_PER_BEAT; i += DMA_WORD_PER_BEAT)
-                    {
-                        HLS_BREAK_ARRAY_DEPENDENCY(plm_wgt_ping);
-                        HLS_BREAK_ARRAY_DEPENDENCY(plm_wgt_pong);
+    		    // TODO
+    		    // This does not work when WORDS_PER_DMA != 1
+		    if (transpose || matrix_d3 == 1) {
+    			length_m2_dma = length2;
+    			index_m2_incr = length2;
+		    } else {
+			if (load_cfg == LESS_THAN_ROW) {
+			    m2_loop_iters = length2;
+			} else if (load_cfg == LESS_THAN_MATRIX2) {
+			    length_m2_dma = min(loadable_rows, matrix_d3 - d2);
+			    // ESP_REPORT_INFO("here1 %d", length_m2_dma);
+			}
+		    }
 
-                        dataBv = this->dma_read_chnl.get();
-                        wait();
+		    int16_t base_i = 0;
+    		    i = 0;
+    		    for (uint16_t t = 0; t < m2_loop_iters; ++t)
+    		    {
+			i = base_i;
+    			{
+    			    HLS_DEFINE_PROTOCOL("load-matrix2-info");
 
-                        for (uint16_t j = 0; j < DMA_WORD_PER_BEAT; j++)
-                        {
-                            HLS_UNROLL_SIMPLE;
-                            if (i + j >= begin_wgt_invalid && i + j < end_wgt_invalid) {
-                                if (pingpong) plm_wgt_ping[plm_wgt_index++] = dataBv.range((j+1) * DATA_WIDTH - 1, j * DATA_WIDTH).to_int64();
-                                else plm_wgt_pong[plm_wgt_index++] = dataBv.range((j+1) * DATA_WIDTH - 1, j * DATA_WIDTH).to_int64();
-                            }
-                        }
-                    }
+    			    dma_info_t dma_info(index_m2_dma >> WORDS_PER_DMA_LOG,
+    						round_up(length_m2_dma, WORDS_PER_DMA) >> WORDS_PER_DMA_LOG, SIZE_WORD);
+    			    this->dma_read_ctrl.put(dma_info);
 
-                    weight_payload_offset += dim_n;
-                }
+    			    // ESP_REPORT_INFO("load m2 %u %u",
+    			    // 		    (unsigned) index_m2_dma, (unsigned) round_up(length_m2_dma, WORDS_PER_DMA));
+    			}
 
-                this->load_compute_handshake();
-                wait();
-                
-                pingpong = !pingpong;
-            }
-            in_pingpong = !in_pingpong;
-            wait();
-        }
+			bool misaligned = index_m2_dma & 1 & (WORDS_PER_DMA - 1);
+
+    			for (uint16_t k = 0; k < round_up(length_m2_dma + misaligned,
+							  WORDS_PER_DMA) >> WORDS_PER_DMA_LOG; ++k)
+    			{
+    			    sc_dt::sc_bv<DMA_WIDTH> data = this->dma_read_chnl.get();
+
+			    {
+				// This ensures the maximum throughput
+				HLS_DEFINE_PROTOCOL("protocol-load-matrix2");
+				HLS_BREAK_ARRAY_DEPENDENCY(input2);
+				HLS_BREAK_ARRAY_DEPENDENCY(input3);
+
+#if (WORDS_PER_DMA != 2)
+                                if (pingpong_m2)
+                                    input2[i] = data.to_uint();
+                                else
+                                    input3[i] = data.to_uint();
+                                i += m2_plm_incr;
+#else        
+				if (!(misaligned && !k)) {
+				    if (pingpong_m2)
+					input2[i] = data.range(31,0).to_uint();
+				    else
+					input3[i] = data.range(31,0).to_uint();
+				    i += m2_plm_incr;
+				}
+				if (i < DMA_CHUNK) {
+				    if (m2_plm_incr != 1) {
+					wait();
+				    }
+				    if (pingpong_m2)
+					input2[i] = data.range(63,32).to_uint();
+				    else
+					input3[i] = data.range(63,32).to_uint();
+				    i += m2_plm_incr;
+				}
+#endif
+				wait();
+			    }
+    			}
+
+    			index_m2_dma += index_m2_incr;
+			base_i++;
+    		    }
+		    
+    		    // Call the compute_kernel process
+    		    load_compute_handshake();
+
+    		    // Change pingpong buffer
+    		    pingpong_m2 = !pingpong_m2;
+
+    		    // Update the indices
+    		    index_d1_tmp += length1;
+    		    if (transpose)
+    			index_d2_tmp += length_m2_dma; 
+    		}
+    		if (!transpose)
+    		    index_d2_tmp += loadable_rows;
+    	    }
+    	    index_d1 += index_d1_incr;
+    	}
+    	index_d2 += size_matrix2;
+    	index_d1_n += size_matrix1;
     }
+
     // Conclude
     {
-        this->process_done();
+	HLS_DEFINE_PROTOCOL("load-done");
+	this->process_done();
     }
-} // Function : load_input
+}
 
 void gemm::store_output()
 {
+    uint16_t i;
+    bool pingpong;
+    uint24_t ninputs;
+    uint24_t matrix_d1;
+    uint24_t matrix_d2;
+    uint24_t matrix_d3;
+    uint32_t st_offset;
+    uint24_t matrix_chk_out;
+    uint16_t matrix_rem_out;
+    uint32_t size_matrix_out;
+    uint8_t load_cfg;
+    uint16_t loadable_rows;
+
     // Reset
     {
-        HLS_PROTO("store-reset");
-        this->reset_store_output();
-        wait();
+    	HLS_DEFINE_PROTOCOL("store-reset");
+
+    	this->reset_store_output();
+        output_done.req.reset_req();
+	load_store_cfg_done.ack.reset_ack();
+
+    	// PLM memories reset
+
+    	// User-defined reset code
+	i = 0;
+	pingpong = false;
+	ninputs = 0;
+        matrix_d1 = 0;
+        matrix_d2 = 0;
+        matrix_d3 = 0;
+        st_offset = 0;
+        matrix_chk_out = 0;
+        matrix_rem_out = 0;
+        size_matrix_out = 0;
+	load_cfg = 0;
+	loadable_rows = 0;
+
+    	wait();
     }
-    // Read config information for current context
-    uint32_t dim_m;
-    uint32_t dim_n;
-    uint32_t dim_k;
-    uint32_t output_payload_base;
-    uint32_t output_payload_offset;
-    bool pingpong;
-    uint32_t tile_size_m, tile_size_n, tile_size_k;
+
+    // Config
     {
-        HLS_PROTO("store-config");
-        cfg.wait_for_config(); // config process
-        conf_info_t config = this->conf_info.read();
-        dim_m = config.dim_m;
-        dim_n = config.dim_n;
-        dim_k = config.dim_k;
-        output_payload_base = config.output_base;
-        pingpong = true;
-        wait();
+    	HLS_DEFINE_PROTOCOL("store-config");
+
+    	cfg.wait_for_config(); // config process
+    	conf_info_t config = this->conf_info.read();
+
+    	// User-defined config code
+    	ninputs = config.ninputs;
+        matrix_d1 = config.d1;
+        matrix_d2 = config.d2;
+        matrix_d3 = config.d3;
+        st_offset = config.st_offset;
+
+    	store_load_cfg_handshake();
+
+        // Calculating number of outputs to generate
+    	{
+    	    HLS_DEFINE_PROTOCOL("store-config-sig");
+    	    matrix_chk_out = matrix_chk_out_sig.read();
+    	    matrix_rem_out = matrix_rem_out_sig.read();
+    	    size_matrix_out = size_matrix_out_sig.read();
+    	    load_cfg = load_cfg_sig.read();
+    	    loadable_rows = loadable_rows_sig.read();
+    	    wait();
+    	}
+
+    	if (load_cfg == LESS_THAN_MATRIX2 && loadable_rows != 1) {
+    	    matrix_chk_out = 1;
+    	} else {
+    	    ninputs = 1;
+    	    matrix_d1 = 1;
+    	    matrix_d3 = 1;
+    	    loadable_rows = 1;
+    	}
+
+    	// ESP_REPORT_INFO("STORE %u %u %u", (unsigned) size_matrix_out,
+    	// 		(unsigned) matrix_chk_out, (unsigned) matrix_rem_out);
     }
+
     // Store
+    uint32_t index = 0;
+    uint32_t index_simple = st_offset;
+    uint16_t length = OUT_DMA_CHUNK;
+    uint32_t index_a = st_offset;
+
+    for (uint24_t a = 0; a < ninputs; a++)
     {
-        HLS_PROTO("store-data");
+    	uint32_t index_d1 = index_a;
+    	for (uint24_t d1 = 0; d1 < matrix_d1; d1 += loadable_rows)
+    	{
+    	    uint16_t loaded_rows_d1 = min(loadable_rows, matrix_d1 - d1);
+    	    uint32_t index_d2 = index_d1;
+    	    for (uint24_t d2 = 0; d2 < matrix_d3; d2 += loadable_rows)
+    	    {
+    		uint16_t loaded_rows_d3 = min(loadable_rows, matrix_d3 - d2);
+    		uint32_t index_d1i = index_d2;
+    		for (uint16_t d1i = 0; d1i < loaded_rows_d1; d1i++)
+    		{
+    		    for (uint24_t chk = 0; chk < matrix_chk_out; ++chk)
+    		    {
+    			// If true the next is the last (smaller) chunk
+    			if (load_cfg == LESS_THAN_MATRIX2 && loadable_rows != 1) {
+    			    length = loaded_rows_d3;
+    			    index = index_d1i;
+    			} else {
+    			    index = index_simple; 
+    			    if (chk == matrix_chk_out - 1 && matrix_rem_out != 0)
+    				length = matrix_rem_out;
+    			}
 
-        // Tile sizes for larger matrices
-        tile_size_k = dim_k;
-        tile_size_m = TILE_SIZE / tile_size_k;
-        tile_size_n = (tile_size_m / DMA_WORD_PER_BEAT) * DMA_WORD_PER_BEAT;
-        wait();
+    			// Wait the compute_process
+    			// ESP_REPORT_INFO("STORE: before compute hs %u %u %u %u",
+    			// 		(unsigned) d1, (unsigned) d2, (unsigned) d1i, (unsigned) chk);
+    			store_compute_handshake();
+    			// ESP_REPORT_INFO("STORE: after compute hs %u %u %u %u",
+    			// 		(unsigned) d1, (unsigned) d2, (unsigned) d1i, (unsigned) chk);
 
-        for (unsigned tile_m = 0; tile_m < dim_m; tile_m += tile_size_m)
-        {
-            unsigned actual_tile_m = (tile_m + tile_size_m < dim_m) ? tile_size_m : dim_m - tile_m;
+    			{
+    			    HLS_DEFINE_PROTOCOL("store-matrix-info");
+    			    dma_info_t dma_info(index >> WORDS_PER_DMA_LOG,
+						round_up(length, WORDS_PER_DMA) >> WORDS_PER_DMA_LOG,
+						SIZE_WORD);
+    			    this->dma_write_ctrl.put(dma_info);
 
-            for (unsigned tile_n = 0; tile_n < dim_n; tile_n += tile_size_n)
-            {
-                // Accomodate dim_n not being multiple of tile_size_n
-                // Ensure non-tiled stores are not tiled.
-                unsigned actual_tile_m_2, actual_tile_n;
-                if (tile_n == 0) {
-                    actual_tile_n = (tile_size_n < dim_n) ? tile_size_n : dim_m * dim_n;
-                    actual_tile_m_2 = (tile_size_n < dim_n) ? actual_tile_m : 1;
-                } else {
-                    actual_tile_n = (tile_n + tile_size_n < dim_n) ? tile_size_n : dim_n - tile_n;
-                    actual_tile_m_2 = actual_tile_m;
-                }
+    			    // ESP_REPORT_INFO("STORE index %u length %u",
+    			    // 		    (unsigned) index, (unsigned) length);
+    			}
 
-                this->store_compute_handshake();
+    			i = 0;
+    			for (uint16_t k = 0; k < round_up(length, WORDS_PER_DMA) >> WORDS_PER_DMA_LOG; ++k)
+    			{
+    			    sc_dt::sc_bv<DMA_WIDTH> data = 0;
 
-                output_payload_offset = output_payload_base + (tile_m * dim_n) + tile_n;
+    			    {
+    				// This ensures the maximum throughput
+    				HLS_CONSTRAIN_LATENCY(0, HLS_ACHIEVABLE, "store-matrix");
+				
+				if (pingpong) {
+				    data.range(31,0) = output0[i++];
+#if (WORDS_PER_DMA == 2)
+				    data.range(63,32) = output0[i++];
+#endif
+				} else {
+				    data.range(31,0) = output1[i++];
+#if (WORDS_PER_DMA == 2)
+				    data.range(63,32) = output1[i++];
+#endif
+				}
 
-                for (unsigned m = 0; m < actual_tile_m_2; m++)
-                {
-                    // Accomododate offset or size not being a multiple of DMA_WORD_PER_BEAT
-                    uint32_t aligned_output_offset = output_payload_offset / DMA_WORD_PER_BEAT;
-                    uint32_t output_alignment_skew = output_payload_offset - (aligned_output_offset * DMA_WORD_PER_BEAT);
-                    uint32_t aligned_output_words = (output_alignment_skew + actual_tile_n + DMA_WORD_PER_BEAT - 1) / DMA_WORD_PER_BEAT;
+    				wait(); // Only considered in behavioral simulation
+    			    }
 
-                    dma_info_t dma_info(aligned_output_offset, aligned_output_words, DMA_SIZE);
-                    sc_dt::sc_bv<DMA_WIDTH> dataBv;
-                    uint32_t plm_output_index = m * actual_tile_n;
+    			    this->dma_write_chnl.put(data);
+    			}
 
-                    wait();
-                    this->dma_write_ctrl.put(dma_info);
+			// toggle pingpong
+			pingpong = !pingpong;
 
-                    for (unsigned i = 0; i < aligned_output_words * DMA_WORD_PER_BEAT; i += DMA_WORD_PER_BEAT)
-                    {
-                        HLS_BREAK_ARRAY_DEPENDENCY(plm_out_ping);
-                        HLS_BREAK_ARRAY_DEPENDENCY(plm_out_pong);
-                        wait();
-
-                        for (uint16_t j = 0; j < DMA_WORD_PER_BEAT; j++)
-                        {
-                            HLS_UNROLL_SIMPLE;
-                            if (pingpong) dataBv.range((j+1) * DATA_WIDTH - 1, j * DATA_WIDTH) = plm_out_ping[plm_output_index++];
-                            else dataBv.range((j+1) * DATA_WIDTH - 1, j * DATA_WIDTH) = plm_out_pong[plm_output_index++];
-                        }
-
-                        this->dma_write_chnl.put(dataBv);
-                    }
-                    // Wait till the last write is accepted at the cache
-                    wait();
-                    while (!(this->dma_write_chnl.ready)) wait();
-
-                    output_payload_offset += dim_n;
-                }
-
-                pingpong = !pingpong;
-                wait();
-            }
-            wait();
-        }
+    			// update the index
+    			index_simple += length;
+    		    }
+    		    index_d1i += matrix_d3;
+    		}
+    		index_d2 += loadable_rows;
+    	    }
+    	    index_d1 += (loadable_rows * matrix_d3);
+    	}
+    	index_a += (size_matrix_out / ninputs);
     }
+
     // Conclude
     {
-        this->accelerator_done();
-        this->process_done();
+    	this->accelerator_done();
+    	this->process_done();
     }
-} // Function : store_output
+}
 
 void gemm::compute_kernel()
 {
+    bool pingpong_m1, pingpong_m2, pingpong_out;
+    uint24_t ninputs;
+    uint16_t length;
+    uint24_t matrix_d1;
+    uint24_t matrix_d2;
+    uint24_t matrix_d3;
+    bool do_relu;
+    uint24_t matrix_chk_in;
+    uint16_t matrix_rem_in1;
+    uint16_t matrix_rem_in2;
+    uint16_t store_count;
+    uint8_t load_cfg;
+    uint16_t loadable_rows;
+
     // Reset
     {
-        HLS_PROTO("compute-reset");
-        this->reset_compute_kernel();
-        this->reset_accelerator_fence();
-        this->reset_current_context();
-        wait();
+    	HLS_DEFINE_PROTOCOL("compute-reset");
+
+    	this->reset_compute_kernel();
+	output_done.ack.reset_ack();
+	load_compute_cfg_done.ack.reset_ack();
+
+    	// PLM memories reset
+
+    	// User-defined reset code
+        pingpong_m1 = true;
+        pingpong_m2 = true;
+        pingpong_out = false;
+    	ninputs = 0;
+        matrix_d1 = 0;
+        matrix_d2 = 0;
+        matrix_d3 = 0;
+	do_relu = 0;
+        matrix_chk_in = 0;
+        matrix_rem_in1 = 0;
+        matrix_rem_in2 = 0;
+        store_count = 0;
+	load_cfg = 0;
+	loadable_rows = 0;
+
+    	wait();
     }
-    // Read config information for current context
-    uint32_t dim_n;
-    uint32_t dim_m;
-    uint32_t dim_k;
-    bool in_pingpong;
-    bool pingpong;
-    uint32_t tile_size_m, tile_size_n, tile_size_k;
+
+    // Config
     {
-        HLS_PROTO("compute-config");
-        cfg.wait_for_config(); // config process
-        conf_info_t config = this->conf_info.read();
-        dim_m = config.dim_m;
-        dim_n = config.dim_n;
-        dim_k = config.dim_k;
-        in_pingpong = true;
-        pingpong = true;
-        wait();
+    	HLS_DEFINE_PROTOCOL("compute-config");
+
+    	cfg.wait_for_config(); // config process
+    	conf_info_t config = this->conf_info.read();
+
+    	// User-defined config code
+    	ninputs = config.ninputs;
+        matrix_d1 = config.d1;
+        matrix_d2 = config.d2;
+        matrix_d3 = config.d3;
+    	do_relu = config.do_relu;
+
+    	compute_load_cfg_handshake();
+
+    	matrix_chk_in = matrix_chk_in_sig.read();
+    	matrix_rem_in1 = matrix_rem_in1_sig.read();
+    	matrix_rem_in2 = matrix_rem_in2_sig.read();
+    	load_cfg = load_cfg_sig.read();
+    	loadable_rows = loadable_rows_sig.read();
+
+	wait();
+
+        // ESP_REPORT_INFO("COMPUTE %u %u %u %u %u",
+    	// 		(unsigned) matrix_chk_in, (unsigned) matrix_rem_in1, (unsigned) matrix_rem_in2,
+    	// 		(unsigned) load_cfg, (unsigned) loadable_rows);
     }
-    // Compute GeMM
+
+    // Compute
+    for (uint24_t a = 0; a < ninputs; a++)
     {
-        // Tile sizes for larger matrices
-        tile_size_k = dim_k;
-        tile_size_m = TILE_SIZE / tile_size_k;
-        tile_size_n = (tile_size_m / DMA_WORD_PER_BEAT) * DMA_WORD_PER_BEAT;
+    	uint16_t plm_offset_m1 = 0;
+    	uint16_t plm_offset_m2 = 0;
 
-        for (unsigned tile_m = 0; tile_m < dim_m; tile_m += tile_size_m)
-        {
-            unsigned actual_tile_m = (tile_m + tile_size_m < dim_m) ? tile_size_m : dim_m - tile_m;
+    	for (uint24_t d1 = 0; d1 < matrix_d1; d1 += loadable_rows)
+    	{
+    	    uint16_t loaded_rows_d1 = min(loadable_rows, matrix_d1 - d1);
 
-            for (unsigned tile_n = 0; tile_n < dim_n; tile_n += tile_size_n)
-            {
-                unsigned actual_tile_n = (tile_n + tile_size_n < dim_n) ? tile_size_n : dim_n - tile_n;
+    	    for (uint24_t d2 = 0; d2 < matrix_d3; d2 += loadable_rows)
+    	    {
+    		uint16_t loaded_rows_d3 = min(loadable_rows, matrix_d3 - d2);
 
-                this->compute_load_handshake();
+    		if (load_cfg != LESS_THAN_ROW)
+    		    compute_load_handshake();
 
-                // Iterate over register block across M dimension
-                for (unsigned block_m = 0; block_m < actual_tile_m; block_m += BLOCK_SIZE)
-                {
-                    // Iterate over register block across N dimension
-                    for (unsigned block_n = 0; block_n < actual_tile_n; block_n += BLOCK_SIZE)
-                    {
-                        // Iterate over register block across K dimension
-                        for (unsigned block_k = 0; block_k < dim_k; block_k += BLOCK_SIZE)
-                        {
-                            FPDATA regs_m[BLOCK_SIZE];
-                            FPDATA regs_n[BLOCK_SIZE];
-                            FPDATA regs_mul[BLOCK_SIZE];
-                            FPDATA regs_valid[BLOCK_SIZE];
-                            FPDATA regs_acc;
-                            HLS_FLATTEN_ARRAY(regs_m);
-                            HLS_FLATTEN_ARRAY(regs_n);
-                            HLS_FLATTEN_ARRAY(regs_mul);
-                            HLS_FLATTEN_ARRAY(regs_valid);
+    		for (uint16_t d1i = 0; d1i < loaded_rows_d1; d1i++)
+    		{
+    		    plm_offset_m1 = d1i * matrix_d2;
 
-                            // If the remainder of is not a multiple of block_size, we will zero out
-                            // the read elements with a valid vector
-                            for (unsigned elem_k = 0; elem_k < BLOCK_SIZE; elem_k++)
-                            {
-                                regs_valid[elem_k] = (block_k + elem_k < dim_k) ? 1 : 0;
-                            }
+    		    for (uint16_t d2i = 0; d2i < loaded_rows_d3; d2i++)
+    		    {
+    			plm_offset_m2 = d2i * matrix_d2;
 
-                            // Perform block-level multiply - M dimension
-                            for (unsigned row_m = 0; row_m < BLOCK_SIZE; row_m++)
-                            {
-                                HLS_BREAK_ARRAY_DEPENDENCY(plm_in_ping);
-                                HLS_BREAK_ARRAY_DEPENDENCY(plm_in_pong);
+			// reset accumulator register
+			accumulator = 0;
 
-                                unsigned elem_m = block_m + row_m;
-                                unsigned idx_mk = (elem_m * dim_k) + block_k;
+    			for (uint24_t chk = 0; chk < matrix_chk_in; ++chk)
+    			{
+    			    // If true the next is the last (smaller) chunk
+    			    if (load_cfg == LESS_THAN_ROW) {
+    				if (chk == matrix_chk_in - 1 && matrix_rem_in2 != 0) {
+    				    length = matrix_rem_in2;
+    				} else {
+    				    length = DMA_CHUNK;
+    				}
+    				pingpong_m1 = !pingpong_m1;
+    				pingpong_m2 = !pingpong_m2;
+    				compute_load_handshake();
+    			    } else if (load_cfg == LESS_THAN_MATRIX2) {
+    				length = matrix_d2;
+    				if (!d1i && !d2i) {
+    				    if (!d2)
+    					pingpong_m1 = !pingpong_m1;
+    				    pingpong_m2 = !pingpong_m2;
+    				}
+    			    } else { // load_cfg ==  MORE_THAN_MATRIX2
+    				length = matrix_d2;
+    				if (!d1i && !d2i) {
+    				    pingpong_m1 = !pingpong_m1;
+    				    pingpong_m2 = !pingpong_m2;
+    				}
+    			    }
 
-                                // If the remainder is not a multiple of block_size, break out of the loop
-                                if (elem_m >= actual_tile_m) continue;
+			    uint16_t plm_i_row = plm_offset_m1;
+			    uint16_t plm_i_col = plm_offset_m2;
+			    for (uint16_t k = 0; k < (length + PARALLELISM - 1) / PARALLELISM; ++k)
+			    {
+				//HLS_CONSTRAIN_LATENCY(0, HLS_ACHIEVABLE, "constrain-mac");
+#ifdef FIXED_POINT
+ 				HLS_PIPELINE_LOOP(HARD_STALL, 2, "pipeline-mac-fixed");
+#else
+ 				HLS_PIPELINE_LOOP(HARD_STALL, 2, "pipeline-mac-float");
+#endif
+				HLS_BREAK_ARRAY_DEPENDENCY(input0);
+				HLS_BREAK_ARRAY_DEPENDENCY(input1);
+				HLS_BREAK_ARRAY_DEPENDENCY(input2);
+				HLS_BREAK_ARRAY_DEPENDENCY(input3);
 
-                                // read Mth block across K dimension of matrix 1 from PLM into a register array
-                                for (unsigned elem_k = 0; elem_k < BLOCK_SIZE; elem_k++)
-                                {
-                                    HLS_UNROLL_LOOP(ON, "read_plm_m");
-                                    if (in_pingpong) regs_m[elem_k] = regs_valid[elem_k] * INT2FP(plm_in_ping[idx_mk + elem_k]);
-                                    else regs_m[elem_k] = regs_valid[elem_k] * INT2FP(plm_in_pong[idx_mk + elem_k]);
-                                }
+				if (pingpong_m1) {
+				    row[0] = INT2FP(input0[plm_i_row++]);
+				    row[1] = INT2FP(input0[plm_i_row++]);
+#if (PARALLELISM >= 4)
+				    row[2] = INT2FP(input0[plm_i_row++]);
+				    row[3] = INT2FP(input0[plm_i_row++]);
+#endif
+#if (PARALLELISM >= 8)
+				    row[4] = INT2FP(input0[plm_i_row++]);
+				    row[5] = INT2FP(input0[plm_i_row++]);
+				    row[6] = INT2FP(input0[plm_i_row++]);
+				    row[7] = INT2FP(input0[plm_i_row++]);
+#endif
+#if (PARALLELISM >= 16)
+				    row[8] = INT2FP(input0[plm_i_row++]);
+				    row[9] = INT2FP(input0[plm_i_row++]);
+				    row[10] = INT2FP(input0[plm_i_row++]);
+				    row[11] = INT2FP(input0[plm_i_row++]);
+				    row[12] = INT2FP(input0[plm_i_row++]);
+				    row[13] = INT2FP(input0[plm_i_row++]);
+				    row[14] = INT2FP(input0[plm_i_row++]);
+				    row[15] = INT2FP(input0[plm_i_row++]);
+#endif
+				} else {
+				    row[0] = INT2FP(input1[plm_i_row++]);
+				    row[1] = INT2FP(input1[plm_i_row++]);
+#if (PARALLELISM >= 4)
+				    row[2] = INT2FP(input1[plm_i_row++]);
+				    row[3] = INT2FP(input1[plm_i_row++]);
+#endif
+#if (PARALLELISM >= 8)
+				    row[4] = INT2FP(input1[plm_i_row++]);
+				    row[5] = INT2FP(input1[plm_i_row++]);
+				    row[6] = INT2FP(input1[plm_i_row++]);
+				    row[7] = INT2FP(input1[plm_i_row++]);
+#endif
+#if (PARALLELISM >= 16)
+				    row[8] = INT2FP(input1[plm_i_row++]);
+				    row[9] = INT2FP(input1[plm_i_row++]);
+				    row[10] = INT2FP(input1[plm_i_row++]);
+				    row[11] = INT2FP(input1[plm_i_row++]);
+				    row[12] = INT2FP(input1[plm_i_row++]);
+				    row[13] = INT2FP(input1[plm_i_row++]);
+				    row[14] = INT2FP(input1[plm_i_row++]);
+				    row[15] = INT2FP(input1[plm_i_row++]);
+#endif
 
-                                // Perform block-level multiply - N dimension
-                                for (unsigned row_n = 0; row_n < BLOCK_SIZE; row_n++)
-                                {
-                                    HLS_BREAK_ARRAY_DEPENDENCY(plm_wgt_ping);
-                                    HLS_BREAK_ARRAY_DEPENDENCY(plm_wgt_pong);
-                                    HLS_BREAK_ARRAY_DEPENDENCY(plm_out_ping);
-                                    HLS_BREAK_ARRAY_DEPENDENCY(plm_out_pong);
+				}
+				if (pingpong_m2) {
+				    col[0] = INT2FP(input2[plm_i_col++]);
+				    col[1] = INT2FP(input2[plm_i_col++]);
+#if (PARALLELISM >= 4)
+				    col[2] = INT2FP(input2[plm_i_col++]);
+				    col[3] = INT2FP(input2[plm_i_col++]);
+#endif
+#if (PARALLELISM >= 8)
+				    col[4] = INT2FP(input2[plm_i_col++]);
+				    col[5] = INT2FP(input2[plm_i_col++]);
+				    col[6] = INT2FP(input2[plm_i_col++]);
+				    col[7] = INT2FP(input2[plm_i_col++]);
+#endif
+#if (PARALLELISM >= 16)
+				    col[8] = INT2FP(input2[plm_i_col++]);
+				    col[9] = INT2FP(input2[plm_i_col++]);
+				    col[10] = INT2FP(input2[plm_i_col++]);
+				    col[11] = INT2FP(input2[plm_i_col++]);
+				    col[12] = INT2FP(input2[plm_i_col++]);
+				    col[13] = INT2FP(input2[plm_i_col++]);
+				    col[14] = INT2FP(input2[plm_i_col++]);
+				    col[15] = INT2FP(input2[plm_i_col++]);
+#endif
+				} else {
+				    col[0] = INT2FP(input3[plm_i_col++]);
+				    col[1] = INT2FP(input3[plm_i_col++]);
+#if (PARALLELISM >= 4)
+				    col[2] = INT2FP(input3[plm_i_col++]);
+				    col[3] = INT2FP(input3[plm_i_col++]);
+#endif
+#if (PARALLELISM >= 8)
+				    col[4] = INT2FP(input3[plm_i_col++]);
+				    col[5] = INT2FP(input3[plm_i_col++]);
+				    col[6] = INT2FP(input3[plm_i_col++]);
+				    col[7] = INT2FP(input3[plm_i_col++]);
+#endif
+#if (PARALLELISM >= 16)
+				    col[8] = INT2FP(input3[plm_i_col++]);
+				    col[9] = INT2FP(input3[plm_i_col++]);
+				    col[10] = INT2FP(input3[plm_i_col++]);
+				    col[11] = INT2FP(input3[plm_i_col++]);
+				    col[12] = INT2FP(input3[plm_i_col++]);
+				    col[13] = INT2FP(input3[plm_i_col++]);
+				    col[14] = INT2FP(input3[plm_i_col++]);
+				    col[15] = INT2FP(input3[plm_i_col++]);
+#endif
+				}
 
-                                    unsigned elem_n = block_n + row_n;                                                                                
-                                    unsigned idx_kn = (block_k * actual_tile_n) + elem_n;
-                                    unsigned idx_mn = (elem_m * actual_tile_n) + elem_n;
+				uint16_t plm_i = k * PARALLELISM + 1;
+				mult_out[0] = row[0] * col[0];
+				if (plm_i < length)
+				    mult_out[1] =  row[1] * col[1];
+				else
+				    mult_out[1] = 0;
+#if (PARALLELISM >= 4)
+				if (plm_i + 1 < length)
+				    mult_out[2] = row[2] * col[2];
+				else
+				    mult_out[2] = 0;
+				if (plm_i + 2 < length)
+				    mult_out[3] = row[3] * col[3];
+				else
+				    mult_out[3] = 0;
+#endif
+#if (PARALLELISM >= 8)
+				if (plm_i + 3 < length)
+				    mult_out[4] = row[4] * col[4];
+				else
+				    mult_out[4] = 0;
+				if (plm_i + 4 < length)
+				    mult_out[5] = row[5] * col[5];
+				else
+				    mult_out[5] = 0;
+				if (plm_i + 5 < length)
+				    mult_out[6] = row[6] * col[6];
+				else
+				    mult_out[6] = 0;
+				if (plm_i + 6 < length)
+				    mult_out[7] = row[7] * col[7];
+				else
+				    mult_out[7] = 0;
+#endif
+#if (PARALLELISM >= 16)
+				if (plm_i + 7 < length)
+				    mult_out[8] = row[8] * col[8];
+				else
+				    mult_out[8] = 0;
+				if (plm_i + 8 < length)
+				    mult_out[9] = row[9] * col[9];
+				else
+				    mult_out[9] = 0;
+				if (plm_i + 9 < length)
+				    mult_out[10] = row[10] * col[10];
+				else
+				    mult_out[10] = 0;
+				if (plm_i + 10 < length)
+				    mult_out[11] = row[11] * col[11];
+				else
+				    mult_out[11] = 0;
+				if (plm_i + 11 < length)
+				    mult_out[12] = row[12] * col[12];
+				else
+				    mult_out[12] = 0;
+				if (plm_i + 12 < length)
+				    mult_out[13] = row[13] * col[13];
+				else
+				    mult_out[13] = 0;
+				if (plm_i + 13 < length)
+				    mult_out[14] = row[14] * col[14];
+				else
+				    mult_out[14] = 0;
+				if (plm_i + 14 < length)
+				    mult_out[15] = row[15] * col[15];
+				else
+				    mult_out[15] = 0;
+#endif
 
-                                    // If the remainder is not a multiple of block_size, break out of the loop
-                                    if (elem_n >= actual_tile_n) continue;
+#if (PARALLELISM == 2)
+				accumulator += mult_out[0] + mult_out[1];
+#elif (PARALLELISM == 4)
+				FPDATA add_tmp0 = mult_out[0] + mult_out[1];
+				FPDATA add_tmp1 = mult_out[2] + mult_out[3];
+				accumulator += add_tmp0 + add_tmp1;
+#elif (PARALLELISM == 8)
+				FPDATA add_tmp0 = mult_out[0] + mult_out[1];
+				FPDATA add_tmp1 = mult_out[2] + mult_out[3];
+				FPDATA add_tmp2 = mult_out[4] + mult_out[5];
+				FPDATA add_tmp3 = mult_out[6] + mult_out[7];
+				FPDATA add_tmp4 = add_tmp0 + add_tmp1;
+				FPDATA add_tmp5 = add_tmp2 + add_tmp3;
+				accumulator += add_tmp4 + add_tmp5;
+#elif (PARALLELISM == 16)
+				FPDATA add_tmp0 = mult_out[0] + mult_out[1];
+				FPDATA add_tmp1 = mult_out[2] + mult_out[3];
+				FPDATA add_tmp2 = mult_out[4] + mult_out[5];
+				FPDATA add_tmp3 = mult_out[6] + mult_out[7];
+				FPDATA add_tmp4 = mult_out[8] + mult_out[9];
+				FPDATA add_tmp5 = mult_out[10] + mult_out[11];
+				FPDATA add_tmp6 = mult_out[12] + mult_out[13];
+				FPDATA add_tmp7 = mult_out[14] + mult_out[15];
+				FPDATA add_tmp8 = add_tmp0 + add_tmp1;
+				FPDATA add_tmp9 = add_tmp2 + add_tmp3;
+				FPDATA add_tmp10 = add_tmp4 + add_tmp5;
+				FPDATA add_tmp11 = add_tmp6 + add_tmp7;
+				FPDATA add_tmp12 = add_tmp8 + add_tmp9;
+				FPDATA add_tmp13 = add_tmp10 + add_tmp11;
+				accumulator += add_tmp12 + add_tmp13;
+#endif
+			    }
 
-                                    // read Nth block across K dimension of matrix 2 from PLM into a register array
-                                    for (unsigned elem_k = 0; elem_k < BLOCK_SIZE; elem_k++)
-                                    {
-                                        HLS_UNROLL_LOOP(ON, "read_plm_n");
-                                        if (pingpong) regs_n[elem_k] = regs_valid[elem_k] * INT2FP(plm_wgt_ping[idx_kn + (elem_k * actual_tile_n)]);
-                                        else regs_n[elem_k] = regs_valid[elem_k] * INT2FP(plm_wgt_pong[idx_kn + (elem_k * actual_tile_n)]);
-                                    }
+    			}
 
-                                    // multiply all elements stored in regs_1 and regs_2
-                                    for (unsigned elem_k = 0; elem_k < BLOCK_SIZE; elem_k++)
-                                    {
-                                        HLS_UNROLL_LOOP(ON, "multiply_k");
-                                        regs_mul[elem_k] = regs_m[elem_k] * regs_n[elem_k];                                            
-                                    }
+			// ReLU
+			accumulator = (do_relu && accumulator < (FPDATA) 0) ? (FPDATA) 0 : accumulator;
 
-                                    // read the previous partial sum, or not
-                                    if (block_k == 0) {
-                                        regs_acc = 0;
-                                    } else {
-                                        if (pingpong) regs_acc = INT2FP(plm_out_ping[idx_mn]);
-                                        else regs_acc = INT2FP(plm_out_pong[idx_mn]);
-                                    }
+			// Write to output PLM
+			if (pingpong_out) {
+			    output0[store_count] = FP2INT(accumulator);
+			} else {
+			    output1[store_count] = FP2INT(accumulator);
+			}
 
-                                    // Accumulate all products
-                                    for (unsigned elem_k = 0; elem_k < BLOCK_SIZE; elem_k++)
-                                    {
-                                        HLS_UNROLL_LOOP(ON, "accumulate_k_0");
-                                        regs_acc += regs_mul[elem_k];
-                                    }
+    			// Call the store_output process and wait for the store_output process
+    			// -> output PLM is not in pingpong
 
-                                    // write the partial sum to PLM
-                                    {
-                                        if (pingpong) plm_out_ping[idx_mn] = FP2INT(regs_acc);
-                                        else plm_out_pong[idx_mn] = FP2INT(regs_acc);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                this->compute_store_handshake();
-                pingpong = !pingpong;
-            }
-            in_pingpong = !in_pingpong;
-        }
+			sync_compute_store(store_count, loaded_rows_d3, load_cfg,
+					   loadable_rows, pingpong_out);
+    		    }
+    		}
+    	    }
+    	}
     }
+
+    // Force to store the last chunk
+    if (store_count) {
+    	store_count = OUT_DMA_CHUNK - 1;
+    	sync_compute_store(store_count, 1, load_cfg, loadable_rows, pingpong_out);
+    }
+
     // Conclude
     {
-        this->process_done();
+	this->process_done();
     }
-} // Function : compute_kernel
+}
