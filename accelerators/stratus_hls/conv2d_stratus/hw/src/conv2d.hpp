@@ -23,19 +23,39 @@
 #define PARALLELISM 8
 #define PARAL_LOG2 3
 
+#ifdef ENABLE_AMU
+class conv2d : public esp_accelerator_amu<DMA_WIDTH>
+#else
 class conv2d : public esp_accelerator_3P<DMA_WIDTH>
+#endif
 {
 public:
     // Constructor
     SC_HAS_PROCESS(conv2d);
     conv2d(const sc_module_name& name)
-    : esp_accelerator_3P<DMA_WIDTH>(name)
-        , cfg("config")
+#ifdef ENABLE_AMU
+	: esp_accelerator_amu<DMA_WIDTH>(name)
+#else
+	: esp_accelerator_3P<DMA_WIDTH>(name, true)
+#endif    
 	, load_compute_cfg_done("load_compute_cfg_done")
 	, load_store_cfg_done("load_store_cfg_done")
     {
+#ifdef ENABLE_AMU
+            SC_CTHREAD(load_input, this->clk.pos());
+            this->reset_signal_is(this->rst, false);
+            // set_stack_size(0x400000);
+
+            SC_CTHREAD(compute_kernel, this->clk.pos());
+            this->reset_signal_is(this->rst, false);
+            // set_stack_size(0x400000);
+
+            SC_CTHREAD(store_output, this->clk.pos());
+            this->reset_signal_is(this->rst, false);
+            // set_stack_size(0x400000);
+#endif            
+
         // Signal binding
-        cfg.bind_with(*this);
 	load_compute_cfg_done.bind_with<DMA_WIDTH>(*this);
 	load_store_cfg_done.bind_with<DMA_WIDTH>(*this);
 
@@ -64,9 +84,6 @@ public:
 
     // Store the output data
     void store_output();
-
-    // Configure conv2d
-    esp_config_proc cfg;
 
     // Custom handshakes
     handshake_t load_compute_cfg_done;

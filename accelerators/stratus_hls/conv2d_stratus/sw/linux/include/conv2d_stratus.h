@@ -17,9 +17,10 @@
 #include <esp.h>
 #include <esp_accelerator.h>
 
-struct conv2d_stratus_access {
-	struct esp_access esp;
-	/* <<--regs-->> */
+#define CONV_PARAM_SIZE 10
+
+// <<--params-->>
+typedef struct {
 	unsigned n_channels;
 	unsigned feature_map_height;
 	unsigned feature_map_width;
@@ -30,8 +31,12 @@ struct conv2d_stratus_access {
 	unsigned do_relu;
 	unsigned pool_type;
 	unsigned batch_size;
-	unsigned src_offset;
-	unsigned dst_offset;
+} conv2d_params_t;
+
+struct conv2d_stratus_access {
+	struct esp_access esp;
+	/* <<--regs-->> */
+	conv2d_params_t params;
 };
 
 #define CONV2D_STRATUS_IOC_ACCESS _IOW ('S', 0, struct conv2d_stratus_access)

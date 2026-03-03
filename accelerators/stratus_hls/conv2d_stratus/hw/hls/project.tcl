@@ -106,6 +106,7 @@ set bias_plm_size 16
 set output_plm_size 2048
 set patch_plm_size 512
 set mac_plm_size 512
+set AMU_CONFIG "BASELINE AMU_RR AMU_FAIR"
 
 append COMMON_HLS_FLAGS \
     " -DDATA_WIDTH=${data_width} -DWORD_SIZE=${data_width} -DINPUT_PLM_SIZE=$input_plm_size \
@@ -118,23 +119,29 @@ append COMMON_CFG_FLAGS \
       -DOUTPUT_PLM_SIZE=$output_plm_size \
       -DPATCH_PLM_SIZE=$patch_plm_size -DMAC_PLM_SIZE=$mac_plm_size"
 
-foreach dma [list 32 64] {
-    define_io_config * IOCFG_DMA$dma -DDMA_WIDTH=$dma $COMMON_CFG_FLAGS
-    define_system_config tb TESTBENCH_DMA$dma -io_config IOCFG_DMA$dma
+foreach dma [list 64] {
+foreach amu_cfg $AMU_CONFIG {
+    set conf "$dma\_$amu_cfg"
+    set local_cfg_flags $COMMON_CFG_FLAGS
+    if {$amu_cfg eq "AMU_RR"} { append local_cfg_flags " -DENABLE_AMU -DSCHED_RR" }
+    if {$amu_cfg eq "AMU_FAIR"} { append local_cfg_flags " -DENABLE_AMU" }
+
+    define_io_config * IOCFG_DMA$conf -DDMA_WIDTH=$dma $local_cfg_flags
+    define_system_config tb TESTBENCH_DMA$conf -io_config IOCFG_DMA$conf
 
     foreach iosz $TB_INOUT_SIZE {
 	foreach fsz $TB_FILTER_SIZE {
 	    set ARGV ""
 	    append ARGV "$iosz "; # argv[1]
 	    append ARGV "$fsz ";  # argv[2]
-	    define_sim_config "BEHAV_DMA$dma\_$iosz\_$fsz" "conv2d BEH" \
-		"tb TESTBENCH_DMA$dma" -io_config IOCFG_DMA$dma -argv $ARGV
+	    define_sim_config "BEHAV_DMA$conf\_$iosz\_$fsz" "conv2d BEH" \
+		"tb TESTBENCH_DMA$conf" -io_config IOCFG_DMA$conf -argv $ARGV
 	}
     }
 
     foreach cfg [list BASIC] {
-	set cname $cfg\_DMA$dma
-	define_hls_config conv2d $cname -io_config IOCFG_DMA$dma \
+	set cname $cfg\_DMA$conf
+	define_hls_config conv2d $cname -io_config IOCFG_DMA$conf \
 	    --clock_period=$CLOCK_PERIOD $COMMON_HLS_FLAGS -DHLS_DIRECTIVES_$cfg
 
 	foreach iosz $TB_INOUT_SIZE {
@@ -145,15 +152,16 @@ foreach dma [list 32 64] {
 
 		if {$TECH_IS_XILINX == 1} {
 		    define_sim_config "$cname\_$iosz\_$fsz\_V" "conv2d RTL_V $cname" \
-			"tb TESTBENCH_DMA$dma" -io_config IOCFG_DMA$dma \
+			"tb TESTBENCH_DMA$conf" -io_config IOCFG_DMA$conf \
 			-argv $ARGV -verilog_top_modules glbl
 		} else {
 		    define_sim_config "$cname\_$iosz\_$fsz\_V" "conv2d RTL_V $cname" \
-			"tb TESTBENCH_DMA$dma" -io_config IOCFG_DMA$dma \
+			"tb TESTBENCH_DMA$conf" -io_config IOCFG_DMA$conf \
 			-argv $ARGV
 		}
 	    }
 	}
+    }
     }
 }
 

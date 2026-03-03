@@ -23,6 +23,9 @@ void conv2d::load_input()
         this->reset_load_input();
 	load_compute_cfg_done.req.reset_req();
 	load_store_cfg_done.req.reset_req();
+#ifdef ENABLE_AMU
+    load_done.req.reset_req();
+#endif	
 
         // explicit PLM ports reset if any
 
@@ -31,6 +34,10 @@ void conv2d::load_input()
         wait();
     }
 
+#ifdef ENABLE_AMU
+    while(true)
+    {
+#endif
     // Config
     /* <<--params-->> */
     uint16_t n_channels;
@@ -45,8 +52,14 @@ void conv2d::load_input()
     {
         HLS_PROTO("load-config");
 
+	#ifdef ENABLE_AMU
+		this->wait_amu_config(); // wait for signal from AMU
+		conf_info_t config = this->sm_info.read();
+		wait();
+	#else		
         cfg.wait_for_config(); // config process
         conf_info_t config = this->conf_info.read();
+	#endif		
 
         // User-defined config code
         /* <<--local-params-->> */
@@ -422,12 +435,16 @@ void conv2d::load_input()
 	    }
 	}
     }
-
+#ifdef ENABLE_AMU
+		this->load_amu_done_handshake(); // tell amu you are done
+	}
+#else	
 
     // Conclude
     {
         this->process_done();
     }
+#endif	
 }
 
 
@@ -440,6 +457,9 @@ void conv2d::store_output()
 
         this->reset_store_output();
 	load_store_cfg_done.ack.reset_ack();
+#ifdef ENABLE_AMU
+	    store_done.req.reset_req();
+#endif
         // explicit PLM ports reset if any
 
         // User-defined reset code
@@ -447,6 +467,10 @@ void conv2d::store_output()
         wait();
     }
 
+#ifdef ENABLE_AMU
+    while(true)
+    {
+#endif
     // Config
     /* <<--params-->> */
     uint16_t n_filters;
@@ -459,8 +483,14 @@ void conv2d::store_output()
     {
         HLS_PROTO("store-config");
 
+#ifdef ENABLE_AMU
+		this->wait_amu_config(); // wait for signal from AMU
+		conf_info_t config = this->sm_info.read();
+	wait();
+#else
         cfg.wait_for_config(); // config process
         conf_info_t config = this->conf_info.read();
+#endif
 
         // User-defined config code
         /* <<--local-params-->> */
@@ -658,12 +688,17 @@ void conv2d::store_output()
 	out_channel_offset_base +=
 	    (out_channel_pool_offset_incr * max_cacheable_filters);
     }
+#ifdef ENABLE_AMU
+		this->store_amu_done_handshake(); // tell amu you are done
+	}
+#else
 
     // Conclude
     {
         this->accelerator_done();
         this->process_done();
     }
+#endif	
 }
 
 
@@ -675,6 +710,9 @@ void conv2d::compute_kernel()
 
         this->reset_compute_kernel();
 	load_compute_cfg_done.ack.reset_ack();
+#ifdef ENABLE_AMU
+    	compute_done.req.reset_req();
+#endif
 
         // explicit PLM ports reset if any
 
@@ -683,6 +721,10 @@ void conv2d::compute_kernel()
         wait();
     }
 
+#ifdef ENABLE_AMU
+    while(true)
+    {
+#endif
     // Config
     /* <<--params-->> */
     uint16_t n_channels;
@@ -697,8 +739,14 @@ void conv2d::compute_kernel()
     {
         HLS_PROTO("compute-config");
 
+	#ifdef ENABLE_AMU
+		this->wait_amu_config(); // wait for signal from AMU
+		conf_info_t config = this->sm_info.read();
+		wait();
+	#else
         cfg.wait_for_config(); // config process
         conf_info_t config = this->conf_info.read();
+	#endif		
 
         // User-defined config code
         /* <<--local-params-->> */
@@ -961,9 +1009,13 @@ void conv2d::compute_kernel()
 	    ping_bias = !ping_bias;
 	}
     }
-
+#ifdef ENABLE_AMU
+		this->compute_amu_done_handshake(); // tell amu you are done
+	}
+#else
     // Conclude
     {
 	this->process_done();
     }
+#endif	
 }

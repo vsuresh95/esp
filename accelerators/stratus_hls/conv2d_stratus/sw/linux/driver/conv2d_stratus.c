@@ -11,16 +11,16 @@
 #define DRV_NAME	"conv2d_stratus"
 
 /* <<--regs-->> */
-#define CONV2D_N_CHANNELS_REG 0x40
-#define CONV2D_FEATURE_MAP_HEIGHT_REG 0x44
-#define CONV2D_FEATURE_MAP_WIDTH_REG 0x48
-#define CONV2D_N_FILTERS_REG 0x4c
-#define CONV2D_FILTER_DIM_REG 0x50
-#define CONV2D_IS_PADDED_REG 0x54
-#define CONV2D_STRIDE_REG 0x58
-#define CONV2D_DO_RELU_REG 0x5c
-#define CONV2D_POOL_TYPE_REG 0x60
-#define CONV2D_BATCH_SIZE_REG 0x64
+#define CONV2D_N_CHANNELS_REG 			0x98
+#define CONV2D_FEATURE_MAP_HEIGHT_REG	0x9c
+#define CONV2D_FEATURE_MAP_WIDTH_REG	0xA0
+#define CONV2D_N_FILTERS_REG			0xA4
+#define CONV2D_FILTER_DIM_REG			0xA8
+#define CONV2D_IS_PADDED_REG			0xAC
+#define CONV2D_STRIDE_REG				0xB0
+#define CONV2D_DO_RELU_REG				0xB4
+#define CONV2D_POOL_TYPE_REG			0xB8
+#define CONV2D_BATCH_SIZE_REG			0xBC
 
 struct conv2d_stratus_device {
 	struct esp_device esp;
@@ -53,18 +53,16 @@ static void conv2d_prep_xfer(struct esp_device *esp, void *arg)
 	struct conv2d_stratus_access *a = arg;
 
 	/* <<--regs-config-->> */
-	iowrite32be(a->n_channels, esp->iomem + CONV2D_N_CHANNELS_REG);
-	iowrite32be(a->feature_map_height, esp->iomem + CONV2D_FEATURE_MAP_HEIGHT_REG);
-	iowrite32be(a->feature_map_width, esp->iomem + CONV2D_FEATURE_MAP_WIDTH_REG);
-	iowrite32be(a->n_filters, esp->iomem + CONV2D_N_FILTERS_REG);
-	iowrite32be(a->filter_dim, esp->iomem + CONV2D_FILTER_DIM_REG);
-	iowrite32be(a->is_padded, esp->iomem + CONV2D_IS_PADDED_REG);
-	iowrite32be(a->stride, esp->iomem + CONV2D_STRIDE_REG);
-	iowrite32be(a->do_relu, esp->iomem + CONV2D_DO_RELU_REG);
-	iowrite32be(a->pool_type, esp->iomem + CONV2D_POOL_TYPE_REG);
-	iowrite32be(a->batch_size, esp->iomem + CONV2D_BATCH_SIZE_REG);
-	iowrite32be(a->src_offset, esp->iomem + SRC_OFFSET_REG);
-	iowrite32be(a->dst_offset, esp->iomem + DST_OFFSET_REG);
+	iowrite32be(a->params.n_channels, esp->iomem + CONV2D_N_CHANNELS_REG);
+	iowrite32be(a->params.feature_map_height, esp->iomem + CONV2D_FEATURE_MAP_HEIGHT_REG);
+	iowrite32be(a->params.feature_map_width, esp->iomem + CONV2D_FEATURE_MAP_WIDTH_REG);
+	iowrite32be(a->params.n_filters, esp->iomem + CONV2D_N_FILTERS_REG);
+	iowrite32be(a->params.filter_dim, esp->iomem + CONV2D_FILTER_DIM_REG);
+	iowrite32be(a->params.is_padded, esp->iomem + CONV2D_IS_PADDED_REG);
+	iowrite32be(a->params.stride, esp->iomem + CONV2D_STRIDE_REG);
+	iowrite32be(a->params.do_relu, esp->iomem + CONV2D_DO_RELU_REG);
+	iowrite32be(a->params.pool_type, esp->iomem + CONV2D_POOL_TYPE_REG);
+	iowrite32be(a->params.batch_size, esp->iomem + CONV2D_BATCH_SIZE_REG);
 }
 
 static bool conv2d_xfer_input_ok(struct esp_device *esp, void *arg)

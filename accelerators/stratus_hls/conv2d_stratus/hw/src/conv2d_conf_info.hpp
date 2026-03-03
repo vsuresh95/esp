@@ -6,6 +6,8 @@
 
 #include <systemc.h>
 
+#define CONF_INFO_SIZE 12
+
 //
 // Configuration parameters for the accelerator.
 //
@@ -114,6 +116,44 @@ public:
         os << "}";
         return os;
     }
+
+    // index assignment operator
+    inline int32_t& operator[](int index)
+    {
+        /* <<--index assign-->> */
+        switch (index) {
+            case 0: return n_channels;
+            case 1: return n_filters;
+            case 2: return filter_dim;
+            case 3: return stride;
+            case 4: return is_padded;
+            case 5: return feature_map_height;
+            case 6: return feature_map_width;
+            case 7: return do_relu;
+            case 8: return pool_type;
+            case 9: return batch_size;
+            default: return batch_size;
+        }
+    }
+
+    // index read operator
+    inline const int32_t& operator[](int index) const
+    {
+        /* <<--index read-->> */
+        switch (index) {
+            case 0: return n_channels;
+            case 1: return n_filters;
+            case 2: return filter_dim;
+            case 3: return stride;
+            case 4: return is_padded;
+            case 5: return feature_map_height;
+            case 6: return feature_map_width;
+            case 7: return do_relu;
+            case 8: return pool_type;
+            case 9: return batch_size;
+            default: return batch_size;
+        }
+	}
 
         /* <<--params-->> */
         int32_t n_channels;
