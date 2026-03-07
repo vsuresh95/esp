@@ -11,5 +11,9 @@
     <param name="do_relu" desc="do ReLU" />
     <param name="pool_type" desc="0: no pooling, 1: 2x2 max pooling, 2: 2x2 avg pooling" />
     <param name="batch_size" desc="number of input feature batches" />
+    <param name="input_offset" desc="input offset" />
+    <param name="filters_offset" desc="filters offset" />
+    <param name="bias_offset" desc="bias offset" />
+    <param name="output_offset" desc="output offset" />
   </accelerator>
 </sld>

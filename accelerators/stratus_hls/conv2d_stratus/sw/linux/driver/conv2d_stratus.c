@@ -21,6 +21,10 @@
 #define CONV2D_DO_RELU_REG				0xB4
 #define CONV2D_POOL_TYPE_REG			0xB8
 #define CONV2D_BATCH_SIZE_REG			0xBC
+#define CONV2D_INPUT_OFFSET_REG			0xC0
+#define CONV2D_FILTERS_OFFSET_REG		0xC4
+#define CONV2D_BIAS_OFFSET_REG			0xC8
+#define CONV2D_OUTPUT_OFFSET_REG		0xCC
 
 struct conv2d_stratus_device {
 	struct esp_device esp;
@@ -63,6 +67,10 @@ static void conv2d_prep_xfer(struct esp_device *esp, void *arg)
 	iowrite32be(a->params.do_relu, esp->iomem + CONV2D_DO_RELU_REG);
 	iowrite32be(a->params.pool_type, esp->iomem + CONV2D_POOL_TYPE_REG);
 	iowrite32be(a->params.batch_size, esp->iomem + CONV2D_BATCH_SIZE_REG);
+	iowrite32be(a->params.input_offset, esp->iomem + CONV2D_INPUT_OFFSET_REG);
+	iowrite32be(a->params.filters_offset, esp->iomem + CONV2D_FILTERS_OFFSET_REG);
+	iowrite32be(a->params.bias_offset, esp->iomem + CONV2D_BIAS_OFFSET_REG);
+	iowrite32be(a->params.output_offset, esp->iomem + CONV2D_OUTPUT_OFFSET_REG);
 }
 
 static bool conv2d_xfer_input_ok(struct esp_device *esp, void *arg)

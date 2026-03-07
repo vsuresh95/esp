@@ -49,6 +49,9 @@ void conv2d::load_input()
     uint16_t width;
     uint2_t pool_type;
     uint16_t batch_size;
+	uint32_t input_offset;
+	uint32_t filters_offset;
+	uint32_t bias_offset;
     {
         HLS_PROTO("load-config");
 
@@ -72,6 +75,9 @@ void conv2d::load_input()
         width = config.feature_map_width;
         pool_type = config.pool_type;
         batch_size = config.batch_size;
+		input_offset = config.input_offset;
+		filters_offset = config.filters_offset;
+		bias_offset = config.bias_offset;
     }
 
     // Precompute sizes
@@ -178,9 +184,9 @@ void conv2d::load_input()
 	// Chunking
 	uint32_t infeature_offset_incr = channel_offset_incr * n_channels;
 	bool single_chunk_done = false;
-	uint32_t filters_offset_start_phys = filters_offset_start_base;
+	uint32_t filters_offset_start_phys = filters_offset;
 	uint32_t filters_offset_start_virt = 0;
-	uint32_t bias_offset_start_phys = bias_offset_start_base;
+	uint32_t bias_offset_start_phys = bias_offset;
 	uint32_t bias_offset_start_virt = 0;
 	uint16_t bias_chunk = 0;
 	uint16_t plm_bias_i = 0;
@@ -323,7 +329,7 @@ void conv2d::load_input()
 	    }
 
 	    // Batching
-	    uint32_t infeature_offset_start_base = 0;
+	    uint32_t infeature_offset_start_base = input_offset;
 	    for (uint16_t b = 0; b < batch_size; b++)
 	    {
 		uint32_t infeature_offset_start_virt = 0;
@@ -479,6 +485,7 @@ void conv2d::store_output()
     uint16_t height;
     uint2_t pool_type;
     uint16_t batch_size;
+	uint32_t output_offset;
 
     {
         HLS_PROTO("store-config");
@@ -500,6 +507,7 @@ void conv2d::store_output()
         height = config.feature_map_height;
 	pool_type = config.pool_type;
 	batch_size = config.batch_size;
+		output_offset = config.output_offset;
     }
 
     store_load_cfg_handshake();
@@ -538,7 +546,7 @@ void conv2d::store_output()
     for (uint16_t filter_chunk = 0; filter_chunk < total_filters_chunks; filter_chunk++)
     {
 	wait();
-	uint32_t feature_offset_start_base_tmp = feature_offset_start_base;
+	uint32_t feature_offset_start_base_tmp = output_offset;
 	for (uint16_t b = 0; b < batch_size; b++)
 	{
 	    uint32_t feature_offset_start_phys = feature_offset_start_base_tmp;

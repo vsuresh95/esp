@@ -138,6 +138,14 @@ static unsigned mem_size;
 #define CONV2D_DO_RELU_REG 0xB4
 #define CONV2D_POOL_TYPE_REG 0xB8
 #define CONV2D_BATCH_SIZE_REG 0xBC
+#define CONV2D_INPUT_OFFSET_REG 0xC0
+#define CONV2D_FILTERS_OFFSET_REG 0xC4
+#define CONV2D_BIAS_OFFSET_REG 0xC8
+#define CONV2D_OUTPUT_OFFSET_REG 0xCC
+
+#include "input.h"
+#include "wgt.h"
+#include "bias.h"
 
 static int validate_buf(token_t *out, native_t *gold)
 {

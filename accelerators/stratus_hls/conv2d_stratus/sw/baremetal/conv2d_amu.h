@@ -244,6 +244,10 @@ int conv2d_amu()
 		desc[9] = do_relu;
 		desc[10] = pool_type;
 		desc[11] = batch_size;
+		desc[12] = 0x0;
+		desc[13] = 0x0;
+		desc[14] = 0x0;
+		desc[15] = 0x0;
 	}
 
 	// Main processing loop

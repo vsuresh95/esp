@@ -112,6 +112,10 @@ int conv2d_baseline()
 	iowrite32(dev, CONV2D_DO_RELU_REG, do_relu);
 	iowrite32(dev, CONV2D_POOL_TYPE_REG, pool_type);
 	iowrite32(dev, CONV2D_BATCH_SIZE_REG, batch_size);
+	iowrite32(dev, CONV2D_INPUT_OFFSET_REG, 0x0);
+	iowrite32(dev, CONV2D_FILTERS_OFFSET_REG, 0x0);
+	iowrite32(dev, CONV2D_BIAS_OFFSET_REG, 0x0);
+	iowrite32(dev, CONV2D_OUTPUT_OFFSET_REG, 0x0);
 
 	// Flush (customize coherence model here)
 	esp_flush(coherence);
