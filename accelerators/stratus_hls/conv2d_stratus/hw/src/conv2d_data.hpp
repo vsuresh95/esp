@@ -11,7 +11,7 @@
 #if defined(FIXED_POINT)
 
 const unsigned int FPDATA_WL = DATA_WIDTH;
-const unsigned int FPDATA_IL = DATA_WIDTH / 2;
+const unsigned int FPDATA_IL = 8;
 const unsigned int FPDATA_FL = DATA_WIDTH - FPDATA_IL;
 
 #elif defined(FLOAT_POINT)
