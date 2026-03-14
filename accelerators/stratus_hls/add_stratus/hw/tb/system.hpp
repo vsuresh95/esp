@@ -1,4 +1,4 @@
-// Copyright (c) 2011-2022 Columbia University, System Level Design Group
+// Copyright (c) 2011-2023 Columbia University, System Level Design Group
 // SPDX-License-Identifier: Apache-2.0
 
 #ifndef __SYSTEM_HPP__
@@ -11,7 +11,7 @@
 
 #include "esp_templates.hpp"
 
-const size_t MEM_SIZE = 16 / (DMA_WIDTH/8);
+const size_t MEM_SIZE = 16384 / (DMA_WIDTH/8);
 
 #include "core/systems/esp_system.hpp"
 
@@ -54,9 +54,10 @@ public:
         acc->debug(debug);
 
         /* <<--params-default-->> */
-        do_inverse = 1;
-        logn_samples = 1;
-        do_shift = 1;
+        total_len = 1;
+        output_offset = 1;
+        input1_offset = 1;
+        input2_offset = 1;
     }
 
     // Processes
@@ -75,9 +76,10 @@ public:
 
     // Accelerator-specific data
     /* <<--params-->> */
-    int32_t do_inverse;
-    int32_t logn_samples;
-    int32_t do_shift;
+    int32_t total_len;
+    int32_t output_offset;
+    int32_t input1_offset;
+    int32_t input2_offset;
 
     uint32_t in_words_adj;
     uint32_t out_words_adj;

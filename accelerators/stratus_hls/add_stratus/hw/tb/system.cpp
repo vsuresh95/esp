@@ -1,4 +1,4 @@
-// Copyright (c) 2011-2022 Columbia University, System Level Design Group
+// Copyright (c) 2011-2023 Columbia University, System Level Design Group
 // SPDX-License-Identifier: Apache-2.0
 
 #include <sstream>
@@ -23,9 +23,10 @@ void system_t::config_proc()
         conf_info_t config;
         // Custom configuration
         /* <<--params-->> */
-        config.do_inverse = do_inverse;
-        config.logn_samples = logn_samples;
-        config.do_shift = do_shift;
+        config.total_len = total_len;
+        config.output_offset = output_offset;
+        config.input1_offset = input1_offset;
+        config.input2_offset = input2_offset;
 
         wait(); conf_info.write(config);
         conf_done.write(true);
@@ -84,11 +85,11 @@ void system_t::load_memory()
 
     // Input data and golden output (aligned to DMA_WIDTH makes your life easier)
 #if (DMA_WORD_PER_BEAT == 0)
-    in_words_adj = do_shift;
-    out_words_adj = do_shift;
+    in_words_adj = 2048;
+    out_words_adj = 2048;
 #else
-    in_words_adj = round_up(do_shift, DMA_WORD_PER_BEAT);
-    out_words_adj = round_up(do_shift, DMA_WORD_PER_BEAT);
+    in_words_adj = round_up(2048, DMA_WORD_PER_BEAT);
+    out_words_adj = round_up(2048, DMA_WORD_PER_BEAT);
 #endif
 
     in_size = in_words_adj * (1);
@@ -97,13 +98,13 @@ void system_t::load_memory()
     // Initialize input
     in = new int32_t[in_size];
     for (int i = 0; i < 1; i++)
-        for (int j = 0; j < do_shift; j++)
+        for (int j = 0; j < 2048; j++)
             in[i * in_words_adj + j] = (int32_t) j;
 
     // Compute golden output
     gold = new int32_t[out_size];
     for (int i = 0; i < 1; i++)
-        for (int j = 0; j < do_shift; j++)
+        for (int j = 0; j < 2048; j++)
             gold[i * out_words_adj + j] = (int32_t) j;
 
     // Memory initialization:
@@ -157,7 +158,7 @@ int system_t::validate()
     uint32_t errors = 0;
 
     for (int i = 0; i < 1; i++)
-        for (int j = 0; j < do_shift; j++)
+        for (int j = 0; j < 2048; j++)
             if (gold[i * out_words_adj + j] != out[i * out_words_adj + j])
                 errors++;
 

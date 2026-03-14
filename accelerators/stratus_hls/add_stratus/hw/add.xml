@@ -1,31 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <sld>
-  <accelerator name="add" desc="Accelerator ADD" data_size="4" device_id="063" hls_tool="stratus_hls">
-    <param name="do_shift_0" desc="do_shift_0" />
-    <param name="do_shift_1" desc="do_shift_1" />
-    <param name="do_shift_2" desc="do_shift_2" />
-    <param name="do_shift_3" desc="do_shift_3" />
-    <param name="logn_samples_0" desc="logn_samples_0" />
-    <param name="logn_samples_1" desc="logn_samples_1" />
-    <param name="logn_samples_2" desc="logn_samples_2" />
-    <param name="logn_samples_3" desc="logn_samples_3" />
-    <param name="do_inverse_0" desc="do_inverse_0" />
-    <param name="do_inverse_1" desc="do_inverse_1" />
-    <param name="do_inverse_2" desc="do_inverse_2" />
-    <param name="do_inverse_3" desc="do_inverse_3" />
-    <param name="input_queue_base_0_0" desc="input_queue_base_0_0" />
-    <param name="input_queue_base_1_0" desc="input_queue_base_1_0" />
-    <param name="input_queue_base_2_0" desc="input_queue_base_2_0" />
-    <param name="input_queue_base_3_0" desc="input_queue_base_3_0" />
-    <param name="output_queue_base_0_0" desc="output_queue_base_0_0" />
-    <param name="output_queue_base_1_0" desc="output_queue_base_1_0" />
-    <param name="output_queue_base_2_0" desc="output_queue_base_2_0" />
-    <param name="output_queue_base_3_0" desc="output_queue_base_3_0" />
-    <param name="context_nprio_0" desc="context_nprio_0" />
-    <param name="context_nprio_1" desc="context_nprio_1" />
-    <param name="context_nprio_2" desc="context_nprio_2" />
-    <param name="context_nprio_3" desc="context_nprio_3" />
-    <param name="valid_contexts" desc="valid_contexts" />
-    <param name="sched_period" desc="sched_period" />
+  <accelerator name="add" desc="Accelerator ADD" data_size="4" device_id="070" hls_tool="stratus_hls">
+    <param name="total_len" desc="total_len" />
+    <param name="input1_offset" desc="input1_offset" />
+    <param name="input2_offset" desc="input2_offset" />
+    <param name="output_offset" desc="output_offset" />
+    <param name="do_relu" desc="do_relu" />
   </accelerator>
 </sld>

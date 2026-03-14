@@ -1,4 +1,4 @@
-// Copyright (c) 2011-2022 Columbia University, System Level Design Group
+// Copyright (c) 2011-2023 Columbia University, System Level Design Group
 // SPDX-License-Identifier: Apache-2.0
 #ifndef __ESP_CFG_000_H__
 #define __ESP_CFG_000_H__
@@ -6,37 +6,35 @@
 #include "libesp.h"
 #include "add_stratus.h"
 
-typedef int token_t;
-typedef float native_t;
-#define fx2float fixed32_to_float
-#define float2fx float_to_fixed32
-#define FX_IL 14
+typedef int32_t token_t;
 
 /* <<--params-def-->> */
-#define DO_INVERSE 0
-#define LOGN_SAMPLES 6
-#define DO_SHIFT 0
+#define LEN 1
+#define OUTPUT_OFFSET 1
+#define INPUT1_OFFSET 1
+#define INPUT2_OFFSET 1
 
 /* <<--params-->> */
-const int32_t logn_samples = LOGN_SAMPLES;
-const int32_t do_inverse = DO_INVERSE;
-const int32_t do_shift = DO_SHIFT;
-
+const int32_t total_len = LEN;
+const int32_t output_offset = OUTPUT_OFFSET;
+const int32_t input1_offset = INPUT1_OFFSET;
+const int32_t input2_offset = INPUT2_OFFSET;
 
 #define NACC 1
 
 struct add_stratus_access add_cfg_000[] = {
 	{
 		/* <<--descriptor-->> */
-		.do_inverse = 0,
-		.logn_samples = LOGN_SAMPLES,
-		.do_shift = DO_SHIFT,
-
-		.input_queue_base = 0,
-		.output_queue_base = 0,
-		
+		.total_len = LEN,
+		.output_offset = OUTPUT_OFFSET,
+		.input1_offset = INPUT1_OFFSET,
+		.input2_offset = INPUT2_OFFSET,
 		.src_offset = 0,
 		.dst_offset = 0,
+		.esp.coherence = ACC_COH_NONE,
+		.esp.p2p_store = 0,
+		.esp.p2p_nsrcs = 0,
+		.esp.p2p_srcs = {"", "", "", ""},
 	}
 };
 

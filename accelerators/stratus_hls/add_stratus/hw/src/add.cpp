@@ -1,7 +1,5 @@
-// Copyright (c) 2011-2019 Columbia University, System Level Design Group
+// Copyright (c) 2011-2023 Columbia University, System Level Design Group
 // SPDX-License-Identifier: Apache-2.0
-
-#ifndef ENABLE_PP
 
 #include "add.hpp"
 #include "add_directives.hpp"
@@ -14,86 +12,122 @@
 
 void add::load_input()
 {
+
     // Reset
     {
         HLS_PROTO("load-reset");
 
         this->reset_load_input();
 
+        // explicit PLM ports reset if any
+
+        // User-defined reset code
+
         wait();
     }
 
     // Config
     /* <<--params-->> */
-    int32_t logn_samples;
-    int32_t num_samples;
-    int32_t input_payload_offset;
+    int32_t total_len;
+    int32_t input1_offset;
+    int32_t input2_offset;
     {
         HLS_PROTO("load-config");
 
         cfg.wait_for_config(); // config process
+        conf_info_t config = this->conf_info.read();
 
-        wait();
+        // User-defined config code
+        /* <<--local-params-->> */
+        total_len = config.total_len;
+        input1_offset = config.input1_offset;
+        input2_offset = config.input2_offset;
     }
 
     // Load
-    while(true)
     {
-        HLS_PROTO("load-loop");
-
+        HLS_PROTO("load-dma");
         wait();
 
-        this->load_avu_ready_handshake();
+        bool ping = true;
+        uint32_t offset1 = round_up(input1_offset, DMA_WORD_PER_BEAT) * 1;
+        uint32_t offset2 = round_up(input2_offset, DMA_WORD_PER_BEAT) * 1;
 
-        // Read config information for current context
+        uint32_t length = round_up(total_len, DMA_WORD_PER_BEAT);
+        // Chunking
+        for (int rem = length; rem > 0; rem -= PLM_IN_WORD)
         {
-            HLS_PROTO("read-load-config");
-
-            conf_info_t config = this->conf_info.read();        
-            HLS_FLATTEN_ARRAY(config.logn_samples);
-            HLS_FLATTEN_ARRAY(config.input_queue_base);
-
-            // User-defined config code
-            /* <<--local-params-->> */
-            logn_samples = config.logn_samples[current_context_int];
-            num_samples = 1 << logn_samples;
-
-            // Configured shared memory base addresses for input queue
-            input_payload_offset = config.input_queue_base[current_context_int][0] + PAYLOAD_OFFSET;
-
             wait();
-        }
-
-        // Load input data
-        {
-            HLS_PROTO("load-data");
-
-            dma_info_t dma_info(input_payload_offset / DMA_WORD_PER_BEAT, 2 * num_samples / DMA_WORD_PER_BEAT, DMA_SIZE);
-            sc_dt::sc_bv<DMA_WIDTH> dataBv;
-
-            wait();
-
-            this->dma_read_ctrl.put(dma_info);
-
-            for (int i = 0; i < 2 * num_samples; i += DMA_WORD_PER_BEAT)
+            uint32_t len = rem > PLM_IN_WORD ? PLM_IN_WORD : rem;
+            // Configure DMA transaction for Input 1
             {
-                HLS_BREAK_DEP(A0);
+                dma_info_t dma_info(offset1 / DMA_WORD_PER_BEAT, len / DMA_WORD_PER_BEAT, DMA_SIZE);
+                offset1 += len;
 
-                dataBv = this->dma_read_chnl.get();
-                wait();
-                for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
+                this->dma_read_ctrl.put(dma_info);
+
+                for (uint16_t i = 0; i < len; i += DMA_WORD_PER_BEAT)
                 {
-                    HLS_UNROLL_SIMPLE;
-                    A0[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
+                    HLS_BREAK_DEP(plm_in1_ping);
+                    HLS_BREAK_DEP(plm_in1_pong);
+
+                    sc_dt::sc_bv<DMA_WIDTH> dataBv;
+
+                    dataBv = this->dma_read_chnl.get();
+                    wait();
+
+                    // Write to PLM (all DMA_WORD_PER_BEAT words in one cycle)
+                    for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
+                    {
+                        HLS_UNROLL_SIMPLE;
+                        if (ping)
+                            plm_in1_ping[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
+                        else
+                            plm_in1_pong[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
+                    }
                 }
             }
+            wait();
+            // Configure DMA transaction for Input 2
+            {
+                dma_info_t dma_info(offset2 / DMA_WORD_PER_BEAT, len / DMA_WORD_PER_BEAT, DMA_SIZE);
+                offset2 += len;
+
+                this->dma_read_ctrl.put(dma_info);
+
+                for (uint16_t i = 0; i < len; i += DMA_WORD_PER_BEAT)
+                {
+                    HLS_BREAK_DEP(plm_in2_ping);
+                    HLS_BREAK_DEP(plm_in2_pong);
+
+                    sc_dt::sc_bv<DMA_WIDTH> dataBv;
+
+                    dataBv = this->dma_read_chnl.get();
+                    wait();
+
+                    // Write to PLM (all DMA_WORD_PER_BEAT words in one cycle)
+                    for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
+                    {
+                        HLS_UNROLL_SIMPLE;
+                        if (ping)
+                            plm_in2_ping[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
+                        else
+                            plm_in2_pong[i + k] = dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH).to_int64();
+                    }
+                }
+            }
+            this->load_compute_handshake();
+            ping = !ping;
         }
-
-        wait();
-
-        this->load_avu_done_handshake();
     }
-} // Function : load_input
+
+    // Conclude
+    {
+        this->process_done();
+    }
+}
+
+
 
 void add::store_output()
 {
@@ -103,85 +137,78 @@ void add::store_output()
 
         this->reset_store_output();
 
+        // explicit PLM ports reset if any
+
+        // User-defined reset code
+
         wait();
     }
 
     // Config
     /* <<--params-->> */
-    int32_t logn_samples;
-    int32_t num_samples;;
-    int32_t output_payload_offset;
+    int32_t total_len;
+    int32_t output_offset;
     {
         HLS_PROTO("store-config");
 
         cfg.wait_for_config(); // config process
+        conf_info_t config = this->conf_info.read();
 
-        wait();
+        // User-defined config code
+        /* <<--local-params-->> */
+        total_len = config.total_len;
+        output_offset = config.output_offset;
     }
 
     // Store
-    while(true)
     {
-        HLS_PROTO("store-loop");
-
+        HLS_PROTO("store-dma");
         wait();
 
-        this->store_avu_ready_handshake();
+        bool ping = true;
+        uint32_t offset = round_up(output_offset, DMA_WORD_PER_BEAT) * 1;
 
-        // Read config information for current context
+        wait();
+        uint32_t length = round_up(total_len, DMA_WORD_PER_BEAT);
+        // Chunking
+        for (int rem = length; rem > 0; rem -= PLM_OUT_WORD)
         {
-            HLS_PROTO("read-store-config");
+            this->store_compute_handshake();
 
-            conf_info_t config = this->conf_info.read();        
-            HLS_FLATTEN_ARRAY(config.logn_samples);
-            HLS_FLATTEN_ARRAY(config.output_queue_base);
-
-            // User-defined config code
-            /* <<--local-params-->> */
-            logn_samples = config.logn_samples[current_context_int];
-            num_samples = 1 << logn_samples;
-
-            // Configured shared memory base addresses for output queue
-            output_payload_offset = config.output_queue_base[current_context_int][0] + PAYLOAD_OFFSET;
-
-            wait();
-        }
-
-        {
-            HLS_PROTO("store-data");
-
-            dma_info_t dma_info(output_payload_offset / DMA_WORD_PER_BEAT, 2 * num_samples / DMA_WORD_PER_BEAT, DMA_SIZE);
-            sc_dt::sc_bv<DMA_WIDTH> dataBv;
-
-            wait();
+            // Configure DMA transaction
+            uint32_t len = rem > PLM_OUT_WORD ? PLM_OUT_WORD : rem;
+            dma_info_t dma_info(offset / DMA_WORD_PER_BEAT, len / DMA_WORD_PER_BEAT, DMA_SIZE);
+            offset += len;
 
             this->dma_write_ctrl.put(dma_info);
 
-            for (int i = 0; i < 2 * num_samples; i += DMA_WORD_PER_BEAT)
+            for (uint16_t i = 0; i < len; i += DMA_WORD_PER_BEAT)
             {
-                HLS_BREAK_DEP(A0);
+                sc_dt::sc_bv<DMA_WIDTH> dataBv;
 
+                // Read from PLM
                 wait();
-
                 for (uint16_t k = 0; k < DMA_WORD_PER_BEAT; k++)
                 {
                     HLS_UNROLL_SIMPLE;
-                    dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH) = A0[i + k];
+                    if (ping)
+                        dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH) = plm_out_ping[i + k];
+                    else
+                        dataBv.range((k+1) * DATA_WIDTH - 1, k * DATA_WIDTH) = plm_out_pong[i + k];
                 }
-
                 this->dma_write_chnl.put(dataBv);
             }
-
-            // Wait till the last write is accepted at the cache
-            wait();
-            while (!(this->dma_write_chnl.ready)) wait();
+            ping = !ping;
         }
-
-        wait();
-
-        this->store_avu_done_handshake();
     }
-} // Function : store_output
+
+    // Conclude
+    {
+        this->accelerator_done();
+        this->process_done();
+    }
+}
+
 
 void add::compute_kernel()
 {
@@ -191,127 +218,62 @@ void add::compute_kernel()
 
         this->reset_compute_kernel();
 
+        // explicit PLM ports reset if any
+
+        // User-defined reset code
+
         wait();
     }
 
     // Config
     /* <<--params-->> */
-    int32_t logn_samples;
-    int32_t num_samples;
-    int32_t do_inverse;
-    int32_t do_shift;
+    int32_t total_len;
+    int32_t do_relu;
     {
         HLS_PROTO("compute-config");
 
         cfg.wait_for_config(); // config process
-        
-        wait();
+        conf_info_t config = this->conf_info.read();
+
+        // User-defined config code
+        /* <<--local-params-->> */
+        total_len = config.total_len;
+        do_relu = config.do_relu;
     }
 
+
     // Compute
-    while(true)
+    bool ping = true;
     {
-        // Read config information for current context
+        uint32_t length = total_len;
+
+        for (int rem = length; rem > 0; rem -= PLM_IN_WORD)
         {
-            HLS_PROTO("read-compute-config");
+            uint32_t len = rem > PLM_IN_WORD ? PLM_IN_WORD : rem;
 
-            this->compute_avu_ready_handshake();
-
-            wait();
-
-            conf_info_t config = this->conf_info.read();        
-            HLS_FLATTEN_ARRAY(config.logn_samples);
-            HLS_FLATTEN_ARRAY(config.do_shift);
-            HLS_FLATTEN_ARRAY(config.do_inverse);
-            
-            logn_samples = config.logn_samples[current_context_int];
-            num_samples = 1 << logn_samples;
-            do_inverse = config.do_inverse[current_context_int];
-            do_shift = config.do_shift[current_context_int];
-
-            wait();
-        }
-
-        // Compute FFT
-        {
-            unsigned offset = 0;  // Offset into Mem for start of this FFT
-            int sin_sign = (do_inverse) ? -1 : 1; // This modifes the mySin
-                                                  // values used below
-            if (do_inverse && do_shift) {
-                fft2_do_shift(offset, num_samples, logn_samples);
-            }
-
-            // Do the bit-reverse
-            fft2_bit_reverse(offset, num_samples, logn_samples);
+            this->compute_load_handshake();
 
             // Computing phase implementation
-            int m = 1;  // iterative FFT
-
-            FFT2_SINGLE_L1:
-                for(unsigned s = 1; s <= logn_samples; s++) {
-                    m = 1 << s;
-                    CompNum wm(myCos(s), sin_sign*mySin(s));
-
-                FFT2_SINGLE_L2:
-                    for(unsigned k = 0; k < num_samples; k +=m) {
-
-                        CompNum w((FPDATA) 1, (FPDATA) 0);
-                        int md2 = m / 2;
-
-                    FFT2_SINGLE_L3:
-                        for(int j = 0; j < md2; j++) {
-
-                            int kj = offset + k + j;
-                            int kjm = offset + k + j + md2;
-                            CompNum akj, akjm;
-                            CompNum bkj, bkjm;
-
-                            akj.re = int2fp<FPDATA, WORD_SIZE>(A0[2 * kj]);
-                            akj.im = int2fp<FPDATA, WORD_SIZE>(A0[2 * kj + 1]);
-                            akjm.re = int2fp<FPDATA, WORD_SIZE>(A0[2 * kjm]);
-                            akjm.im = int2fp<FPDATA, WORD_SIZE>(A0[2 * kjm + 1]);
-
-                            CompNum t;
-                            compMul(w, akjm, t);
-                            CompNum u(akj.re, akj.im);
-                            compAdd(u, t, bkj);
-                            compSub(u, t, bkjm);
-                            CompNum wwm;
-                            wwm.re = w.re - (wm.im * w.im + wm.re * w.re);
-                            wwm.im = w.im + (wm.im * w.re - wm.re * w.im);
-                            w = wwm;
-
-                            {
-                                HLS_PROTO("compute_write_A0");
-                                HLS_BREAK_DEP(A0);
-                                wait();
-                                A0[2 * kj] = fp2int<FPDATA, WORD_SIZE>(bkj.re);
-                                A0[2 * kj + 1] = fp2int<FPDATA, WORD_SIZE>(bkj.im);
-                                wait();
-                                A0[2 * kjm] = fp2int<FPDATA, WORD_SIZE>(bkjm.re);
-                                A0[2 * kjm + 1] = fp2int<FPDATA, WORD_SIZE>(bkjm.im);
-                            }
-                        } // for (j = 0 .. md2)
-                    } // for (k = 0 .. num_samples)
-                } // for (s = 1 .. logn_samples)
-
-            if ((!do_inverse) && (do_shift)) {
-                fft2_do_shift(offset, num_samples, logn_samples);
+            for (int i = 0; i < len; i++) {
+                FPDATA out;
+                if (ping) {
+                    out = int2fp<FPDATA, WORD_SIZE>(plm_in1_ping[i]) + int2fp<FPDATA, WORD_SIZE>(plm_in2_ping[i]);
+                    out = (do_relu == 1) ? (out > FPDATA(0) ? out : FPDATA(0)) : out;
+                    plm_out_ping[i] = fp2int<FPDATA, WORD_SIZE>(out);
+                } else {
+                    out = int2fp<FPDATA, WORD_SIZE>(plm_in1_pong[i]) + int2fp<FPDATA, WORD_SIZE>(plm_in2_pong[i]);
+                    out = (do_relu == 1) ? (out > FPDATA(0) ? out : FPDATA(0)) : out;
+                    plm_out_pong[i] = fp2int<FPDATA, WORD_SIZE>(out);
+                }
             }
-        } // Compute
 
-        {
-            HLS_PROTO("compute-done");
-
-            this->compute_avu_done_handshake();
-
-            wait();
+            this->compute_store_handshake();
+            ping = !ping;
         }
-    } // while (true)
-} // Function : compute_kernel
 
-#else // ENABLE_PP
-
-#include "add_pipelined.cpp"
-
-#endif // ENABLE_PP
+        // Conclude
+        {
+            this->process_done();
+        }
+    }
+}

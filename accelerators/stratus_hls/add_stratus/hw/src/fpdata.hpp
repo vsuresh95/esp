@@ -15,15 +15,10 @@
 
 // Data types
 
-const unsigned int WORD_SIZE = FX_WIDTH;
+const unsigned int WORD_SIZE = 32;
 
-const unsigned int FPDATA_WL = FX_WIDTH;
-
-#if (FX_WIDTH==64)
-const unsigned int FPDATA_IL = FX64_IL;
-#elif (FX_WIDTH==32)
-const unsigned int FPDATA_IL = FX32_IL;
-#endif // FX_WIDTH
+const unsigned int FPDATA_WL = WORD_SIZE;
+const unsigned int FPDATA_IL = WORD_SIZE / 2;
 
 const unsigned int FPDATA_PL = (FPDATA_WL - FPDATA_IL);
 
@@ -31,23 +26,6 @@ const unsigned int FPDATA_PL = (FPDATA_WL - FPDATA_IL);
 typedef sc_dt::sc_int<WORD_SIZE> FPDATA_WORD;
 
 typedef cynw_fixed<FPDATA_WL, FPDATA_IL, SC_RND> FPDATA;
-
-class CompNum { // a complex number
-public:
-    FPDATA re;   // the real part
-    FPDATA im;   // the imaginary part
-
-    CompNum() {
-        re = 0;
-        im = 0;
-    }
-
-    CompNum(FPDATA real, FPDATA imaginary) {
-        re = real;
-        im = imaginary;
-    }
-};
-
 
 // Helper functions
 

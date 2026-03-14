@@ -1,12 +1,21 @@
-// Copyright (c) 2011-2022 Columbia University, System Level Design Group
+// Copyright (c) 2011-2023 Columbia University, System Level Design Group
 // SPDX-License-Identifier: Apache-2.0
 
 #ifndef __ADD_DIRECTIVES_HPP__
 #define __ADD_DIRECTIVES_HPP__
 
+#if (DMA_WIDTH == 32)
+#define DMA_BEAT_PER_WORD 1
+#define DMA_WORD_PER_BEAT 1
+#define PLM_IN_NAME "add_plm_block_in_dma32"
+#define PLM_OUT_NAME "add_plm_block_out_dma32"
+#elif (DMA_WIDTH == 64)
 #define DMA_BEAT_PER_WORD 1
 #define DMA_WORD_PER_BEAT 2
 #define PLM_IN_NAME "add_plm_block_in_dma64"
+#define PLM_OUT_NAME "add_plm_block_out_dma64"
+#endif
+
 
 #if defined(STRATUS_HLS)
 
@@ -25,9 +34,6 @@
 #define HLS_UNROLL_SIMPLE                       \
     HLS_UNROLL_LOOP(ON)
 
-#define HLS_UNROLL_N(_n, _name)                 \
-    HLS_UNROLL_LOOP(AGGRESSIVE, _n, _name)
-    
 #if defined(HLS_DIRECTIVES_BASIC)
 
 #else
@@ -43,7 +49,6 @@
 #define HLS_FLAT(_a)
 #define HLS_BREAK_DEP(_a)
 #define HLS_UNROLL_SIMPLE
-#define HLS_UNROLL_N(_n, _name)
 
 #endif /* STRATUS_HLS */
 
