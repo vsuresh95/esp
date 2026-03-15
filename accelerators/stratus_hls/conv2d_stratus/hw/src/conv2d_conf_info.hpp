@@ -6,7 +6,7 @@
 
 #include <systemc.h>
 
-#define CONF_INFO_SIZE 14+2
+#define CONF_INFO_SIZE 16
 
 //
 // Configuration parameters for the accelerator.

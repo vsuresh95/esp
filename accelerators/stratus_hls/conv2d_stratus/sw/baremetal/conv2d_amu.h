@@ -2,7 +2,7 @@
 #define CONV_AMU_H
 
 // Size and parameter defines
-#define CONF_INFO_SIZE 12
+#define CONF_INFO_SIZE 16
 
 // Context descriptors status
 #define QUEUE_INVALID 0
@@ -245,9 +245,9 @@ int conv2d_amu()
 		desc[10] = pool_type;
 		desc[11] = batch_size;
 		desc[12] = 0x0;
-		desc[13] = 0x0;
-		desc[14] = 0x0;
-		desc[15] = 0x0;
+		desc[13] = in_len;
+		desc[14] = in_len + weights_len;
+		desc[15] = in_len + weights_len + bias_len;
 	}
 
 	// Main processing loop

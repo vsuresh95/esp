@@ -143,10 +143,6 @@ static unsigned mem_size;
 #define CONV2D_BIAS_OFFSET_REG 0xC8
 #define CONV2D_OUTPUT_OFFSET_REG 0xCC
 
-#include "input.h"
-#include "wgt.h"
-#include "bias.h"
-
 static int validate_buf(token_t *out, native_t *gold)
 {
 	int j;
