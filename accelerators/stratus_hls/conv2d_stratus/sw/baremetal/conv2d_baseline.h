@@ -18,13 +18,13 @@ int conv2d_baseline()
 	// Input data and golden output (aligned to DMA_WIDTH makes your life easier)
 	if (DMA_WORD_PER_BEAT(sizeof(token_t)) == 0) {
 	    in_words_adj = n_channels * feature_map_height * feature_map_width;
-	    weights_words_adj = n_filters * n_channels * filter_height * filter_width;
+	    weights_words_adj = n_filters * n_channels * filter_dim * filter_dim;
 	    bias_words_adj = n_filters;
 	    out_words_adj = n_filters * feature_map_height * feature_map_width;
 	} else {
 	    in_words_adj = round_up(n_channels * feature_map_height * feature_map_width,
 				    DMA_WORD_PER_BEAT(sizeof(token_t)));
-	    weights_words_adj = round_up(n_filters * n_channels * filter_height * filter_width,
+	    weights_words_adj = round_up(n_filters * n_channels * filter_dim * filter_dim,
 					 DMA_WORD_PER_BEAT(sizeof(token_t)));
 	    bias_words_adj = round_up(n_filters, DMA_WORD_PER_BEAT(sizeof(token_t)));
 	    out_words_adj = round_up(n_filters * feature_map_height * feature_map_width,
@@ -42,7 +42,7 @@ int conv2d_baseline()
 	weights_offset = in_len;
 	bias_offset = in_len + weights_len;
 	out_offset  = in_len + weights_len + bias_len;
-	mem_size = in_size + weights_size + bias_len + out_size;
+	mem_size = in_size + weights_size + bias_size + out_size;
 
 
 	// Search for the device
@@ -68,7 +68,7 @@ int conv2d_baseline()
 	}
 
 	// Allocate memory
-	gold = aligned_malloc(out_size);
+	gold = aligned_malloc(mem_size);
 	mem = aligned_malloc(mem_size);
 
 	printf("  memory buffer base-address = %p\n", mem);
@@ -106,9 +106,9 @@ int conv2d_baseline()
 	iowrite32(dev, CONV2D_FEATURE_MAP_HEIGHT_REG, feature_map_height);
 	iowrite32(dev, CONV2D_FEATURE_MAP_WIDTH_REG, feature_map_width);
 	iowrite32(dev, CONV2D_N_FILTERS_REG, n_filters);
-	iowrite32(dev, CONV2D_FILTER_DIM_REG, filter_height);
+	iowrite32(dev, CONV2D_FILTER_DIM_REG, filter_dim);
 	iowrite32(dev, CONV2D_IS_PADDED_REG, is_padded);
-	iowrite32(dev, CONV2D_STRIDE_REG, stride_w);
+	iowrite32(dev, CONV2D_STRIDE_REG, stride);
 	iowrite32(dev, CONV2D_DO_RELU_REG, do_relu);
 	iowrite32(dev, CONV2D_POOL_TYPE_REG, pool_type);
 	iowrite32(dev, CONV2D_BATCH_SIZE_REG, batch_size);
@@ -136,7 +136,7 @@ int conv2d_baseline()
 	printf("  validating...\n");
 
 	/* Validation */
-	errors = validate_buf(&mem[out_offset], gold);
+	errors = validate_buf(&mem[out_offset], &gold[out_offset]);
 	if (errors)
 		printf("  ... FAIL\n");
 	else

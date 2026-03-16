@@ -101,13 +101,13 @@ int conv2d_amu()
 	// Input data and golden output (aligned to DMA_WIDTH makes your life easier)
 	if (DMA_WORD_PER_BEAT(sizeof(token_t)) == 0) {
 	    in_words_adj = n_channels * feature_map_height * feature_map_width;
-	    weights_words_adj = n_filters * n_channels * filter_height * filter_width;
+	    weights_words_adj = n_filters * n_channels * filter_dim * filter_dim;
 	    bias_words_adj = n_filters;
 	    out_words_adj = n_filters * feature_map_height * feature_map_width;
 	} else {
 	    in_words_adj = round_up(n_channels * feature_map_height * feature_map_width,
 				    DMA_WORD_PER_BEAT(sizeof(token_t)));
-	    weights_words_adj = round_up(n_filters * n_channels * filter_height * filter_width,
+	    weights_words_adj = round_up(n_filters * n_channels * filter_dim * filter_dim,
 					 DMA_WORD_PER_BEAT(sizeof(token_t)));
 	    bias_words_adj = round_up(n_filters, DMA_WORD_PER_BEAT(sizeof(token_t)));
 	    out_words_adj = round_up(n_filters * feature_map_height * feature_map_width,
@@ -236,8 +236,8 @@ int conv2d_amu()
 		desc[1] = 0; // test does not do anything with descriptor pointer
 		desc[2] = n_channels;
 		desc[3] = n_filters;
-		desc[4] = filter_height;
-		desc[5] = stride_w;
+		desc[4] = filter_dim;
+		desc[5] = stride;
 		desc[6] = is_padded;
 		desc[7] = feature_map_height;
 		desc[8] = feature_map_width;

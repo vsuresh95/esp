@@ -25,9 +25,10 @@ inline void conv2d::compute_dimensions(
     uint16_t *loadable_chan_sz, uint16_t *chan_rem_sz)
 {
     uint8_t filter_dim2 = (uint8_t) filter_dim * filter_dim;
+    uint4_t stride_log2 = ilog2(stride);
     /* Spatial dimensions of the output activation map */
     *pad = is_padded ? (filter_dim >> 1) : 0;
-    *output_w = ((uint16_t) (width + 2 * *pad - filter_dim)) / stride + 1;
+    *output_w = (((uint16_t) (width + 2 * *pad - filter_dim)) >> stride_log2) + 1;
 
     /* Size (in number of words) of an input */
     *feature_size = height * width;
