@@ -1,16 +1,16 @@
 // Copyright (c) 2011-2023 Columbia University, System Level Design Group
 // SPDX-License-Identifier: Apache-2.0
 
-#ifndef __ADD_HPP__
-#define __ADD_HPP__
+#ifndef __VECTOR_HPP__
+#define __VECTOR_HPP__
 
 #include "fpdata.hpp"
-#include "add_conf_info.hpp"
-#include "add_debug_info.hpp"
+#include "vector_conf_info.hpp"
+#include "vector_debug_info.hpp"
 
 #include "esp_templates.hpp"
 
-#include "add_directives.hpp"
+#include "vector_directives.hpp"
 
 #define __round_mask(x, y) ((y)-1)
 #define round_up(x, y) ((((x)-1) | __round_mask(x, y))+1)
@@ -20,12 +20,12 @@
 #define PLM_OUT_WORD 2048
 #define PLM_IN_WORD 2048
 
-class add : public esp_accelerator_3P<DMA_WIDTH>
+class vector : public esp_accelerator_3P<DMA_WIDTH>
 {
 public:
     // Constructor
-    SC_HAS_PROCESS(add);
-    add(const sc_module_name& name)
+    SC_HAS_PROCESS(vector);
+    vector(const sc_module_name& name)
     : esp_accelerator_3P<DMA_WIDTH>(name)
     {
         // Map arrays to memories
@@ -61,4 +61,4 @@ public:
 };
 
 
-#endif /* __ADD_HPP__ */
+#endif /* __VECTOR_HPP__ */

@@ -18,8 +18,8 @@ static unsigned DMA_WORD_PER_BEAT(unsigned _st)
 }
 
 
-#define SLD_ADD 0x070
-#define DEV_NAME "sld,add_stratus"
+#define SLD_VECTOR 0x070
+#define DEV_NAME "sld,vector_stratus"
 
 /* <<--params-->> */
 const int32_t total_len = 1;
@@ -45,10 +45,10 @@ static unsigned mem_size;
 
 /* User defined registers */
 /* <<--regs-->> */
-#define ADD_LEN_REG 0x4c
-#define ADD_OUTPUT_OFFSET_REG 0x48
-#define ADD_INPUT1_OFFSET_REG 0x44
-#define ADD_INPUT2_OFFSET_REG 0x40
+#define VECTOR_LEN_REG 0x4c
+#define VECTOR_OUTPUT_OFFSET_REG 0x48
+#define VECTOR_INPUT1_OFFSET_REG 0x44
+#define VECTOR_INPUT2_OFFSET_REG 0x40
 
 
 static int validate_buf(token_t *out, token_t *gold)
@@ -113,9 +113,9 @@ int main(int argc, char * argv[])
 	// Search for the device
 	printf("Scanning device tree... \n");
 
-	ndev = probe(&espdevs, VENDOR_SLD, SLD_ADD, DEV_NAME);
+	ndev = probe(&espdevs, VENDOR_SLD, SLD_VECTOR, DEV_NAME);
 	if (ndev == 0) {
-		printf("add not found\n");
+		printf("vector not found\n");
 		return 0;
 	}
 
@@ -139,7 +139,7 @@ int main(int argc, char * argv[])
 		// Allocate memory
 		gold = aligned_malloc(out_size);
 		mem = aligned_malloc(mem_size);
-		printf("  memory buffer base-address = %p\n", mem);
+		printf("  memory buffer base-vectorress = %p\n", mem);
 
 		// Alocate and populate page table
 		ptable = aligned_malloc(NCHUNK(mem_size) * sizeof(unsigned *));
@@ -166,9 +166,9 @@ int main(int argc, char * argv[])
 			iowrite32(dev, COHERENCE_REG, coherence);
 
 #ifndef __sparc
-			iowrite32(dev, PT_ADDRESS_REG, (unsigned long long) ptable);
+			iowrite32(dev, PT_VECTORRESS_REG, (unsigned long long) ptable);
 #else
-			iowrite32(dev, PT_ADDRESS_REG, (unsigned) ptable);
+			iowrite32(dev, PT_VECTORRESS_REG, (unsigned) ptable);
 #endif
 			iowrite32(dev, PT_NCHUNK_REG, NCHUNK(mem_size));
 			iowrite32(dev, PT_SHIFT_REG, CHUNK_SHIFT);
@@ -179,10 +179,10 @@ int main(int argc, char * argv[])
 
 			// Pass accelerator-specific configuration parameters
 			/* <<--regs-config-->> */
-		iowrite32(dev, ADD_LEN_REG, total_len);
-		iowrite32(dev, ADD_OUTPUT_OFFSET_REG, output_offset);
-		iowrite32(dev, ADD_INPUT1_OFFSET_REG, input1_offset);
-		iowrite32(dev, ADD_INPUT2_OFFSET_REG, input2_offset);
+		iowrite32(dev, VECTOR_LEN_REG, total_len);
+		iowrite32(dev, VECTOR_OUTPUT_OFFSET_REG, output_offset);
+		iowrite32(dev, VECTOR_INPUT1_OFFSET_REG, input1_offset);
+		iowrite32(dev, VECTOR_INPUT2_OFFSET_REG, input2_offset);
 
 			// Flush (customize coherence model here)
 			esp_flush(coherence);

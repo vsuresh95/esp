@@ -1,9 +1,9 @@
 // Copyright (c) 2011-2023 Columbia University, System Level Design Group
 // SPDX-License-Identifier: Apache-2.0
 
-#ifndef __ADD_DEBUG_INFO_HPP__
-#define __ADD_DEBUG_INFO_HPP__
+#ifndef __VECTOR_DEBUG_INFO_HPP__
+#define __VECTOR_DEBUG_INFO_HPP__
 
 typedef uint32_t debug_info_t;
 
-#endif // __ADD_DEBUG_INFO_HPP__
+#endif // __VECTOR_DEBUG_INFO_HPP__

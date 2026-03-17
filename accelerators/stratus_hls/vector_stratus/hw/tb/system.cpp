@@ -38,7 +38,7 @@ void system_t::config_proc()
     {
         // Print information about begin time
         sc_time begin_time = sc_time_stamp();
-        ESP_REPORT_TIME(begin_time, "BEGIN - add");
+        ESP_REPORT_TIME(begin_time, "BEGIN - vector");
 
         // Wait the termination of the accelerator
         do { wait(); } while (!acc_done.read());
@@ -46,7 +46,7 @@ void system_t::config_proc()
 
         // Print information about end time
         sc_time end_time = sc_time_stamp();
-        ESP_REPORT_TIME(end_time, "END - add");
+        ESP_REPORT_TIME(end_time, "END - vector");
 
         esc_log_latency(sc_object::basename(), clock_cycle(end_time - begin_time));
         wait(); conf_done.write(false);

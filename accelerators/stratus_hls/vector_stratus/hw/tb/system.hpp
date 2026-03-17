@@ -4,10 +4,10 @@
 #ifndef __SYSTEM_HPP__
 #define __SYSTEM_HPP__
 
-#include "add_conf_info.hpp"
-#include "add_debug_info.hpp"
-#include "add.hpp"
-#include "add_directives.hpp"
+#include "vector_conf_info.hpp"
+#include "vector_debug_info.hpp"
+#include "vector.hpp"
+#include "vector_directives.hpp"
 
 #include "esp_templates.hpp"
 
@@ -16,7 +16,7 @@ const size_t MEM_SIZE = 16384 / (DMA_WIDTH/8);
 #include "core/systems/esp_system.hpp"
 
 #ifdef CADENCE
-#include "add_wrap.h"
+#include "vector_wrap.h"
 #endif
 
 class system_t : public esp_system<DMA_WIDTH, MEM_SIZE>
@@ -25,9 +25,9 @@ public:
 
     // ACC instance
 #ifdef CADENCE
-    add_wrapper *acc;
+    vector_wrapper *acc;
 #else
-    add *acc;
+    vector *acc;
 #endif
 
     // Constructor
@@ -37,9 +37,9 @@ public:
     {
         // ACC
 #ifdef CADENCE
-        acc = new add_wrapper("add_wrapper");
+        acc = new vector_wrapper("vector_wrapper");
 #else
-        acc = new add("add_wrapper");
+        acc = new vector("vector_wrapper");
 #endif
         // Binding ACC
         acc->clk(clk);

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <sld>
-  <accelerator name="add" desc="Accelerator ADD" data_size="4" device_id="070" hls_tool="stratus_hls">
+  <accelerator name="vector" desc="Accelerator VECTOR" data_size="4" device_id="070" hls_tool="stratus_hls">
     <param name="total_len" desc="total_len" />
     <param name="input1_offset" desc="input1_offset" />
     <param name="input2_offset" desc="input2_offset" />

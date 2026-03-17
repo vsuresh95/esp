@@ -1,16 +1,16 @@
 // Copyright (c) 2011-2023 Columbia University, System Level Design Group
 // SPDX-License-Identifier: Apache-2.0
 
-#include "add.hpp"
-#include "add_directives.hpp"
+#include "vector.hpp"
+#include "vector_directives.hpp"
 
 // Functions
 
-#include "add_functions.hpp"
+#include "vector_functions.hpp"
 
 // Processes
 
-void add::load_input()
+void vector::load_input()
 {
 
     // Reset
@@ -129,7 +129,7 @@ void add::load_input()
 
 
 
-void add::store_output()
+void vector::store_output()
 {
     // Reset
     {
@@ -210,7 +210,7 @@ void add::store_output()
 }
 
 
-void add::compute_kernel()
+void vector::compute_kernel()
 {
     // Reset
     {

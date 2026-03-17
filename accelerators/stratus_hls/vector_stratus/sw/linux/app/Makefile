@@ -1,4 +1,5 @@
 # Copyright (c) 2011-2023 Columbia University, System Level Design Group
 # SPDX-License-Identifier: Apache-2.0
-APPNAME := add
-include $(DRIVERS)/common_bare.mk
+EXTRA_CFLAGS ?=
+APPNAME := vector
+include $(DRIVERS)/common.mk

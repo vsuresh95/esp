@@ -4,7 +4,7 @@
 #define __ESP_CFG_000_H__
 
 #include "libesp.h"
-#include "add_stratus.h"
+#include "vector_stratus.h"
 
 typedef int32_t token_t;
 
@@ -22,7 +22,7 @@ const int32_t input2_offset = INPUT2_OFFSET;
 
 #define NACC 1
 
-struct add_stratus_access add_cfg_000[] = {
+struct vector_stratus_access vector_cfg_000[] = {
 	{
 		/* <<--descriptor-->> */
 		.total_len = LEN,
@@ -41,9 +41,9 @@ struct add_stratus_access add_cfg_000[] = {
 esp_thread_info_t cfg_000[] = {
 	{
 		.run = true,
-		.devname = "add_stratus.0",
-		.ioctl_req = ADD_STRATUS_IOC_ACCESS,
-		.esp_desc = &(add_cfg_000[0].esp),
+		.devname = "vector_stratus.0",
+		.ioctl_req = VECTOR_STRATUS_IOC_ACCESS,
+		.esp_desc = &(vector_cfg_000[0].esp),
 	}
 };
 
