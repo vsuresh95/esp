@@ -94,7 +94,7 @@ public:
 	const uint16_t height, const uint16_t width, const uint16_t n_channels,
 	const bool is_padded, const uint4_t stride, const uint4_t filter_dim,
 	const uint16_t n_filters, const uint2_t pool_type, const uint16_t batch_size,
-	uint16_t *output_w, uint4_t *pad,
+	uint16_t *output_w, uint4_t *pad_top, uint4_t *pad_bottom, uint4_t *pad_left,
 	uint16_t *feature_size, uint16_t *filter_size, uint32_t *filters_size, 
 	uint16_t *max_cacheable_rows, uint16_t *max_cacheable_rows_init,
 	uint16_t *max_cacheable_size, uint16_t *max_cacheable_size_init,
@@ -102,6 +102,7 @@ public:
 	uint16_t *max_cacheable_bias_chunks, uint16_t *max_cacheable_bias_size,
 	uint16_t *total_input_chunks, uint16_t *total_filters_chunks,
 	uint16_t *feature_offset_incr, uint16_t *feature_offset_incr_init,
+	uint16_t *feature_row_incr, uint16_t *feature_row_incr_init,
 	uint16_t *channel_offset_incr, uint16_t *out_channel_offset_incr,
 	uint16_t *out_channel_pool_offset_incr, uint32_t *filters_offset_start_base,
 	uint32_t *bias_offset_start_base, uint32_t *feature_offset_start_base,
@@ -118,6 +119,8 @@ public:
     const uint16_t filter_chunk, const uint16_t cacheable_filters, const uint16_t plm_bias_index,
     const uint16_t output_plm_offset, const uint16_t loadable_output_size,
     const bool do_relu);
+    inline uint16_t conv2d_chunk_output_rows(const uint16_t effective_rows,
+    const uint4_t filter_dim, const uint4_t stride_log2);
 
     // Configuration handshakes
     inline void load_compute_cfg_handshake();
@@ -139,11 +142,15 @@ public:
     FPDATA      reg_w[PARALLELISM];
 
     // Custom configuration signals
-    sc_signal<uint4_t> pad_sig;
+    sc_signal<uint4_t> pad_top_sig;
+    sc_signal<uint4_t> pad_bottom_sig;
+    sc_signal<uint4_t> pad_left_sig;
     sc_signal<uint16_t> output_w_sig;
     sc_signal<uint16_t> filter_size_sig;
     sc_signal<uint16_t> total_filters_chunks_sig;
     sc_signal<uint16_t> total_input_chunks_sig;
+    sc_signal<uint16_t> feature_row_incr_sig;
+    sc_signal<uint16_t> feature_row_incr_init_sig;
     sc_signal<uint16_t> max_cacheable_rows_sig;
     sc_signal<uint16_t> max_cacheable_rows_init_sig;
     sc_signal<uint16_t> max_cacheable_filters_sig;

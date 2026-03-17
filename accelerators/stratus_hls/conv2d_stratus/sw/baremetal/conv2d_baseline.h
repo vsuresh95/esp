@@ -11,23 +11,34 @@ int conv2d_baseline()
 	unsigned done;
 	unsigned **ptable;
 	token_t *mem;
-	native_t *gold;
 	unsigned errors = 0;
 	unsigned coherence;
+
+    int32_t output_h, output_w, output_pool_h, output_pool_w;
+		
+	if (is_padded) {
+		output_h = (feature_map_height - 1) / stride + 1;
+		output_w = (feature_map_width - 1) / stride + 1;
+	} else {
+		output_h = (feature_map_height - filter_dim) / stride + 1;
+		output_w = (feature_map_width - filter_dim) / stride + 1;
+	}
+	output_pool_h = pool_type ? output_h / 2 : output_h;
+	output_pool_w = pool_type ? output_w / 2 : output_w;	
 
 	// Input data and golden output (aligned to DMA_WIDTH makes your life easier)
 	if (DMA_WORD_PER_BEAT(sizeof(token_t)) == 0) {
 	    in_words_adj = n_channels * feature_map_height * feature_map_width;
 	    weights_words_adj = n_filters * n_channels * filter_dim * filter_dim;
 	    bias_words_adj = n_filters;
-	    out_words_adj = n_filters * feature_map_height * feature_map_width;
+	    out_words_adj = n_filters * output_pool_h * output_pool_w;
 	} else {
 	    in_words_adj = round_up(n_channels * feature_map_height * feature_map_width,
 				    DMA_WORD_PER_BEAT(sizeof(token_t)));
 	    weights_words_adj = round_up(n_filters * n_channels * filter_dim * filter_dim,
 					 DMA_WORD_PER_BEAT(sizeof(token_t)));
 	    bias_words_adj = round_up(n_filters, DMA_WORD_PER_BEAT(sizeof(token_t)));
-	    out_words_adj = round_up(n_filters * feature_map_height * feature_map_width,
+	    out_words_adj = round_up(n_filters * output_pool_h * output_pool_w,
 				     DMA_WORD_PER_BEAT(sizeof(token_t)));
 	}
 
@@ -68,7 +79,6 @@ int conv2d_baseline()
 	}
 
 	// Allocate memory
-	gold = aligned_malloc(mem_size);
 	mem = aligned_malloc(mem_size);
 
 	printf("  memory buffer base-address = %p\n", mem);
@@ -85,7 +95,7 @@ int conv2d_baseline()
 
 	printf("  Generate input...\n");
 
-	init_buf(mem, gold);
+	init_buf(mem);
 
 	// Pass common configuration parameters
 
@@ -136,15 +146,14 @@ int conv2d_baseline()
 	printf("  validating...\n");
 
 	/* Validation */
-	errors = validate_buf(&mem[out_offset], &gold[out_offset]);
+	errors = validate_buf(&mem[out_offset]);
 	if (errors)
-		printf("  ... FAIL\n");
+		printf("  ... FAIL: %d errors\n", errors);
 	else
 		printf("  ... PASS\n");
 
 	aligned_free(ptable);
 	aligned_free(mem);
-	aligned_free(gold);
 
 	return 0;
 }
