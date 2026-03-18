@@ -23,7 +23,7 @@ void system_t::config_proc()
         conf_info_t config;
         // Custom configuration
         /* <<--params-->> */
-        config.total_len = total_len;
+        config.input_len = input_len;
         config.output_offset = output_offset;
         config.input1_offset = input1_offset;
         config.input2_offset = input2_offset;

@@ -18,14 +18,12 @@
 const unsigned int WORD_SIZE = 32;
 
 const unsigned int FPDATA_WL = WORD_SIZE;
-const unsigned int FPDATA_IL = WORD_SIZE / 2;
-
-const unsigned int FPDATA_PL = (FPDATA_WL - FPDATA_IL);
-
+const unsigned int FPDATA_IL = 8;
+const unsigned int FPDATA_FL = WORD_SIZE - FPDATA_IL;
 
 typedef sc_dt::sc_int<WORD_SIZE> FPDATA_WORD;
 
-typedef cynw_fixed<FPDATA_WL, FPDATA_IL, SC_RND> FPDATA;
+typedef cynw_fixed<FPDATA_WL, FPDATA_IL> FPDATA;
 
 // Helper functions
 

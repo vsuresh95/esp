@@ -17,11 +17,14 @@
 #include <esp.h>
 #include <esp_accelerator.h>
 
-#define VECTOR_PARAM_SIZE 6
+#define VECTOR_PARAM_SIZE 8
 
 // <<--params-->>
 typedef struct {
-	unsigned total_len;
+	unsigned vector_op;
+	unsigned n_channel;
+	unsigned input_len;
+	unsigned stride;
 	unsigned input1_offset;
 	unsigned input2_offset;
 	unsigned output_offset;

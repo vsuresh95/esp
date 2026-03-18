@@ -15,7 +15,7 @@ typedef int32_t token_t;
 #define INPUT2_OFFSET 1
 
 /* <<--params-->> */
-const int32_t total_len = LEN;
+const int32_t input_len = LEN;
 const int32_t output_offset = OUTPUT_OFFSET;
 const int32_t input1_offset = INPUT1_OFFSET;
 const int32_t input2_offset = INPUT2_OFFSET;
@@ -25,7 +25,7 @@ const int32_t input2_offset = INPUT2_OFFSET;
 struct vector_stratus_access vector_cfg_000[] = {
 	{
 		/* <<--descriptor-->> */
-		.total_len = LEN,
+		.input_len = LEN,
 		.output_offset = OUTPUT_OFFSET,
 		.input1_offset = INPUT1_OFFSET,
 		.input2_offset = INPUT2_OFFSET,

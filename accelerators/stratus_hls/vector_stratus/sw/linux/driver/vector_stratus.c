@@ -13,11 +13,14 @@
 #define DRV_NAME	"vector_stratus"
 
 /* <<--regs-->> */
-#define VECTOR_TOTAL_LEN_REG 			0x98
-#define VECTOR_INPUT1_OFFSET_REG 		0x9C
-#define VECTOR_INPUT2_OFFSET_REG 		0xA0
-#define VECTOR_OUTPUT_OFFSET_REG 		0xA4
-#define VECTOR_DO_RELU_REG 			0xA8
+#define VECTOR_VECTOR_OP_REG		0x98
+#define VECTOR_N_CHANNEL_REG		0x9C
+#define VECTOR_INPUT_LEN_REG		0xA0
+#define VECTOR_STRIDE_REG			0xA4
+#define VECTOR_INPUT1_OFFSET_REG 	0xA8
+#define VECTOR_INPUT2_OFFSET_REG 	0xAC
+#define VECTOR_OUTPUT_OFFSET_REG 	0xB0
+#define VECTOR_DO_RELU_REG			0xB4
 
 struct vector_stratus_device {
 	struct esp_device esp;
@@ -50,7 +53,10 @@ static void vector_prep_xfer(struct esp_device *esp, void *arg)
 	struct vector_stratus_access *a = arg;
 
 	/* <<--regs-config-->> */
-	iowrite32be(a->params.total_len, esp->iomem + VECTOR_TOTAL_LEN_REG);
+	iowrite32be(a->params.vector_op, esp->iomem + VECTOR_VECTOR_OP_REG);
+	iowrite32be(a->params.n_channel, esp->iomem + VECTOR_N_CHANNEL_REG);
+	iowrite32be(a->params.input_len, esp->iomem + VECTOR_INPUT_LEN_REG);
+	iowrite32be(a->params.stride, esp->iomem + VECTOR_STRIDE_REG);
 	iowrite32be(a->params.output_offset, esp->iomem + VECTOR_OUTPUT_OFFSET_REG);
 	iowrite32be(a->params.input1_offset, esp->iomem + VECTOR_INPUT1_OFFSET_REG);
 	iowrite32be(a->params.input2_offset, esp->iomem + VECTOR_INPUT2_OFFSET_REG);

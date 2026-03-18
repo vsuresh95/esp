@@ -54,7 +54,7 @@ public:
         acc->debug(debug);
 
         /* <<--params-default-->> */
-        total_len = 1;
+        input_len = 1;
         output_offset = 1;
         input1_offset = 1;
         input2_offset = 1;
@@ -76,7 +76,7 @@ public:
 
     // Accelerator-specific data
     /* <<--params-->> */
-    int32_t total_len;
+    int32_t input_len;
     int32_t output_offset;
     int32_t input1_offset;
     int32_t input2_offset;

@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <sld>
   <accelerator name="vector" desc="Accelerator VECTOR" data_size="4" device_id="070" hls_tool="stratus_hls">
-    <param name="total_len" desc="total_len" />
+    <param name="vector_op" desc="vector_op" />
+    <param name="n_channel" desc="n_channel" />
+    <param name="input_len" desc="input_len" />
+    <param name="stride" desc="stride" />
     <param name="input1_offset" desc="input1_offset" />
     <param name="input2_offset" desc="input2_offset" />
     <param name="output_offset" desc="output_offset" />

@@ -5,8 +5,8 @@
 
 static unsigned in_words_adj;
 static unsigned out_words_adj;
-static unsigned in_total_len;
-static unsigned out_total_len;
+static unsigned in_input_len;
+static unsigned out_input_len;
 static unsigned in_size;
 static unsigned out_size;
 static unsigned out_offset;
@@ -54,11 +54,11 @@ static void init_parameters()
 		in_words_adj = round_up(2048, DMA_WORD_PER_BEAT(sizeof(token_t)));
 		out_words_adj = round_up(2048, DMA_WORD_PER_BEAT(sizeof(token_t)));
 	}
-	in_total_len = in_words_adj * (1);
-	out_total_len =  out_words_adj * (1);
-	in_size = in_total_len * sizeof(token_t);
-	out_size = out_total_len * sizeof(token_t);
-	out_offset = in_total_len;
+	in_input_len = in_words_adj * (1);
+	out_input_len =  out_words_adj * (1);
+	in_size = in_input_len * sizeof(token_t);
+	out_size = out_input_len * sizeof(token_t);
+	out_offset = in_input_len;
 	size = (out_offset * sizeof(token_t)) + out_size;
 }
 
@@ -81,7 +81,7 @@ int main(int argc, char **argv)
 
 	printf("\n====== %s ======\n\n", cfg_000[0].devname);
 	/* <<--print-params-->> */
-	printf("  .total_len = %d\n", total_len);
+	printf("  .input_len = %d\n", input_len);
 	printf("  .output_offset = %d\n", output_offset);
 	printf("  .input1_offset = %d\n", input1_offset);
 	printf("  .input2_offset = %d\n", input2_offset);

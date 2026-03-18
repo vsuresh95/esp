@@ -4,6 +4,7 @@
 #ifndef __VECTOR_HPP__
 #define __VECTOR_HPP__
 
+#include "common.hpp"
 #include "fpdata.hpp"
 #include "vector_conf_info.hpp"
 #include "vector_debug_info.hpp"
@@ -50,6 +51,7 @@ public:
     void store_output();
 
     // Functions
+    uint32_t cheap_divider(uint32_t dividend, uint32_t divisor);
 
     // Private local memories
     sc_dt::sc_int<DATA_WIDTH> plm_in1_ping[PLM_IN_WORD];
