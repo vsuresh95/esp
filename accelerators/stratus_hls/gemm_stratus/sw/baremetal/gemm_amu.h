@@ -2,7 +2,7 @@
 #define GEMM_AMU_H
 
 // Size and parameter defines
-#define CONF_INFO_SIZE 12
+#define CONF_INFO_SIZE 14
 
 // Context descriptors status
 #define QUEUE_INVALID 0
@@ -227,10 +227,12 @@ void gemm_amu() {
 		desc[5] = dim_n;
 		desc[6] = mat_a_offset;
 		desc[7] = mat_b_offset;
-		desc[8] = mat_c_offset;
-		desc[9] = 0;
+		desc[8] = 0;
+		desc[9] = mat_c_offset;
 		desc[10] = 0;
 		desc[11] = 0;
+		desc[12] = 0;
+		desc[13] = 0;
 	}
 
 	// Main processing loop

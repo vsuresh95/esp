@@ -27,11 +27,13 @@ void gemm_baseline() {
 	printf("dim_m %u dim_n %u dim_k %u\n", dim_m, dim_n, dim_k);
     unsigned mat_a_len = dim_m * dim_k;
     unsigned mat_b_len = dim_n * dim_k;
+    unsigned mat_bias_len = dim_n;
     unsigned mat_c_len = dim_m * dim_n;
     // Data offsets
     unsigned mat_a_offset = 0;
     unsigned mat_b_offset = mat_a_offset + mat_a_len;
-    unsigned mat_c_offset = mat_b_offset + mat_b_len;
+    unsigned mat_bias_offset = mat_b_offset + mat_b_len;
+    unsigned mat_c_offset = mat_bias_offset + mat_bias_len;
 
     unsigned mem_size = 4 * (mat_c_offset + mat_c_len) * sizeof(float);
 
@@ -86,8 +88,8 @@ void gemm_baseline() {
 	///////////////////////////////////////////////////////
 	/// Start first task
 	///////////////////////////////////////////////////////
-	init_buffer(&mem0[mat_a_offset], &mem0[mat_b_offset],
-				&gold0[mat_a_offset], &gold0[mat_b_offset], &gold0[mat_c_offset]);
+	init_buffer(&mem0[mat_a_offset], &mem0[mat_b_offset], &mem0[mat_bias_offset],
+				&gold0[mat_a_offset], &gold0[mat_b_offset], &gold0[mat_bias_offset], &gold0[mat_c_offset]);
 
 	iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
 	iowrite32(dev, COHERENCE_REG, coherence);
@@ -102,8 +104,10 @@ void gemm_baseline() {
 	iowrite32(dev, GEMM_D3_REG, dim_n);
 	iowrite32(dev, GEMM_LD_OFFSET1_REG, mat_a_offset);
 	iowrite32(dev, GEMM_LD_OFFSET2_REG, mat_b_offset);
+	iowrite32(dev, GEMM_BIAS_OFFSET_REG, mat_bias_offset);
 	iowrite32(dev, GEMM_ST_OFFSET_REG, mat_c_offset);
 	iowrite32(dev, GEMM_DO_RELU_REG, 0);
+	iowrite32(dev, GEMM_DO_BIAS_REG, 1);
 	iowrite32(dev, GEMM_TRANSPOSE_REG, 0);
 
 	// Start accelerator
@@ -125,8 +129,8 @@ void gemm_baseline() {
 	///////////////////////////////////////////////////////
 	/// Start second task
 	///////////////////////////////////////////////////////
-	init_buffer(&mem1[mat_a_offset], &mem1[mat_b_offset],
-				&gold1[mat_a_offset], &gold1[mat_b_offset], &gold1[mat_c_offset]);
+	init_buffer(&mem1[mat_a_offset], &mem1[mat_b_offset], &mem1[mat_bias_offset],
+				&gold1[mat_a_offset], &gold1[mat_b_offset], &gold1[mat_bias_offset], &gold1[mat_c_offset]);
 
 	iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
 	iowrite32(dev, COHERENCE_REG, coherence);
@@ -141,8 +145,10 @@ void gemm_baseline() {
 	iowrite32(dev, GEMM_D3_REG, dim_n);
 	iowrite32(dev, GEMM_LD_OFFSET1_REG, mat_a_offset);
 	iowrite32(dev, GEMM_LD_OFFSET2_REG, mat_b_offset);
+	iowrite32(dev, GEMM_BIAS_OFFSET_REG, mat_bias_offset);
 	iowrite32(dev, GEMM_ST_OFFSET_REG, mat_c_offset);
 	iowrite32(dev, GEMM_DO_RELU_REG, 0);
+	iowrite32(dev, GEMM_DO_BIAS_REG, do_bias);
 	iowrite32(dev, GEMM_TRANSPOSE_REG, 0);
 
 	// Start accelerator
@@ -164,8 +170,8 @@ void gemm_baseline() {
 	///////////////////////////////////////////////////////
 	/// Start third task
 	///////////////////////////////////////////////////////
-	init_buffer(&mem2[mat_a_offset], &mem2[mat_b_offset],
-				&gold2[mat_a_offset], &gold2[mat_b_offset], &gold2[mat_c_offset]);
+	init_buffer(&mem2[mat_a_offset], &mem2[mat_b_offset], &mem2[mat_bias_offset],
+				&gold2[mat_a_offset], &gold2[mat_b_offset], &gold2[mat_bias_offset], &gold2[mat_c_offset]);
 
 	iowrite32(dev, SELECT_REG, ioread32(dev, DEVID_REG));
 	iowrite32(dev, COHERENCE_REG, coherence);
@@ -180,8 +186,10 @@ void gemm_baseline() {
 	iowrite32(dev, GEMM_D3_REG, dim_n);
 	iowrite32(dev, GEMM_LD_OFFSET1_REG, mat_a_offset);
 	iowrite32(dev, GEMM_LD_OFFSET2_REG, mat_b_offset);
+	iowrite32(dev, GEMM_BIAS_OFFSET_REG, mat_bias_offset);
 	iowrite32(dev, GEMM_ST_OFFSET_REG, mat_c_offset);
 	iowrite32(dev, GEMM_DO_RELU_REG, 0);
+	iowrite32(dev, GEMM_DO_BIAS_REG, 1);
 	iowrite32(dev, GEMM_TRANSPOSE_REG, 0);
 
 	// Start accelerator
@@ -194,10 +202,6 @@ void gemm_baseline() {
 		done = ioread32(dev, STATUS_REG);
 		done &= STATUS_MASK_DONE;
 	}
-	for (i = 0; i < 4; i++) {
-		printf("MON_UTIL_REG_%d_LO = %x\n", i, ioread32(dev, MON_UTIL_REG_0_LO + 0x8*i));
-		printf("MON_UTIL_REG_%d_HI = %x\n", i, ioread32(dev, MON_UTIL_REG_0_HI + 0x8*i));
-	}	
 	iowrite32(dev, CMD_REG, 0x0);
 
 	printf("Third context task done\n");

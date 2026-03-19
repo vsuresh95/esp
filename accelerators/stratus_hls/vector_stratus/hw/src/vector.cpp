@@ -361,7 +361,7 @@ void vector::compute_kernel()
                         // For each output element in the pooled output
                         for (int r = 0; r < output_len; r++) {
                             for (int c = 0; c < output_len; c++) {
-                                FPDATA sum = 0;
+                                FPDATA_WIDE sum = 0;
                                 // Calculate the start index of the pooling window in input
                                 uint32_t in_row = r << stride_log2;
                                 uint32_t in_col = c << stride_log2;
@@ -371,17 +371,18 @@ void vector::compute_kernel()
                                         uint32_t idx = input_channel_offset + (in_row + pr) * input_len + (in_col + pc);
                                         if (idx < input_length) {
                                             if (in_ping)
-                                                sum += int2fp<FPDATA, WORD_SIZE>(plm_in1_ping[idx]);
+                                                sum += FPDATA_WIDE(int2fp<FPDATA, WORD_SIZE>(plm_in1_ping[idx]));
                                             else
-                                                sum += int2fp<FPDATA, WORD_SIZE>(plm_in1_pong[idx]);
+                                                sum += FPDATA_WIDE(int2fp<FPDATA, WORD_SIZE>(plm_in1_pong[idx]));
                                         }
                                     }
                                 }
                                 sum = sum >> (2 * stride_log2); // divide by stride*stride using bit shift
+                                FPDATA avg = FPDATA(sum);
                                 if (out_ping)
-                                    plm_out_ping[output_channel_offset + r * output_len + c] = fp2int<FPDATA, WORD_SIZE>(sum);
+                                    plm_out_ping[output_channel_offset + r * output_len + c] = fp2int<FPDATA, WORD_SIZE>(avg);
                                 else
-                                    plm_out_pong[output_channel_offset + r * output_len + c] = fp2int<FPDATA, WORD_SIZE>(sum);
+                                    plm_out_pong[output_channel_offset + r * output_len + c] = fp2int<FPDATA, WORD_SIZE>(avg);
                             }
                         }
                         output_done += out_feature_words;

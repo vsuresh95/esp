@@ -4,7 +4,8 @@ static void init_parameters(int test, int32_t do_relu, int32_t transpose, int32_
 			    unsigned *in_len, unsigned *in1_len, unsigned *out_len,
 			    unsigned *in_size, unsigned *out_size, unsigned *size, native_t* sw_buf, int inp_offset, unsigned* st_offset)
 {
-    int32_t ld_offset1, ld_offset2;//, st_offset;
+    int32_t ld_offset1, ld_offset2, bias_offset;
+    int32_t do_bias;
     unsigned in2_len;
     int i;
     #ifdef ENABLE_SM
@@ -33,6 +34,8 @@ static void init_parameters(int test, int32_t do_relu, int32_t transpose, int32_
     ld_offset1 = 0;
     ld_offset2 = *in1_len;
     *st_offset = *in_len;
+    bias_offset = 0;
+    do_bias = 0;
     
     #endif
     gemm_cfg_000[0].do_relu = do_relu;
@@ -43,11 +46,15 @@ static void init_parameters(int test, int32_t do_relu, int32_t transpose, int32_
     gemm_cfg_000[0].d3 = d3;
     gemm_cfg_000[0].ld_offset1 = ld_offset1;
     gemm_cfg_000[0].ld_offset2 = ld_offset2;
+    gemm_cfg_000[0].bias_offset = bias_offset;
     gemm_cfg_000[0].st_offset = *st_offset;
+    gemm_cfg_000[0].do_bias = do_bias;
 #else
 ld_offset1 = inp_offset; //0;
     ld_offset2 = ld_offset1 + *in1_len;
     *st_offset = 2*inp_offset + (*in_len);
+    bias_offset = 0;
+    do_bias = 0;
 for(int dev_id = 0; dev_id < NUM_DEVICES; dev_id++){
 		accel_prod_valid_offset[dev_id] = dev_id*(tile_size + SYNC_VAR_SIZE) + rel_accel_prod_valid_offset;
 		accel_cons_ready_offset[dev_id] = dev_id*(tile_size + SYNC_VAR_SIZE) + rel_accel_cons_ready_offset;
@@ -62,6 +69,8 @@ for(int dev_id = 0; dev_id < NUM_DEVICES; dev_id++){
 	gemm_cfg_000[0].prod_ready_offset = CONS_READY_OFFSET;//READY_FLAG_OFFSET;
 	gemm_cfg_000[0].cons_valid_offset = INPUT_OFFSET + in_len + CONS_VALID_OFFSET; //PROD_VALID_OFFSET;//SYNC_VAR_SIZE + LEN + VALID_FLAG_OFFSET;
 	gemm_cfg_000[0].cons_ready_offset = INPUT_OFFSET + in_len + CONS_READY_OFFSET; //PROD_READY_OFFSET;//SYNC_VAR_SIZE + LEN + VALID_FLAG_OFFSET;
+	gemm_cfg_000[0].bias_offset = bias_offset;
+	gemm_cfg_000[0].do_bias = do_bias;
 
 	const unsigned cpu_cons_valid_offset =gemm_cfg_000[0].prod_valid_offset ;//CONS_VALID_OFFSET;//VALID_FLAG_OFFSET;
 	const unsigned cpu_cons_ready_offset =gemm_cfg_000[0].prod_ready_offset ;//CONS_READY_OFFSET;//READY_FLAG_OFFSET;

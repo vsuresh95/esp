@@ -6,7 +6,7 @@
 
 #include <systemc.h>
 
-#define CONF_INFO_SIZE 12
+#define CONF_INFO_SIZE 14
 
 //
 // Configuration parameters for the accelerator.
@@ -26,8 +26,10 @@ public:
     uint32_t d3;         // Size d2 of the matrix 2
     uint32_t ld_offset1; // Input offset (matrix 1)
     uint32_t ld_offset2; // Input offset (matrix 2)
+    uint32_t bias_offset; // Bias vector offset
     uint32_t st_offset;  // Output offset
     uint32_t do_relu; // Do ReLU stage
+    uint32_t do_bias; // Add bias stage
     uint32_t transpose; // True if matrix 2 is transposed
 
     //
@@ -41,10 +43,12 @@ public:
             , d3(0)
             , ld_offset1(0)
             , ld_offset2(0)
+            , bias_offset(0)
             , st_offset(0)
 	    , do_relu(0)
+	    , do_bias(0)
 	    , transpose(0)
-	{}
+		{}
 
     // equals operator
     inline bool operator==(const conf_info_t &rhs) const
@@ -55,8 +59,10 @@ public:
                 && (rhs.d3 == d3)
                 && (rhs.ld_offset1 == ld_offset1)
                 && (rhs.ld_offset2 == ld_offset2)
+                && (rhs.bias_offset == bias_offset)
                 && (rhs.st_offset == st_offset)
 		&& (rhs.do_relu == do_relu)
+		&& (rhs.do_bias == do_bias)
 		&& (rhs.transpose == transpose);
 	}
 
@@ -69,8 +75,10 @@ public:
             d3 = other.d3;
             ld_offset1 = other.ld_offset1;
             ld_offset2 = other.ld_offset2;
+            bias_offset = other.bias_offset;
             st_offset = other.st_offset;
             do_relu = other.do_relu;
+	    do_bias = other.do_bias;
 	    transpose = other.transpose;
             return *this;
 	}
@@ -86,9 +94,11 @@ public:
             case 3: return d3;
             case 4: return ld_offset1;
             case 5: return ld_offset2;
-            case 6: return st_offset;
-            case 7: return do_relu;
-            case 8: return transpose;
+            case 6: return bias_offset;
+            case 7: return st_offset;
+            case 8: return do_relu;
+            case 9: return do_bias;
+            case 10: return transpose;
             default: return transpose;
         }
     }
@@ -104,9 +114,11 @@ public:
             case 3: return d3;
             case 4: return ld_offset1;
             case 5: return ld_offset2;
-            case 6: return st_offset;
-            case 7: return do_relu;
-            case 8: return transpose;
+            case 6: return bias_offset;
+            case 7: return st_offset;
+            case 8: return do_relu;
+            case 9: return do_bias;
+            case 10: return transpose;
             default: return transpose;
         }
 	}

@@ -64,6 +64,8 @@ public:
 	    HLS_MAP_plm(input1, IN_PLM_NAME);
 	    HLS_MAP_plm(input2, IN_PLM_NAME);
 	    HLS_MAP_plm(input3, IN_PLM_NAME);
+	    HLS_MAP_plm(bias0, IN_PLM_NAME);
+	    HLS_MAP_plm(bias1, IN_PLM_NAME);
 	    HLS_MAP_plm(output0, OUT_PLM_NAME);
 	    HLS_MAP_plm(output1, OUT_PLM_NAME);
         }
@@ -131,6 +133,8 @@ public:
     PLM_WORD input1[DMA_CHUNK];
     PLM_WORD input2[DMA_CHUNK];
     PLM_WORD input3[DMA_CHUNK];
+    PLM_WORD bias0[DMA_CHUNK];
+    PLM_WORD bias1[DMA_CHUNK];
     PLM_WORD output0[OUT_DMA_CHUNK];
     PLM_WORD output1[OUT_DMA_CHUNK];
     FPDATA row[PARALLELISM];

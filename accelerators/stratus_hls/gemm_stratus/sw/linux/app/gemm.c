@@ -58,7 +58,8 @@ static void init_parameters(int test, int32_t do_relu, int32_t transpose, int32_
 			    unsigned *in_len, unsigned *in1_len, unsigned *out_len,
 			    unsigned *in_size, unsigned *out_size, unsigned *size)
 {
-    int32_t ld_offset1, ld_offset2, st_offset;
+    int32_t ld_offset1, ld_offset2, bias_offset, st_offset;
+    int32_t do_bias;
     unsigned in2_len;
     
     *in1_len = round_up(ninputs * d1 * d2, DMA_WORD_PER_BEAT(sizeof(token_t)));
@@ -71,7 +72,9 @@ static void init_parameters(int test, int32_t do_relu, int32_t transpose, int32_
 
     ld_offset1 = 0;
     ld_offset2 = *in1_len;
+    bias_offset = 0;
     st_offset = *in_len;
+    do_bias = 0;
 
     gemm_cfg_000[0].do_relu = do_relu;
     gemm_cfg_000[0].transpose = transpose;
@@ -81,7 +84,9 @@ static void init_parameters(int test, int32_t do_relu, int32_t transpose, int32_
     gemm_cfg_000[0].d3 = d3;
     gemm_cfg_000[0].ld_offset1 = ld_offset1;
     gemm_cfg_000[0].ld_offset2 = ld_offset2;
+    gemm_cfg_000[0].bias_offset = bias_offset;
     gemm_cfg_000[0].st_offset = st_offset;
+    gemm_cfg_000[0].do_bias = do_bias;
 
     // print test info
     printf("  Prepare test %d parameters\n", test);
@@ -94,6 +99,8 @@ static void init_parameters(int test, int32_t do_relu, int32_t transpose, int32_
     printf("    .st_offset = %d\n", st_offset);
     printf("    .ld_offset1 = %d\n", ld_offset1);
     printf("    .ld_offset2 = %d\n", ld_offset2);
+    printf("    .bias_offset = %d\n", bias_offset);
+    printf("    .do_bias = %d\n", do_bias);
 }
 
 static void sw_run(int32_t do_relu, int32_t transpose, int32_t ninputs,

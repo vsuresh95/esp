@@ -28,7 +28,7 @@ static unsigned DMA_WORD_PER_BEAT(unsigned _st)
 
 #define VECTOR_OP_ADD 0
 #define VECTOR_OP_AVG_POOL 1
-#define VECTOR_TEST VECTOR_OP_ADD
+#define VECTOR_TEST VECTOR_OP_AVG_POOL
 
 /* <<--params-->> */
 #if (VECTOR_TEST == VECTOR_OP_ADD)
@@ -81,10 +81,10 @@ static int validate_buf(token_t *out)
 		#if (VECTOR_TEST == VECTOR_OP_ADD)
 		native_t expected = 2 * (0.1 + (i % 8) * 0.1);
 		#else
-		native_t expected = 0.35;
+		native_t expected = 0.45;
 		#endif
 		native_t rel_err = (expected - val) / expected;
-		if (rel_err > REL_ERROR_THRESHOLD)
+		if (rel_err > REL_ERROR_THRESHOLD || rel_err < -REL_ERROR_THRESHOLD)
 			errors++;
 	}
 

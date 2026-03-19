@@ -20,12 +20,13 @@ static unsigned DMA_WORD_PER_BEAT(unsigned _st)
 
 #define SLD_GEMM 0x051
 #define DEV_NAME "sld,gemm_stratus"
-#define FX_IL 16
+#define FX_IL 8
 
 /* <<--params-->> */
 const unsigned dim_m = 20;
 const unsigned dim_n = 20;
 const unsigned dim_k = 20;
+const unsigned do_bias = 1;
 
 /* Size of the contiguous chunks for scatter/gather */
 #define CHUNK_SHIFT 20
@@ -42,11 +43,13 @@ const unsigned dim_k = 20;
 #define GEMM_D3_REG         0xA4
 #define GEMM_LD_OFFSET1_REG 0xA8
 #define GEMM_LD_OFFSET2_REG 0xAC
-#define GEMM_ST_OFFSET_REG  0xB0
-#define GEMM_DO_RELU_REG    0xB4
-#define GEMM_TRANSPOSE_REG  0xB8
+#define GEMM_BIAS_OFFSET_REG 0xB0
+#define GEMM_ST_OFFSET_REG  0xB4
+#define GEMM_DO_RELU_REG    0xB8
+#define GEMM_DO_BIAS_REG    0xBC
+#define GEMM_TRANSPOSE_REG  0xC0
 
-void gemm(const float* mat_a, const float* mat_b, float* mat_c, unsigned dim_m, unsigned dim_n, unsigned dim_k) {
+void gemm(const float* mat_a, const float* mat_b, float* mat_c, const float *bias, unsigned dim_m, unsigned dim_n, unsigned dim_k) {
     const unsigned block_size = 16;
     float sum;
 
@@ -68,6 +71,13 @@ void gemm(const float* mat_a, const float* mat_b, float* mat_c, unsigned dim_m, 
                         mat_c[m_ * dim_n + n_] = sum;
                     }
                 }
+            }
+        }
+    }
+    if (do_bias) {
+        for (unsigned m = 0; m < dim_m; m++) {
+            for (unsigned n = 0; n < dim_n; n++) {
+                mat_c[m * dim_n + n] += bias[n];
             }
         }
     }
@@ -97,12 +107,14 @@ int validate_buffer(int *mem_c, float *gold_c)
 }
 
 // Initialize input and calculate golden output
-void init_buffer(int *mem_a, int *mem_b, float *gold_a, float *gold_b, float *gold_c)
+void init_buffer(int *mem_a, int *mem_b, int *mem_bias,
+		 float *gold_a, float *gold_b, float *gold_bias, float *gold_c)
 {
-    const float LO = -2.0;
-    const float HI = 2.0;
+    const float LO = -1.0;
+    const float HI = 1.0;
     const unsigned len_a = dim_m * dim_k;
     const unsigned len_b = dim_n * dim_k;
+    const unsigned len_bias = dim_n;
 
     for (unsigned j = 0; j < len_a; j++) {
         float scaling_factor = (float) rand() / (float) RAND_MAX;
@@ -116,8 +128,14 @@ void init_buffer(int *mem_a, int *mem_b, float *gold_a, float *gold_b, float *go
         mem_b[j] = float_to_fixed32(gold_b[j], FX_IL);
     }
 
+    for (unsigned j = 0; j < len_bias; j++) {
+        float scaling_factor = (float) rand() / (float) RAND_MAX;
+        gold_bias[j] = LO + scaling_factor * (HI - LO);
+        mem_bias[j] = float_to_fixed32(gold_bias[j], FX_IL);
+    }
+
     // Compute golden output
-    gemm(gold_a, gold_b, gold_c, dim_m, dim_n, dim_k);
+    gemm(gold_a, gold_b, gold_c, gold_bias, dim_m, dim_n, dim_k);
 }
 
 #include "gemm_baseline.h"

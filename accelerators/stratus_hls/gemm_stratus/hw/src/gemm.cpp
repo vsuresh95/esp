@@ -40,6 +40,8 @@ void gemm::load_input()
     uint16_t m2_loop_iters, length_m2_dma;
     uint32_t index_m2_incr;
     uint16_t m2_plm_incr;
+    uint32_t bias_offset;
+    bool do_bias;
 
     // Reset
     {
@@ -88,6 +90,8 @@ void gemm::load_input()
 	length_m2_dma = 0;
 	index_m2_incr = 0;
 	m2_plm_incr = 0;
+	bias_offset = 0;
+	do_bias = 0;
 
 	wait();
     }
@@ -116,6 +120,8 @@ void gemm::load_input()
         matrix_d3 = config.d3;
         ld_offset1 = config.ld_offset1;
         ld_offset2 = config.ld_offset2;
+		bias_offset = config.bias_offset;
+		do_bias = config.do_bias;
 	transpose = config.transpose;
     }
 
@@ -330,6 +336,50 @@ void gemm::load_input()
 
     			index_m2_dma += index_m2_incr;
 			base_i++;
+		    }
+
+		    if (do_bias) {
+			uint16_t bias_len = min(loadable_rows, matrix_d3 - d2);
+			uint32_t index_bias_dma = bias_offset + d2;
+
+			{
+			    HLS_DEFINE_PROTOCOL("load-bias-info");
+
+			    dma_info_t dma_info(index_bias_dma >> WORDS_PER_DMA_LOG,
+						round_up(bias_len, WORDS_PER_DMA) >> WORDS_PER_DMA_LOG,
+						SIZE_WORD);
+			    this->dma_read_ctrl.put(dma_info);
+			}
+
+			i = 0;
+			for (uint16_t k = 0; k < round_up(bias_len, WORDS_PER_DMA) >> WORDS_PER_DMA_LOG; ++k)
+			{
+			    sc_dt::sc_bv<DMA_WIDTH> data = this->dma_read_chnl.get();
+
+			    {
+				HLS_DEFINE_PROTOCOL("protocol-load-bias");
+				HLS_BREAK_ARRAY_DEPENDENCY(bias0);
+				HLS_BREAK_ARRAY_DEPENDENCY(bias1);
+
+#if (WORDS_PER_DMA == 2)
+				if (pingpong_m2) {
+				    bias0[i++] = data.range(31,0).to_uint();
+				    if (i < DMA_CHUNK)
+					bias0[i++] = data.range(63,32).to_uint();
+				} else {
+				    bias1[i++] = data.range(31,0).to_uint();
+				    if (i < DMA_CHUNK)
+					bias1[i++] = data.range(63,32).to_uint();
+				}
+#else
+				if (pingpong_m2)
+				    bias0[i++] = data.to_uint();
+				else
+				    bias1[i++] = data.to_uint();
+#endif
+				wait();
+			    }
+			}
     		    }
 		    
     		    // Call the compute_kernel process
@@ -575,6 +625,7 @@ void gemm::compute_kernel()
     uint16_t store_count;
     uint8_t load_cfg;
     uint16_t loadable_rows;
+    bool do_bias;
 
     // Reset
     {
@@ -597,7 +648,8 @@ void gemm::compute_kernel()
         matrix_d1 = 0;
         matrix_d2 = 0;
         matrix_d3 = 0;
-	do_relu = 0;
+		do_relu = 0;
+		do_bias = 0;
         matrix_chk_in = 0;
         matrix_rem_in1 = 0;
         matrix_rem_in2 = 0;
@@ -631,6 +683,7 @@ void gemm::compute_kernel()
         matrix_d2 = config.d2;
         matrix_d3 = config.d3;
     	do_relu = config.do_relu;
+		do_bias = config.do_bias;
 
     	compute_load_cfg_handshake();
 
@@ -915,6 +968,13 @@ void gemm::compute_kernel()
 #endif
 			    }
 
+				if (do_bias) {
+				    if (pingpong_m2) {
+					accumulator += INT2FP(bias0[d2i]);
+				    } else {
+					accumulator += INT2FP(bias1[d2i]);
+				    }
+				}
     			}
 
 			// ReLU

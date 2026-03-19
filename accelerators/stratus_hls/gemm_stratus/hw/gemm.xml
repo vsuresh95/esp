@@ -7,8 +7,10 @@
     <param name="d3" desc="Size d2 of the matrix 2"/>
     <param name="ld_offset1" desc="Input offset (matrix 1)"/>
     <param name="ld_offset2" desc="Input offset (matrix 2)"/>
+    <param name="bias_offset" desc="Bias vector offset"/>
     <param name="st_offset" desc="Output offset"/>
     <param name="do_relu" desc="Do ReLU stage"/>
+    <param name="do_bias" desc="Add bias stage"/>
     <param name="transpose" desc="True if matrix 2 is transposed"/>
   </accelerator>
 </sld>

@@ -17,7 +17,7 @@
 #include <esp.h>
 #include <esp_accelerator.h>
 
-#define GEMM_PARAM_SIZE 10
+#define GEMM_PARAM_SIZE 12
 
 // <<--params-->>
 typedef struct {
@@ -27,8 +27,10 @@ typedef struct {
 	uint32_t d3;         // Size d2 of the matrix 2
 	uint32_t ld_offset1; // Input offset (matrix 1)
 	uint32_t ld_offset2; // Input offset (matrix 2)
+	uint32_t bias_offset; // Bias vector offset
 	uint32_t st_offset;  // Output offset
 	uint32_t do_relu; // Do ReLU stage
+	uint32_t do_bias; // Add bias stage
 	uint32_t transpose; // True
 	uint32_t padding;
 } gemm_params_t;

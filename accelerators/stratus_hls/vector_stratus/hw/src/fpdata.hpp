@@ -24,6 +24,7 @@ const unsigned int FPDATA_FL = WORD_SIZE - FPDATA_IL;
 typedef sc_dt::sc_int<WORD_SIZE> FPDATA_WORD;
 
 typedef cynw_fixed<FPDATA_WL, FPDATA_IL> FPDATA;
+typedef cynw_fixed<FPDATA_WL + 8, FPDATA_IL + 8> FPDATA_WIDE;
 
 // Helper functions
 

@@ -17,9 +17,11 @@
 #define GEMM_D3_REG         0xA4
 #define GEMM_LD_OFFSET1_REG 0xA8
 #define GEMM_LD_OFFSET2_REG 0xAC
-#define GEMM_ST_OFFSET_REG  0xB0
-#define GEMM_DO_RELU_REG    0xB4
-#define GEMM_TRANSPOSE_REG  0xB8
+#define GEMM_BIAS_OFFSET_REG 0xB0
+#define GEMM_ST_OFFSET_REG  0xB4
+#define GEMM_DO_RELU_REG    0xB8
+#define GEMM_DO_BIAS_REG    0xBC
+#define GEMM_TRANSPOSE_REG  0xC0
 
 struct gemm_stratus_device {
 	struct esp_device esp;
@@ -61,6 +63,8 @@ static void gemm_prep_xfer(struct esp_device *esp, void *arg)
 	iowrite32be(a->params.st_offset, esp->iomem + GEMM_ST_OFFSET_REG);
 	iowrite32be(a->params.ld_offset1, esp->iomem + GEMM_LD_OFFSET1_REG);
 	iowrite32be(a->params.ld_offset2, esp->iomem + GEMM_LD_OFFSET2_REG);
+	iowrite32be(a->params.bias_offset, esp->iomem + GEMM_BIAS_OFFSET_REG);
+	iowrite32be(a->params.do_bias, esp->iomem + GEMM_DO_BIAS_REG);
 }
 
 static bool gemm_xfer_input_ok(struct esp_device *esp, void *arg)
