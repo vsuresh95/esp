@@ -5,7 +5,8 @@
     <param name="feature_map_height" desc="feature_map_height" />
     <param name="feature_map_width" desc="feature_map_width" />
     <param name="n_filters" desc="n_filters" />
-    <param name="filter_dim" desc="filter_dim" />
+    <param name="filter_height" desc="filter height" />
+    <param name="filter_width" desc="filter width" />
     <param name="is_padded" desc="is_padded" />
     <param name="stride" desc="stride" />
     <param name="do_relu" desc="do ReLU" />

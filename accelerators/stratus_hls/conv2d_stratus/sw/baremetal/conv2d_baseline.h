@@ -20,8 +20,8 @@ int conv2d_baseline()
 		output_h = (feature_map_height - 1) / stride + 1;
 		output_w = (feature_map_width - 1) / stride + 1;
 	} else {
-		output_h = (feature_map_height - filter_dim) / stride + 1;
-		output_w = (feature_map_width - filter_dim) / stride + 1;
+		output_h = (feature_map_height - filter_height) / stride + 1;
+		output_w = (feature_map_width - filter_width) / stride + 1;
 	}
 	output_pool_h = pool_type ? output_h / 2 : output_h;
 	output_pool_w = pool_type ? output_w / 2 : output_w;	
@@ -29,16 +29,15 @@ int conv2d_baseline()
 	// Input data and golden output (aligned to DMA_WIDTH makes your life easier)
 	if (DMA_WORD_PER_BEAT(sizeof(token_t)) == 0) {
 	    in_words_adj = n_channels * feature_map_height * feature_map_width;
-	    weights_words_adj = n_filters * n_channels * filter_dim * filter_dim;
+	    weights_words_adj = n_filters * n_channels * filter_height * filter_width;
 	    bias_words_adj = n_filters;
 	    out_words_adj = n_filters * output_pool_h * output_pool_w;
 	} else {
-	    in_words_adj = round_up(n_channels * feature_map_height * feature_map_width,
+	    in_words_adj = n_channels * round_up(feature_map_height * feature_map_width,
 				    DMA_WORD_PER_BEAT(sizeof(token_t)));
-	    weights_words_adj = round_up(n_filters * n_channels * filter_dim * filter_dim,
-					 DMA_WORD_PER_BEAT(sizeof(token_t)));
-	    bias_words_adj = round_up(n_filters, DMA_WORD_PER_BEAT(sizeof(token_t)));
-	    out_words_adj = round_up(n_filters * output_pool_h * output_pool_w,
+	    weights_words_adj = n_filters * n_channels * filter_height * filter_width;
+	    bias_words_adj = n_filters;
+	    out_words_adj = n_filters * round_up(output_pool_h * output_pool_w,
 				     DMA_WORD_PER_BEAT(sizeof(token_t)));
 	}
 
@@ -116,7 +115,8 @@ int conv2d_baseline()
 	iowrite32(dev, CONV2D_FEATURE_MAP_HEIGHT_REG, feature_map_height);
 	iowrite32(dev, CONV2D_FEATURE_MAP_WIDTH_REG, feature_map_width);
 	iowrite32(dev, CONV2D_N_FILTERS_REG, n_filters);
-	iowrite32(dev, CONV2D_FILTER_DIM_REG, filter_dim);
+	iowrite32(dev, CONV2D_FILTER_HEIGHT_REG, filter_height);
+	iowrite32(dev, CONV2D_FILTER_WIDTH_REG, filter_width);
 	iowrite32(dev, CONV2D_IS_PADDED_REG, is_padded);
 	iowrite32(dev, CONV2D_STRIDE_REG, stride);
 	iowrite32(dev, CONV2D_DO_RELU_REG, do_relu);

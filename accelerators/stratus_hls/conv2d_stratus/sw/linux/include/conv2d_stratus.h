@@ -17,7 +17,7 @@
 #include <esp.h>
 #include <esp_accelerator.h>
 
-#define CONV_PARAM_SIZE 14
+#define CONV_PARAM_SIZE 16
 
 // <<--params-->>
 typedef struct {
@@ -25,7 +25,8 @@ typedef struct {
 	unsigned feature_map_height;
 	unsigned feature_map_width;
 	unsigned n_filters;
-	unsigned filter_dim;
+	unsigned filter_height;
+	unsigned filter_width;
 	unsigned is_padded;
 	unsigned stride;
 	unsigned do_relu;
@@ -35,6 +36,7 @@ typedef struct {
 	unsigned filters_offset;
 	unsigned bias_offset;
 	unsigned output_offset;
+	unsigned padding;
 } conv2d_params_t;
 
 struct conv2d_stratus_access {

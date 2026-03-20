@@ -12,19 +12,20 @@
 
 /* <<--regs-->> */
 #define CONV2D_N_CHANNELS_REG 			0x98
-#define CONV2D_FEATURE_MAP_HEIGHT_REG	0x9c
+#define CONV2D_FEATURE_MAP_HEIGHT_REG	0x9C
 #define CONV2D_FEATURE_MAP_WIDTH_REG	0xA0
 #define CONV2D_N_FILTERS_REG			0xA4
-#define CONV2D_FILTER_DIM_REG			0xA8
-#define CONV2D_IS_PADDED_REG			0xAC
-#define CONV2D_STRIDE_REG				0xB0
-#define CONV2D_DO_RELU_REG				0xB4
-#define CONV2D_POOL_TYPE_REG			0xB8
-#define CONV2D_BATCH_SIZE_REG			0xBC
-#define CONV2D_INPUT_OFFSET_REG			0xC0
-#define CONV2D_FILTERS_OFFSET_REG		0xC4
-#define CONV2D_BIAS_OFFSET_REG			0xC8
-#define CONV2D_OUTPUT_OFFSET_REG		0xCC
+#define CONV2D_FILTER_HEIGHT_REG		0xA8
+#define CONV2D_FILTER_WIDTH_REG			0xAC
+#define CONV2D_IS_PADDED_REG			0xB0
+#define CONV2D_STRIDE_REG				0xB4
+#define CONV2D_DO_RELU_REG				0xB8
+#define CONV2D_POOL_TYPE_REG			0xBC
+#define CONV2D_BATCH_SIZE_REG			0xC0
+#define CONV2D_INPUT_OFFSET_REG			0xC4
+#define CONV2D_FILTERS_OFFSET_REG		0xC8
+#define CONV2D_BIAS_OFFSET_REG			0xCC
+#define CONV2D_OUTPUT_OFFSET_REG 		0xD0
 
 struct conv2d_stratus_device {
 	struct esp_device esp;
@@ -61,7 +62,8 @@ static void conv2d_prep_xfer(struct esp_device *esp, void *arg)
 	iowrite32be(a->params.feature_map_height, esp->iomem + CONV2D_FEATURE_MAP_HEIGHT_REG);
 	iowrite32be(a->params.feature_map_width, esp->iomem + CONV2D_FEATURE_MAP_WIDTH_REG);
 	iowrite32be(a->params.n_filters, esp->iomem + CONV2D_N_FILTERS_REG);
-	iowrite32be(a->params.filter_dim, esp->iomem + CONV2D_FILTER_DIM_REG);
+	iowrite32be(a->params.filter_height, esp->iomem + CONV2D_FILTER_HEIGHT_REG);
+	iowrite32be(a->params.filter_width, esp->iomem + CONV2D_FILTER_WIDTH_REG);
 	iowrite32be(a->params.is_padded, esp->iomem + CONV2D_IS_PADDED_REG);
 	iowrite32be(a->params.stride, esp->iomem + CONV2D_STRIDE_REG);
 	iowrite32be(a->params.do_relu, esp->iomem + CONV2D_DO_RELU_REG);

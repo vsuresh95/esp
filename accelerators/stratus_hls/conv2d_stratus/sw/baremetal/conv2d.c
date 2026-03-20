@@ -87,11 +87,13 @@ static unsigned DMA_WORD_PER_BEAT(unsigned _st)
 #define DMA_RATIO 2
 
 /* <<--params-->> */
-const int32_t n_channels = 3;
-const int32_t feature_map_height = 16;
-const int32_t feature_map_width = 16;
+const int32_t n_channels = 1;
+const int32_t feature_map_height = 49;
+const int32_t feature_map_width = 10;
 const int32_t n_filters = 16;
-const int32_t filter_dim = 3;
+const int32_t filter_height = 10;
+const int32_t filter_width = 4;
+const int32_t filter_dim = filter_height;
 const int32_t pad_h = 1;
 const int32_t pad_w = 1;
 const int32_t is_padded = 1;
@@ -132,16 +134,17 @@ static unsigned mem_size;
 #define CONV2D_FEATURE_MAP_HEIGHT_REG 0x9C
 #define CONV2D_FEATURE_MAP_WIDTH_REG 0xA0
 #define CONV2D_N_FILTERS_REG 0xA4
-#define CONV2D_FILTER_DIM_REG 0xA8
-#define CONV2D_IS_PADDED_REG 0xAC
-#define CONV2D_STRIDE_REG 0xB0
-#define CONV2D_DO_RELU_REG 0xB4
-#define CONV2D_POOL_TYPE_REG 0xB8
-#define CONV2D_BATCH_SIZE_REG 0xBC
-#define CONV2D_INPUT_OFFSET_REG 0xC0
-#define CONV2D_FILTERS_OFFSET_REG 0xC4
-#define CONV2D_BIAS_OFFSET_REG 0xC8
-#define CONV2D_OUTPUT_OFFSET_REG 0xCC
+#define CONV2D_FILTER_HEIGHT_REG 0xA8
+#define CONV2D_FILTER_WIDTH_REG 0xAC
+#define CONV2D_IS_PADDED_REG 0xB0
+#define CONV2D_STRIDE_REG 0xB4
+#define CONV2D_DO_RELU_REG 0xB8
+#define CONV2D_POOL_TYPE_REG 0xBC
+#define CONV2D_BATCH_SIZE_REG 0xC0
+#define CONV2D_INPUT_OFFSET_REG 0xC4
+#define CONV2D_FILTERS_OFFSET_REG 0xC8
+#define CONV2D_BIAS_OFFSET_REG 0xCC
+#define CONV2D_OUTPUT_OFFSET_REG 0xD0
 
 static int validate_buf(token_t *out)
 {

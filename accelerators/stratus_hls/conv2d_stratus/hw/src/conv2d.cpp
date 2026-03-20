@@ -42,7 +42,8 @@ void conv2d::load_input()
     /* <<--params-->> */
     uint16_t n_channels;
     uint16_t n_filters;
-    uint4_t filter_dim;
+    uint4_t filter_height;
+    uint4_t filter_width;
     uint4_t stride;
     bool is_padded;
     uint16_t height;
@@ -68,7 +69,8 @@ void conv2d::load_input()
         /* <<--local-params-->> */
         n_channels = config.n_channels;
         n_filters = config.n_filters;
-        filter_dim = config.filter_dim;
+        filter_height = config.filter_height;
+        filter_width = config.filter_width;
         stride = config.stride;
         is_padded = config.is_padded;
         height = config.feature_map_height;
@@ -115,7 +117,7 @@ void conv2d::load_input()
     uint16_t loadable_chan_sz, chan_rem_sz;
 
     compute_dimensions(height, width, n_channels, (bool) is_padded,
-		       stride, (uint8_t) filter_dim, n_filters, pool_type, batch_size,
+		       stride, (uint8_t) filter_height, filter_width, n_filters, pool_type, batch_size,
 		       &output_w, &pad_top, &pad_bottom, &pad_left,
 			   &feature_size, &filter_size, &filters_size,
 		       &max_cacheable_rows, &max_cacheable_rows_init,
@@ -513,7 +515,8 @@ void conv2d::store_output()
     // Config
     /* <<--params-->> */
     uint16_t n_filters;
-    uint4_t filter_dim;
+    uint4_t filter_height;
+    uint4_t filter_width;
     uint4_t stride;
     uint16_t height;
     uint2_t pool_type;
@@ -535,7 +538,8 @@ void conv2d::store_output()
         // User-defined config code
         /* <<--local-params-->> */
         n_filters = config.n_filters;
-        filter_dim = config.filter_dim;
+        filter_height = config.filter_height;
+        filter_width = config.filter_width;
         stride = config.stride;
         height = config.feature_map_height;
 	pool_type = config.pool_type;
@@ -619,7 +623,7 @@ void conv2d::store_output()
 		}
 		uint16_t effective_rows = loadable_rows + top_padding + bottom_padding;
 		uint16_t output_rows_this_chunk = conv2d_chunk_output_rows(
-		    effective_rows, filter_dim, stride_log2);
+		    effective_rows, filter_height, stride_log2);
 		uint16_t output_rows_this_chunk_pool =
 		    (uint16_t) output_rows_this_chunk >> is_pool;
 		uint16_t n_words_to_store = output_rows_this_chunk_pool *
@@ -632,8 +636,16 @@ void conv2d::store_output()
 
 		this->store_compute_handshake();
 
+		if (n_words_to_store == 0) {
+			ping_output = !ping_output;
+			feature_offset_start_phys += n_words_to_store;
+			feature_offset_start_virt += n_words_to_store;
+			first_row_to_load += feature_row_incr_i;
+			continue;
+		}
+
 		// pooling step
-		for (uint16_t filter_i = 0; filter_i < cached_filters; filter_i++)
+		for (uint16_t filter_i = 0; filter_i < cached_filters && n_words_to_store != 0; filter_i++)
 		{
 		    uint32_t offset_start = out_channel_offset +
 			feature_offset_start_phys;
@@ -711,7 +723,7 @@ void conv2d::store_output()
 
 		    	    wait();
 
-		    	    sc_dt::sc_bv<DMA_WIDTH> dataBv;
+		    	    sc_dt::sc_bv<DMA_WIDTH> dataBv = 0;
 
 		    	    // Write to PLM (all DMA_WORD_PER_BEAT words in one cycle)
 		    	    if (ping_output) {
@@ -719,14 +731,18 @@ void conv2d::store_output()
 		    		INT2FP(plm_out_ping[plm_out_index]) << std::endl;
 		    		dataBv.range(31, 0) = plm_out_ping[plm_out_index++];
 #if (DMA_WORD_PER_BEAT == 2)
-		    		dataBv.range(63, 32) = plm_out_ping[plm_out_index++];
+					if (i + 1 < n_words_to_store) {
+						dataBv.range(63, 32) = plm_out_ping[plm_out_index++];
+					}
 #endif
 		    	    } else {
 		    		std::cout << "store pong " <<
 		    		INT2FP(plm_out_pong[plm_out_index]) << std::endl;
 		    		dataBv.range(31, 0) = plm_out_pong[plm_out_index++];
 #if (DMA_WORD_PER_BEAT == 2)
-		    		dataBv.range(63, 32) = plm_out_pong[plm_out_index++];
+					if (i + 1 < n_words_to_store) {
+						dataBv.range(63, 32) = plm_out_pong[plm_out_index++];
+					}
 #endif
 		    	    }
 
@@ -734,6 +750,11 @@ void conv2d::store_output()
 
 			    wait();
 		    	}
+				#if (DMA_WORD_PER_BEAT == 2)
+				if (n_words_to_store & 1) {
+					plm_out_index++;
+				}
+				#endif				
 		    }
 		    out_channel_offset += out_channel_pool_offset_incr;
 		}
@@ -788,7 +809,8 @@ void conv2d::compute_kernel()
     /* <<--params-->> */
     uint16_t n_channels;
     uint16_t n_filters;
-    uint4_t filter_dim;
+    uint4_t filter_height;
+    uint4_t filter_width;
     uint2_t stride;
     uint16_t height;
     uint16_t width;
@@ -811,7 +833,8 @@ void conv2d::compute_kernel()
         /* <<--local-params-->> */
         n_channels = config.n_channels;
         n_filters = config.n_filters;
-        filter_dim = config.filter_dim;
+        filter_height = config.filter_height;
+        filter_width = config.filter_width;
         stride = config.stride;
         height = config.feature_map_height;
         width = config.feature_map_width;
@@ -904,7 +927,7 @@ void conv2d::compute_kernel()
 		}
 		uint16_t effective_rows = loadable_rows + top_padding + bottom_padding;
 		uint16_t output_rows_this_chunk = conv2d_chunk_output_rows(
-		    effective_rows, filter_dim, stride_log2);
+		    effective_rows, filter_height, stride_log2);
 		uint16_t output_row_limit = output_rows_this_chunk <<
 		    stride_log2;
 		uint16_t output_col_limit = output_w << stride_log2;
@@ -970,10 +993,10 @@ void conv2d::compute_kernel()
 				    reg_patch[j] = INT2FP(val);
 
 				    k_c++;
-				    if (k_c == filter_dim) {
+				    if (k_c == filter_width) {
 					k_c = 0;
 					k_r++;
-					if (k_r == filter_dim)  {
+					if (k_r == filter_height)  {
 					    k_r = 0;
 					    ch++;
 					    ch_base += ch_size;

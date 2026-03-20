@@ -6,7 +6,7 @@
 
 #include <systemc.h>
 
-#define CONF_INFO_SIZE 16
+#define CONF_INFO_SIZE 18
 
 //
 // Configuration parameters for the accelerator.
@@ -23,7 +23,8 @@ public:
         /* <<--ctor-->> */
         this->n_channels = 1;
         this->n_filters = 1;
-        this->filter_dim = 1;
+        this->filter_height = 1;
+        this->filter_width = 1;
         this->stride = 1;
         this->is_padded = 1;
         this->feature_map_height = 1;
@@ -41,7 +42,8 @@ public:
         /* <<--ctor-args-->> */
         int32_t n_channels, 
         int32_t n_filters, 
-        int32_t filter_dim, 
+        int32_t filter_height, 
+        int32_t filter_width,
         int32_t stride, 
         int32_t is_padded, 
         int32_t feature_map_height, 
@@ -58,7 +60,8 @@ public:
         /* <<--ctor-custom-->> */
         this->n_channels = n_channels;
         this->n_filters = n_filters;
-        this->filter_dim = filter_dim;
+        this->filter_height = filter_height;
+        this->filter_width = filter_width;
         this->stride = stride;
         this->is_padded = is_padded;
         this->feature_map_height = feature_map_height;
@@ -78,7 +81,8 @@ public:
         /* <<--eq-->> */
         if (n_channels != rhs.n_channels) return false;
         if (n_filters != rhs.n_filters) return false;
-        if (filter_dim != rhs.filter_dim) return false;
+        if (filter_height != rhs.filter_height) return false;
+        if (filter_width != rhs.filter_width) return false;
         if (stride != rhs.stride) return false;
         if (is_padded != rhs.is_padded) return false;
         if (feature_map_height != rhs.feature_map_height) return false;
@@ -99,7 +103,8 @@ public:
         /* <<--assign-->> */
         n_channels = other.n_channels;
         n_filters = other.n_filters;
-        filter_dim = other.filter_dim;
+        filter_height = other.filter_height;
+        filter_width = other.filter_width;
         stride = other.stride;
         is_padded = other.is_padded;
         feature_map_height = other.feature_map_height;
@@ -125,7 +130,8 @@ public:
         /* <<--print-->> */
         os << "n_channels = " << conf_info.n_channels << ", ";
         os << "n_filters = " << conf_info.n_filters << ", ";
-        os << "filter_dim = " << conf_info.filter_dim << ", ";
+        os << "filter_height = " << conf_info.filter_height << ", ";
+        os << "filter_width = " << conf_info.filter_width << ", ";
         os << "stride = " << conf_info.stride << ", ";
         os << "is_padded = " << conf_info.is_padded << ", ";
         os << "feature_map_height = " << conf_info.feature_map_height << ", ";
@@ -148,18 +154,19 @@ public:
         switch (index) {
             case 0: return n_channels;
             case 1: return n_filters;
-            case 2: return filter_dim;
-            case 3: return stride;
-            case 4: return is_padded;
-            case 5: return feature_map_height;
-            case 6: return feature_map_width;
-            case 7: return do_relu;
-            case 8: return pool_type;
-            case 9: return batch_size;
-            case 10: return input_offset;
-            case 11: return filters_offset;
-            case 12: return bias_offset;
-            case 13: return output_offset;
+            case 2: return filter_height;
+            case 3: return filter_width;
+            case 4: return stride;
+            case 5: return is_padded;
+            case 6: return feature_map_height;
+            case 7: return feature_map_width;
+            case 8: return do_relu;
+            case 9: return pool_type;
+            case 10: return batch_size;
+            case 11: return input_offset;
+            case 12: return filters_offset;
+            case 13: return bias_offset;
+            case 14: return output_offset;
             default: return do_relu;
         }
     }
@@ -171,18 +178,19 @@ public:
         switch (index) {
             case 0: return n_channels;
             case 1: return n_filters;
-            case 2: return filter_dim;
-            case 3: return stride;
-            case 4: return is_padded;
-            case 5: return feature_map_height;
-            case 6: return feature_map_width;
-            case 7: return do_relu;
-            case 8: return pool_type;
-            case 9: return batch_size;
-            case 10: return input_offset;
-            case 11: return filters_offset;
-            case 12: return bias_offset;
-            case 13: return output_offset;
+            case 2: return filter_height;
+            case 3: return filter_width;
+            case 4: return stride;
+            case 5: return is_padded;
+            case 6: return feature_map_height;
+            case 7: return feature_map_width;
+            case 8: return do_relu;
+            case 9: return pool_type;
+            case 10: return batch_size;
+            case 11: return input_offset;
+            case 12: return filters_offset;
+            case 13: return bias_offset;
+            case 14: return output_offset;
             default: return do_relu;
         }
 	}
@@ -190,7 +198,8 @@ public:
         /* <<--params-->> */
         int32_t n_channels;
         int32_t n_filters;
-        int32_t filter_dim;
+        int32_t filter_height;
+        int32_t filter_width;
         int32_t stride;
         int32_t is_padded;
         int32_t feature_map_height;

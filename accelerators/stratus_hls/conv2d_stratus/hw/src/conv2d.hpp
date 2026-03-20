@@ -92,7 +92,8 @@ public:
     // Functions
     void compute_dimensions(
 	const uint16_t height, const uint16_t width, const uint16_t n_channels,
-	const bool is_padded, const uint4_t stride, const uint4_t filter_dim,
+	const bool is_padded, const uint4_t stride, const uint4_t filter_height,
+	const uint4_t filter_width,
 	const uint16_t n_filters, const uint2_t pool_type, const uint16_t batch_size,
 	uint16_t *output_w, uint4_t *pad_top, uint4_t *pad_bottom, uint4_t *pad_left,
 	uint16_t *feature_size, uint16_t *filter_size, uint32_t *filters_size, 
@@ -120,7 +121,7 @@ public:
     const uint16_t output_plm_offset, const uint16_t loadable_output_size,
     const bool do_relu);
     inline uint16_t conv2d_chunk_output_rows(const uint16_t effective_rows,
-    const uint4_t filter_dim, const uint4_t stride_log2);
+    const uint4_t filter_height, const uint4_t stride_log2);
 
     // Configuration handshakes
     inline void load_compute_cfg_handshake();
